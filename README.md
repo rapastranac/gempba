@@ -27,7 +27,7 @@
 
 ## Multithreading
 
-This is easiest environment to setup, which is in turn the fastest to implement. In general the user must modify only the main functions to be parrallised. If the algorithm uses more than a single function recursion, this can also be parallelized. 
+This is the easiest environment to setup, which is in turn the fastest to implement. In general the user must modify only the main functions to be parrallised. If the algorithm uses more than a single function recursion, this can also be parallelized. 
 
 Consider the following function with three branches per recursion. Essentially, when finding a solution, every algorithm can be reduced to a minimisation or maximisation problem. For the sake of the following example, let's assume that it is a minimisation problem.
 
