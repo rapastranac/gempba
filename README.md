@@ -246,7 +246,7 @@ void foo(MyClass instance, float f, double d){
 The above code does not change in its parallel version, the branch checking will be exactly the same.
 
 
-***GemPBA*** has a method to avoid instantiating input parameter for each branch, which is the ```bind_branch_checkIn``` method. This method, guarantees to instantiate the input arguments just before using them, thus guaranteeing to use the most up-to-date date. This avoids sending useless data to processors just to be discarded by the algorithm in the first few lines.
+***GemPBA*** has a method to avoid instantiating input parameters for each branch, which is the ```bind_branch_checkIn``` method. This method, guarantees to instantiate the input arguments just before using them, thus guaranteeing to use the most up-to-date values. This avoids sending useless data to processors just to be discarded by the algorithm in the first few lines.
 
 
 Let's optimise our reference parallel code. 
@@ -325,14 +325,14 @@ void foo(int tid, MyClass instance, float f, double d, void *parent = nullptr)
 ```
 
 
-As seen above, the ```HType``` instance wraps a lambda function, where the instantion is delegated to it, and it must return a boolean. The purpose of this lambda function is to be able to tell the library is it is worth it to invoke a branch. Then, after the instantiation withing the lambda function scope, this is verified. Since it is reading the most up-to-date values, now it is possible to use the custom verification to discard skip a branch or not. If it is worth it, then the the ```HType``` instance holde the arguments as usual and the lambda function returns ```true```. If it is not worth it, there is no need to holde arguments, and the lambda function returns ```false```.
+As seen above, the ```HType``` instance wraps a lambda function, where the instantion is delegated to it, and it must return a boolean. The purpose of this lambda function is to be able to tell the library if it is worth it to invoke a branch. Then, after the instantiation within the lambda function scope, this is verified. Since it is reading the most up-to-date values, now it is possible to use the custom verification to skip a branch or not. If it is worth it, then the ```HType``` instance holds the arguments as usual and the lambda function returns ```true```. If it is not worth it, there is no need to holds arguments, and the lambda function returns ```false```.
 
 
 Since this lambda function wraps the branch verification condition, there is no need to write it again in the main scope, since it can be simply invoked by calling the method ```evaluate_branch_checkIn()``` as shown above.
 
 
 
-This ```evaluate_branch_checkIn()``` is also evaluated internally in ***GemPBA*** so the ***DLB*** discards automatically a useless task, and skips to next branch.
+This ```evaluate_branch_checkIn()``` method is also invoked internally in ***GemPBA*** so the ***DLB*** discards automatically a useless task, and skips to next branch.
 
 
 
