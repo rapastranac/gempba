@@ -215,7 +215,7 @@ If there is no interest in parallelising a branch, it can simply be invoked as i
 If this branch is to be run sequentially, then no instance of ```GemPBA::ResultHolder``` should be created for it.
 
 
-Most of the time, the code of a branching algorithm is optimised to check if the branch is worth it to explore. What it usually happens is that the instances to be passed are compared somehow against the best solution so far, and therefore it is possible to conclude that a branch is leading to a best or worse solution.
+Most of the time, the code of a branching algorithm is optimised to check if the branch is worth it to explore. What it usually happens is that the instances to be passed are compared somehow against the best solution so far, and therefore it is possible to conclude that a branch is leading to a better or worse solution.
 
 Then, an optimised version of the our sequential algorithm would be as follows.
 
