@@ -217,7 +217,7 @@ If this branch is to be run sequentially, then no instance of ```GemPBA::ResultH
 
 Most of the time, the code of a branching algorithm is optimised to check if the branch is worth it to explore. What it usually happens is that the instances to be passed are compared somehow against the best solution so far, and therefore it is possible to conclude that a branch is leading to a better or worse solution.
 
-Then, an optimised version of the our sequential algorithm would be as follows.
+Then, an optimised version of our sequential algorithm would be as follows.
 
 
 
@@ -232,11 +232,11 @@ void foo(MyClass instance, float f, double d){
     /* intance, f and d are used to create sub instances for the
         recursions, for left, middle and right branches.
     */
-    if( /* leads to a better solution */)
+    if( /* left branch leads to a better solution */)
         foo(instance_l, f_l, d_l);
-    if( /* leads to a better solution */)
+    if( /* middle branch leads to a better solution */)
         foo(instance_m, f_m, d_m);
-    if( /* leads to a better solution */)
+    if( /* right branch leads to a better solution */)
         foo(instance_r, f_r, d_r);
 
     return;
@@ -282,7 +282,7 @@ void foo(int tid, MyClass instance, float f, double d, void *parent = nullptr)
 
     rHolder_l.bind_branch_checkIn([&]{
                                       /* arguments intantiation instance_l, f_l, d_l */
-                                      if (/* leads to a better solution */){
+                                      if (/* left branch leads to a better solution */){
                                           rHolder_l.holdArgs(instance_l, f_l, d_l);
                                           return true;
                                       }
@@ -291,7 +291,7 @@ void foo(int tid, MyClass instance, float f, double d, void *parent = nullptr)
 
     rHolder_m.bind_branch_checkIn([&]{
                                       /* arguments intantiation instance_m, f_m, d_m */
-                                      if (/* leads to a better solution */){
+                                      if (/* middle branch leads to a better solution */){
                                           rHolder_m.holdArgs(instance_m, f_m, d_m);
                                           return true;
                                       }
@@ -300,7 +300,7 @@ void foo(int tid, MyClass instance, float f, double d, void *parent = nullptr)
 
     rHolder_r.bind_branch_checkIn([&]{
                                       /* arguments intantiation instance_r, f_r, d_r */
-                                      if (/* leads to a better solution */){
+                                      if (/* right branch leads to a better solution */){
                                           rHolder_r.holdArgs(instance_r, f_r, d_r);
                                           return true;
                                       }
