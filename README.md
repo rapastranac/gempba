@@ -163,7 +163,7 @@ void foo1(MyClass instance, float f, double d){
 }
 ```
 
-Even if their function signature are different, parallelising the program would not be any different than the version presented above. We should only pay attention to match the proper arguments to the corresponding function. Which just modifying the parallel version, excluding the comment. It will result as follows.
+Parallelising the program would not be any different than the version presented above. We should only pay attention to match the proper arguments to the corresponding function. Which just modifying the parallel version, excluding the comment. It will result as follows.
 
 
  ```cpp
