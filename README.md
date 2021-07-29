@@ -240,7 +240,7 @@ void foo(MyClass instance, float f, double d){
 }
 ```
 
-The above code does not change in its parallel version, the branch checking will be exactly the same.
+The branch checking in the above code does not change in its parallel version.
 
 
 ***GemPBA*** has a method to avoid instantiating input parameters for each branch, which is the ```bind_branch_checkIn``` method. This method guarantees to instantiate the input arguments just before using them, thus guaranteeing to use the most up-to-date values. This avoids sending useless data to processors just to be discarded by the algorithm in the first few lines.
