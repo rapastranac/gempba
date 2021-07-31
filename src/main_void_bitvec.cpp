@@ -5,9 +5,9 @@
 
 #include "../include/VC_void_bitvec.hpp"
 
-#include "../include/resultholder/ResultHolder.hpp"
-#include "../include/BranchHandler.hpp"
-#include "../include/DLB_Handler.hpp"
+#include "GemPBA/Resultholder/ResultHolder.hpp"
+#include "GemPBA/BranchHandler/BranchHandler.hpp"
+#include "GemPBA/DLB/DLB_Handler.hpp"
 
 #include <chrono>
 #include <filesystem>

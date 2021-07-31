@@ -7,8 +7,8 @@
 * rapastranac@gmail.com
 */
 
-#include "VoidIntermediate.hpp"
-#include "NonVoidIntermediate.hpp"
+#include "ResultHolderIntVoid.hpp"
+#include "ResultHolderIntNonVoid.hpp"
 
 namespace GemPBA
 {
@@ -26,7 +26,7 @@ namespace GemPBA
 
 	public:
 		// default constructor, it has no parent, used for virtual roots
-		ResultHolder(DLB_Handler &dlb, int threadId) : ResultHolderInt<_Ret, void, Args...>(dlb), Base<Args...>(dlb)
+		ResultHolder(DLB_Handler &dlb, int threadId) : ResultHolderInt<_Ret, void, Args...>(dlb), ResultHolderBase<Args...>(dlb)
 		{
 			this->threadId = threadId;
 			this->id = dlb.getUniqueId();
@@ -39,7 +39,7 @@ namespace GemPBA
 			this->isVirtual = true;
 		}
 
-		ResultHolder(DLB_Handler &dlb, int threadId, void *parent) : ResultHolderInt<_Ret, void, Args...>(dlb), Base<Args...>(dlb)
+		ResultHolder(DLB_Handler &dlb, int threadId, void *parent) : ResultHolderInt<_Ret, void, Args...>(dlb), ResultHolderBase<Args...>(dlb)
 		{
 			this->threadId = threadId;
 			this->id = this->dlb.getUniqueId();

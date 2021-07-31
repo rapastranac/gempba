@@ -6,7 +6,7 @@
 
 #include "../include/VC_void_MPI.hpp"
 
-#include "../include/resultholder/ResultHolder.hpp"
+#include "../include/Resultholder/ResultHolder.hpp"
 #include "../include/BranchHandler.hpp"
 #include "../include/DLB_Handler.hpp"
 

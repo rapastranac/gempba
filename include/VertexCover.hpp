@@ -6,11 +6,11 @@
 #include <boost/archive/text_iarchive.hpp>
 
 #include "Graph.hpp"
-#include "BranchHandler.hpp"
-#include <resultholder/ResultHolder.hpp>
+#include "GemPBA/BranchHandler/BranchHandler.hpp"
+#include <GemPBA/Resultholder/ResultHolder.hpp>
 #include "util.hpp"
 #include "fmt/core.h"
-#include "DLB_Handler.hpp"
+#include "GemPBA/DLB/DLB_Handler.hpp"
 
 #include <algorithm>
 #include <filesystem>
