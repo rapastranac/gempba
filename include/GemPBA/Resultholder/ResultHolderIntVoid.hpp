@@ -7,17 +7,17 @@
 * rapastranac@gmail.com
 */
 
-#include "Base.hpp"
+#include "ResultHolderBase.hpp"
 
 namespace GemPBA
 {
     template <typename _Ret, typename... Args>
-    class ResultHolderInt<_Ret, typename std::enable_if<std::is_void<_Ret>::value>::type, Args...> : virtual public Base<Args...>
+    class ResultHolderInt<_Ret, typename std::enable_if<std::is_void<_Ret>::value>::type, Args...> : virtual public ResultHolderBase<Args...>
     {
         friend class DLB_Handler;
 
     public:
-        ResultHolderInt(DLB_Handler &dlb) : Base<Args...>(dlb) {}
+        ResultHolderInt(DLB_Handler &dlb) : ResultHolderBase<Args...>(dlb) {}
     };
 }
 #endif

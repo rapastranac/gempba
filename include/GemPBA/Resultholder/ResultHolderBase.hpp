@@ -26,7 +26,7 @@ namespace GemPBA
     class DLB_Handler;
 
     template <typename... Args>
-    class Base
+    class ResultHolderBase
     {
         friend class DLB_Handler;
 
@@ -57,7 +57,7 @@ namespace GemPBA
 #endif
 
     public:
-        Base(DLB_Handler &dlb) : dlb(dlb)
+        ResultHolderBase(DLB_Handler &dlb) : dlb(dlb)
         {
         }
 

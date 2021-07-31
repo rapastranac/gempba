@@ -9,7 +9,7 @@
 */
 #include <fmt/format.h>
 #include "args_handler.hpp"
-#include "DLB_Handler.hpp"
+#include "GemPBA/DLB/DLB_Handler.hpp"
 #include "ThreadPool.hpp"
 
 #ifdef MPI_ENABLED
