@@ -23,7 +23,7 @@
 
 #include <unistd.h>
 
-int main_void_MPI_bitvec(int numThreads, int prob, std::string filename)
+int main_void_MPI_bitvec(int numThreads, int prob, std::string &filename)
 {
 
 	auto &branchHandler = GemPBA::BranchHandler::getInstance(); // parallel library

@@ -88,7 +88,7 @@ void foo(int id, int depth, float treeIdx, void *parent)
 		branchHandler.forward<void>(foo, id, hol_r);
 }
 
-int main_void_MPI(int numThreads, int prob, std::string filename)
+int main_void_MPI(int numThreads, int prob, std::string &filename)
 {
 	//using HolderType = GemPBA::ResultHolder<void, int, Graph>;
 

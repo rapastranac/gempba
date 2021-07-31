@@ -741,15 +741,14 @@ public:
 		adj[v].insert(u);
 	}
 
-	void readEdges(string &NameOfFile)
+	void readEdges(string NameOfFile)
 	{
 
 		std::ifstream file(NameOfFile);
 
 		if (!file.is_open())
 		{
-			printf("Input file not found");
-			throw "Input file not found";
+			throw std::runtime_error("Input file not found\n");
 		}
 
 		int u, v;
@@ -1043,7 +1042,8 @@ public:
 		size_t MAX = max;
 		size_t edges_p = numEdges;
 
-		auto findMax = [&adj_cpy]() {
+		auto findMax = [&adj_cpy]()
+		{
 			int max = 0;
 
 			for (auto &[key, val] : adj_cpy)
@@ -1096,7 +1096,8 @@ public:
 
 		size_t edges_p = numEdges;
 
-		auto findMaxVertex = [&adj_cpy]() {
+		auto findMaxVertex = [&adj_cpy]()
+		{
 			int maxdeg_v = adj_cpy.begin()->second.size();
 
 			for (auto &[key, val] : adj_cpy)

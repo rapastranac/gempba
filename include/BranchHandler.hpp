@@ -219,15 +219,15 @@ namespace GemPBA
 					if (upperHolder->isTreated())
 						throw std::runtime_error("Attempt to push a treated holder\n");
 
-					if (upperHolder->evaluate_branch_checkIn())
+					if (upperHolder->evaluate_branch_checkIn()) // checks if it's worth it to push
 					{
 						this->numThreadRequests++;
 						upperHolder->setPushStatus();
 						std::args_handler::unpack_and_push_void(*thread_pool, f, upperHolder->getArgs());
 					}
-					else // checks if it's worth it to push
+					else // discard otherwise
 					{
-						upperHolder->setDiscard(); // discard otherwise
+						upperHolder->setDiscard();
 					}
 					return true; // top holder found whether discarded or pushed
 				}
