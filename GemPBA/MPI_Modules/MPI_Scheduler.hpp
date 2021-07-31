@@ -3,7 +3,7 @@
 #define MPI_SCHEDULER_HPP
 
 #include "Tree.hpp"
-#include "../include/Queue.hpp"
+#include "Utils/Queue.hpp"
 #include <algorithm>
 #include <condition_variable>
 #include <cstring>

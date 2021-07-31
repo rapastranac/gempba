@@ -5,7 +5,7 @@
 #ifndef OMP_THREADPOOL_H
 #define OMP_THREADPOOL_H
 
-#include "Queue.hpp"
+#include "Utils/Queue.hpp"
 
 #include <any>
 #include <atomic>
