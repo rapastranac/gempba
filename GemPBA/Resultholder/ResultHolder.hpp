@@ -13,8 +13,8 @@
 namespace GemPBA
 {
 
-	template <typename _Ret, typename... Args>
-	class ResultHolder : public ResultHolderInt<_Ret, void, Args...>
+	template <typename Ret, typename... Args>
+	class ResultHolder : public ResultHolderInt<Ret, void, Args...>
 	{
 		friend class DLB_Handler;
 
@@ -26,7 +26,7 @@ namespace GemPBA
 
 	public:
 		// default constructor, it has no parent, used for virtual roots
-		ResultHolder(DLB_Handler &dlb, int threadId) : ResultHolderInt<_Ret, void, Args...>(dlb), ResultHolderBase<Args...>(dlb)
+		ResultHolder(DLB_Handler &dlb, int threadId) : ResultHolderInt<Ret, void, Args...>(dlb), ResultHolderBase<Args...>(dlb)
 		{
 			this->threadId = threadId;
 			this->id = dlb.getUniqueId();
@@ -39,7 +39,7 @@ namespace GemPBA
 			this->isVirtual = true;
 		}
 
-		ResultHolder(DLB_Handler &dlb, int threadId, void *parent) : ResultHolderInt<_Ret, void, Args...>(dlb), ResultHolderBase<Args...>(dlb)
+		ResultHolder(DLB_Handler &dlb, int threadId, void *parent) : ResultHolderInt<Ret, void, Args...>(dlb), ResultHolderBase<Args...>(dlb)
 		{
 			this->threadId = threadId;
 			this->id = this->dlb.getUniqueId();

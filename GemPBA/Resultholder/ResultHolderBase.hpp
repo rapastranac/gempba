@@ -141,8 +141,6 @@ namespace GemPBA
         void bind_branch_checkIn(F &&branch_checkIn)
         {
             this->branch_checkIn = std::bind(std::forward<F>(branch_checkIn));
-            size_t size = sizeof(this->branch_checkIn);
-            return;
         }
 
         /* this should be invoked always before calling a branch, since 

@@ -101,15 +101,13 @@ namespace GemPBA
             else
                 return nullptr; // there is no parent
 
-            //#ifdef DEBUG_COMMENTS
-            //            fmt::print("rank {}, likely to get an upperHolder \n", -1);
-            //#endif
+            /*
+            #ifdef DEBUG_COMMENTS
+            fmt::print("rank {}, likely to get an upperHolder \n", -1);
             int N_children = root->children.size();
+            fmt::print("rank {}, root->children.size() = {} \n", -1, N_children);
 
-            //#ifdef DEBUG_COMMENTS
-            //            fmt::print("rank {}, root->children.size() = {} \n", -1, N_children);
-            //#endif
-
+            #endif  */
             /*Here below, we check is left child was pushed to pool, then the pointer to parent is pruned
 							 parent
 						  /  |  \   \  \
