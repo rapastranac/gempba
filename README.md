@@ -26,11 +26,12 @@
     <br /> 
  
  - *MPI Scheduler:*
-    This additional module is in charge of establishing inter-process communication using a lightweight semi-centralised topology. If multiprocessing parallelism is of the user's interest, then this module must be used and passed to the Branch Handler, which is the one in charge of controlling the parallelisation.
+    This additional module is in charge of establishing inter-process communication using a lightweight semi-centralised topology. If multiprocessing parallelism is of the user's interest, then this module must be used and passed to the Branch Handler just after its initialisation,
     
 
 <br /> 
 <br />
+
 ## Multithreading
 
 This is the easiest environment to setup, which is in turn the fastest to implement. In general the user must modify only the main functions to be parallelised. If the algorithm uses more than a single function recursion, this can also be parallelised.
