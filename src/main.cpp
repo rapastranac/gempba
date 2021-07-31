@@ -1,7 +1,7 @@
 #include "../include/main.h"
 #include "fmt/format.h"
 
-#include "argsparse/argparse.hpp"
+#include <argparse.hpp>
 
 #include <iostream>
 

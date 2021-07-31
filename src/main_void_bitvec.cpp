@@ -5,20 +5,13 @@
 
 #include "../include/VC_void_bitvec.hpp"
 
-#include "GemPBA/Resultholder/ResultHolder.hpp"
-#include "GemPBA/BranchHandler/BranchHandler.hpp"
-#include "GemPBA/DLB/DLB_Handler.hpp"
+#include <Resultholder/ResultHolder.hpp>
+#include <BranchHandler/BranchHandler.hpp>
+#include <DLB/DLB_Handler.hpp>
 
-#include <chrono>
-#include <filesystem>
-#include <fstream>
 #include <iostream>
-
 #include <istream>
-#include <sstream>
-#include <iterator>
 #include <string>
-#include <vector>
 
 #include <unistd.h>
 

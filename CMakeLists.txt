@@ -40,8 +40,8 @@ add_compile_options("-g" "-Wall" "-Wpedantic" "-Wextra" "-fexceptions" "-pthread
 set( CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} )
 
 include_directories("include")
-include_directories("include/GemPBA")
-include_directories("cereal" )
+include_directories("GemPBA")
+include_directories("argsparse" )
 include_directories("fmt/include" )
 
 file(GLOB Sources "src/*.cpp")
