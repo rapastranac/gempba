@@ -377,7 +377,7 @@ If the environment has been properly setup for multiprocessing, the center proce
 - invoke the ``` mpiScheduler.runCenter(buffer.data(),buffer.size()) ``` to passed the raw data buffer ```char[]```.
 
 
-
+<br /> 
 
 All other processes will do the following steps:
 
@@ -390,7 +390,7 @@ All other processes will do the following steps:
 - Initialise the ```resultFetcher```. This instance will fetch the result from the *branch handler* the process has ended all its tasks, and it will send it back to the corresponding process. This *result fetcher* is usually invoked when the center has notified termination to all the processes. However, it is aimed to be used for non-void functions, when this result must be returned to another process different from the center.
 - invoke ```mpiScheduler.runNode(branchHandler, bufferDecoder, resultFetcher, serializer)```
 
-
+<br /> 
 These functions are synchronised such that no process ends until all of them have properly finished their duties.
 
 After doing this, if the user wants to fetch the solution. It should invoke from the center process:
