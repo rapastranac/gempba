@@ -26,6 +26,7 @@
     <br /> 
  
  - *MPI Scheduler:*
+
     This additional module is in charge of establishing inter-process communication using a lightweight semi-centralised topology. If multiprocessing parallelism is of the user's interest, then this module must be used and passed to the Branch Handler just after its initialisation,
     
 
