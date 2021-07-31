@@ -369,8 +369,8 @@ When executing the aforementioned command, it will launch *N* copies of the prog
 If the environment has been properly setup for multiprocessing, the center process (rank 0) will do the following steps:
 
 - initialise:
-    - BranchHandler();
-    - MPIScheduler();
+  - BranchHandler();
+  - MPIScheduler();
 - read input data
 - build arguments that will be passed to the function that we want to parallelise.
 - serialise these arguments to create a string data buffer. ```std::string```
