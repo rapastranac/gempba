@@ -6,24 +6,28 @@
 
  **GemPBA** will allow you to perform parallelism using a multithreading or multiprocessing environment. It also contains a robust ***Dynamic Load Balancing*** (DLB) that significantly decreases the CPU idle time, which also increases performance due to the reduction of parallel calls in branching algorithms.
 
-**GemPBA** has three main modules that help you easily understand its applications.
+**GemPBA** has four main modules that help you easily understand its applications.
 
- - *BranchHandler:*
+ - *Branch Handler:*
 
     This module is in charge of handling tasks among the processors, whether multithreading or multiprocessing is being used. It manages a thread pool, for which the user can allocate the number of threads he needs, yet it is recommended to allocate them according to the number of physical cores in your machine.
 
     It essentially finds the first available processor in the thread pool, or in a remote participating machine.
     <br /> 
 
- - *ResultHolder:*
+ - *Result Holder:*
  
     In order to keep track of the arguments such that they can be properly managed by the library. The function signature must be slightly modified to include two additional parameters, one as the first, and other as the last one. This modification will be explained later.
     <br /> 
  
- - *DLB_Handler:*
+ - *Dynamic Load Balancing Handler:*
 
     Since recursive functions create a stack, the *DLB* instance has access to all the generated tasks at each level of it by the means of the *ResultHolder* instances. Thus, when creating an instance of the *ResultHolder*, the *Dynamic Load Balancer* must be passed in the constructor.
-
+    <br /> 
+ 
+ - *MPI Scheduler:*
+    This additional module is in charge of establishing inter-process communication using a lightweight semi-centralised topology. If multiprocessing parallelism is of the user's interest, then this module must be used and passed to the Branch Handler, which is the one in charge of controlling the parallelisation.
+    
 
 <br /> 
 <br />
