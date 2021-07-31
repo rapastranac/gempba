@@ -185,7 +185,7 @@ namespace GemPBA
 
 		/*	This method is thread safe:
 			
-			- returns false if there exist already a better value, this better value is copied
+			- returns false if there exists already a better value, this better value is copied
 				to the second parameter mostUpToDate if provided by reference
 
 			- return true if successfuly updated*/
