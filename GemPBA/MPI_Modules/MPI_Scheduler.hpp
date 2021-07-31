@@ -210,8 +210,10 @@ namespace GemPBA
 				delete holder;
 				delete[] message;
 			}
-
-			// TODO.. send result
+			/**
+             * TODO.. send results to the rank the task was sent from
+             * this applies only when parallelising non-void functions
+             */
 
 			sendSolution(resultFetcher);
 		}
@@ -493,9 +495,7 @@ namespace GemPBA
 			}
 		}
 
-		/*	given a rank ID, this method returns its child
-            TODO .. adapt it for multi-branching
-        */
+		// already adapted for multibranching
 		int getNextProcess(int j, int pi, int b, int depth)
 		{
 			return (j * pow(b, depth)) + pi;
