@@ -22,7 +22,7 @@
 
 #include <unistd.h>
 
-int main_void_bitvec(int numThreads, int prob, std::string filename)
+int main_void_bitvec(int numThreads, int prob, std::string& filename)
 {
 	using HolderType = GemPBA::ResultHolder<void, int, gbitset, int>;
 

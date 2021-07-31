@@ -20,7 +20,7 @@
 #include <string>
 #include <vector>
 
-int main_non_void_MPI(int numThreads, int prob, std::string filename)
+int main_non_void_MPI(int numThreads, int prob, std::string &filename)
 {
 	using HolderType = GemPBA::ResultHolder<Graph, int, Graph>;
 

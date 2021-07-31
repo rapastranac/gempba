@@ -293,13 +293,36 @@ namespace GemPBA
             /* this method is invoked when DLB_Handler is enabled and the method find_top_holder() was not able to find
 		a top branch to push, because it means the next right sibling will become a root(for binary recursion)
 		or just the leftMost will be unlisted from the parent's children. This method is invoked if and only if 
-		a thread is available*/
+		a thread is available
+
+        In this scenario, the root does not change
+
+                    parent == root          (potentially virtual)
+                         /    \    \
+                        /      \      \
+                       /        \        \
+                    left        next     right
+                (pushed or
+                sequential)
+
+
+        In the following scenario the remaining right child becomes the root, because the right child was pushed
+        
+                    parent == root          (potentially virtual)
+                         /    \
+                        /      \
+                       /        \
+                    left        right
+                (pushed or      (new root)
+                sequential)
+
+        */
             auto *_parent = holder->parent;
             if (_parent)                          // it should always comply, virtual parent is being created
             {                                     // it also confirms that holder is not a parent (applies for DLB_Handler)
                 if (_parent->children.size() > 2) // this is for more than two recursions per scope
                 {
-                    //TODO ..
+                    _parent->children.pop_front();
                 }
                 else if (_parent->children.size() == 2) // this verifies that  it's binary and the rightMost will become a new root
                 {

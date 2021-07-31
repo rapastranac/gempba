@@ -19,7 +19,7 @@
 #include <string>
 #include <vector>
 
-int main_non_void(int numThreads,int prob, std::string filename)
+int main_non_void(int numThreads,int prob, std::string &filename)
 {
 	auto &handler = GemPBA::BranchHandler::getInstance(); // parallel GemPBA
 
