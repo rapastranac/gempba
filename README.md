@@ -1,5 +1,6 @@
 # Generic Massive Parallelisation of Branching Algorithms
 
+<br /> 
 
  This tool will help you parallelise almost any branching algorithm that seemed initially impossible or super complex to do. Please refer to ``` paper reference ```, for a performance report.
 
@@ -12,16 +13,20 @@
     This module is in charge of handling tasks among the processors, whether multithreading or multiprocessing is being used. It manages a thread pool, for which the user can allocate the number of threads he needs, yet it is recommended to allocate them according to the number of physical cores in your machine.
 
     It essentially finds the first available processor in the thread pool, or in a remote participating machine.
+    <br /> 
 
  - *ResultHolder:*
  
     In order to keep track of the arguments such that they can be properly managed by the library. The function signature must be slightly modified to include two additional parameters, one as the first, and other as the last one. This modification will be explained later.
+    <br /> 
  
  - *DLB_Handler:*
 
     Since recursive functions create a stack, the *DLB* instance has access to all the generated tasks at each level of it by the means of the *ResultHolder* instances. Thus, when creating an instance of the *ResultHolder*, the *Dynamic Load Balancer* must be passed in the constructor.
 
 
+<br /> 
+<br />
 ## Multithreading
 
 This is the easiest environment to setup, which is in turn the fastest to implement. In general the user must modify only the main functions to be parallelised. If the algorithm uses more than a single function recursion, this can also be parallelised.
@@ -48,9 +53,14 @@ void foo(MyClass instance, float f, double d){
 ```
 
 In order to parallelise the previous code, the function signature should change like this.
+<br /> 
+
 ```cpp
 void foo(int tid, MyClass instance, float f, double d, void *parent = nullptr);
 ```
+
+<br />
+
  Where ```tid``` stands for thread ID and ```parent``` is designed to used the *Novel Dynamic Load Balancing*.
 
  These additional arguments are to be used by the library only, yet the user could also use them to track like threads utilization and other scenarios that it might find applicable.
@@ -137,6 +147,9 @@ void foo(int tid, MyClass instance, float f, double d, void *parent = nullptr)
 }
 ```
 
+<br /> 
+<br />
+
 As seen above, the parallelisation of this algorithm is straightforward once the library is well managed. It is worth highlighting that input arguments must be ready before any branch calling, since down this branch, the ```DLB``` might try to call a sibling branch at this level, and it will receive only empty data. This might introduce some unnecessary memory utilization. Also, instantiating an input parameter will lead to passing outdated arguments to the functions that may be discarded just after invoking the function. This can be minimised by other available techniques discussed later.
 
 Let's imagine that there are three functions ```foo1, foo2, foo3```, and they call each other recursively. Like the following snippet.
@@ -161,7 +174,8 @@ void foo1(MyClass instance, float f, double d){
 ```
 
 Parallelising the program would not be any different than the version presented above. We should only pay attention to match the proper arguments to the corresponding function. Which just modifies the parallel version, excluding the comment. It will result as follows.
-
+<br /> 
+<br />
 
  ```cpp
 std::mutex mtx;
@@ -247,7 +261,8 @@ The branch checking in the above code does not change in its parallel version.
 
 
 Let's optimise our reference parallel code. 
-
+<br /> 
+<br />
 
  ```cpp
 std::mutex mtx;
@@ -330,7 +345,8 @@ Since this lambda function wraps the branch verification condition, there is no 
 
 This ```evaluate_branch_checkIn()``` method is also invoked internally in ***GemPBA*** so the ***DLB*** discards automatically a useless task, and skips to the next branch.
 
-
+<br /> 
+<br />
 
 ## Multiprocessing
 
@@ -567,7 +583,8 @@ int main(){
 }
 ```
 
-
+<br /> 
+<br />
 - #### Multiprocessing main.cpp
 
 ```cpp
@@ -621,3 +638,94 @@ int main(){
         
 }
 ```
+<br /> 
+<br />
+<br /> 
+<br />
+
+Hence, the code modifications to convert the Multithreading function to Multiprocessing are minors. As presented below.
+
+<br /> 
+
+
+ ```cpp
+std::mutex mtx;
+auto &dlb = GemPBA::DLB_Handler::getInstance();
+auto &branchHandler = GemPBA::BranchHandler::getInstance();
+using HType = GemPBA::ResultHolder<void, MyClass, float, double>;
+
+void foo(int tid, MyClass instance, float f, double d, void *parent = nullptr)
+
+    if (localSolution < branchHandler.refValue()){
+        std::scoped_lock<std::mutex> lock(mtx); 
+        branchHandler.holdSolution(localSolution.size(), localSolution, serializer);
+        branchHandler.updateRefValue(localSolution.size());
+        
+        return;
+    }
+
+    HType *dummyParent = nullptr;
+    HType rHolder_l(dlb, tid, parent);
+    HType rHolder_m(dlb, tid, parent);
+    HType rHolder_r(dlb, tid, parent);
+
+    if (!parent){
+        dummyParent = new HolderType(dlb, id);
+        dlb.linkVirtualRoot(id, dummyParent, rHolder_l, rHolder_m,rHolder_r);
+    }
+    
+
+    rHolder_l.bind_branch_checkIn([&]{
+                                      /* arguments intantiation instance_l, f_l, d_l */
+                                      if (/* left branch leads to a better solution */){
+                                          rHolder_l.holdArgs(instance_l, f_l, d_l);
+                                          return true;
+                                      }
+                                      else { return false;}                                          
+                                  });
+
+    rHolder_m.bind_branch_checkIn([&]{
+                                      /* arguments intantiation instance_m, f_m, d_m */
+                                      if (/* middle branch leads to a better solution */){
+                                          rHolder_m.holdArgs(instance_m, f_m, d_m);
+                                          return true;
+                                      }
+                                      else { return false;}                                          
+                                  });
+
+    rHolder_r.bind_branch_checkIn([&]{
+                                      /* arguments intantiation instance_r, f_r, d_r */
+                                      if (/* right branch leads to a better solution */){
+                                          rHolder_r.holdArgs(instance_r, f_r, d_r);
+                                          return true;
+                                      }
+                                      else { return false;}                                          
+                                  });
+
+    if (rHolder_l.evaluate_branch_checkIn()){
+        branchHandler.try_push_MP<void>(foo, tid, rHolder_l, serializer);
+    }
+    if (rHolder_m.evaluate_branch_checkIn()){
+        branchHandler.try_push_MP<void>(foo, tid, rHolder_m, serializer);
+    }
+    if (rHolder_r.evaluate_branch_checkIn()){
+        branchHandler.forward<void>(foo, id, rHolder_r);
+    }
+
+    if (dummyParent)
+            delete dummyParent;
+    
+    return;
+}
+```
+
+
+As you may have noticed, within the termination condition, the solution is captured in a serial fashion. This solution is stored in a ```std::pair<int, string>``` data type, where the integer is the reference value associated with the solution. This reference value is used by the ```MpiScheduler``` when retrieving the global solution by the means of comparing the best value so far against the solutions attained by each process.
+
+As for the parallel calls, the method ```BranchHandler::try_push_MT(...)``` is changed to ```BranchHandler::try_push_MP(..., serializer)```.
+
+This ```MT``` suffix stands for Multithreading whereas the ```MP``` suffix stands for Multiprocessing.
+
+Internally, ```try_push_MP``` will invoke the ```MpiScheduler``` to ascertain for any available processor, if none, then it will invoke ```try_push_MT``` for a local thread.
+
+```try_push_MT``` and ```try_push_MP``` return ```true``` if the asynchronous operation was succeeding, otherwise, it will continue sequentially and when it returns, it will be ```false```.
