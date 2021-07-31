@@ -425,15 +425,6 @@ private:
 		return flag;
 	}
 
-	bool _rule5(map<int16_t, set<int16_t>> &adj, int16_t &added_to_cover, int16_t k)
-	{
-		for (auto const &[v, neighbours] : adj)
-		{
-		}
-
-		return true;
-	}
-
 	void erase(map<int16_t, set<int16_t>> &adj, int16_t v)
 	{
 		try
@@ -850,7 +841,7 @@ public:
 		return adj.size();
 	}
 
-	int [[nodiscard("Number of vertices added to the cover")]] clean_graph()
+	int clean_graph()
 	{
 		int16_t added_to_cover = 0;
 		bool flag = true;
@@ -876,7 +867,7 @@ public:
 		return added_to_cover;
 	}
 
-	int [[nodiscard("Number of vertices added to the cover")]] clean_graph(int16_t k)
+	int clean_graph(int16_t k)
 	{
 		int16_t added_to_cover = 0;
 		bool flag = true;
