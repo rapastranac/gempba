@@ -2,7 +2,7 @@
 
 <br /> 
 
- This tool will help you parallelise almost any branching algorithm that seemed initially impossible or super complex to do. Please refer to ``` paper reference ```, for a performance report.
+ This tool will help you parallelise almost any branching algorithm that seemed initially impossible or super complex to do. Please refer to this [MSc. Thesis](http://hdl.handle.net/11143/18687), for a performance report.
 
  **GemPBA** will allow you to perform parallelism using a multithreading or multiprocessing environment. It also contains a robust ***Dynamic Load Balancing*** (DLB) that significantly decreases the CPU idle time, which also increases performance due to the reduction of parallel calls in branching algorithms.
 
