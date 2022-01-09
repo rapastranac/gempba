@@ -361,7 +361,7 @@ This is aimed for advanced users who might want to massively parallelise their a
 Multiprocessing can also be used within a single machine depending on the user's interests.
 
 
-***GenPMBA*** uses *openmpi* to establish interprocess communication. In order to achieve better performance, a semi-centralised topology is the core of the communication. When launching your program with *openmpi*, the next command is used in the bash.
+***GemPBA*** uses *openmpi* to establish interprocess communication. In order to achieve better performance, a semi-centralised topology is the core of the communication. When launching your program with *openmpi*, the next command is used in the bash.
 
 ```
     mpirun -n 10 --oversubscribe a.out args...
