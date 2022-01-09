@@ -557,7 +557,7 @@ int main(){
         SolType solution;
         std::stringstream ss;
         ss << buffer;   // buffer passed to a stringstream
-		deserializer(ss, solsize);
+		deserializer(ss, solution);
 
         // do something else with the solution
     }        
