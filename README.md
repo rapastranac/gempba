@@ -17,7 +17,7 @@
 
  - *Result Holder:*
  
-    In order to keep track of the arguments such that they can be properly managed by the library. The function signature must be slightly modified to include two additional parameters, one as the first, and other as the last one. This modification will be explained later.
+    In order to keep track of the arguments such that they can properly be managed by the library. The function signature must be slightly modified to include two additional parameters, one as the first, and other as the last one. This modification will be explained later.
     <br /> 
  
  - *Dynamic Load Balancing Handler:*
@@ -98,7 +98,7 @@ void foo(int tid, MyClass instance, float f, double d, void *parent = nullptr)
         /*this method stores the best reference value of the solution 
         found so far, which is usually the size of it. It is thread safe,
         and no synchronisation methods are required from the user's end
-        if the as long as holdSolution() is not invoked.*/
+        as long as holdSolution() is not invoked.*/
         branchHandler.updateRefValue(localSolution.size());
         
         return;
@@ -388,10 +388,10 @@ If the environment has been properly setup for multiprocessing, the center proce
 All other processes will do the following steps:
 
 - initialise:
-    * BranchHandler();
-    * MPIScheduler();
+  - BranchHandler();
+  - MPIScheduler();
 - read input data
-    * This is only necessary if all processes need a global copy of the initial data set. Otherwise it can be avoided.
+  - This is only necessary if all processes need a global copy of the initial data set. Otherwise it can be avoided.
 - Initialise a buffer decoder. This instance will know the data types that the received buffer is going to be converted to.
 - Initialise the ```resultFetcher```. This instance will fetch the result from the *branch handler* the process has ended all its tasks, and it will send it back to the corresponding process. This *result fetcher* is usually invoked when the center has notified termination to all the processes. However, it is aimed to be used for non-void functions, when this result must be returned to another process different from the center.
 - invoke ```mpiScheduler.runNode(branchHandler, bufferDecoder, resultFetcher, serializer)```
