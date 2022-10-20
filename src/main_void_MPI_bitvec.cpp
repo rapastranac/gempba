@@ -2,13 +2,18 @@
 
 #include "../include/main.h"
 #include "../include/Graph.hpp"
-#include "../MPI_Modules/MPI_Scheduler.hpp"
+
+#ifdef SCHEDULER_CENTRALIZED
+    #include "../GemPBA/MPI_Modules/MPI_Scheduler_Centralized.hpp"
+#else 
+    #include "../GemPBA/MPI_Modules/MPI_Scheduler.hpp"
+#endif
 
 #include "../include/VC_void_MPI_bitvec.hpp"
 
-#include "../include/resultholder/ResultHolder.hpp"
-#include "../include/BranchHandler.hpp"
-#include "../include/DLB_Handler.hpp"
+#include "../GemPBA/Resultholder/ResultHolder.hpp"
+#include "../GemPBA/BranchHandler/BranchHandler.hpp"
+#include "../GemPBA/DLB/DLB_Handler.hpp"
 
 #include <chrono>
 #include <filesystem>
@@ -27,6 +32,9 @@ int main_void_MPI_bitvec(int numThreads, int prob, std::string &filename)
 {
 
 	auto &branchHandler = GemPBA::BranchHandler::getInstance(); // parallel library
+	
+
+    //NOTE: instanciated object depends on SCHEDULER_CENTRALIZED macro
 	auto &mpiScheduler = GemPBA::MPI_Scheduler::getInstance();
 
 	int rank = mpiScheduler.rank_me();

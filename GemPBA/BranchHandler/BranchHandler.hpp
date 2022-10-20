@@ -256,8 +256,8 @@ namespace GemPBA
 					else
 					{
 						upperHolder->setDiscard();
-						// WARNING, ATTENTION, CUIDADO! : holder discarded, flagged as sent but not really sent, then priority should be realeased!!!!
-						mpiScheduler->releasePriority();
+						// WARNING, ATTENTION, CUIDADO! : holder discarded, flagged as sent but not really sent, then sending channel should be realeased!!!!
+						mpiScheduler->closeSendingChannel();
 					}
 					return true; // top holder found whether discarded or pushed
 				}
@@ -426,7 +426,7 @@ namespace GemPBA
 				std::unique_lock<std::mutex> lck(mtx_MPI, std::defer_lock);
 				if (lck.try_lock()) // if mutex acquired, other threads will jump this section
 				{
-					if (mpiScheduler->acquirePriority())
+					if (mpiScheduler->openSendingChannel())
 					{
 						auto getBuffer = [&serializer](auto &tuple)
 						{
@@ -443,7 +443,7 @@ namespace GemPBA
 							if (holder.isTreated())
 								throw std::runtime_error("Attempt to push a treated holder\n");
 
-							mpiScheduler->push(getBuffer(holder.getArgs())); // this releases priority internally
+							mpiScheduler->push(getBuffer(holder.getArgs())); // this closes sending channel internally
 							holder.setMPISent();
 							dlb.prune(&holder);
 							return true;
