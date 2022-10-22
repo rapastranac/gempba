@@ -2,7 +2,12 @@
 
 #include "../include/main.h"
 #include "../include/Graph.hpp"
+
+#ifdef SCHEDULER_CENTRALIZED
+#include "../GemPBA/MPI_Modules/MPI_Scheduler_Centralized.hpp"
+#else
 #include "../GemPBA/MPI_Modules/MPI_Scheduler.hpp"
+#endif
 
 #include "../include/VC_void_MPI_bitvec.hpp"
 
@@ -27,6 +32,8 @@ int main_void_MPI_bitvec(int numThreads, int prob, std::string &filename)
 {
 
 	auto &branchHandler = GemPBA::BranchHandler::getInstance(); // parallel library
+
+	// NOTE: instantiated object depends on SCHEDULER_CENTRALIZED macro
 	auto &mpiScheduler = GemPBA::MPI_Scheduler::getInstance();
 
 	int rank = mpiScheduler.rank_me();
@@ -38,7 +45,7 @@ int main_void_MPI_bitvec(int numThreads, int prob, std::string &filename)
 	auto function = std::bind(&VC_void_MPI_bitvec ::mvcbitset, &cover, _1, _2, _3, _4, _5); // target algorithm [all arguments]
 																							// initialize MPI and member variable linkin
 
-	/* this is run by all processes, because it is a bitvector implementation, 
+	/* this is run by all processes, because it is a bitvector implementation,
 		all processes should know the original graph ******************************************************/
 
 	Graph graph;
@@ -95,7 +102,7 @@ int main_void_MPI_bitvec(int numThreads, int prob, std::string &filename)
 	int taskSent;
 
 	if (rank != 0)
-	{ //rank 0 does not run the main function
+	{ // rank 0 does not run the main function
 		idl_tm = branchHandler.getPoolIdleTime();
 		rqst = branchHandler.number_thread_requests();
 
@@ -119,7 +126,7 @@ int main_void_MPI_bitvec(int numThreads, int prob, std::string &filename)
 
 		mpiScheduler.printStats();
 
-		//print sumation of refValGlobal
+		// print sumation of refValGlobal
 		int solsize;
 		std::stringstream ss;
 		std::string buffer = mpiScheduler.fetchSolution(); // returns a stringstream

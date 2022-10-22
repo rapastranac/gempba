@@ -35,7 +35,7 @@
 #define HAS_RESULT_TAG 13
 #define NO_RESULT_TAG 14
 
-#define TIMEOUT_TIME 20
+#define TIMEOUT_TIME 3
 
 namespace GemPBA
 {
