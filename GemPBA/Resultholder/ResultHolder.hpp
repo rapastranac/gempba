@@ -2,10 +2,10 @@
 #define RESULTHOLDER_HPP
 
 /*
-* Created by Andres Pastrana on 2019
-* pasr1602@usherbrooke.ca
-* rapastranac@gmail.com
-*/
+ * Created by Andres Pastrana on 2019
+ * pasr1602@usherbrooke.ca
+ * rapastranac@gmail.com
+ */
 
 #include "ResultHolderIntVoid.hpp"
 #include "ResultHolderIntNonVoid.hpp"
@@ -30,7 +30,7 @@ namespace GemPBA
 		{
 			this->threadId = threadId;
 			this->id = dlb.getUniqueId();
-			//this->expectedFut.reset(new std::future<_Ret>);
+			// this->expectedFut.reset(new std::future<_Ret>);
 			this->itself = this;
 
 			this->dlb.assign_root(threadId, this);

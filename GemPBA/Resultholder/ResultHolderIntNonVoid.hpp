@@ -2,10 +2,10 @@
 #define NONVOIDINTERMEDIATE_HPP
 
 /*
-* Created by Andres Pastrana on 2019
-* pasr1602@usherbrooke.ca
-* rapastranac@gmail.com
-*/
+ * Created by Andres Pastrana on 2019
+ * pasr1602@usherbrooke.ca
+ * rapastranac@gmail.com
+ */
 
 #include "ResultHolderBase.hpp"
 
@@ -59,17 +59,17 @@ namespace GemPBA
                 this->expected = this->expectedFut.get();
                 std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
                 /*If a thread comes in this scope, then it is clear that numThread
-							must be decremented in one, also it should be locked before another thread
-							changes it, since it is atomic, this operation is already well defined*/
+                            must be decremented in one, also it should be locked before another thread
+                            changes it, since it is atomic, this operation is already well defined*/
 
                 this->dlb.add_on_idle_time(begin, end);
             }
             else if (this->isMPISent)
             {
                 this->branchHandler.lock_mpi(); /* this blocks any other thread to use an MPI function since MPI_Recv is blocking
-														thus, mpi_thread_serialized is guaranteed */
+                                                        thus, mpi_thread_serialized is guaranteed */
 #ifdef DEBUG_COMMENTS
-                //printf("rank %d entered get() to retrieve from %d! \n", branchHandler.world_rank, dest_rank);
+                // printf("rank %d entered get() to retrieve from %d! \n", branchHandler.world_rank, dest_rank);
                 fmt::print("rank {} entered get() to retrieve from {}! \n", this->branchHandler.world_rank, this->dest_rank);
 #endif
 
@@ -83,7 +83,7 @@ namespace GemPBA
                 MPI_Recv(in_buffer, Bytes, MPI::CHAR, this->dest_rank, MPI::ANY_TAG, this->branchHandler.getCommunicator(), &status);
 
 #ifdef DEBUG_COMMENTS
-                //printf("rank %d received %d Bytes from %d! \n", branchHandler.world_rank, Bytes, dest_rank);
+                // printf("rank %d received %d Bytes from %d! \n", branchHandler.world_rank, Bytes, dest_rank);
                 fmt::print("rank {} received {} Bytes from {}! \n", this->branchHandler.world_rank, Bytes, this->dest_rank);
 #endif
 
@@ -101,7 +101,7 @@ namespace GemPBA
                 return temp;
             }
             /*	This condition is relevant due to some functions might return empty values
-						which are not stored in std::any types	*/
+                        which are not stored in std::any types	*/
             this->isRetrieved = true;
             return expected; // returns empty object of type _Ret,
         }

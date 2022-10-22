@@ -9,13 +9,13 @@
 #include <tuple>
 #include <utility>
 
-//This is just a GemPBA to handle arguments
+// This is just a GemPBA to handle arguments
 
 /*
-* Created by Andres Pastrana on 2019
-* pasr1602@usherbrooke.ca
-* rapastranac@gmail.com
-*/
+ * Created by Andres Pastrana on 2019
+ * pasr1602@usherbrooke.ca
+ * rapastranac@gmail.com
+ */
 
 namespace std
 {
@@ -60,7 +60,7 @@ namespace std
 		template <typename F, typename Tuple>
 		static auto unpack_and_push_non_void(ThreadPool::Pool &pool, F &&f, Tuple &t)
 		{
-			//https://stackoverflow.com/a/36656413/5248548
+			// https://stackoverflow.com/a/36656413/5248548
 			static constexpr auto size = std::tuple_size<Tuple>::value;
 			return unpack_and_push_non_void(pool, f, t, std::make_index_sequence<size>{});
 		}
@@ -79,9 +79,9 @@ namespace std
 		template <typename HOLDER, typename Function, typename Tuple>
 		static auto unpack_and_forward_non_void(Function &&f, int id, Tuple &t, HOLDER *holder)
 		{
-			//https://stackoverflow.com/a/36656413/5248548
+			// https://stackoverflow.com/a/36656413/5248548
 			static constexpr auto size = std::tuple_size<Tuple>::value;
-			//std::cout << typeid(t).name() << "\n";
+			// std::cout << typeid(t).name() << "\n";
 			return unpack_and_forward_non_void(f, id, t, holder, std::make_index_sequence<size>{});
 		}
 		/*------- This unpacks tuple before forwarding it through the function ----->end*/
@@ -101,7 +101,7 @@ namespace std
 		template <typename F, typename Tuple>
 		static constexpr decltype(auto) unpack_and_forward_void(F &&f, int id, Tuple &&t, void *holder)
 		{
-			//https://stackoverflow.com/a/36656413/5248548
+			// https://stackoverflow.com/a/36656413/5248548
 			return unpack_and_forward_void(std::forward<F>(f),
 										   std::forward<int>(id),
 										   std::forward<Tuple>(t),

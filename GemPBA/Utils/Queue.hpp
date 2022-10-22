@@ -5,11 +5,11 @@
 #include <mutex>
 #include <utility>
 
-/* 
+/*
     from https://github.com/vit-vit/CTPL
 
     thread safe queue, it stores a pointer of data such that copying data is avoided
-    Thus, to enqueue tasks, task is allocated in heap, then a pointer of it is passed 
+    Thus, to enqueue tasks, task is allocated in heap, then a pointer of it is passed
     to this queue to be retrieved later in the order it is spawned.
  */
 

@@ -19,10 +19,10 @@
 #include <omp.h>
 
 /*
-*Created by Andres Pastrana on 2020-05
-*pasr1602@usherbrooke.ca
-*rapastranac@gmail.com
-*/
+ *Created by Andres Pastrana on 2020-05
+ *pasr1602@usherbrooke.ca
+ *rapastranac@gmail.com
+ */
 
 /*
  * This pool has a fixed size during the whole execution, it's non-copyable, non-deletable, non-movable,
@@ -33,13 +33,16 @@
  * Inspired on https://github.com/vit-vit/CTPL
  * */
 
-namespace ThreadPool {
+namespace ThreadPool
+{
 
-    class Pool {
+    class Pool
+    {
     public:
         Pool() { this->init(); }
 
-        Pool(int size) {
+        Pool(int size)
+        {
             this->init();
             this->setSize(size);
         }
@@ -49,7 +52,8 @@ namespace ThreadPool {
         // number of idle threads
         size_t n_idle() { return this->nWaiting.load(); }
 
-        bool hasFinished() {
+        bool hasFinished()
+        {
             std::unique_lock<std::mutex> lck(mtx);
             if (nWaiting.load() == SIZE && q.empty())
                 return true;
@@ -62,10 +66,12 @@ namespace ThreadPool {
         // change the number of threads in the pool
         // should be called from one thread, otherwise be careful to not interleave, also with this->interrupt()
         // size must be >= 0
-        void setSize(int size) {
+        void setSize(int size)
+        {
             this->SIZE = size;
 
-            auto f = [this, size]() {
+            auto f = [this, size]()
+            {
 
 #pragma omp parallel default(shared) num_threads(size)
                 {
@@ -74,13 +80,14 @@ namespace ThreadPool {
                         printf("Number of threads spawned : %d \n", size);
                     }
                     int tid = omp_get_thread_num(); // get thread id
-                    this->run(tid);                       // run thread pool
+                    this->run(tid);                 // run thread pool
                 }                                   // leave parallel region
             };
 
             thread = std::make_unique<std::thread>(f);
             while (nWaiting.load() !=
-                   SIZE); // main thread loops until one thread in thread pool has attained waiting mode
+                   SIZE)
+                ; // main thread loops until one thread in thread pool has attained waiting mode
         }
 
         /*	when pushing recursive functions that do not require waiting for merging
@@ -89,30 +96,36 @@ namespace ThreadPool {
             the job has finished
 
         */
-        void wait() {
+        void wait()
+        {
 
             std::unique_lock<std::mutex> lck(this->mtx_wait);
-            cv_wait.wait(lck, [this]() { return exitWait && running; });
+            cv_wait.wait(lck, [this]()
+                         { return exitWait && running; });
             exitWait = false; // this allows to reuse the wait and therefore the pool
         }
 
-        [[maybe_unused]] void clear_queue() {
+        [[maybe_unused]] void clear_queue()
+        {
             std::function<void(int)> *_f;
             while (this->q.pop(_f))
                 delete _f; // empty the queue
         }
 
-        [[maybe_unused]] double idle_time() {
-            return ((double) idleTime.load() * 1.0e-9); //seconds
+        [[maybe_unused]] double idle_time()
+        {
+            return ((double)idleTime.load() * 1.0e-9); // seconds
         }
 
-        template<typename F, typename... Args>
-        auto push(F &&f, Args &&...args) -> std::future<decltype(f(0, args...))> {
+        template <typename F, typename... Args>
+        auto push(F &&f, Args &&...args) -> std::future<decltype(f(0, args...))>
+        {
             using namespace std::placeholders;
             auto pck = std::make_shared<std::packaged_task<decltype(f(0, args...))(int)>>(
-                    std::bind(std::forward<F>(f), _1, std::forward<Args>(args)...));
+                std::bind(std::forward<F>(f), _1, std::forward<Args>(args)...));
 
-            auto _f = new std::function<void(int)>([pck](int id) { (*pck)(id); });
+            auto _f = new std::function<void(int)>([pck](int id)
+                                                   { (*pck)(id); });
 
             this->q.push(_f);
             std::unique_lock<std::mutex> lock(this->mtx);
@@ -130,8 +143,10 @@ namespace ThreadPool {
 
     protected:
         // it forces interrupt even if there is some task in the queue
-        void interrupt() {
-            if (thread) {
+        void interrupt()
+        {
+            if (thread)
+            {
                 if (this->isDone || this->isInterrupted)
                     return;
 
@@ -147,18 +162,22 @@ namespace ThreadPool {
             }
         }
 
-        void add_on_idle_time(std::chrono::steady_clock::time_point begin, std::chrono::steady_clock::time_point end) {
+        void add_on_idle_time(std::chrono::steady_clock::time_point begin, std::chrono::steady_clock::time_point end)
+        {
             long long temp = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
             idleTime.fetch_add(temp, std::memory_order_relaxed);
         }
 
-        void run(int threadId) {
+        void run(int threadId)
+        {
             std::function<void(int)> *_f; // pointer to the function enqueued
             bool isPop = this->q.pop(_f); // dequeuing a function
             std::chrono::steady_clock::time_point begin;
             std::chrono::steady_clock::time_point end;
-            while (true) {
-                while (isPop) { // if there is anything in the queue
+            while (true)
+            {
+                while (isPop)
+                { // if there is anything in the queue
                     /* at return, delete the function even if an exception occurred, this
                             allows to free memory according to unique pointer rules*/
 
@@ -178,10 +197,10 @@ namespace ThreadPool {
                 notify_no_tasks();
 
                 // all threads go into sleep mode when pool is launched
-                this->cv.wait(lock, [this, &_f, &isPop]() {
+                this->cv.wait(lock, [this, &_f, &isPop]()
+                              {
                     isPop = this->q.pop(_f);
-                    return isPop || this->isDone;
-                });
+                    return isPop || this->isDone; });
                 end = std::chrono::steady_clock::now(); // time, thread wakes up
 
                 add_on_idle_time(begin, end); // this only measures the threads idle time
@@ -192,18 +211,21 @@ namespace ThreadPool {
             }
         }
 
-        void notify_no_tasks() {
+        void notify_no_tasks()
+        {
 #pragma omp critical(only_one)
             {
                 // this condition is met only when all threads are sleeping (no tasks)
-                if (nWaiting.load() == this->size() && running) {
+                if (nWaiting.load() == this->size() && running)
+                {
                     this->exitWait = true;
                     this->cv_wait.notify_one();
                 }
             }
         }
 
-        void init() {
+        void init()
+        {
             this->SIZE = 0;
             this->nWaiting = 0;
             this->isInterrupted = false;
@@ -231,4 +253,4 @@ namespace ThreadPool {
 
 } // namespace ThreadPool
 
-#endif //OMP_THREADPOOL_H
+#endif // OMP_THREADPOOL_H

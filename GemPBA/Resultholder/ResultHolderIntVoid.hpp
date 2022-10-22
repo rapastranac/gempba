@@ -2,10 +2,10 @@
 #define VOIDINTERMEDIATE_HPP
 
 /*
-* Created by Andres Pastrana on 2019
-* pasr1602@usherbrooke.ca
-* rapastranac@gmail.com
-*/
+ * Created by Andres Pastrana on 2019
+ * pasr1602@usherbrooke.ca
+ * rapastranac@gmail.com
+ */
 
 #include "ResultHolderBase.hpp"
 

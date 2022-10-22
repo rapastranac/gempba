@@ -16,10 +16,10 @@
 #include <type_traits>
 
 /*
-* Created by Andres Pastrana on 2019
-* pasr1602@usherbrooke.ca
-* rapastranac@gmail.com
-*/
+ * Created by Andres Pastrana on 2019
+ * pasr1602@usherbrooke.ca
+ * rapastranac@gmail.com
+ */
 
 namespace GemPBA
 {
@@ -89,7 +89,7 @@ namespace GemPBA
         bool isFetchable()
         {
 #ifdef MPI_ENABLED
-            //return (isPushed || isForwarded || isMPISent) && !isRetrieved;
+            // return (isPushed || isForwarded || isMPISent) && !isRetrieved;
             return false;
 #else
             return (isPushed || isForwarded) && !isRetrieved;
@@ -143,24 +143,24 @@ namespace GemPBA
             this->branch_checkIn = std::bind(std::forward<F>(branch_checkIn));
         }
 
-        /* this should be invoked always before calling a branch, since 
-			it invokes user's instructions to prepare data that will be pushed
-			If not invoked, input for a specific branch handled by ResultHolder instance
-			will be empty.
-			
-			This method allows to always have input data ready before a branch call, avoiding to
-			have data in the stack before it is actually needed.
+        /* this should be invoked always before calling a branch, since
+            it invokes user's instructions to prepare data that will be pushed
+            If not invoked, input for a specific branch handled by ResultHolder instance
+            will be empty.
 
-			Thus, the user can evaluate any condition to check if a branch call is worth it or 
-			not, while creating a temporarily a input data set. 
-			
-			If user's condition is met then this temporarily input is held by the ResultHolder::holdArgs(...)
-			and it should return true
-			If user's condition is not met, no input is held and it should return false
+            This method allows to always have input data ready before a branch call, avoiding to
+            have data in the stack before it is actually needed.
 
-			if a void function is being used, this should be a problem, since 
+            Thus, the user can evaluate any condition to check if a branch call is worth it or
+            not, while creating a temporarily a input data set.
 
-			*/
+            If user's condition is met then this temporarily input is held by the ResultHolder::holdArgs(...)
+            and it should return true
+            If user's condition is not met, no input is held and it should return false
+
+            if a void function is being used, this should be a problem, since
+
+            */
         bool evaluate_branch_checkIn()
         {
             if (isForwarded || isPushed || isDiscarded)
@@ -177,7 +177,7 @@ namespace GemPBA
         void setMPISent(bool val = true)
         {
             this->isMPISent = val;
-            //this->dest_rank = dest_rank;
+            // this->dest_rank = dest_rank;
         }
 
         void setMPISent(bool val, int dest_rank)

@@ -6,12 +6,12 @@
 #include <mutex>
 
 /*
-* Created by Andres Pastrana on 2019
-* pasr1602@usherbrooke.ca
-* rapastranac@gmail.com
-*/
+ * Created by Andres Pastrana on 2019
+ * pasr1602@usherbrooke.ca
+ * rapastranac@gmail.com
+ */
 
-/* 
+/*
 - by default every holder is a root of itself and has no parent
 
 - if a parent is passed at construction time, then a holder will have this as a parent
@@ -85,15 +85,15 @@ namespace GemPBA
                 if (holder->parent != *holder->root) // this confirms, the root isn't the parent
                 {
                     /* this condition complies if a branch has already
-					 been pushed, to ensure pushing leftMost first */
-                    root = static_cast<Holder *>(*holder->root); //no need to iterate
-                    //int tmp = root->children.size(); // this probable fix the following
+                     been pushed, to ensure pushing leftMost first */
+                    root = static_cast<Holder *>(*holder->root); // no need to iterate
+                    // int tmp = root->children.size(); // this probable fix the following
 
                     // the following is not true, it could be also the right branch
                     // Unless root is guaranteed to have at least 2 children,
                     // TODO ... verify
 
-                    leftMost = root->children.front(); //TODO ... check if branch has been pushed or forwarded
+                    leftMost = root->children.front(); // TODO ... check if branch has been pushed or forwarded
                 }
                 else
                     return nullptr; // parent == root
@@ -109,35 +109,35 @@ namespace GemPBA
 
             #endif  */
             /*Here below, we check is left child was pushed to pool, then the pointer to parent is pruned
-							 parent
-						  /  |  \   \  \
-						 /   |   \	 \	 \
-						/    |    \	  \	   \
-					  p     cb    w1  w2 ... wk
+                             parent
+                          /  |  \   \  \
+                         /   |   \	 \	 \
+                        /    |    \	  \	   \
+                      p     cb    w1  w2 ... wk
 
-			p	stands for pushed branch
-			cb	stands for current branch
-			w	stands for waiting branch, or target holder
-			Following previous diagram
-			if "p" is already pushed, it won't be part of children list of "parent", then list = {cb,w1,w2}
-			leftMost = cb
-			nextElt = w1
+            p	stands for pushed branch
+            cb	stands for current branch
+            w	stands for waiting branch, or target holder
+            Following previous diagram
+            if "p" is already pushed, it won't be part of children list of "parent", then list = {cb,w1,w2}
+            leftMost = cb
+            nextElt = w1
 
-			There will never be fewer than two elements, asuming multiple recursion per scope,
-			because as long as it remains two elements, it means than rightMost element will be pushed to pool
-			and then leftMost element will no longer need a parent, which is the first condition to explore
-			this level of the tree*/
+            There will never be fewer than two elements, asuming multiple recursion per scope,
+            because as long as it remains two elements, it means than rightMost element will be pushed to pool
+            and then leftMost element will no longer need a parent, which is the first condition to explore
+            this level of the tree*/
 
             if (root->children.size() > 2)
             {
                 /* TO BE VERIFIED
                 this condition is for multiple recursion, the diference with the one below is that
-				the root does not move after returning one of the waiting nodes,
-				say we have the following root's childen
+                the root does not move after returning one of the waiting nodes,
+                say we have the following root's childen
 
-				children =	{	cb	w1	w2	... wk}
+                children =	{	cb	w1	w2	... wk}
 
-				the goal is to push w1, which is the inmmediate right node */
+                the goal is to push w1, which is the inmmediate right node */
 
                 auto second = std::next(root->children.begin(), 1); // this is to access the 2nd element
                 auto secondHolder = *second;                        // catches the pointer of the node	<-------------------------
@@ -151,19 +151,19 @@ namespace GemPBA
                 //                fmt::print("rank {}, about to choose an upperHolder \n", -1);
                 //#endif
                 /*	this scope is meant to push right branch which was put in waiting line
-					because there was no available thread to push leftMost branch, then leftMost
-					will be the new root since after this scope right branch will have been
-					already pushed*/
+                    because there was no available thread to push leftMost branch, then leftMost
+                    will be the new root since after this scope right branch will have been
+                    already pushed*/
 
                 root->children.pop_front();             // deletes leftMost from root's children
                 Holder *right = root->children.front(); // The one to be pushed
                 root->children.clear();                 // ..
 
-                //right->prune();                         // just in case, right branch is not being sent anyway, only its data
+                // right->prune();                         // just in case, right branch is not being sent anyway, only its data
                 this->prune(right);
 
                 this->lowerRoot(*leftMost);
-                //leftMost->lowerRoot(); // it sets leftMost as the new root
+                // leftMost->lowerRoot(); // it sets leftMost as the new root
 
                 rootCorrecting(leftMost); // if leftMost has no pending branch, then root will be assigned to the next
                                           // descendant with at least two children (which is at least a pending branch),
@@ -189,39 +189,39 @@ namespace GemPBA
         {
 
             /* What does it do?. Having the following figure
-						  root == parent
-						  /  |  \   \  \
-						 /   |   \	 \	 \
-						/    |    \	  \	   \
-					  pb     cb    w1  w2 ... wk
-					  △ -->
-			pb	stands for previous branch
-			cb	stands for current branch
-			w_i	stands for waiting branch, or target holder i={1..k}
+                          root == parent
+                          /  |  \   \  \
+                         /   |   \	 \	 \
+                        /    |    \	  \	   \
+                      pb     cb    w1  w2 ... wk
+                      △ -->
+            pb	stands for previous branch
+            cb	stands for current branch
+            w_i	stands for waiting branch, or target holder i={1..k}
 
-			if pb is fully solved sequentially or w_i were pushed but there is at least
-				one w_i remaining, then thread will return to first level where the
-				parent is also the root, then leftMost child of the root should be
-				deleted of the list since it is already solved. Thus, pushing cb twice
-				is avoided because find_top_holder() pushes the second element of the children
-			*/
+            if pb is fully solved sequentially or w_i were pushed but there is at least
+                one w_i remaining, then thread will return to first level where the
+                parent is also the root, then leftMost child of the root should be
+                deleted of the list since it is already solved. Thus, pushing cb twice
+                is avoided because find_top_holder() pushes the second element of the children
+            */
 
-            if (holder->parent) //this confirms the holder is not a root
+            if (holder->parent) // this confirms the holder is not a root
             {
-                if (holder->parent == *holder->root) //this confirms that it's the first level of the root
+                if (holder->parent == *holder->root) // this confirms that it's the first level of the root
                 {
                     Holder *leftMost = holder->parent->children.front();
-                    if (leftMost != holder) //This confirms pb has already been solved
+                    if (leftMost != holder) // This confirms pb has already been solved
                     {                       /*
-						 root == parent
-						  /  |  \   \  \
-						 /   |   \	 \	 \
-						/    |    \	  \	   \
-					  pb     cb    w1  w2 ... wk
-					  		 **
-					   next conditional should always comply, there should not be required
-						* to use a loop, then this While is entitled to just a single loop. 4 testing!!
-						*/
+                         root == parent
+                          /  |  \   \  \
+                         /   |   \	 \	 \
+                        /    |    \	  \	   \
+                      pb     cb    w1  w2 ... wk
+                             **
+                       next conditional should always comply, there should not be required
+                        * to use a loop, then this While is entitled to just a single loop. 4 testing!!
+                        */
                         auto leftMost_cpy = leftMost;
                         while (leftMost != holder)
                         {
@@ -235,49 +235,49 @@ namespace GemPBA
                             return; // root does not change
 
                         /* if holder is the only remaining child from parent then this means
-						that it will have to become a new root*/
+                        that it will have to become a new root*/
 
-                        //holder->lowerRoot();
+                        // holder->lowerRoot();
                         this->lowerRoot(*holder);
 
-                        //leftMost_cpy->prune();
+                        // leftMost_cpy->prune();
                         this->prune(leftMost_cpy);
-                        //holder->parent = nullptr;
-                        //holder->prune(); //not even required, nullptr is sent
+                        // holder->parent = nullptr;
+                        // holder->prune(); //not even required, nullptr is sent
                     }
                 }
-                else if (holder->parent != *holder->root) //any other level,
+                else if (holder->parent != *holder->root) // any other level,
                 {
                     /*
-						 root != parent
-						   /|  \   \  \
-						  / |   \	 \	 \
-					solved  *    w1  w2 . wk
-					       /|
-					solved	*
-						   /|
-					solved	* parent
-						   / \
-				 solved(pb)  cb
+                         root != parent
+                           /|  \   \  \
+                          / |   \	 \	 \
+                    solved  *    w1  w2 . wk
+                           /|
+                    solved	*
+                           /|
+                    solved	* parent
+                           / \
+                 solved(pb)  cb
 
 
-					this is relevant, because eventhough the root still has some waiting nodes
-					the thread in charge of the tree might be deep down solving everything sequentially.
-					Every time a leftMost branch is solved sequentially, this one should be removed from 
-					the list to avoid failure attempts of solving a branch that has already been solved.
+                    this is relevant, because eventhough the root still has some waiting nodes
+                    the thread in charge of the tree might be deep down solving everything sequentially.
+                    Every time a leftMost branch is solved sequentially, this one should be removed from
+                    the list to avoid failure attempts of solving a branch that has already been solved.
 
-					If a thread attempts to solve an already solved branch, this will throw an error
-					because the node won't have information anymore since it has already been passed
-					*/
+                    If a thread attempts to solve an already solved branch, this will throw an error
+                    because the node won't have information anymore since it has already been passed
+                    */
 
                     Holder *leftMost = holder->parent->children.front();
-                    if (leftMost != holder) //This confirms pb has already been solved
+                    if (leftMost != holder) // This confirms pb has already been solved
                     {
                         /*this scope only deletes leftMost holder, which is already
-						* solved sequentially by here and leaves the parent with at
-						* least a child because the root still has at least a holder in
-						* the waiting list
-						*/
+                         * solved sequentially by here and leaves the parent with at
+                         * least a child because the root still has at least a holder in
+                         * the waiting list
+                         */
                         holder->parent->children.pop_front();
                     }
                 }
@@ -289,9 +289,9 @@ namespace GemPBA
         void pop_left_sibling(Holder *holder)
         {
             /* this method is invoked when DLB_Handler is enabled and the method find_top_holder() was not able to find
-		a top branch to push, because it means the next right sibling will become a root(for binary recursion)
-		or just the leftMost will be unlisted from the parent's children. This method is invoked if and only if 
-		a thread is available
+        a top branch to push, because it means the next right sibling will become a root(for binary recursion)
+        or just the leftMost will be unlisted from the parent's children. This method is invoked if and only if
+        a thread is available
 
         In this scenario, the root does not change
 
@@ -305,7 +305,7 @@ namespace GemPBA
 
 
         In the following scenario the remaining right child becomes the root, because the right child was pushed
-        
+
                     parent == root          (potentially virtual)
                          /    \
                         /      \
@@ -327,7 +327,7 @@ namespace GemPBA
                     _parent->children.pop_front();
                     auto right = _parent->children.front();
                     _parent->children.pop_front();
-                    //right->lowerRoot();
+                    // right->lowerRoot();
                     this->lowerRoot(*right);
                 }
                 else
@@ -369,7 +369,7 @@ namespace GemPBA
         template <typename Holder>
         void prune(Holder *holder)
         {
-            //holder.prune();
+            // holder.prune();
             holder->root = nullptr;
             holder->parent = nullptr;
         }
@@ -382,29 +382,29 @@ namespace GemPBA
         }
 
         /* this is useful because at level zero of a root, there might be multiple
-		waiting nodes, though the leftMost branch (at zero level) might be at one of 
-		the very right sub branches deep down, which means that there is a line of
-		 multiple nodes with a single child.
-		 A node with a single child means that it has already been solved and 
-		 also its siblings, because children are unlinked from their parent node
-		 when these ones are pushed or fully solved (returned) 
-		 							
-							root == parent
-						  /  |  \   \  \
-						 /   |   \	 \	 \
-						/    |    \	  \	   \
-				leftMost     w1    w2  w3 ... wk
-						\
-						 *
-						  \
-						   *
-						   	\
-						current_level
-		
-		if there are available threads, and all waiting nodes at level zero are pushed,
-		then root should lower down where it finds a node with at least two children or
-		the deepest node
-		 */
+        waiting nodes, though the leftMost branch (at zero level) might be at one of
+        the very right sub branches deep down, which means that there is a line of
+         multiple nodes with a single child.
+         A node with a single child means that it has already been solved and
+         also its siblings, because children are unlinked from their parent node
+         when these ones are pushed or fully solved (returned)
+
+                            root == parent
+                          /  |  \   \  \
+                         /   |   \	 \	 \
+                        /    |    \	  \	   \
+                leftMost     w1    w2  w3 ... wk
+                        \
+                         *
+                          \
+                           *
+                            \
+                        current_level
+
+        if there are available threads, and all waiting nodes at level zero are pushed,
+        then root should lower down where it finds a node with at least two children or
+        the deepest node
+         */
         template <typename Holder>
         void rootCorrecting(Holder *root)
         {

@@ -174,7 +174,7 @@ private:
             {
                 return _ptr->idx;
             }
-            //overload pre increment operator
+            // overload pre increment operator
             Iterator &operator++()
             {
                 _ptr = _ptr->rightSibling;

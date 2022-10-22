@@ -160,7 +160,7 @@ namespace GemPBA
 		void runNode(auto &branchHandler, auto &&bufferDecoder, auto &&resultFetcher, auto &&serializer)
 		{
 			MPI_Barrier(world_Comm);
-			//nice(18);
+			// nice(18);
 
 			while (true)
 			{
@@ -211,9 +211,9 @@ namespace GemPBA
 				delete[] message;
 			}
 			/**
-             * TODO.. send results to the rank the task was sent from
-             * this applies only when parallelising non-void functions
-             */
+			 * TODO.. send results to the rank the task was sent from
+			 * this applies only when parallelising non-void functions
+			 */
 
 			sendSolution(resultFetcher);
 		}
@@ -255,7 +255,7 @@ namespace GemPBA
 		{
 			std::string *message = nullptr;
 			bool isPop = q.pop(message);
-			//nice(18); // this method changes OS priority of current thread, it should be carefully used
+			// nice(18); // this method changes OS priority of current thread, it should be carefully used
 
 			while (true)
 			{
@@ -292,7 +292,7 @@ namespace GemPBA
 				if (!isPop && branchHandler.isDone())
 				{
 					/* by the time this thread realises that the thread pool has no more tasks,
-                        another buffer might have been pushed, which should be verified in the next line*/
+						another buffer might have been pushed, which should be verified in the next line*/
 					isPop = q.pop(message);
 
 					if (!isPop)
@@ -306,9 +306,9 @@ namespace GemPBA
 			if (!q.empty())
 				throw std::runtime_error("leaving process with a pending message\n");
 			/* to reuse the task funneling, otherwise it will exit
-            right away the second time the process receives a task*/
+			right away the second time the process receives a task*/
 
-			//nice(0);
+			// nice(0);
 		}
 
 		// checks for a ref value update from center
@@ -367,7 +367,7 @@ namespace GemPBA
 			int _refGlobal = refValueGlobal;		  // constant within this scope
 			int _refLocal = branchHandler.refValue(); // constant within this scope
 
-			//static size_t C = 0;
+			// static size_t C = 0;
 
 			if ((maximisation && _refGlobal > _refLocal) || (!maximisation && _refGlobal < _refLocal))
 			{
@@ -382,8 +382,8 @@ namespace GemPBA
 		/*	- return true is priority is acquired, false otherwise
 			- priority released automatically if a message is pushed, otherwise it should be released manually
 			- only ONE buffer will be enqueued at a time
-        	- if the taskFunneling is transmitting the buffer to another node, this method will return false
-        	- if previous conditions are met, then actual condition for pushing is evaluated next_process[0] > 0
+			- if the taskFunneling is transmitting the buffer to another node, this method will return false
+			- if previous conditions are met, then actual condition for pushing is evaluated next_process[0] > 0
 		*/
 
 		// it separates receiving buffer from the local
@@ -474,9 +474,9 @@ namespace GemPBA
 	public:
 	private:
 		/*	each nodes has an array containing its children were it is going to send tasks,
-            this method puts the rank of these nodes into the array in the order that they
-            are supposed to help the parent
-        */
+			this method puts the rank of these nodes into the array in the order that they
+			are supposed to help the parent
+		*/
 		void assignNodes()
 		{
 			// send initial topology to each process
@@ -566,7 +566,7 @@ namespace GemPBA
 						int nxt = getAvailable();
 						if (nxt > 0)
 						{
-							//put(&nxt, 1, status.MPI_SOURCE, MPI_INT, 0, win_nextProcess);
+							// put(&nxt, 1, status.MPI_SOURCE, MPI_INT, 0, win_nextProcess);
 							MPI_Send(&nxt, 1, MPI_INT, status.MPI_SOURCE, NEXT_PROCESS_TAG, nextProcess_Comm);
 							processTree[status.MPI_SOURCE].addNext(nxt);
 							processState[nxt] = STATE_ASSIGNED;
@@ -620,8 +620,8 @@ namespace GemPBA
 				case REFVAL_UPDATE_TAG:
 				{
 					/* if center reaches this point, for sure nodes have attained a better reference value
-                            or they are not up-to-date, thus it is required to broadcast it whether this value
-                            changes or not  */
+							or they are not up-to-date, thus it is required to broadcast it whether this value
+							changes or not  */
 #ifdef DEBUG_COMMENTS
 					fmt::print("center received refValue {} from rank {}\n", buffer, status.MPI_SOURCE);
 #endif
@@ -629,7 +629,7 @@ namespace GemPBA
 
 					if ((maximisation && buffer > refValueGlobal) || (!maximisation && buffer < refValueGlobal))
 					{
-						//refValueGlobal[0] = buffer;
+						// refValueGlobal[0] = buffer;
 						refValueGlobal = buffer;
 						signal = true;
 						for (int rank = 1; rank < world_size; rank++)
@@ -637,7 +637,7 @@ namespace GemPBA
 							MPI_Send(&refValueGlobal, 1, MPI_INT, rank, REFVAL_UPDATE_TAG, refValueGlobal_Comm);
 						}
 
-						//bcastPut(refValueGlobal, 1, MPI_INT, 0, win_refValueGlobal);
+						// bcastPut(refValueGlobal, 1, MPI_INT, 0, win_refValueGlobal);
 					}
 
 					if (signal)
@@ -658,9 +658,9 @@ namespace GemPBA
 			}
 
 			/*
-            after breaking the previous loop, all jobs are finished and the only remaining step
-            is notifying exit and fetching results
-            */
+			after breaking the previous loop, all jobs are finished and the only remaining step
+			is notifying exit and fetching results
+			*/
 			notifyTermination();
 
 			// receive solution from other processes
@@ -797,10 +797,10 @@ namespace GemPBA
 			MPI_Comm_rank(world_Comm, &this->world_rank);
 
 			/*if (world_size < 2)
-            {
-                fmt::print("At least two processes required !!\n");
-                MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
-            }*/
+			{
+				fmt::print("At least two processes required !!\n");
+				MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+			}*/
 		}
 
 		void allocateMPI()
@@ -851,7 +851,7 @@ namespace GemPBA
 		Queue<std::string *> q;
 		bool exit = false;
 
-		//MPI_Group world_group;		  // all ranks belong to this group
+		// MPI_Group world_group;		  // all ranks belong to this group
 		MPI_Comm refValueGlobal_Comm; // attached to win_refValueGlobal
 		MPI_Comm nextProcess_Comm;	  // attached to win_nextProcess
 		MPI_Comm world_Comm;		  // world communicator

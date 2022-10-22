@@ -3,10 +3,10 @@
 #define BRANCHHANDLER_H
 
 /*
-* Created by Andres Pastrana on 2019
-* pasr1602@usherbrooke.ca
-* rapastranac@gmail.com
-*/
+ * Created by Andres Pastrana on 2019
+ * pasr1602@usherbrooke.ca
+ * rapastranac@gmail.com
+ */
 #include <fmt/format.h>
 #include "args_handler.hpp"
 #include <DLB/DLB_Handler.hpp>
@@ -69,7 +69,7 @@ namespace GemPBA
 			return thread_pool->idle_time() / (double)processor_count;
 		}
 
-		int getPoolSize() //ParBranchHandler::getInstance().MaxThreads() = 10;
+		int getPoolSize() // ParBranchHandler::getInstance().MaxThreads() = 10;
 		{
 			return this->thread_pool->size();
 		}
@@ -89,7 +89,7 @@ namespace GemPBA
 			this->mtx.unlock();
 		}
 
-		//seconds
+		// seconds
 		double idle_time()
 		{
 			double nanoseconds = idleTime / ((double)processor_count + 1);
@@ -162,7 +162,7 @@ namespace GemPBA
 			bestSolution.reset();
 		}
 
-		/* if running in multithreading mode, best solution can directly fetch without 
+		/* if running in multithreading mode, best solution can directly fetch without
 			any deserialization
 		*/
 		template <typename RESULT_TYPE>
@@ -184,7 +184,7 @@ namespace GemPBA
 		}
 
 		/*	This method is thread safe:
-			
+
 			- returns false if there exists already a better value, this better value is copied
 				to the second parameter mostUpToDate if provided by reference
 
@@ -270,11 +270,11 @@ namespace GemPBA
 
 	public:
 		/* Asyncrhonous operation:
-		
+
 		Special care should be taken with this method, otherwise deadlocks
 		might appear.
 
-		It could be used once for the pushing the first time		
+		It could be used once for the pushing the first time
 		*/
 		template <typename _ret, typename F, typename Holder,
 				  std::enable_if_t<std::is_void_v<_ret>, int> = 0>
@@ -323,7 +323,7 @@ namespace GemPBA
 							if (holder.isTreated())
 								throw std::runtime_error("Attempt to push a treated holder\n");
 
-							//after this line, only leftMost holder should be pushed
+							// after this line, only leftMost holder should be pushed
 							this->numThreadRequests++;
 							holder.setPushStatus();
 							dlb.prune(&holder);
@@ -350,13 +350,13 @@ namespace GemPBA
 			/*This lock must be performed before checking the condition,
 			even though numThread is atomic*/
 			std::unique_lock<std::mutex> lck(mtx);
-			//if (busyThreads < thread_pool->size())
+			// if (busyThreads < thread_pool->size())
 			if (thread_pool->n_idle() > 0)
 			{
 				if (is_DLB)
 				{
-					//bool res = try_top_holder<_ret>(lck, f, holder);
-					//if (res)
+					// bool res = try_top_holder<_ret>(lck, f, holder);
+					// if (res)
 					//	return false; //if top holder found, then it should return false to keep trying
 
 					dlb.pop_left_sibling(&holder);
@@ -435,7 +435,7 @@ namespace GemPBA
 
 						if (try_top_holder(getBuffer, holder))
 						{
-							//if top holder found, then it is pushed, therefore priority is release internally
+							// if top holder found, then it is pushed, therefore priority is release internally
 							continue; // keeps iterating from root to current level
 						}
 						else // since priority is already acquired, take advantage of it to push current holder
@@ -542,8 +542,8 @@ namespace GemPBA
 			// TODO this is related to non-void function on multiprocessing mode
 			// in construction
 
-			if (holder.is_pushed() || holder.is_MPI_Sent()) //TODO.. this should be considered when using DLB_Handler and pushing to another processsI
-				return holder.get(f_deser);					//return {}; // nope, if it was pushed, then result should be retrieved in here
+			if (holder.is_pushed() || holder.is_MPI_Sent()) // TODO.. this should be considered when using DLB_Handler and pushing to another processsI
+				return holder.get(f_deser);					// return {}; // nope, if it was pushed, then result should be retrieved in here
 
 			if (is_DLB)
 				dlb.checkLeftSibling(&holder);
@@ -551,16 +551,16 @@ namespace GemPBA
 			return forward<_ret>(f, threadId, holder);
 		}
 
-		/* 	
+		/*
 			types must be passed through the brackets constructBufferDecoder<_Ret, Args...>(..), so it is
 			known at compile time.
-			
+
 			_Ret: stands for the return type of the main function
 			Args...: is the type list of original type of the function, without considering int id, and void* parent
-			
+
 			input: this method receives the main algorithm and a deserializer.
-			
-			return:  a lambda object who is in charge of receiving a raw buffer in MPI_Scheduler::runNode(...), this 
+
+			return:  a lambda object who is in charge of receiving a raw buffer in MPI_Scheduler::runNode(...), this
 			lambda object will deserialize the buffer and create a new Holder containing
 			the deserialized arguments. Lambda object will push to thread pool and it
 			will return a pointer to the holder
@@ -643,7 +643,7 @@ namespace GemPBA
 
 		unsigned int processor_count;
 		std::atomic<long long> idleTime;
-		std::mutex mtx; //local mutex
+		std::mutex mtx; // local mutex
 		std::condition_variable cv;
 		std::unique_ptr<ThreadPool::Pool> thread_pool;
 
@@ -750,7 +750,7 @@ namespace GemPBA
 #ifdef DEBUG_COMMENTS
 				fmt::print("rank {} about to reply to {}! \n", world_rank, src);
 #endif
-				std::unique_lock<std::mutex> lck(mtx_MPI); //no other thread can retrieve nor send via MPI
+				std::unique_lock<std::mutex> lck(mtx_MPI); // no other thread can retrieve nor send via MPI
 
 				std::stringstream ss;
 				serialize(ss, res);
