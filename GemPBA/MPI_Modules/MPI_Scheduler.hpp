@@ -120,7 +120,7 @@ namespace GemPBA
 				MPI_Barrier(world_Comm);
 		}
 
-		bool acquirePriority()
+		bool openSendingChannel()
 		{
 			if (mtx.try_lock()) // acquires mutex
 			{
@@ -138,7 +138,7 @@ namespace GemPBA
 		}
 
 		/* this should be invoked only if priority is acquired*/
-		void releasePriority()
+		void closeSendingChannel()
 		{
 			mtx.unlock();
 		}
@@ -247,7 +247,7 @@ namespace GemPBA
 
 			q.push(_message);
 
-			releasePriority();
+			closeSendingChannel();
 		}
 
 	private:
