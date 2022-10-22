@@ -2,13 +2,13 @@
 
 #include "../include/main.h"
 #include "../include/Graph.hpp"
-#include "../MPI_Modules/MPI_Scheduler.hpp"
+#include "../GemPBA/MPI_Modules/MPI_Scheduler.hpp"
 
 #include "../include/VC_void_MPI_bitvec.hpp"
 
-#include "../include/resultholder/ResultHolder.hpp"
-#include "../include/BranchHandler.hpp"
-#include "../include/DLB_Handler.hpp"
+#include "../GemPBA/Resultholder/ResultHolder.hpp"
+#include "../GemPBA/BranchHandler/BranchHandler.hpp"
+#include "../GemPBA/DLB/DLB_Handler.hpp"
 
 #include <chrono>
 #include <filesystem>
