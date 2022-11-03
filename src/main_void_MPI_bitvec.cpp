@@ -148,12 +148,12 @@ int main_void_MPI_bitvec(int job_id,
 		deserializer(ss, solsize);
 		fmt::print("Cover size : {} \n", solsize);
 
-		double sum = 0;
+		double global_cpu_idle_time = 0;
 		for (int i = 1; i < world_size; i++)
 		{
-			sum += idleTime[i];
+			global_cpu_idle_time += idleTime[i];
 		}
-		fmt::print("\nGlobal pool idle time: {0:.6f} seconds\n\n\n", sum);
+		fmt::print("\nGlobal cpu idle time: {0:.6f} seconds\n\n\n", global_cpu_idle_time);
 
 		// **************************************************************************
 
