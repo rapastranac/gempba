@@ -31,7 +31,8 @@ echo "Starting run at: `date`"
 #mpirun --oversubscribe -n 6 -display-map --bind-to none --map-by core --report-bindings ./a.out -N 1 -I input/prob_4/600/00600_1
 
 #binding
-mpirun -n 6 -display-map --bind-to core --map-by numa:PE=1 --report-bindings ./a.out -N 2 -I input/prob_4/600/00600_1
+#mpirun -n 6 -display-map --bind-to core --map-by numa:PE=1 --report-bindings ./a.out -N 1 -I input/prob_4/600/00600_1
+mpirun  -n 6 -display-map --bind-to core --map-by numa:PE=1 --report-bindings ./a.out -job_id 5 -nodes 4 -ntasks_per_node 3 -ntasks_per_socket 2 -cpus_per_task 1 -N 2 -I input/prob_4/100/00100_1
 #mpirun -n 3 -host manager:2,node1:1 -display-map --bind-to core --map-by numa:PE=3 --report-bindings ./a.out -N 3 -I input/prob_4/600/00600_1
 
 

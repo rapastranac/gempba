@@ -85,6 +85,11 @@ namespace GemPBA
 			fmt::print("\n \n \n");
 		}
 
+		double getTotalRequests()
+		{
+			return totalRequests;
+		}
+
 		double elapsedTime()
 		{
 			return (end_time - start_time) - static_cast<double>(TIMEOUT_TIME);

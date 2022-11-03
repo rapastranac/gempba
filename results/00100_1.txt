@@ -1,0 +1,30 @@
+job id:	5
+nodes:	4
+ntasks-per-node:	3
+ntasks-per-socket:	2
+cpus-per-task:	1
+graph size:		101
+cover size:		54
+process requests:		3
+thread requests:		25
+elapsed time:		0.00104151
+cpu idle time (global):	0.0108137
+wall idle time (global):	0.00180228
+
+tasks sent by rank 1:	1
+tasks sent by rank 2:	1
+tasks sent by rank 3:	0
+tasks sent by rank 4:	0
+tasks sent by rank 5:	0
+
+tasks received by rank 1:	1
+tasks received by rank 2:	1
+tasks received by rank 3:	0
+tasks received by rank 4:	1
+tasks received by rank 5:	0
+
+rank 1, thread requests:	7
+rank 2, thread requests:	18
+rank 3, thread requests:	0
+rank 4, thread requests:	0
+rank 5, thread requests:	0
