@@ -168,10 +168,13 @@ int main_void_MPI_bitvec(int job_id,
 			fmt::print("tasks received by rank {} = {} \n", rank, nTasksRecvd[rank]);
 		}
 		fmt::print("\n");
-
+		size_t totalThreadRequests = 0;
 		for (int rank = 1; rank < world_size; rank++)
 		{
-			fmt::print("rank {}, thread requests: {} \n", rank, threadRequests[rank]);
+			size_t rank_thread_requests = threadRequests[rank];
+			totalThreadRequests += rank_thread_requests;
+
+			fmt::print("rank {}, thread requests: {} \n", rank, rank_thread_requests);
 		}
 
 		fmt::print("\n\n\n");
