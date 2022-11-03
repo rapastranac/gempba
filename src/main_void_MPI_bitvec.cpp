@@ -23,7 +23,14 @@
 
 #include <unistd.h>
 
-int main_void_MPI_bitvec(int numThreads, int prob, std::string &filename)
+int main_void_MPI_bitvec(int job_id,
+						 int nodes,
+						 int ntasks_per_node,
+						 int ntasks_per_socket,
+						 int cpus_per_task,
+						 int numThreads,
+						 int prob,
+						 std::string &filename_directory)
 {
 
 	auto &branchHandler = GemPBA::BranchHandler::getInstance(); // parallel library
@@ -38,13 +45,13 @@ int main_void_MPI_bitvec(int numThreads, int prob, std::string &filename)
 	auto function = std::bind(&VC_void_MPI_bitvec ::mvcbitset, &cover, _1, _2, _3, _4, _5); // target algorithm [all arguments]
 																							// initialize MPI and member variable linkin
 
-	/* this is run by all processes, because it is a bitvector implementation, 
+	/* this is run by all processes, because it is a bitvector implementation,
 		all processes should know the original graph ******************************************************/
 
 	Graph graph;
-	graph.readEdges(filename);
+	graph.readEdges(filename_directory);
 
-	cover.init(graph, numThreads, filename, prob);
+	cover.init(graph, numThreads, filename_directory, prob);
 	cover.setGraph(graph);
 
 	int gsize = graph.adj.size() + 1; //+1 cuz some files use node ids from 1 to n (instead of 0 to n - 1)
@@ -95,7 +102,7 @@ int main_void_MPI_bitvec(int numThreads, int prob, std::string &filename)
 	int taskSent;
 
 	if (rank != 0)
-	{ //rank 0 does not run the main function
+	{ // rank 0 does not run the main function
 		idl_tm = branchHandler.getPoolIdleTime();
 		rqst = branchHandler.number_thread_requests();
 
@@ -119,7 +126,7 @@ int main_void_MPI_bitvec(int numThreads, int prob, std::string &filename)
 
 		mpiScheduler.printStats();
 
-		//print sumation of refValGlobal
+		// print sumation of refValGlobal
 		int solsize;
 		std::stringstream ss;
 		std::string buffer = mpiScheduler.fetchSolution(); // returns a stringstream
