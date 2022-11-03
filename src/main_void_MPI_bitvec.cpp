@@ -28,7 +28,14 @@
 
 #include <unistd.h>
 
-int main_void_MPI_bitvec(int numThreads, int prob, std::string &filename)
+int main_void_MPI_bitvec(int job_id,
+						 int nodes,
+						 int ntasks_per_node,
+						 int ntasks_per_socket,
+						 int cpus_per_task,
+						 int numThreads,
+						 int prob,
+						 std::string &filename_directory)
 {
 
 	auto &branchHandler = GemPBA::BranchHandler::getInstance(); // parallel library
@@ -49,9 +56,9 @@ int main_void_MPI_bitvec(int numThreads, int prob, std::string &filename)
 		all processes should know the original graph ******************************************************/
 
 	Graph graph;
-	graph.readEdges(filename);
+	graph.readEdges(filename_directory);
 
-	cover.init(graph, numThreads, filename, prob);
+	cover.init(graph, numThreads, filename_directory, prob);
 	cover.setGraph(graph);
 
 	int gsize = graph.adj.size() + 1; //+1 cuz some files use node ids from 1 to n (instead of 0 to n - 1)

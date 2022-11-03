@@ -97,7 +97,8 @@ int main(int argc, char *argv[])
 #elif VC_NON_VOID_MPI
 	return main_non_void_MPI(numThreads, prob, filename);
 #elif BITVECTOR_VC
-	return main_void_MPI_bitvec(numThreads, prob, filename);
+	return main_void_MPI_bitvec(job_id, nodes, ntasks_per_node, ntasks_per_socket,
+								cpus_per_task, numThreads, prob, filename);
 #elif BITVECTOR_VC_THREAD
 	return main_void_bitvec(numThreads, prob, filename);
 #endif
