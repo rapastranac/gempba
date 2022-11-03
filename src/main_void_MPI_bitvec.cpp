@@ -70,13 +70,18 @@ int main_void_MPI_bitvec(int job_id,
 
 	int zero = 0;
 	int solsize = graph.size();
-	cout << "solsize=" << solsize << endl;
+	std::cout << "solsize=" << solsize << endl;
+	mpiScheduler.barrier();
 	std::string buffer = serializer(zero, allones, zero);
 
 	std::cout << "Starting MPI node " << branchHandler.rank_me() << std::endl;
 
+	mpiScheduler.barrier();
+
 	int pid = getpid();									   // for debugging purposes
 	fmt::print("rank {} is process ID : {}\n", rank, pid); // for debugging purposes
+
+	mpiScheduler.barrier();
 
 	if (rank == 0)
 	{
