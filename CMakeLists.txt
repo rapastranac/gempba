@@ -7,8 +7,8 @@ set(CMAKE_CXX_STANDARD 20)
 find_package(OpenMP REQUIRED)
 find_package(Threads  REQUIRED)
 find_package(MPI  REQUIRED)
-#find_package(Boost  COMPONENTS system serialization fiber REQUIRED)
-find_package(Boost)
+find_package(Boost  COMPONENTS system serialization fiber REQUIRED)
+#find_package(Boost)
 
 include_directories(${MPI_INCLUDE_PATH})
 

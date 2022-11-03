@@ -426,8 +426,11 @@ public:
         {
             //if (nbVertices < 50)
             //    branchHandler.forward<void>(_f, id, hol_l);
-            //else
-            branchHandler.try_push_MP<void>(_f, id, hol_l, serializer);
+           // else
+			{
+				
+					branchHandler.try_push_MP<void>(_f, id, hol_l, serializer);
+			}
         }
         else
         {

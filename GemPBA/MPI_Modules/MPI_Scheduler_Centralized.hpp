@@ -79,6 +79,50 @@
 #error "Cannot define getPeakRSS( ) or getCurrentRSS( ) for an unknown OS."
 #endif
 
+
+
+
+
+
+
+
+/**
+  Return number of bits that are set to 1
+**/
+int getNbSetBits(char c)
+{
+	//all credits to https://stackoverflow.com/questions/697978/c-code-to-count-the-number-of-1-bits-in-an-unsigned-char
+	return (c * 01001001001ULL & 042104210421ULL) % 017;
+}
+
+int getNbSetBits(std::pair<char*, int> task)
+{
+	int nb = 0;
+	for (int i = 0; i < task.second; ++i)
+	{
+		  nb += getNbSetBits(task.first[i]);
+	}
+	return nb;
+}
+
+class TaskComparator
+{
+public:
+    bool operator() (std::pair<char*, int> t1, std::pair<char*, int> t2)
+    {
+        int n1 = getNbSetBits(t1);
+		int n2 = getNbSetBits(t2);
+		
+		return (n1 <= n2);
+    }
+};
+
+
+
+
+
+
+
 /**
  * Returns the peak (maximum so far) resident set size (physical
  * memory use) measured in bytes, or zero if the value cannot be
@@ -171,10 +215,15 @@ namespace GemPBA
 	class MPI_Scheduler
 	{
 
-		vector<std::pair<char *, int>> center_queue;
+		std::priority_queue<std::pair<char *, int>, std::vector<std::pair<char *, int>>, TaskComparator> center_queue;	//message, size
+		//std::vector<std::pair<char *, int>> center_queue;
 
 		int max_queue_size;
 		bool center_last_full_status = false;
+		
+		
+		vector<std::pair<char*, int>> local_outqueue;
+		vector<std::pair<char*, int>> local_inqueue;
 
 	public:
 		static MPI_Scheduler &getInstance()
@@ -204,6 +253,17 @@ namespace GemPBA
 		{
 			return bestResults;
 		}
+		
+		
+		/*void encode_queue(vector<std::pair<char*, int>> tasks, char* out)
+		{
+			 for (auto task : tasks)
+			 {
+				  
+			 }
+			
+		}*/
+		
 
 		void printStats()
 		{
@@ -581,8 +641,10 @@ namespace GemPBA
 			{
 				if (processState[rank] == STATE_AVAILABLE)
 				{
-					pair<char *, size_t> msg = center_queue.back();
-					center_queue.pop_back();
+					//pair<char *, size_t> msg = center_queue.back();
+					//center_queue.pop_back();
+					pair<char *, size_t> msg = center_queue.top();
+					center_queue.pop();
 
 					MPI_Send(msg.first, msg.second, MPI_CHAR, rank, TASK_FROM_CENTER_TAG, world_Comm);
 					delete[] msg.first;
@@ -765,7 +827,8 @@ namespace GemPBA
 				{
 
 					pair<char *, int> msg = make_pair(buffer_char, buffer_char_count);
-					center_queue.push_back(msg);
+					//center_queue.push_back(msg);
+					center_queue.push(msg);
 
 					if (center_queue.size() > max_queue_size)
 					{
