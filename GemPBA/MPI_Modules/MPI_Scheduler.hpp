@@ -21,6 +21,8 @@
 #include <thread>
 #include <queue>
 #include <unistd.h>
+#include <atomic>
+#include <memory>
 
 #define CENTER 0
 
