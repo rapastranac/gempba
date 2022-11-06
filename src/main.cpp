@@ -45,12 +45,6 @@ int main(int argc, char *argv[])
 		.action([](const std::string &value)
 				{ return std::stoi(value); });
 
-	program.add_argument("-N", "--nThreads")
-		.help("Number of threads")
-		.nargs(1)
-		.default_value(int{1})
-		.action([](const std::string &value)
-				{ return std::stoi(value); });
 
 	program.add_argument("-P", "--prob")
 		.help("Density probability of input graph")
@@ -82,11 +76,10 @@ int main(int argc, char *argv[])
 	int ntasks_per_socket = program.get<int>("--ntasks_per_socket");
 	int cpus_per_task = program.get<int>("--cpus_per_task");
 
-	int numThreads = program.get<int>("--nThreads");
 	int prob = program.get<int>("--prob");
 	auto filename = program.get<std::string>("--indir");
 
-	fmt::print("argc: {}, nodes: {}, ntasks_per_node: {}, ntasks_per_socket: {}, cpus_per_task: {}, threads: {}, prob : {}, filename: {} \n", argc, nodes, ntasks_per_node, ntasks_per_socket, cpus_per_task, numThreads, prob, filename);
+	fmt::print("argc: {}, nodes: {}, ntasks_per_node: {}, ntasks_per_socket: {}, cpus_per_task: {}, prob : {}, filename: {} \n", argc, nodes, ntasks_per_node, ntasks_per_socket, cpus_per_task, prob, filename);
 
 #ifdef VC_VOID
 	return main_void(numThreads, prob, filename);
@@ -98,7 +91,7 @@ int main(int argc, char *argv[])
 	return main_non_void_MPI(numThreads, prob, filename);
 #elif BITVECTOR_VC
 	return main_void_MPI_bitvec(job_id, nodes, ntasks_per_node, ntasks_per_socket,
-								cpus_per_task, numThreads, prob, filename);
+                                cpus_per_task, prob, filename);
 #elif BITVECTOR_VC_THREAD
 	return main_void_bitvec(numThreads, prob, filename);
 #endif
