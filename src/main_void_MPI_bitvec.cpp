@@ -34,13 +34,7 @@ void printToSummaryFile(int job_id, int nodes, int ntasks_per_node, int ntasks_p
                         const vector<int> &nTasksSent, int solSize, double global_cpu_idle_time,
                         size_t totalThreadRequests);
 
-int main_void_MPI_bitvec(int job_id,
-                         int nodes,
-                         int ntasks_per_node,
-                         int ntasks_per_socket,
-                         int cpus_per_task,
-                         int numThreads,
-                         int prob,
+int main_void_MPI_bitvec(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int cpus_per_task, int prob,
                          std::string &filename_directory)
 {
 
@@ -52,7 +46,7 @@ int main_void_MPI_bitvec(int job_id,
 	int rank = mpiScheduler.rank_me();
 	branchHandler.passMPIScheduler(&mpiScheduler);
 
-	cout << "NUMTHREADS= " << numThreads << endl;
+	cout << "NUMTHREADS= " << cpus_per_task << endl;
 
 	VC_void_MPI_bitvec cover;
 	auto function = std::bind(&VC_void_MPI_bitvec ::mvcbitset, &cover, _1, _2, _3, _4, _5); // target algorithm [all arguments]
@@ -64,7 +58,7 @@ int main_void_MPI_bitvec(int job_id,
 	Graph graph;
 	graph.readEdges(filename_directory);
 
-	cover.init(graph, numThreads, filename_directory, prob);
+	cover.init(graph, cpus_per_task, filename_directory, prob);
 	cover.setGraph(graph);
 
 	int gsize = graph.adj.size() + 1; //+1 cuz some files use node ids from 1 to n (instead of 0 to n - 1)
@@ -100,7 +94,7 @@ int main_void_MPI_bitvec(int job_id,
 			main thread will take care of Inter-process communication (IPC), dedicated core
 			numThreads could be the number of physical cores managed by this process - 1
 		*/
-		branchHandler.initThreadPool(numThreads);
+        branchHandler.initThreadPool(cpus_per_task - 1);
 		auto bufferDecoder = branchHandler.constructBufferDecoder<void, int, gbitset, int>(function, deserializer);
 		auto resultFetcher = branchHandler.constructResultFetcher();
 		mpiScheduler.runNode(branchHandler, bufferDecoder, resultFetcher, serializer);
