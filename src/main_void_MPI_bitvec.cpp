@@ -28,14 +28,20 @@
 
 #include <unistd.h>
 
+void printToSummaryFile(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int cpus_per_task,
+                        const string &filename_directory, GemPBA::MPI_Scheduler &mpiScheduler, int gsize,
+                        int world_size, const vector<size_t> &threadRequests, const vector<int> &nTasksRecvd,
+                        const vector<int> &nTasksSent, int solSize, double global_cpu_idle_time,
+                        size_t totalThreadRequests);
+
 int main_void_MPI_bitvec(int job_id,
-						 int nodes,
-						 int ntasks_per_node,
-						 int ntasks_per_socket,
-						 int cpus_per_task,
-						 int numThreads,
-						 int prob,
-						 std::string &filename_directory)
+                         int nodes,
+                         int ntasks_per_node,
+                         int ntasks_per_socket,
+                         int cpus_per_task,
+                         int numThreads,
+                         int prob,
+                         std::string &filename_directory)
 {
 
 	auto &branchHandler = GemPBA::BranchHandler::getInstance(); // parallel library
@@ -179,9 +185,80 @@ int main_void_MPI_bitvec(int job_id,
 
 		fmt::print("\n\n\n");
 
-		// **************************************************************************
+		// print stats to a file ***********
+        printToSummaryFile(job_id, nodes, ntasks_per_node, ntasks_per_socket, cpus_per_task, filename_directory,
+                           mpiScheduler, gsize,
+                           world_size, threadRequests, nTasksRecvd, nTasksSent, solsize, global_cpu_idle_time,
+                           totalThreadRequests);
+        // **************************************************************************
 	}
 	return 0;
+}
+
+std::string createDir(std::string root) {
+    if (!fs::is_directory(root) || !fs::exists(root)) {
+        fs::create_directory(root);
+    }
+    return root;
+}
+
+std::string createDir(std::string root, std::string folder) {
+    if (!fs::is_directory(root) || !fs::exists(root)) {
+        fs::create_directory(root);
+    }
+    return createDir(root + "/" + folder + "/");
+}
+
+template<typename... T>
+std::string createDir(std::string root, std::string folder, T... dir) {
+    if (!fs::is_directory(root) || !fs::exists(root)) {
+        fs::create_directory(root);
+    }
+    return createDir(root + "/" + folder, dir...);
+}
+
+void printToSummaryFile(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int cpus_per_task,
+                        const string &filename_directory, GemPBA::MPI_Scheduler &mpiScheduler, int gsize,
+                        int world_size, const vector<size_t> &threadRequests, const vector<int> &nTasksRecvd,
+                        const vector<int> &nTasksSent, int solSize, double global_cpu_idle_time,
+                        size_t totalThreadRequests) {
+    string file_name = filename_directory.substr(filename_directory.find_last_of("/\\") + 1);
+    const std::string targetDir = createDir("results", std::to_string(gsize), std::to_string(nodes));
+
+    ofstream myfile;
+    myfile.open(targetDir + file_name);
+    myfile << "job id:\t" << job_id << endl;
+    myfile << "nodes:\t" << nodes << endl;
+    myfile << "ntasks-per-node:\t" << ntasks_per_node << endl;
+    myfile << "ntasks-per-socket:\t" << ntasks_per_socket << endl;
+    myfile << "cpus-per-task:\t" << cpus_per_task << endl;
+    myfile << "graph size:\t\t" << gsize << endl;
+    myfile << "cover size:\t\t" << solSize << endl;
+    myfile << "process requests:\t\t" << mpiScheduler.getTotalRequests() << endl;
+    myfile << "thread requests:\t\t" << totalThreadRequests << endl;
+    myfile << "elapsed time:\t\t" << mpiScheduler.elapsedTime() << endl;
+    myfile << "cpu idle time (global):\t" << global_cpu_idle_time << endl;
+    myfile << "wall idle time (global):\t" << global_cpu_idle_time / world_size << endl;
+
+    myfile << endl;
+
+    for (int rank = 1; rank < world_size; rank++)
+    {
+        myfile << "tasks sent by rank " << rank << ":\t" << nTasksSent[rank] << endl;
+    }
+    myfile << endl;
+
+    for (int rank = 1; rank < world_size; rank++)
+    {
+        myfile << "tasks received by rank " << rank << ":\t" << nTasksRecvd[rank] << endl;
+    }
+    myfile << endl;
+
+    for (int rank = 1; rank < world_size; rank++)
+    {
+        myfile << "rank " << rank << ", thread requests:\t" << threadRequests[rank] << endl;
+    }
+    myfile.close();
 }
 
 #endif
