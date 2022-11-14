@@ -48,6 +48,9 @@
 
 #define TIMEOUT_TIME 2
 
+
+#define CENTER_NBSTORED_TASKS_PER_PROCESS 1000
+
 /*
  * Author:  David Robert Nadeau
  * Site:    http://NadeauSoftware.com/
@@ -665,29 +668,36 @@ namespace GemPBA
 		{
 			size_t currentMemory = getCurrentRSS() / (1024 * 1024); // ram usage in megabytes
 
-			// last iter, center wasn't full but now it is => warn nodes to stop sending
-			if (!center_last_full_status && currentMemory > MAX_MEMORY_MB)
+			
+			if (!center_last_full_status)
 			{
-				// cout<<"CURMEM="<<currentMemory<<"    maxMemory="<<maxMemory<<"    "<<(currentMemory <= maxMemory)<<endl;
-				for (int rank = 1; rank < world_size; rank++)
-				{
-					char tmp = 0;
-					MPI_Send(&tmp, 1, MPI_CHAR, rank, CENTER_IS_FULL_TAG, world_Comm);
-				}
-				center_last_full_status = true;
+				// last iter, center wasn't full but now it is => warn nodes to stop sending
+				if (currentMemory > MAX_MEMORY_MB || center_queue.size() > CENTER_NBSTORED_TASKS_PER_PROCESS * world_size)
+				{				
+					for (int rank = 1; rank < world_size; rank++)
+					{
+						char tmp = 0;
+						MPI_Send(&tmp, 1, MPI_CHAR, rank, CENTER_IS_FULL_TAG, world_Comm);
+					}
+					center_last_full_status = true;
 
-				cout << "CENTER IS FULL" << endl;
+					//cout << "CENTER IS FULL" << endl;
+				}
 			}
-			else if (center_last_full_status && currentMemory <= 0.95 * MAX_MEMORY_MB)
+			else
 			{
-				for (int rank = 1; rank < world_size; rank++)
+				// last iter, center was full but now it has space => warn others it's ok
+				if (currentMemory <= 0.95 * MAX_MEMORY_MB && center_queue.size() < CENTER_NBSTORED_TASKS_PER_PROCESS * world_size * 0.9)
 				{
-					char tmp = 0;
-					MPI_Send(&tmp, 1, MPI_CHAR, rank, CENTER_IS_FREE_TAG, world_Comm);
-				}
-				center_last_full_status = false;
+					for (int rank = 1; rank < world_size; rank++)
+					{
+						char tmp = 0;
+						MPI_Send(&tmp, 1, MPI_CHAR, rank, CENTER_IS_FREE_TAG, world_Comm);
+					}
+					center_last_full_status = false;
 
-				cout << "CENTER IS NOT FULL ANYMORE" << endl;
+					//cout << "CENTER IS NOT FULL ANYMORE" << endl;
+				}
 			}
 		}
 

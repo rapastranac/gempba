@@ -228,7 +228,9 @@ void printToSummaryFile(int job_id, int nodes, int ntasks_per_node, int ntasks_p
     myfile << "cpus-per-task:\t" << cpus_per_task << endl;
     myfile << "graph size:\t\t" << gsize << endl;
     myfile << "cover size:\t\t" << solSize << endl;
+#ifdef SCHEDULER_CENTRALIZED
     myfile << "process requests:\t\t" << mpiScheduler.getTotalRequests() << endl;
+#endif
     myfile << "thread requests:\t\t" << totalThreadRequests << endl;
     myfile << "elapsed time:\t\t" << mpiScheduler.elapsedTime() << endl;
     myfile << "cpu idle time (global):\t" << global_cpu_idle_time << endl;
