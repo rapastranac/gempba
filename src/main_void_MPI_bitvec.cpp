@@ -234,7 +234,7 @@ void printToSummaryFile(int job_id, int nodes, int ntasks_per_node, int ntasks_p
     myfile << "thread requests:\t\t" << totalThreadRequests << endl;
     myfile << "elapsed time:\t\t" << mpiScheduler.elapsedTime() << endl;
     myfile << "cpu idle time (global):\t" << global_cpu_idle_time << endl;
-    myfile << "wall idle time (global):\t" << global_cpu_idle_time / world_size << endl;
+    myfile << "wall idle time (global):\t" << global_cpu_idle_time / (world_size - 1) << endl;
 
     myfile << endl;
 
