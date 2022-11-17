@@ -672,7 +672,7 @@ namespace GemPBA
 			if (!center_last_full_status)
 			{
 				// last iter, center wasn't full but now it is => warn nodes to stop sending
-				if (currentMemory > MAX_MEMORY_MB || center_queue.size() > CENTER_NBSTORED_TASKS_PER_PROCESS * world_size)
+				if (currentMemory > MAX_MEMORY_MB && center_queue.size() > CENTER_NBSTORED_TASKS_PER_PROCESS * world_size)
 				{				
 					for (int rank = 1; rank < world_size; rank++)
 					{
