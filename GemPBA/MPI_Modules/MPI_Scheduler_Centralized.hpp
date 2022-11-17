@@ -538,24 +538,24 @@ namespace GemPBA
 			int flag1 = 0;
 			int flag2 = 0;
 			MPI_Status status;
-			MPI_Iprobe(CENTER, CENTER_IS_FULL_TAG, world_Comm, &flag1, &status);
+			MPI_Iprobe(CENTER, CENTER_IS_FULL_TAG, centerFullness_Comm, &flag1, &status);
 
 			if (flag1)
 			{
 				char buf;
-				MPI_Recv(&buf, 1, MPI_CHAR, CENTER, CENTER_IS_FULL_TAG, world_Comm, &status);
+				MPI_Recv(&buf, 1, MPI_CHAR, CENTER, CENTER_IS_FULL_TAG, centerFullness_Comm, &status);
 				isCenterFull = true;
 #if DEBUG_COMMENTS
 				cout << "Node " << rank_me() << " received full center" << endl;
 #endif
 			}
 
-			MPI_Iprobe(CENTER, CENTER_IS_FREE_TAG, world_Comm, &flag2, &status);
+			MPI_Iprobe(CENTER, CENTER_IS_FREE_TAG, centerFullness_Comm, &flag2, &status);
 
 			if (flag2)
 			{
 				char buf;
-				MPI_Recv(&buf, 1, MPI_CHAR, CENTER, CENTER_IS_FREE_TAG, world_Comm, &status);
+				MPI_Recv(&buf, 1, MPI_CHAR, CENTER, CENTER_IS_FREE_TAG, centerFullness_Comm, &status);
 				isCenterFull = false;
 #if DEBUG_COMMENTS
 				cout << "Node " << rank_me() << " received free center" << endl;
@@ -677,7 +677,7 @@ namespace GemPBA
 					for (int rank = 1; rank < world_size; rank++)
 					{
 						char tmp = 0;
-						MPI_Send(&tmp, 1, MPI_CHAR, rank, CENTER_IS_FULL_TAG, world_Comm);
+						MPI_Send(&tmp, 1, MPI_CHAR, rank, CENTER_IS_FULL_TAG, centerFullness_Comm);
 					}
 					center_last_full_status = true;
 
@@ -692,7 +692,7 @@ namespace GemPBA
 					for (int rank = 1; rank < world_size; rank++)
 					{
 						char tmp = 0;
-						MPI_Send(&tmp, 1, MPI_CHAR, rank, CENTER_IS_FREE_TAG, world_Comm);
+						MPI_Send(&tmp, 1, MPI_CHAR, rank, CENTER_IS_FREE_TAG, centerFullness_Comm);
 					}
 					center_last_full_status = false;
 
@@ -853,6 +853,14 @@ namespace GemPBA
 					}
 
 					++totalRequests;
+					
+					
+					if (center_queue.size() > 2 * CENTER_NBSTORED_TASKS_PER_PROCESS * world_size)
+					{
+						fmt::print("Center queue size is twice the limit.  Contacting workers to let them know.  This should not happen.  Contact the devs.\n");
+						center_last_full_status = false;	//handleFullMessaging will see this and reontact workers
+					}
+					
 #ifdef DEBUG_COMMENTS
 					fmt::print("center received task from {}, current queue size is {}\n", status.MPI_SOURCE, center_queue.size());
 #endif
@@ -1001,7 +1009,9 @@ namespace GemPBA
 		{
 			MPI_Comm_dup(MPI_COMM_WORLD, &world_Comm);			// world communicator for this library
 			MPI_Comm_dup(MPI_COMM_WORLD, &refValueGlobal_Comm); // exclusive communicator for reference value - one-sided comm
-
+			
+			MPI_Comm_dup(MPI_COMM_WORLD, &centerFullness_Comm);
+			
 			MPI_Comm_size(world_Comm, &this->world_size);
 			MPI_Comm_rank(world_Comm, &this->world_rank);
 
@@ -1022,6 +1032,7 @@ namespace GemPBA
 		void deallocateMPI()
 		{
 			MPI_Comm_free(&refValueGlobal_Comm);
+			MPI_Comm_free(&centerFullness_Comm);
 
 			MPI_Comm_free(&world_Comm);
 		}
@@ -1063,8 +1074,11 @@ namespace GemPBA
 
 		// MPI_Group world_group;		  // all ranks belong to this group
 		MPI_Comm refValueGlobal_Comm; // attached to win_refValueGlobal
+		MPI_Comm centerFullness_Comm;
 
 		MPI_Comm world_Comm; // world communicator
+
+
 
 		int refValueGlobal;
 
