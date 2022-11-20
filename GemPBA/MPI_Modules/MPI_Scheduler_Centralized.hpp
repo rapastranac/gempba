@@ -224,6 +224,8 @@ namespace GemPBA
 		int max_queue_size;
 		bool center_last_full_status = false;
 		
+		double time_centerfull_sent = 0;
+		
 		
 		vector<std::pair<char*, int>> local_outqueue;
 		vector<std::pair<char*, int>> local_inqueue;
@@ -680,6 +682,7 @@ namespace GemPBA
 						MPI_Send(&tmp, 1, MPI_CHAR, rank, CENTER_IS_FULL_TAG, centerFullness_Comm);
 					}
 					center_last_full_status = true;
+					time_centerfull_sent = MPI_Wtime();
 
 					//cout << "CENTER IS FULL" << endl;
 				}
@@ -687,7 +690,7 @@ namespace GemPBA
 			else
 			{
 				// last iter, center was full but now it has space => warn others it's ok
-				if (currentMemory <= 0.95 * MAX_MEMORY_MB && center_queue.size() < CENTER_NBSTORED_TASKS_PER_PROCESS * world_size * 0.9)
+				if (currentMemory <= 0.9 * MAX_MEMORY_MB && center_queue.size() < CENTER_NBSTORED_TASKS_PER_PROCESS * world_size * 0.8)
 				{
 					for (int rank = 1; rank < world_size; rank++)
 					{
@@ -748,6 +751,12 @@ namespace GemPBA
 					while (!flag && (difftime(begin, MPI_Wtime()) < TIMEOUT_TIME))
 					{
 						MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, world_Comm, &flag, &status);
+						
+						if (!flag)
+						{
+							clearBuffer();
+							handleFullMessaging();
+						}
 					}
 
 					if (!flag)
@@ -857,8 +866,11 @@ namespace GemPBA
 					
 					if (center_queue.size() > 2 * CENTER_NBSTORED_TASKS_PER_PROCESS * world_size)
 					{
-						fmt::print("Center queue size is twice the limit.  Contacting workers to let them know.  This should not happen.  Contact the devs.\n");
-						center_last_full_status = false;	//handleFullMessaging will see this and reontact workers
+						if (difftime(time_centerfull_sent, MPI_Wtime() > 1))
+						{
+							fmt::print("Center queue size is twice the limit.  Contacting workers to let them know.\n");
+							center_last_full_status = false;	//handleFullMessaging will see this and reontact workers
+						}
 					}
 					
 #ifdef DEBUG_COMMENTS
