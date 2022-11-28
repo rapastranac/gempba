@@ -21,6 +21,14 @@ namespace boost
         template <typename Ar, typename Block, typename Alloc>
         void save(Ar &ar, dynamic_bitset<Block, Alloc> const &bs, unsigned)
         {
+	    /*dynamic_bitset<Block, Alloc> dummy(bs);
+	    dummy.resize( bs.size() * 100 );
+	    
+	    size_t num_bits = dummy.size();
+            std::vector<Block> blocks(dummy.num_blocks());
+            to_block_range(dummy, blocks.begin());
+            ar &num_bits &blocks;*/
+	    
             size_t num_bits = bs.size();
             std::vector<Block> blocks(bs.num_blocks());
             to_block_range(bs, blocks.begin());
@@ -36,7 +44,9 @@ namespace boost
 
             bs.resize(num_bits);
             from_block_range(blocks.begin(), blocks.end(), bs);
+            
             bs.resize(num_bits);
+            //bs.resize(num_bits / 100);
         }
 
         template <typename Ar, typename Block, typename Alloc>

@@ -28,7 +28,7 @@ add_definitions(-DBITVECTOR_VC)
 #add_definitions(-DVC_NON_VOID)
 #add_definitions(-DVC_NON_VOID_MPI)
 
-add_definitions(-DSCHEDULER_CENTRALIZED)
+#add_definitions(-DSCHEDULER_CENTRALIZED)
 
 add_compile_options("-std=c++2a" "-fconcepts" "-O3" "-Wall" "-Wpedantic" "-Wextra" "-fexceptions" "-pthread")
 
