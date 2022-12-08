@@ -13,6 +13,8 @@ using namespace boost;
 
 #define gbitset dynamic_bitset<>
 
+
+//SERIALIZE A DYNAMIC_BITSET
 namespace boost
 {
     namespace serialization
@@ -21,13 +23,6 @@ namespace boost
         template <typename Ar, typename Block, typename Alloc>
         void save(Ar &ar, dynamic_bitset<Block, Alloc> const &bs, unsigned)
         {
-	    /*dynamic_bitset<Block, Alloc> dummy(bs);
-	    dummy.resize( bs.size() * 100 );
-	    
-	    size_t num_bits = dummy.size();
-            std::vector<Block> blocks(dummy.num_blocks());
-            to_block_range(dummy, blocks.begin());
-            ar &num_bits &blocks;*/
 	    
             size_t num_bits = bs.size();
             std::vector<Block> blocks(bs.num_blocks());
@@ -53,6 +48,109 @@ namespace boost
         void serialize(Ar &ar, dynamic_bitset<Block, Alloc> &bs, unsigned version)
         {
             split_free(ar, bs, version);
+        }
+
+    }
+}
+
+
+//SERIALIZE A GRAPHBITS OBJECT
+namespace boost
+{
+    namespace serialization
+    {
+
+        template <typename Ar>
+        void save(Ar &ar, unordered_map<int, gbitset> const &graphbits, unsigned)
+        {
+            /*ar << graphbits.size();
+            for (const auto &keyvaluepair : graphbits)
+            {
+            	ar << keyvaluepair.first;
+            	ar << keyvaluepair.second; 
+            }*/
+            
+                 
+            //encoding format of each vertex is [vertex no] [nb neighbors] [list of nb neighbors ints]
+            
+            int16_t nbbits_per_bitset = 0;
+            vector<int16_t> encoding;
+            encoding.reserve(graphbits.size() * graphbits.size()/10);	//heuristic way of reserving edges, because I don't want to count them
+            
+
+            for (const auto &keyvaluepair : graphbits)
+            {
+            	  encoding.push_back( (int16_t) keyvaluepair.first);
+            	  
+            	  const gbitset &nbrs = keyvaluepair.second;
+            	  nbbits_per_bitset = (int16_t)nbrs.size();
+
+            	  encoding.push_back(nbrs.count());
+            	  
+            	  for (int j = nbrs.find_first(); j != gbitset::npos; j = nbrs.find_next(j))
+            	  {
+            	  	encoding.push_back( (int16_t)j );
+            	  }
+            	  
+            }
+            size_t num_entries = encoding.size();
+            
+            
+            ar << num_entries << nbbits_per_bitset;
+
+	    ar << boost::serialization::make_array(encoding.data(), encoding.size());
+        }
+
+        template <typename Ar>
+        void load(Ar &ar, unordered_map<int, gbitset> &graphbits, unsigned)
+        {
+	    /*size_t num_entries;
+	    ar >> num_entries;
+	    
+	    for (int i = 0; i < num_entries; ++i)
+	    {
+	    	int v;
+	    	gbitset bits;
+	    	ar >> v;
+	    	ar >> bits;
+	    	graphbits[v] = bits;
+	    }*/
+            
+            size_t num_entries;
+            int16_t nbbits_per_bitset;
+            ar >> num_entries;
+            
+            ar >> nbbits_per_bitset;
+            
+            std::vector<int16_t> encoding(num_entries);
+	    ar >> boost::serialization::make_array(encoding.data(), encoding.size());
+	    
+	    size_t cpt = 0;
+	    while (cpt < encoding.size())
+	    {
+	    	int16_t v = encoding[cpt];
+		++cpt;
+		int16_t nbnbrs = encoding[cpt];
+		++cpt;
+		
+		gbitset vvec(nbbits_per_bitset);
+		
+		for (size_t i = 0; i < nbnbrs; ++i)
+		{
+			int16_t w = encoding[cpt];
+			vvec[w] = true;
+			++cpt;
+		}
+		
+		graphbits[(int)v] = vvec;
+	    }
+            
+        }
+
+        template <typename Ar>
+        void serialize(Ar &ar, unordered_map<int, gbitset> &graphbits, unsigned version)
+        {
+            split_free(ar, graphbits, version);
         }
 
     }
@@ -103,13 +201,13 @@ auto deserializer = [](std::stringstream &ss, auto &...args)
     //archive(args...);
 };
 
-class VC_void_MPI_bitvec : public VertexCover
+class VC_void_MPI_bitvec_enc : public VertexCover
 {
     //using HolderType = GemPBA::ResultHolder<void, int, gbitset, int, std::vector<int>>;
-    using HolderType = GemPBA::ResultHolder<void, int, gbitset, int>;
+    using HolderType = GemPBA::ResultHolder<void, int, unordered_map<int, gbitset>, int>;
 
 private:
-    std::function<void(int, int, gbitset &, int, void *)> _f;
+    std::function<void(int, int, unordered_map<int, gbitset> &, int, void *)> _f;
     //std::function<void(int, int, gbitset &, int, std::vector<int>, void *)> _f;
 
 public:
@@ -118,16 +216,16 @@ public:
     long deglb_skips;
     long seen_skips;
 
-    unordered_map<int, gbitset> graphbits;
+    unordered_map<int, gbitset> init_graphbits;
     std::atomic<size_t> passes;
     std::mutex mtx;
 
-    VC_void_MPI_bitvec()
+    VC_void_MPI_bitvec_enc()
     {
-        //this->_f = std::bind(&VC_void_MPI_bitvec::mvcbitset, this, _1, _2, _3, _4, _5, _6);
-        this->_f = std::bind(&VC_void_MPI_bitvec::mvcbitset, this, _1, _2, _3, _4, _5);
+
+        this->_f = std::bind(&VC_void_MPI_bitvec_enc::mvcbitset, this, _1, _2, _3, _4, _5);
     }
-    ~VC_void_MPI_bitvec() {}
+    ~VC_void_MPI_bitvec_enc() {}
 
     void setGraph(Graph &graph)
     {
@@ -180,15 +278,15 @@ public:
             {
                 vnbrs[i] = true;
             }
-            graphbits[v] = vnbrs;
+            init_graphbits[v] = vnbrs;
         }
 
         //check for evil degree 0 vertices
         for (int i = 0; i < gsize; ++i)
         {
-            if (!graphbits.contains(i))
+            if (!init_graphbits.contains(i))
             {
-                graphbits[i] = gbitset(gsize);
+                init_graphbits[i] = gbitset(gsize);
             }
         }
     }
@@ -199,8 +297,18 @@ public:
     
 
     //void mvcbitset(int id, int depth, gbitset &bits_in_graph, int solsize, std::vector<int> dummy, void *parent)
-    void mvcbitset(int id, int depth, gbitset &bits_in_graph, int solsize, void *parent = nullptr)
+    void mvcbitset(int id, int depth, unordered_map<int, gbitset> &graphbits, int solsize, void *parent = nullptr)
     {
+
+	gbitset bits_in_graph(init_graphbits.size());
+	
+	for (const auto &kv_pair : graphbits)
+	{
+		bits_in_graph[kv_pair.first] = true;
+	}
+	
+
+
 
         //{                                                   // 1 MB, emulates heavy messaging
         //    std::random_device rd;                          // Will be used to obtain a seed for the random number engine
@@ -240,9 +348,8 @@ public:
         }
 
         //cout<<"depth="<<depth<<" ref="<<branchHandler.getRefValue()<<"cursolsize="<<cursol_size<<" cnt="<<bits_in_graph.count()<<" sol="<<cur_sol<<endl;
-        if (bits_in_graph.count() <= 1)
+        if (graphbits.size() <= 1)
         {
-
             terminate_condition_bits(cursol_size, id, depth);
             //terminate_condition_bits(cursol_size, id, depth, dummy);
             return;
@@ -253,20 +360,6 @@ public:
             return;
         }
 
-        /*if (bits_in_graph.count() <= 90 && bits_in_graph.count() >= 120 )
-		{
-			pair<gbitset, int> instance_key = make_pair(bits_in_graph, cursol_size);
-			if (seen[id].find(instance_key) != seen[id].end())
-			{
-				seen_skips++;
-				return;
-			}
-			
-			if (seen[id].size() <= 4000000)
-			{
-				seen[id].insert(instance_key);
-			}
-		}*/
 
         //max degree dude
         int maxdeg = 0;
@@ -275,6 +368,8 @@ public:
         int nbEdgesDoubleCounted = 0;
 
         bool someRuleApplies = true;
+        
+        std::list<int> to_erase;
 
         while (someRuleApplies)
         {
@@ -283,15 +378,22 @@ public:
             maxdeg_v = 0;
             someRuleApplies = false;
 
-            for (int i = bits_in_graph.find_first(); i != gbitset::npos; i = bits_in_graph.find_next(i))
+            for (const auto &kv_pair : graphbits)
             {
-
-                gbitset nbrs = (graphbits[i] & bits_in_graph);
+            	 int i = kv_pair.first;
+            	 
+            	 if (!bits_in_graph[i])
+            	 {
+            	 	continue;
+            	 }
+            	 
+                gbitset nbrs = (kv_pair.second & bits_in_graph);
 
                 int cnt = nbrs.count();
                 if (cnt == 0)
                 {
                     bits_in_graph[i] = false;
+                    to_erase.push_back(i);
                 }
                 else if (cnt == 1)
                 {
@@ -301,6 +403,8 @@ public:
                     bits_in_graph[i] = false;
                     bits_in_graph[the_nbr] = false;
                     someRuleApplies = true;
+                    to_erase.push_back(i);
+                    to_erase.push_back(the_nbr);
                 }
                 else if (cnt > maxdeg)
                 {
@@ -323,40 +427,31 @@ public:
                             bits_in_graph[n2] = false;
                             cursol_size += 2;
                             someRuleApplies = true;
+                            
+                            to_erase.push_back(i);
+                            to_erase.push_back(n1);
+                            to_erase.push_back(n2);
                         }
                     }
-                    /*
-					{
-						for (int j = nbrs.find_first(); j != gbitset::npos; j = nbrs.find_next(j))
-						{
-							gbitset nbrs_of_j = (graphbits[j] & bits_in_graph);
-							nbrs_of_j.set(i, false);
-							nbrs_of_j.set(j, true);
-							if ((nbrs_of_j & nbrs) == nbrs)
-							{
-								//cout<<"we have twins at (i, j)="<<i<<","<<j<<endl<<
-								//	nbrs<<endl<<(graphbits[j] & bits_in_graph)<<endl<<(nbrs_of_j & nbrs)<<endl;
-								cur_sol[j] = true;
-								cursol_size++;
-								//bits_in_graph[i] = false;
-								bits_in_graph[j] = false;
-								someRuleApplies = true;
-								break;
-							}
-							
-						}
-					}*/
+
                 }
                 nbEdgesDoubleCounted += cnt;
             }
+        }
+        
+        for (int er : to_erase)
+        {
+        	if (er == maxdeg_v)
+        	{
+        		cout<<"MAXDEG_ERASED!"<<endl;
+        	}
+        	graphbits.erase(er);
         }
 
         int nbVertices = bits_in_graph.count();
         if (nbVertices <= 1)
         {
-            //cout<<"terminating 2"<<endl;
             terminate_condition_bits(cursol_size, id, depth);
-            //terminate_condition_bits(cursol_size, id, depth, dummy);
 
             return;
         }
@@ -373,7 +468,6 @@ public:
 
         int degLB = 0; //getDegLB(bits_in_graph, nbEdgesDoubleCounted/2);
         degLB = (nbEdgesDoubleCounted / 2) / maxdeg;
-        //cout<<"deglb="<<degLB<<" n="<<bits_in_graph.count()<<" refval="<<branchHandler.getRefValue()<<endl;
         if (degLB + cursol_size >= branchHandler.refValue())
         {
             deglb_skips++;
@@ -398,22 +492,19 @@ public:
         hol_l.bind_branch_checkIn([&]
                                   {
                                       int bestVal = branchHandler.refValue();
-                                      gbitset ingraph1 = bits_in_graph;
                                       
-                                      if (!ingraph1[maxdeg_v])
+                                      unordered_map<int, gbitset> graphbits_maxdegremoved;
+                                      for (const auto &kv : graphbits)
                                       {
-                                      	cout<<"ERROR : maxdeg_v already gone"<<endl;
+                                      	graphbits_maxdegremoved[kv.first] = kv.second;  //copies everything
                                       }
-                                      ingraph1.set(maxdeg_v, false);
-                                      //gbitset sol1 = cur_sol;
-                                      //sol1.set(maxdeg_v, true);
+                                      graphbits_maxdegremoved.erase(maxdeg_v);	//note: others think they have v as neighbor, but bits_in_graph solve this
+                                      
                                       int solsize1 = cursol_size + 1;
 
                                       if (solsize1 < bestVal)
                                       {
-                                          //auto cpy = dummy;
-                                          //hol_l.holdArgs(newDepth, ingraph1, solsize1, cpy);
-                                          hol_l.holdArgs(newDepth, ingraph1, solsize1);
+                                          hol_l.holdArgs(newDepth, graphbits_maxdegremoved, solsize1);
                                           return true;
                                       }
                                       else
@@ -424,18 +515,42 @@ public:
                                   {
                                       int bestVal = branchHandler.refValue();
                                       //right branch = take out v nbrs
-                                      gbitset ingraph2 = bits_in_graph;
+                                     
 
-                                      ingraph2 = bits_in_graph & (~graphbits[maxdeg_v]);
-                                      gbitset nbrs = (graphbits[maxdeg_v] & bits_in_graph);
-                                      //gbitset sol2 = cur_sol | nbrs;	//add all nbrs to solution
+				       unordered_map<int, gbitset> graphbits_nbrsremoved; //copies everything
+				       for (const auto &kv : graphbits)
+                                      {
+                                      	graphbits_nbrsremoved[kv.first] = kv.second;  //copies everything
+                                      }
+				       
+				       if (graphbits.find(maxdeg_v) == graphbits.end())
+				       {
+				       	cout<<"MAXDEGV GONE "<<maxdeg_v<<endl;
+				       					       for (const auto &kv : graphbits)
+				       					       {
+				       					       	cout<<kv.first<<endl;
+				       					       }
+				       	int xx; cin >> xx;
+				       }
+				       if (graphbits[maxdeg_v].size() != bits_in_graph.size())
+            	 {
+            	 cout<<"LINE 478"<<endl;
+            	 int xx; cin >> xx;
+            	 }
+				       
+				       gbitset nbrs = graphbits[maxdeg_v] & bits_in_graph;
+				       
+				       for (int j = nbrs.find_first(); j != gbitset::npos; j = nbrs.find_next(j))
+				       {
+				       	graphbits_nbrsremoved.erase(j);	//note: this works because we are iterating on graphbits, not graphbits_nbrsremoved
+				       }
+				       
+				       
                                       int solsize2 = cursol_size + nbrs.count();
 
                                       if (solsize2 < bestVal)
                                       {
-                                          hol_r.holdArgs(newDepth, ingraph2, solsize2);
-                                          //auto cpy = dummy;
-                                          //hol_r.holdArgs(newDepth, ingraph2, solsize2, cpy);
+                                          hol_r.holdArgs(newDepth, graphbits_nbrsremoved, solsize2);
                                           return true;
                                       }
                                       else

@@ -9,7 +9,14 @@
 #include "../GemPBA/MPI_Modules/MPI_Scheduler.hpp"
 #endif
 
+
+
+#ifdef USE_LARGE_ENCODING
+#include "../include/VC_void_bitvec_enc.hpp"
+#else
 #include "../include/VC_void_MPI_bitvec.hpp"
+#endif
+
 
 #include "../GemPBA/Resultholder/ResultHolder.hpp"
 #include "../GemPBA/BranchHandler/BranchHandler.hpp"
@@ -37,6 +44,17 @@ void printToSummaryFile(int job_id, int nodes, int ntasks_per_node, int ntasks_p
 int main_void_MPI_bitvec(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int cpus_per_task, int prob,
                          std::string &filename_directory)
 {
+#ifdef USE_LARGE_ENCODING
+	cout<<"USING LARGE ENCODING"<<endl;
+#else
+	cout<<"USING OPTIMIZED ENCODING"<<endl;
+#endif
+#ifdef SCHEDULER_CENTRALIZED
+	cout<<"USING CENTRALIZED STRATEGY"<<endl;
+#else
+	cout<<"USING SEMI-CENTRALIZED STRATEGY"<<endl;
+#endif
+
 
 	auto &branchHandler = GemPBA::BranchHandler::getInstance(); // parallel library
 
@@ -48,8 +66,14 @@ int main_void_MPI_bitvec(int job_id, int nodes, int ntasks_per_node, int ntasks_
 
 	cout << "NUMTHREADS= " << cpus_per_task << endl;
 
+#ifdef USE_LARGE_ENCODING
+	VC_void_MPI_bitvec_enc cover;
+	auto function = std::bind(&VC_void_MPI_bitvec_enc::mvcbitset, &cover, _1, _2, _3, _4, _5); // target algorithm [all arguments]
+#else
 	VC_void_MPI_bitvec cover;
-	auto function = std::bind(&VC_void_MPI_bitvec ::mvcbitset, &cover, _1, _2, _3, _4, _5); // target algorithm [all arguments]
+	auto function = std::bind(&VC_void_MPI_bitvec::mvcbitset, &cover, _1, _2, _3, _4, _5); // target algorithm [all arguments]
+#endif
+
 																							// initialize MPI and member variable linkin
 
 	/* this is run by all processes, because it is a bitvector implementation,
@@ -72,7 +96,11 @@ int main_void_MPI_bitvec(int job_id, int nodes, int ntasks_per_node, int ntasks_
 	int solsize = graph.size();
 	std::cout << "solsize=" << solsize << endl;
 	mpiScheduler.barrier();
+#ifdef USE_LARGE_ENCODING
+	std::string buffer = serializer(zero, cover.init_graphbits, zero);
+#else
 	std::string buffer = serializer(zero, allones, zero);
+#endif
 
 	std::cout << "Starting MPI node " << branchHandler.rank_me() << std::endl;
 
@@ -95,7 +123,12 @@ int main_void_MPI_bitvec(int job_id, int nodes, int ntasks_per_node, int ntasks_
 			numThreads could be the number of physical cores managed by this process - 1
 		*/
         branchHandler.initThreadPool(cpus_per_task - 1);
-		auto bufferDecoder = branchHandler.constructBufferDecoder<void, int, gbitset, int>(function, deserializer);
+#ifdef USE_LARGE_ENCODING
+	auto bufferDecoder = branchHandler.constructBufferDecoder<void, int, unordered_map<int, gbitset>, int>(function, deserializer);
+#else
+	auto bufferDecoder = branchHandler.constructBufferDecoder<void, int, gbitset, int>(function, deserializer);
+#endif
+		
 		auto resultFetcher = branchHandler.constructResultFetcher();
 		mpiScheduler.runNode(branchHandler, bufferDecoder, resultFetcher, serializer);
 	}
