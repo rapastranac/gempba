@@ -124,7 +124,7 @@ int main_void_MPI_bitvec(int job_id, int nodes, int ntasks_per_node, int ntasks_
 		*/
         branchHandler.initThreadPool(cpus_per_task - 1);
 #ifdef USE_LARGE_ENCODING
-	auto bufferDecoder = branchHandler.constructBufferDecoder<void, int, unordered_map<int, gbitset>, int>(function, deserializer);
+	auto bufferDecoder = branchHandler.constructBufferDecoder<void, int, gbits, int>(function, deserializer);
 #else
 	auto bufferDecoder = branchHandler.constructBufferDecoder<void, int, gbitset, int>(function, deserializer);
 #endif

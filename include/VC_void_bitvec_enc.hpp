@@ -5,13 +5,16 @@
 #include <array>
 #include <random>
 
+#include <map>
 #include <boost/dynamic_bitset.hpp>
 #include <boost/container/set.hpp>
 #include <boost/unordered_set.hpp>
+#include <boost/unordered_map.hpp>
 
 using namespace boost;
 
 #define gbitset dynamic_bitset<>
+#define gbits boost::unordered_map<int, gbitset>
 
 
 //SERIALIZE A DYNAMIC_BITSET
@@ -61,15 +64,17 @@ namespace boost
     {
 
         template <typename Ar>
-        void save(Ar &ar, unordered_map<int, gbitset> const &graphbits, unsigned)
+        void save(Ar &ar, gbits const &graphbits, unsigned)
         {
-            /*ar << graphbits.size();
+            if (false){
+            ar << graphbits.size();
             for (const auto &keyvaluepair : graphbits)
             {
             	ar << keyvaluepair.first;
             	ar << keyvaluepair.second; 
-            }*/
-            
+            }
+            return;
+            }
                  
             //encoding format of each vertex is [vertex no] [nb neighbors] [list of nb neighbors ints]
             
@@ -86,11 +91,20 @@ namespace boost
             	  nbbits_per_bitset = (int16_t)nbrs.size();
 
             	  encoding.push_back(nbrs.count());
+            	  int poscount = encoding.size() - 1;
             	  
+            	  int nbfwd = 0;
             	  for (int j = nbrs.find_first(); j != gbitset::npos; j = nbrs.find_next(j))
+            	  //for (int j = nbrs.find_next(keyvaluepair.first); j != gbitset::npos; j = nbrs.find_next(j))
             	  {
-            	  	encoding.push_back( (int16_t)j );
+            	  	if (graphbits.find(j) != graphbits.end())
+            	  	{
+            	  		encoding.push_back( (int16_t)j );
+            	  		++nbfwd;
+            	  	}
             	  }
+            	  encoding[poscount] = nbfwd;
+
             	  
             }
             size_t num_entries = encoding.size();
@@ -102,11 +116,14 @@ namespace boost
         }
 
         template <typename Ar>
-        void load(Ar &ar, unordered_map<int, gbitset> &graphbits, unsigned)
+        void load(Ar &ar, gbits &graphbits, unsigned)
         {
-	    /*size_t num_entries;
+	    
+	    if (false){
+	    size_t num_entries;
 	    ar >> num_entries;
 	    
+
 	    for (int i = 0; i < num_entries; ++i)
 	    {
 	    	int v;
@@ -114,7 +131,9 @@ namespace boost
 	    	ar >> v;
 	    	ar >> bits;
 	    	graphbits[v] = bits;
-	    }*/
+	    }
+	    return;
+            }
             
             size_t num_entries;
             int16_t nbbits_per_bitset;
@@ -124,6 +143,8 @@ namespace boost
             
             std::vector<int16_t> encoding(num_entries);
 	    ar >> boost::serialization::make_array(encoding.data(), encoding.size());
+	    
+	    //map<int, vector<int>> future_edges;
 	    
 	    size_t cpt = 0;
 	    while (cpt < encoding.size())
@@ -139,8 +160,18 @@ namespace boost
 		{
 			int16_t w = encoding[cpt];
 			vvec[w] = true;
+			
+			//future_edges[w].push_back(v);
 			++cpt;
 		}
+		
+		/*if (future_edges.find(v) != future_edges.end())
+		{
+			for (auto z : future_edges[v])
+			{
+				vvec[z] = true;
+			}
+		}*/
 		
 		graphbits[(int)v] = vvec;
 	    }
@@ -148,7 +179,7 @@ namespace boost
         }
 
         template <typename Ar>
-        void serialize(Ar &ar, unordered_map<int, gbitset> &graphbits, unsigned version)
+        void serialize(Ar &ar, gbits &graphbits, unsigned version)
         {
             split_free(ar, graphbits, version);
         }
@@ -204,10 +235,10 @@ auto deserializer = [](std::stringstream &ss, auto &...args)
 class VC_void_MPI_bitvec_enc : public VertexCover
 {
     //using HolderType = GemPBA::ResultHolder<void, int, gbitset, int, std::vector<int>>;
-    using HolderType = GemPBA::ResultHolder<void, int, unordered_map<int, gbitset>, int>;
+    using HolderType = GemPBA::ResultHolder<void, int, gbits, int>;
 
 private:
-    std::function<void(int, int, unordered_map<int, gbitset> &, int, void *)> _f;
+    std::function<void(int, int, gbits &, int, void *)> _f;
     //std::function<void(int, int, gbitset &, int, std::vector<int>, void *)> _f;
 
 public:
@@ -216,7 +247,7 @@ public:
     long deglb_skips;
     long seen_skips;
 
-    unordered_map<int, gbitset> init_graphbits;
+    gbits init_graphbits;
     std::atomic<size_t> passes;
     std::mutex mtx;
 
@@ -284,7 +315,7 @@ public:
         //check for evil degree 0 vertices
         for (int i = 0; i < gsize; ++i)
         {
-            if (!init_graphbits.contains(i))
+            if (init_graphbits.find(i) == init_graphbits.end())
             {
                 init_graphbits[i] = gbitset(gsize);
             }
@@ -297,7 +328,7 @@ public:
     
 
     //void mvcbitset(int id, int depth, gbitset &bits_in_graph, int solsize, std::vector<int> dummy, void *parent)
-    void mvcbitset(int id, int depth, unordered_map<int, gbitset> &graphbits, int solsize, void *parent = nullptr)
+    void mvcbitset(int id, int depth, gbits &graphbits, int solsize, void *parent = nullptr)
     {
 
 	gbitset bits_in_graph(init_graphbits.size());
@@ -493,10 +524,10 @@ public:
                                   {
                                       int bestVal = branchHandler.refValue();
                                       
-                                      unordered_map<int, gbitset> graphbits_maxdegremoved;
-                                      for (const auto &kv : graphbits)
+                                      gbits graphbits_maxdegremoved = graphbits;
+                                      //for (const auto &kv : graphbits)
                                       {
-                                      	graphbits_maxdegremoved[kv.first] = kv.second;  //copies everything
+                                      //	graphbits_maxdegremoved[kv.first] = kv.second;  //copies everything
                                       }
                                       graphbits_maxdegremoved.erase(maxdeg_v);	//note: others think they have v as neighbor, but bits_in_graph solve this
                                       
@@ -517,26 +548,13 @@ public:
                                       //right branch = take out v nbrs
                                      
 
-				       unordered_map<int, gbitset> graphbits_nbrsremoved; //copies everything
-				       for (const auto &kv : graphbits)
+				       gbits graphbits_nbrsremoved = graphbits; //copies everything
+				       //for (const auto &kv : graphbits)
                                       {
-                                      	graphbits_nbrsremoved[kv.first] = kv.second;  //copies everything
+                                      //	graphbits_nbrsremoved[kv.first] = kv.second;  //copies everything
                                       }
 				       
-				       if (graphbits.find(maxdeg_v) == graphbits.end())
-				       {
-				       	cout<<"MAXDEGV GONE "<<maxdeg_v<<endl;
-				       					       for (const auto &kv : graphbits)
-				       					       {
-				       					       	cout<<kv.first<<endl;
-				       					       }
-				       	int xx; cin >> xx;
-				       }
-				       if (graphbits[maxdeg_v].size() != bits_in_graph.size())
-            	 {
-            	 cout<<"LINE 478"<<endl;
-            	 int xx; cin >> xx;
-            	 }
+		
 				       
 				       gbitset nbrs = graphbits[maxdeg_v] & bits_in_graph;
 				       
@@ -559,9 +577,9 @@ public:
 
         if (hol_l.evaluate_branch_checkIn())
         {
-            //if (nbVertices < 50)
-            //    branchHandler.forward<void>(_f, id, hol_l);
-           // else
+            if (nbVertices < 50)
+                branchHandler.try_push_MT<void>(_f, id, hol_l);
+            else
 			{
 				
 					branchHandler.try_push_MP<void>(_f, id, hol_l, serializer);
