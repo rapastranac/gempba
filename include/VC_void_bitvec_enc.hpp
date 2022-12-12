@@ -1,20 +1,36 @@
 #ifdef BITVECTOR_VC
 
+
 #include "VertexCover.hpp"
 #include <atomic>
 #include <array>
 #include <random>
 
+#include <chrono>
 #include <map>
 #include <boost/dynamic_bitset.hpp>
 #include <boost/container/set.hpp>
 #include <boost/unordered_set.hpp>
 #include <boost/unordered_map.hpp>
+#include <boost/container/flat_map.hpp>
+
+#include <memory_resource> 
 
 using namespace boost;
 
+
 #define gbitset dynamic_bitset<>
-#define gbits boost::unordered_map<int, gbitset>
+#define gbits boost::container::flat_map<int, gbitset>
+
+
+
+struct BitGraph
+{
+	vector<int> in;
+	gbits* graphbits_ptr = nullptr;
+	gbits graphbits;
+};
+
 
 
 //SERIALIZE A DYNAMIC_BITSET
@@ -57,6 +73,13 @@ namespace boost
 }
 
 
+
+
+
+
+
+
+
 //SERIALIZE A GRAPHBITS OBJECT
 namespace boost
 {
@@ -66,7 +89,11 @@ namespace boost
         template <typename Ar>
         void save(Ar &ar, gbits const &graphbits, unsigned)
         {
-            if (false){
+        
+        
+        
+        
+            if (true){
             ar << graphbits.size();
             for (const auto &keyvaluepair : graphbits)
             {
@@ -78,17 +105,17 @@ namespace boost
                  
             //encoding format of each vertex is [vertex no] [nb neighbors] [list of nb neighbors ints]
             
-            int16_t nbbits_per_bitset = 0;
-            vector<int16_t> encoding;
+            int32_t nbbits_per_bitset = 0;
+            vector<int32_t> encoding;
             encoding.reserve(graphbits.size() * graphbits.size()/10);	//heuristic way of reserving edges, because I don't want to count them
             
 
             for (const auto &keyvaluepair : graphbits)
             {
-            	  encoding.push_back( (int16_t) keyvaluepair.first);
+            	  encoding.push_back( (int32_t) keyvaluepair.first);
             	  
             	  const gbitset &nbrs = keyvaluepair.second;
-            	  nbbits_per_bitset = (int16_t)nbrs.size();
+            	  nbbits_per_bitset = (int32_t)nbrs.size();
 
             	  encoding.push_back(nbrs.count());
             	  int poscount = encoding.size() - 1;
@@ -99,7 +126,7 @@ namespace boost
             	  {
             	  	if (graphbits.find(j) != graphbits.end())
             	  	{
-            	  		encoding.push_back( (int16_t)j );
+            	  		encoding.push_back( (int32_t)j );
             	  		++nbfwd;
             	  	}
             	  }
@@ -119,7 +146,7 @@ namespace boost
         void load(Ar &ar, gbits &graphbits, unsigned)
         {
 	    
-	    if (false){
+	    if (true){
 	    size_t num_entries;
 	    ar >> num_entries;
 	    
@@ -136,12 +163,12 @@ namespace boost
             }
             
             size_t num_entries;
-            int16_t nbbits_per_bitset;
+            int32_t nbbits_per_bitset;
             ar >> num_entries;
             
             ar >> nbbits_per_bitset;
             
-            std::vector<int16_t> encoding(num_entries);
+            std::vector<int32_t> encoding(num_entries);
 	    ar >> boost::serialization::make_array(encoding.data(), encoding.size());
 	    
 	    //map<int, vector<int>> future_edges;
@@ -149,16 +176,16 @@ namespace boost
 	    size_t cpt = 0;
 	    while (cpt < encoding.size())
 	    {
-	    	int16_t v = encoding[cpt];
+	    	int32_t v = encoding[cpt];
 		++cpt;
-		int16_t nbnbrs = encoding[cpt];
+		int32_t nbnbrs = encoding[cpt];
 		++cpt;
 		
 		gbitset vvec(nbbits_per_bitset);
 		
 		for (size_t i = 0; i < nbnbrs; ++i)
 		{
-			int16_t w = encoding[cpt];
+			int32_t w = encoding[cpt];
 			vvec[w] = true;
 			
 			//future_edges[w].push_back(v);
@@ -246,9 +273,11 @@ public:
     long is_skips;
     long deglb_skips;
     long seen_skips;
+    
+    long timecopying;
 
     gbits init_graphbits;
-    std::atomic<size_t> passes;
+    size_t passes;
     std::mutex mtx;
 
     VC_void_MPI_bitvec_enc()
@@ -260,6 +289,7 @@ public:
 
     void setGraph(Graph &graph)
     {
+    	timecopying = 0;
         is_skips = 0;
         deglb_skips = 0;
         seen_skips = 0;
@@ -372,6 +402,7 @@ public:
                                    std::ctime(&time));
 
             cout << str;
+            
 
             //<<" seen_skips="<<seen_skips<<" seen.size="<<seen[id].size()<<endl;
             //cout<<"ID="<<id<<" CSOL="<<cursol_size<<" REFVAL="<<branchHandler.getRefValue()<<endl;
@@ -524,7 +555,10 @@ public:
                                   {
                                       int bestVal = branchHandler.refValue();
                                       
+                                      //auto t1 = std::chrono::high_resolution_clock::now();
                                       gbits graphbits_maxdegremoved = graphbits;
+                                      //auto t2 = std::chrono::high_resolution_clock::now();
+                                      //timecopying += duration_cast<std::chrono::milliseconds>(t2 - t1).count();
                                       //for (const auto &kv : graphbits)
                                       {
                                       //	graphbits_maxdegremoved[kv.first] = kv.second;  //copies everything
@@ -547,8 +581,12 @@ public:
                                       int bestVal = branchHandler.refValue();
                                       //right branch = take out v nbrs
                                      
+						                                      
 
+                                      //auto t1 = std::chrono::high_resolution_clock::now();
 				       gbits graphbits_nbrsremoved = graphbits; //copies everything
+				       //auto t2 = std::chrono::high_resolution_clock::now();
+				       //timecopying += duration_cast<std::chrono::milliseconds>(t2 - t1).count();
 				       //for (const auto &kv : graphbits)
                                       {
                                       //	graphbits_nbrsremoved[kv.first] = kv.second;  //copies everything
@@ -577,9 +615,9 @@ public:
 
         if (hol_l.evaluate_branch_checkIn())
         {
-            if (nbVertices < 50)
-                branchHandler.try_push_MT<void>(_f, id, hol_l);
-            else
+            //if (nbVertices < 50)
+            //    branchHandler.try_push_MT<void>(_f, id, hol_l);
+            //else
 			{
 				
 					branchHandler.try_push_MP<void>(_f, id, hol_l, serializer);

@@ -12,7 +12,7 @@
 
 
 #ifdef USE_LARGE_ENCODING
-#include "../include/VC_void_bitvec_enc.hpp"
+#include "../include/VC_void_bitvec_enc2.hpp"
 #else
 #include "../include/VC_void_MPI_bitvec.hpp"
 #endif
@@ -67,8 +67,8 @@ int main_void_MPI_bitvec(int job_id, int nodes, int ntasks_per_node, int ntasks_
 	cout << "NUMTHREADS= " << cpus_per_task << endl;
 
 #ifdef USE_LARGE_ENCODING
-	VC_void_MPI_bitvec_enc cover;
-	auto function = std::bind(&VC_void_MPI_bitvec_enc::mvcbitset, &cover, _1, _2, _3, _4, _5); // target algorithm [all arguments]
+	VC_void_MPI_bitvec_enc2 cover;
+	auto function = std::bind(&VC_void_MPI_bitvec_enc2::mvcbitset, &cover, _1, _2, _3, _4, _5); // target algorithm [all arguments]
 #else
 	VC_void_MPI_bitvec cover;
 	auto function = std::bind(&VC_void_MPI_bitvec::mvcbitset, &cover, _1, _2, _3, _4, _5); // target algorithm [all arguments]
@@ -97,7 +97,9 @@ int main_void_MPI_bitvec(int job_id, int nodes, int ntasks_per_node, int ntasks_
 	std::cout << "solsize=" << solsize << endl;
 	mpiScheduler.barrier();
 #ifdef USE_LARGE_ENCODING
-	std::string buffer = serializer(zero, cover.init_graphbits, zero);
+	BitGraph bg;
+	bg.bits_in_graph = allones;
+	std::string buffer = serializer(zero, bg, zero);
 #else
 	std::string buffer = serializer(zero, allones, zero);
 #endif
@@ -124,7 +126,7 @@ int main_void_MPI_bitvec(int job_id, int nodes, int ntasks_per_node, int ntasks_
 		*/
         branchHandler.initThreadPool(cpus_per_task - 1);
 #ifdef USE_LARGE_ENCODING
-	auto bufferDecoder = branchHandler.constructBufferDecoder<void, int, gbits, int>(function, deserializer);
+	auto bufferDecoder = branchHandler.constructBufferDecoder<void, int, BitGraph, int>(function, deserializer);
 #else
 	auto bufferDecoder = branchHandler.constructBufferDecoder<void, int, gbitset, int>(function, deserializer);
 #endif

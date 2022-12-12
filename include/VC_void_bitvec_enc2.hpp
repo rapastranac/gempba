@@ -5,13 +5,30 @@
 #include <array>
 #include <random>
 
+#include <map>
 #include <boost/dynamic_bitset.hpp>
 #include <boost/container/set.hpp>
 #include <boost/unordered_set.hpp>
+#include <boost/unordered_map.hpp>
+#include <boost/container/flat_map.hpp>
+
+#include <memory_resource> 
 
 using namespace boost;
 
+
 #define gbitset dynamic_bitset<>
+#define gbits boost::container::flat_map<int, gbitset>
+
+
+gbits global_graphbits;
+
+
+class BitGraph
+{
+	public:
+	gbitset bits_in_graph;
+};
 
 namespace boost
 {
@@ -61,6 +78,63 @@ namespace boost
     }
 }
 
+
+
+
+
+
+namespace boost
+{
+    namespace serialization
+    {
+
+        template <typename Ar>
+        void save(Ar &ar, BitGraph const &bg, unsigned)
+        {
+            ar << bg.bits_in_graph;
+            
+             for (int i = bg.bits_in_graph.find_first(); i != gbitset::npos; i = bg.bits_in_graph.find_next(i))
+             {
+               ar<<(int32_t)i;
+             	ar << global_graphbits[i];
+             }
+            
+        }
+
+        template <typename Ar>
+        void load(Ar &ar, BitGraph &bg, unsigned)
+        {
+            ar >> bg.bits_in_graph;
+            
+            for (int c = 0; c < bg.bits_in_graph.count(); ++c)
+            {
+               int32_t v;
+            	ar >> v;
+            	gbitset bits;
+            	ar >> bits;
+            }
+        }
+
+        template <typename Ar>
+        void serialize(Ar &ar, BitGraph &bg, unsigned version)
+        {
+            split_free(ar, bg, version);
+        }
+
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
 void helper_ser(auto &archive, auto &first)
 {
     archive << first;
@@ -106,13 +180,13 @@ auto deserializer = [](std::stringstream &ss, auto &...args)
     //archive(args...);
 };
 
-class VC_void_MPI_bitvec : public VertexCover
+class VC_void_MPI_bitvec_enc2 : public VertexCover
 {
     //using HolderType = GemPBA::ResultHolder<void, int, gbitset, int, std::vector<int>>;
-    using HolderType = GemPBA::ResultHolder<void, int, gbitset, int>;
+    using HolderType = GemPBA::ResultHolder<void, int, BitGraph, int>;
 
 private:
-    std::function<void(int, int, gbitset &, int, void *)> _f;
+    std::function<void(int, int, BitGraph &, int, void *)> _f;
     //std::function<void(int, int, gbitset &, int, std::vector<int>, void *)> _f;
 
 public:
@@ -121,16 +195,16 @@ public:
     long deglb_skips;
     long seen_skips;
 
-    unordered_map<int, gbitset> graphbits;
+    gbits graphbits;
     std::atomic<size_t> passes;
     std::mutex mtx;
 
-    VC_void_MPI_bitvec()
+    VC_void_MPI_bitvec_enc2()
     {
         //this->_f = std::bind(&VC_void_MPI_bitvec::mvcbitset, this, _1, _2, _3, _4, _5, _6);
-        this->_f = std::bind(&VC_void_MPI_bitvec::mvcbitset, this, _1, _2, _3, _4, _5);
+        this->_f = std::bind(&VC_void_MPI_bitvec_enc2::mvcbitset, this, _1, _2, _3, _4, _5);
     }
-    ~VC_void_MPI_bitvec() {}
+    ~VC_void_MPI_bitvec_enc2() {}
 
     void setGraph(Graph &graph)
     {
@@ -194,6 +268,8 @@ public:
                 graphbits[i] = gbitset(gsize);
             }
         }
+        
+        global_graphbits = graphbits;
     }
     
     
@@ -202,9 +278,10 @@ public:
     
 
     //void mvcbitset(int id, int depth, gbitset &bits_in_graph, int solsize, std::vector<int> dummy, void *parent)
-    void mvcbitset(int id, int depth, gbitset &bits_in_graph, int solsize, void *parent = nullptr)
+    void mvcbitset(int id, int depth, BitGraph &bg, int solsize, void *parent = nullptr)
     {
 
+	gbitset& bits_in_graph = bg.bits_in_graph;
         //{                                                   // 1 MB, emulates heavy messaging
         //    std::random_device rd;                          // Will be used to obtain a seed for the random number engine
         //    std::mt19937 gen(rd());                         // Standard mersenne_twister_engine seeded with rd()
@@ -416,7 +493,9 @@ public:
                                       {
                                           //auto cpy = dummy;
                                           //hol_l.holdArgs(newDepth, ingraph1, solsize1, cpy);
-                                          hol_l.holdArgs(newDepth, ingraph1, solsize1);
+                                          BitGraph bg;
+                                          bg.bits_in_graph = ingraph1;
+                                          hol_l.holdArgs(newDepth, bg, solsize1);
                                           return true;
                                       }
                                       else
@@ -436,7 +515,9 @@ public:
 
                                       if (solsize2 < bestVal)
                                       {
-                                          hol_r.holdArgs(newDepth, ingraph2, solsize2);
+                                          BitGraph bg;
+                                          bg.bits_in_graph = ingraph2;
+                                          hol_r.holdArgs(newDepth, bg, solsize2);
                                           //auto cpy = dummy;
                                           //hol_r.holdArgs(newDepth, ingraph2, solsize2, cpy);
                                           return true;

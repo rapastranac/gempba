@@ -113,6 +113,7 @@ class TaskComparator
 public:
     bool operator() (std::pair<char*, int> t1, std::pair<char*, int> t2)
     {
+    
         int n1 = getNbSetBits(t1);
 		int n2 = getNbSetBits(t2);
 		
