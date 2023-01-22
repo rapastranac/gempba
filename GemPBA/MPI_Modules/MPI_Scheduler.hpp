@@ -21,6 +21,8 @@
 #include <thread>
 #include <queue>
 #include <unistd.h>
+#include <atomic>
+#include <memory>
 
 #define CENTER 0
 
@@ -35,7 +37,7 @@
 #define HAS_RESULT_TAG 13
 #define NO_RESULT_TAG 14
 
-#define TIMEOUT_TIME 20
+#define TIMEOUT_TIME 3
 
 namespace GemPBA
 {
@@ -120,7 +122,7 @@ namespace GemPBA
 				MPI_Barrier(world_Comm);
 		}
 
-		bool acquirePriority()
+		bool openSendingChannel()
 		{
 			if (mtx.try_lock()) // acquires mutex
 			{
@@ -138,7 +140,7 @@ namespace GemPBA
 		}
 
 		/* this should be invoked only if priority is acquired*/
-		void releasePriority()
+		void closeSendingChannel()
 		{
 			mtx.unlock();
 		}
@@ -247,7 +249,7 @@ namespace GemPBA
 
 			q.push(_message);
 
-			releasePriority();
+			closeSendingChannel();
 		}
 
 	private:

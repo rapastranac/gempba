@@ -9,12 +9,42 @@
 int main(int argc, char *argv[])
 {
 	argparse::ArgumentParser program("main");
-	program.add_argument("-N", "--nThreads")
-		.help("Number of threads")
+
+	program.add_argument("-job_id", "--job_id")
+		.help("Job ID")
 		.nargs(1)
-		.default_value(int{1})
+		.default_value(int{-1})
 		.action([](const std::string &value)
 				{ return std::stoi(value); });
+
+	program.add_argument("-nodes", "--nodes")
+		.help("Number of nodes")
+		.nargs(1)
+		.default_value(int{-1})
+		.action([](const std::string &value)
+				{ return std::stoi(value); });
+
+	program.add_argument("-ntasks_per_node", "--ntasks_per_node")
+		.help("Number of tasks per node")
+		.nargs(1)
+		.default_value(int{-1})
+		.action([](const std::string &value)
+				{ return std::stoi(value); });
+
+	program.add_argument("-ntasks_per_socket", "--ntasks_per_socket")
+		.help("Number of tasks per socket")
+		.nargs(1)
+		.default_value(int{-1})
+		.action([](const std::string &value)
+				{ return std::stoi(value); });
+
+	program.add_argument("-cpus_per_task", "--cpus_per_task")
+		.help("Number of cpus per task")
+		.nargs(1)
+		.default_value(int{-1})
+		.action([](const std::string &value)
+				{ return std::stoi(value); });
+
 
 	program.add_argument("-P", "--prob")
 		.help("Density probability of input graph")
@@ -40,11 +70,16 @@ int main(int argc, char *argv[])
 		exit(0);
 	};
 
-	int numThreads = program.get<int>("--nThreads");
+	int job_id = program.get<int>("--job_id");
+	int nodes = program.get<int>("--nodes");
+	int ntasks_per_node = program.get<int>("--ntasks_per_node");
+	int ntasks_per_socket = program.get<int>("--ntasks_per_socket");
+	int cpus_per_task = program.get<int>("--cpus_per_task");
+
 	int prob = program.get<int>("--prob");
 	auto filename = program.get<std::string>("--indir");
 
-	fmt::print("argc: {}, threads: {}, prob : {}, filename: {} \n", argc, numThreads, prob, filename);
+	fmt::print("argc: {}, nodes: {}, ntasks_per_node: {}, ntasks_per_socket: {}, cpus_per_task: {}, prob : {}, filename: {} \n", argc, nodes, ntasks_per_node, ntasks_per_socket, cpus_per_task, prob, filename);
 
 #ifdef VC_VOID
 	return main_void(numThreads, prob, filename);
@@ -55,7 +90,8 @@ int main(int argc, char *argv[])
 #elif VC_NON_VOID_MPI
 	return main_non_void_MPI(numThreads, prob, filename);
 #elif BITVECTOR_VC
-	return main_void_MPI_bitvec(numThreads, prob, filename);
+	return main_void_MPI_bitvec(job_id, nodes, ntasks_per_node, ntasks_per_socket,
+                                cpus_per_task, prob, filename);
 #elif BITVECTOR_VC_THREAD
 	return main_void_bitvec(numThreads, prob, filename);
 #endif
