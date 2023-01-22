@@ -5,3 +5,7 @@ Makefile
 cmake_install.cmake
 .vscode
 build
+.cmake
+.idea
+global.cbp
+Testing
