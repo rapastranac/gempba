@@ -8,7 +8,6 @@ find_package(OpenMP REQUIRED)
 find_package(Threads  REQUIRED)
 find_package(MPI  REQUIRED)
 find_package(Boost  COMPONENTS system serialization fiber REQUIRED)
-#find_package(Boost REQUIRED)
 
 include_directories(${MPI_INCLUDE_PATH})
 
@@ -19,25 +18,19 @@ Set(CMAKE_EXE_LINKER_FLAGS  "-lboost_system -lboost_serialization  -lboost_fiber
 
 
 add_definitions(-DR_SEARCH=true)
-add_definitions(-DMPI_ENABLED)
+#add_definitions(-DMPI_ENABLED)
 #add_definitions(-DDEBUG_COMMENTS)
 #add_definitions(-DVC_VOID)
 #add_definitions(-DVC_VOID_MPI)
-add_definitions(-DBITVECTOR_VC)
-#add_definitions(-DBITVECTOR_VC_THREAD)
+#add_definitions(-DBITVECTOR_VC)
+add_definitions(-DBITVECTOR_VC_THREAD)
 #add_definitions(-DVC_NON_VOID)
 #add_definitions(-DVC_NON_VOID_MPI)
 
-add_definitions(-DSCHEDULER_CENTRALIZED)
-add_definitions(-DUSE_LARGE_ENCODING)
-
 add_compile_options("-std=c++2a" "-fconcepts" "-O3" "-Wall" "-Wpedantic" "-Wextra" "-fexceptions" "-pthread")
-#add_compile_options("-Wall" "-Wpedantic" "-Wextra" "-fexceptions" "-pthread" "-fconcepts" )
-
-
 
 #valgrind
-add_compile_options("-g" "-Wall" "-Wpedantic" "-Wextra" "-fexceptions" "-pthread" "-fconcepts" "-ggdb3")
+#add_compile_options("-g" "-Wall" "-Wpedantic" "-Wextra" "-fexceptions" "-pthread" "-fconcepts" "-ggdb3")
 
 #Here below for boost
 #add_compile_options("-Wall" "-Wpedantic" "-Wextra" "-fexceptions" "-pthread" "-fconcepts" )

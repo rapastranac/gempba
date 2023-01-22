@@ -1228,7 +1228,7 @@ public:
 		   numVertices);
 	} */
 
-	/*template <class Archive>
+	template <class Archive>
 	void serialize(Archive &ar, const unsigned int version)
 	{
 		ar &max;
@@ -1243,7 +1243,7 @@ public:
 		ar &_cover;
 		ar &numEdges;
 		ar &numVertices;
-	}*/
+	}
 #endif
 
 	std::map<int16_t, std::set<int16_t>> adj; /*Adjacency list*/

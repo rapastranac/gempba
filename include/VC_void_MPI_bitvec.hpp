@@ -21,17 +21,6 @@ namespace boost
         template <typename Ar, typename Block, typename Alloc>
         void save(Ar &ar, dynamic_bitset<Block, Alloc> const &bs, unsigned)
         {
-        
-        	
-        
-	    /*dynamic_bitset<Block, Alloc> dummy(bs);
-	    dummy.resize( bs.size() * 100 );
-	    
-	    size_t num_bits = dummy.size();
-            std::vector<Block> blocks(dummy.num_blocks());
-            to_block_range(dummy, blocks.begin());
-            ar &num_bits &blocks;*/
-	    
             size_t num_bits = bs.size();
             std::vector<Block> blocks(bs.num_blocks());
             to_block_range(bs, blocks.begin());
@@ -47,9 +36,7 @@ namespace boost
 
             bs.resize(num_bits);
             from_block_range(blocks.begin(), blocks.end(), bs);
-            
             bs.resize(num_bits);
-            //bs.resize(num_bits / 100);
         }
 
         template <typename Ar, typename Block, typename Alloc>
@@ -195,11 +182,6 @@ public:
             }
         }
     }
-    
-    
-    
-    
-    
 
     //void mvcbitset(int id, int depth, gbitset &bits_in_graph, int solsize, std::vector<int> dummy, void *parent)
     void mvcbitset(int id, int depth, gbitset &bits_in_graph, int solsize, void *parent = nullptr)
@@ -402,11 +384,6 @@ public:
                                   {
                                       int bestVal = branchHandler.refValue();
                                       gbitset ingraph1 = bits_in_graph;
-                                      
-                                      if (!ingraph1[maxdeg_v])
-                                      {
-                                      	cout<<"ERROR : maxdeg_v already gone"<<endl;
-                                      }
                                       ingraph1.set(maxdeg_v, false);
                                       //gbitset sol1 = cur_sol;
                                       //sol1.set(maxdeg_v, true);
@@ -449,11 +426,8 @@ public:
         {
             //if (nbVertices < 50)
             //    branchHandler.forward<void>(_f, id, hol_l);
-           // else
-			{
-				
-					branchHandler.try_push_MP<void>(_f, id, hol_l, serializer);
-			}
+            //else
+            branchHandler.try_push_MP<void>(_f, id, hol_l, serializer);
         }
         else
         {
