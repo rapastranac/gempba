@@ -9,3 +9,7 @@ build
 .idea
 global.cbp
 Testing
+output
+results
+googletest
+fmt
