@@ -1,7 +1,7 @@
 #!/bin/bash
 # ---------------------------------------------------------------------
-echo "Current working directory: `pwd`"
-echo "Starting run at: `date`"
+echo "Current working directory: $(pwd)"
+echo "Starting run at: $(date)"
 
 #to debug
 #xhost +node1 +manager
@@ -20,7 +20,6 @@ echo "Starting run at: `date`"
 #mpirun -n 5 --bind-to core --map-by numa:PE=2 --report-bindings xterm -fa 'Monospace' -bg white -fg black -fs 12 -e gdb -x gdb_commands --args a.out
 #mpirun --oversubscribe -n 5 -display-map --bind-to none --map-by numa:PE=2 --report-bindings xterm -fa 'Monospace' -bg white -fg black -fs 12 -e gdb -x gdb_commands --args a.out -I input/prob_4/600/00600_1
 
-
 #mpirun --oversubscribe -n 10 -display-map --bind-to none --map-by core --report-bindings xterm -fa 'Monospace' -bg white -fg black -fs 12 -hold -e gdb -x gdb_commands --args a.out -N 1 -I input/prob_4/600/00600_1
 #mpirun --oversubscribe -n 10 -display-map --bind-to none --map-by core --report-bindings xterm -fa 'Monospace' -bg white -fg black -fs 12 -hold -e gdb -x gdb_commands --args a.out -N 1 -I input/p_hat1000_2
 
@@ -30,10 +29,19 @@ echo "Starting run at: `date`"
 #mpirun --oversubscribe -n 2 -display-map --bind-to none --map-by core --report-bindings ./a.out -N 48 -I input/prob_4/600/00600_1
 #mpirun --oversubscribe -n 6 -display-map --bind-to none --map-by core --report-bindings ./a.out -N 1 -I input/prob_4/600/00600_1
 
-#binding
-mpirun -n 6 -display-map --bind-to core --map-by numa:PE=1 --report-bindings ./a.out -N 2 -I input/prob_4/600/00600_1
-#mpirun -n 3 -host manager:2,node1:1 -display-map --bind-to core --map-by numa:PE=3 --report-bindings ./a.out -N 3 -I input/prob_4/600/00600_1
+JOB_ID=9999
+TASKS_PER_NODE=9999
+TASKS_PER_SOCKET=9999
+NODES=3         #processes
+CPUS_PER_TASK=3 #threads per process (including the designated thread for MPI communication)
+GRAPH_FILE=input/prob_4/600/00600_1
 
+# From the following args variable, only CPUS_PER_TASK is used by the project, the rest is used only for stats purposes
+args="-job_id $JOB_ID -nodes $NODES -ntasks_per_node $TASKS_PER_NODE -ntasks_per_socket $TASKS_PER_SOCKET -cpus_per_task $CPUS_PER_TASK -I $GRAPH_FILE"
+
+#binding
+mpirun -n $NODES -display-map --bind-to core --map-by numa:PE=1 --report-bindings ./a.out $args
+#mpirun -n 3 -host manager:2,node1:1 -display-map --bind-to core --map-by numa:PE=3 --report-bindings ./a.out -N 3 -I input/prob_4/600/00600_1
 
 #mpirun --oversubscribe -n 2 -display-map --bind-to none --map-by core --report-bindings ./a.out -N 1 -I input/p_hat700_1
 #mpirun --oversubscribe -n 5 -display-map --bind-to none --map-by core --report-bindings ./a.out -N 4 -I input/p_hat500_3
@@ -46,8 +54,6 @@ mpirun -n 6 -display-map --bind-to core --map-by numa:PE=1 --report-bindings ./a
 #mpirun --oversubscribe -n 10 -host manager:5,node1:5 -display-map --bind-to none --map-by core --report-bindings ./a.out -N 4 -I input/p_hat1000_2
 #mpirun --oversubscribe -n 10 -display-map --bind-to none --map-by core --report-bindings ./a.out -N 4 -I input/p_hat1000_2
 
-
-
 # ---------------------------------------------------------------------
-echo "Finishing run at: `date`"
+echo "Finishing run at: $(date)"
 # ---------------------------------------------------------------------
