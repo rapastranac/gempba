@@ -15,6 +15,7 @@ output
 results
 test
 external
+googletest
 
 
 # Allow
