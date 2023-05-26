@@ -5,7 +5,13 @@ Makefile
 cmake_install.cmake
 .vscode
 build
+cmake-build-debug
+cmake-build-debug-wsl
 .cmake
 .idea
 global.cbp
 Testing
+output
+results
+googletest
+fmt
