@@ -11,5 +11,9 @@ global.cbp
 Testing
 output
 results
-googletest
-fmt
+test
+external
+
+
+# Allow
+!external/CMakeLists.txt
