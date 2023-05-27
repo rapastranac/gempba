@@ -25,7 +25,8 @@ if(NOT fmt_POPULATED)
     add_subdirectory(${fmt_SOURCE_DIR} ${fmt_BINARY_DIR})
 endif()
 
-# You can add more FetchContent_Declare and FetchContent_Populate commands for other libraries if needed
+# Define a custom variable for the include directory
+set(FMT_INCLUDE_DIR ${EXTERNAL_INSTALL_LOCATION}/fmt/include CACHE PATH "fmt include directory")
 
 # Install targets for the external libraries
 install(DIRECTORY ${EXTERNAL_INSTALL_LOCATION}/fmt/
