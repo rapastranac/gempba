@@ -37,6 +37,10 @@ public:
         return this->q.empty();
     }
 
+    size_t size() {
+        return q.size();
+    }
+
 private:
     std::queue<T> q;
     std::mutex mtx;
