@@ -48,6 +48,7 @@ include_directories("include")
 include_directories("GemPBA")
 include_directories(${FMT_INCLUDE_DIR})
 include_directories(${ARGPARSE_INCLUDE_DIR})
+include_directories(${GTEST_INCLUDE_DIR})
 
 message("fmt dir: ${FMT_INCLUDE_DIR}")
 message("Parser dir: ${ARGPARSE_INCLUDE_DIR}")
@@ -62,8 +63,22 @@ target_link_libraries(a.out ${CMAKE_THREAD_LIBS_INIT}
         ${MPI_LIBRARIES}
         ${Boost_LIBRARIES}
         OpenMP::OpenMP_CXX
+        gtest
         )
 
 if (MPI_COMPILE_FLAGS)
     set_target_properties(a.out PROPERTIES COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
 endif ()
+
+# Enable testing
+enable_testing()
+
+# Include the test directory
+add_subdirectory(test)
+
+# Add a custom target to build and run the tests
+add_custom_target(run_tests
+        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
+        DEPENDS tests
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        )
