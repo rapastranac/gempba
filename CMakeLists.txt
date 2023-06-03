@@ -55,8 +55,8 @@ message("Parser dir: ${ARGPARSE_INCLUDE_DIR}")
 file(GLOB Sources "src/*.cpp")
 
 add_executable(a.out ${Sources}
-        ${EXTERNAL_INSTALL_LOCATION}/fmt/src/format.cc
-        ${EXTERNAL_INSTALL_LOCATION}/fmt/src/os.cc)
+        ${FMT_INSTALL_LOCATION}/fmt/src/format.cc
+        ${FMT_INSTALL_LOCATION}/fmt/src/os.cc)
 
 target_link_libraries(a.out ${CMAKE_THREAD_LIBS_INIT}
         ${MPI_LIBRARIES}
@@ -67,4 +67,3 @@ target_link_libraries(a.out ${CMAKE_THREAD_LIBS_INIT}
 if (MPI_COMPILE_FLAGS)
     set_target_properties(a.out PROPERTIES COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
 endif ()
-
