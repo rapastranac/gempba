@@ -157,7 +157,7 @@ public:
         //for some reason, I decided to sort the vertices by degree.  I don't think it is useful.
         std::sort(deg_v.begin(), deg_v.end());
         map<int, int> remap;
-        for (int i = 0; i < deg_v.size(); i++)
+        for (int i = 0; i < static_cast<int>(deg_v.size()); i++)
         {
             remap[deg_v[i].second] = deg_v.size() - 1 - i;
         }
@@ -286,7 +286,7 @@ public:
             maxdeg_v = 0;
             someRuleApplies = false;
 
-            for (int i = bits_in_graph.find_first(); i != gbitset::npos; i = bits_in_graph.find_next(i))
+            for (size_t i = bits_in_graph.find_first(); i != gbitset::npos; i = bits_in_graph.find_next(i))
             {
 
                 gbitset nbrs = (graphbits[i] & bits_in_graph);
