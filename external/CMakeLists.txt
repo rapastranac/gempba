@@ -1,16 +1,19 @@
-cmake_minimum_required(VERSION 3.22)
-project(external)
-
-
+cmake_minimum_required(VERSION 3.2)
 include(FetchContent)
 
+project(external)
+
 set(EXTERNAL_INSTALL_LOCATION ${CMAKE_SOURCE_DIR}/external CACHE PATH "External install location" FORCE)
+
+#region FMT
+# Set the installation location for fmt
+set(FMT_INSTALL_LOCATION ${EXTERNAL_INSTALL_LOCATION} CACHE PATH "Fmt install location" FORCE)
 
 FetchContent_Declare(
         fmt
         GIT_REPOSITORY https://github.com/fmtlib/fmt.git
         GIT_TAG a0b8a92e3d1532361c2f7feb63babc5c18d00ef2    # release-10.0.0
-        SOURCE_DIR ${EXTERNAL_INSTALL_LOCATION}/fmt
+        SOURCE_DIR ${FMT_INSTALL_LOCATION}/fmt
 )
 
 FetchContent_GetProperties(fmt)
@@ -26,17 +29,24 @@ if(NOT fmt_POPULATED)
 endif()
 
 # Define a custom variable for the include directory
-set(FMT_INCLUDE_DIR ${EXTERNAL_INSTALL_LOCATION}/fmt/include CACHE PATH "fmt include directory")
+set(FMT_INCLUDE_DIR ${FMT_INSTALL_LOCATION}/fmt/include CACHE PATH "fmt include directory")
 
 # Install targets for the external libraries
-install(DIRECTORY ${EXTERNAL_INSTALL_LOCATION}/fmt/
+install(DIRECTORY ${FMT_INSTALL_LOCATION}/fmt/
         DESTINATION ${CMAKE_INSTALL_PREFIX}/external/fmt)
+
+#endregion
+
+#region ARGPARSE
+
+# Set the installation location for fmt
+set(ARGPARSE_INSTALL_LOCATION ${EXTERNAL_INSTALL_LOCATION} CACHE PATH "argparse install location" FORCE)
 
 FetchContent_Declare(
         argparse
         GIT_REPOSITORY https://github.com/p-ranav/argparse.git
         GIT_TAG 997da9255618311d1fcb0135ce86022729d1f1cb    # v2.9
-        SOURCE_DIR ${EXTERNAL_INSTALL_LOCATION}/argparse
+        SOURCE_DIR ${ARGPARSE_INSTALL_LOCATION}/argparse
 )
 
 FetchContent_GetProperties(argparse)
@@ -52,13 +62,14 @@ if(NOT argparse_POPULATED)
 endif()
 
 # Define a custom variable for the include directory
-set(ARGPARSE_INCLUDE_DIR ${EXTERNAL_INSTALL_LOCATION}/argparse/include CACHE PATH "argparse include directory")
+set(ARGPARSE_INCLUDE_DIR ${ARGPARSE_INSTALL_LOCATION}/argparse/include CACHE PATH "argparse include directory")
 
 # Install targets for the external libraries
-install(DIRECTORY ${EXTERNAL_INSTALL_LOCATION}/argparse/
+install(DIRECTORY ${ARGPARSE_INSTALL_LOCATION}/argparse/
         DESTINATION ${CMAKE_INSTALL_PREFIX}/external/argparse)
 
+#endregion
+
+
+
 FetchContent_MakeAvailable(fmt argparse)
-
-# You can add more FetchContent_Declare and FetchContent_MakeAvailable commands for other libraries if needed
-
