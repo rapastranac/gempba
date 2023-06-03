@@ -179,9 +179,9 @@ public:
           current = next + splitter.length();
           next = str.find( splitter, current );
 
-          if (next == string::npos)
+          if (next == static_cast<int>(string::npos))
           {
-              if (includeEmpty || (current < str.length()))
+              if (includeEmpty || (current < static_cast<int>(str.length())))
               {
                 v.push_back(str.substr( current ));
               }
@@ -194,7 +194,7 @@ public:
               }
           }
         }
-        while (next != string::npos);
+        while (next != static_cast<int>(string::npos));
 
         return v;
     }
@@ -209,9 +209,9 @@ public:
 
         int pos = 0;
 
-        while (pos < str.length())
+        while (pos < static_cast<int>(str.length()))
         {
-            if (str.length() > pos + nbchars)
+            if (static_cast<int>(str.length()) > pos + nbchars)
             {
                 out += str.substr(pos, nbchars) + splitter;
 
@@ -258,7 +258,7 @@ public:
     {
         string instr = "";
 
-        for (int i = 0; i < sz.size(); i++)
+        for (int i = 0; i < static_cast<int>(sz.size()); i++)
         {
             if (instr != "")
                 instr +=",";
@@ -274,7 +274,7 @@ public:
     {
         int pos = s.find_first_of(separator);
 
-        if (pos != string::npos)
+        if (pos != static_cast<int>(string::npos))
             return s.substr(0, pos);
 
         return s;
@@ -284,7 +284,7 @@ public:
     {
         int pos = s.find_last_of(separator);
 
-        if (pos != string::npos)
+        if (pos != static_cast<int>(string::npos))
             return s.substr(pos + 1);
 
         return s;

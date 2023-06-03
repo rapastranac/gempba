@@ -124,7 +124,7 @@ public:
 		while (it != cover.end())
 		{
 			str += Util::ToString(*it) + "   ";
-			if (str.size() >= wide)
+			if (static_cast<int>(str.size()) >= wide)
 			{
 				std::cout << fmt::format("{:<{}}", str, wide);
 				std::cout << "\n";
