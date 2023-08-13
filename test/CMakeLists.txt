@@ -4,7 +4,7 @@ project(run_tests)
 set(CMAKE_CXX_STANDARD 20)
 
 # Include the external libraries' headers
-include_directories("${GTEST_INSTALL_LOCATION}/googletest/include")
+include_directories("${GTEST_INCLUDE_DIR}")
 
 # Create a binary directory for the GTest library
 set(GTEST_BINARY_DIR "${CMAKE_BINARY_DIR}/gtest")
@@ -13,26 +13,26 @@ file(MAKE_DIRECTORY ${GTEST_BINARY_DIR})
 # Add the GTest library with modified target names
 add_library(my_gtest STATIC IMPORTED)
 set_target_properties(my_gtest PROPERTIES
-        IMPORTED_LOCATION "${GTEST_INSTALL_LOCATION}/gtest/libgtest.a"
-        INTERFACE_INCLUDE_DIRECTORIES "${GTEST_INSTALL_LOCATION}/gtest/googletest/include"
+        IMPORTED_LOCATION "${GTEST_LIB_DIR}/libgtest.a"
+        INTERFACE_INCLUDE_DIRECTORIES "${GTEST_INCLUDE_DIR}"
         )
 
 add_library(my_gtest_main STATIC IMPORTED)
 set_target_properties(my_gtest_main PROPERTIES
-        IMPORTED_LOCATION "${GTEST_INSTALL_LOCATION}/gtest/libgtest_main.a"
+        IMPORTED_LOCATION "${GTEST_LIB_DIR}/libgtest_main.a"
         INTERFACE_LINK_LIBRARIES "my_gtest"
         )
 
 add_library(my_gmock STATIC IMPORTED)
 set_target_properties(my_gmock PROPERTIES
-        IMPORTED_LOCATION "${GTEST_INSTALL_LOCATION}/gtest/libgmock.a"
-        INTERFACE_INCLUDE_DIRECTORIES "${GTEST_INSTALL_LOCATION}/gtest/googlemock/include"
+        IMPORTED_LOCATION "${GTEST_LIB_DIR}/libgmock.a"
+        INTERFACE_INCLUDE_DIRECTORIES "${GTEST_INCLUDE_DIR}"
         INTERFACE_LINK_LIBRARIES "my_gtest"
         )
 
 add_library(my_gmock_main STATIC IMPORTED)
 set_target_properties(my_gmock_main PROPERTIES
-        IMPORTED_LOCATION "${GTEST_INSTALL_LOCATION}/gtest/libgmock_main.a"
+        IMPORTED_LOCATION "${GTEST_LIB_DIR}/libgmock_main.a"
         INTERFACE_LINK_LIBRARIES "my_gmock;my_gtest"
         )
 
