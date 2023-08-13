@@ -1,0 +1,42 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ "update" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup CMake
+      run: sudo apt-get install cmake
+
+    - name: clone GemPBA
+      run: |
+        git clone https://github.com/rapastranac/gempba.git
+        cd gempba
+    
+    # Step to download and build external libraries
+    - name: Build External Libraries
+      run: |
+        cd external
+        # Clone fmt : no need to build
+        git clone --branch "10.0.0" --depth 1 https://github.com/fmtlib/fmt.git fmt        
+        
+        # Clone argparse : no need to build
+        git clone --branch "v2.9" --depth 1 https://github.com/p-ranav/argparse.git argparse
+      
+        # Clone gtest : needs to be built
+        git clone --branch "v1.13.0" --depth 1 https://github.com/google/googletest.git gtest
+        cd gtest
+        mkdir build && cd build
+        cmake ..
+        make
+    
+
