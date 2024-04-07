@@ -74,7 +74,8 @@ int main(int argc, char *argv[]) {
             argc, nodes, ntasks_per_node, ntasks_per_socket, cpus_per_task, prob, filename);
 
 #ifdef VC_VOID
-    return main_void(numThreads, prob, filename);
+    return main_void(job_id, nodes, ntasks_per_node, ntasks_per_socket,
+                     cpus_per_task, prob, filename);
 #elif VC_VOID_MPI
     return main_void_MPI(numThreads, prob, filename);
 #elif VC_NON_VOID

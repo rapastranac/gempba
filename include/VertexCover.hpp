@@ -350,7 +350,7 @@ protected:
     size_t preSize = 0;
     std::mutex mtx;
 
-    std::set<int16_t> cover;
+    std::set<int> cover;
     std::vector<int> visited;
 
     size_t leaves = 0;

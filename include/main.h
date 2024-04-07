@@ -7,7 +7,8 @@
 std::vector<std::string> read_graphs(std::string graphSize);
 
 #ifdef VC_VOID
-int main_void(int numThreads, int prob, std::string &filename);
+int main_void(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int cpus_per_task, int prob,
+              std::string &filename_directory);
 #elif VC_VOID_MPI
 int main_void_MPI(int numThreads, int prob, std::string filename);
 #elif VC_NON_VOID

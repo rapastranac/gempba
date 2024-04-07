@@ -2,22 +2,20 @@
 
 #include "VertexCover.hpp"
 
-class VC_void : public VertexCover
-{
+class VC_void : public VertexCover {
     using HolderType = GemPBA::ResultHolder<void, int, Graph>;
 
 private:
     std::function<void(int, int, Graph &, void *)> _f;
 
 public:
-    VC_void()
-    {
+    VC_void() {
         this->_f = std::bind(&VC_void::mvc, this, _1, _2, _3, _4);
     }
-    ~VC_void() {}
 
-    bool findCover(int run)
-    {
+    ~VC_void() override = default;
+
+    bool findCover(int run) {
         string msg_center = fmt::format("run # {} ", run);
         msg_center = "!" + fmt::format("{:-^{}}", msg_center, wide - 2) + "!" + "\n";
         cout << msg_center;
@@ -44,8 +42,7 @@ public:
 
         begin = std::chrono::steady_clock::now();
 
-        try
-        {
+        try {
             branchHandler.setRefValue(currentMVCSize);
             branchHandler.setRefValStrategyLookup("minimise");
             //mvc(-1, 0, graph);
@@ -65,11 +62,9 @@ public:
             graph_res2 = graph_res;
             cover = graph_res.postProcessing();
         }
-        catch (std::exception &e)
-        {
+        catch (std::exception &e) {
             this->output.open(outPath, std::ofstream::in | std::ofstream::out | std::ofstream::app);
-            if (!output.is_open())
-            {
+            if (!output.is_open()) {
                 printf("Error, output file not found ! \n");
             }
             std::cout << "Exception caught : " << e.what() << '\n';
@@ -85,8 +80,7 @@ public:
         return true;
     }
 
-    void mvc(int id, int depth, Graph graph, void *parent)
-    {
+    void mvc(int id, int depth, Graph graph, void *parent) {
         size_t LB = graph.min_k();
         size_t degLB = 0; //graph.DegLB();
         size_t UB = graph.max_k();
@@ -95,14 +89,12 @@ public:
         size_t k = relaxation(LB, UB);
         //std::max({LB, degLB, acLB})
 
-        if (k + graph.coverSize() >= (size_t)branchHandler.refValue())
-        {
+        if (k + graph.coverSize() >= (size_t) branchHandler.refValue()) {
             //size_t addition = k + graph.coverSize();
             return;
         }
 
-        if (graph.size() == 0)
-        {
+        if (graph.size() == 0) {
 #ifdef DEBUG_COMMENTS
             printf("Leaf reached, depth : %d \n", depth);
 #endif
@@ -119,66 +111,58 @@ public:
         hol_l.setDepth(depth);
         hol_r.setDepth(depth);
 #ifdef R_SEARCH
-        if (!parent)
-        {
+        if (!parent) {
             dummyParent = new HolderType(dlb, id);
             dlb.linkVirtualRoot(id, dummyParent, hol_l, hol_r);
         }
 #endif
 
-        hol_l.bind_branch_checkIn([&]
-                                  {
-                                      Graph g = graph;
-                                      g.removeVertex(v);
-                                      g.clean_graph();
-                                      //g.removeZeroVertexDegree();
-                                      int C = g.coverSize();
+        hol_l.bind_branch_checkIn([&] {
+            Graph g = graph;
+            g.removeVertex(v);
+            g.clean_graph();
+            //g.removeZeroVertexDegree();
+            int C = g.coverSize();
 
-                                      if (C == 0)
-                                      {
-                                          fmt::print("rank {}, thread {}, cover is empty\n", branchHandler.rank_me(), id);
-                                          throw;
-                                      }
-                                      if (C < branchHandler.refValue()) // user's condition to see if it's worth it to make branch call
-                                      {
-                                          int newDepth = depth + 1;
-                                          hol_l.holdArgs(newDepth, g);
-                                          return true; // it's worth it
-                                      }
-                                      else
-                                          return false; // it's not worth it
-                                  });
+            if (C == 0) {
+                fmt::print("rank {}, thread {}, cover is empty\n", branchHandler.rank_me(), id);
+                throw;
+            }
+            if (C < branchHandler.refValue()) // user's condition to see if it's worth it to make branch call
+            {
+                int newDepth = depth + 1;
+                hol_l.holdArgs(newDepth, g);
+                return true; // it's worth it
+            } else
+                return false; // it's not worth it
+        });
 
-        hol_r.bind_branch_checkIn([&]
-                                  {
-                                      Graph g = graph;
-                                      if (g.empty())
-                                          fmt::print("rank {}, thread {}, Graph is empty\n", branchHandler.rank_me(), id);
+        hol_r.bind_branch_checkIn([&] {
+            Graph g = graph;
+            if (g.empty())
+                fmt::print("rank {}, thread {}, Graph is empty\n", branchHandler.rank_me(), id);
 
-                                      g.removeNv(v);
-                                      g.clean_graph();
-                                      //g.removeZeroVertexDegree();
-                                      int C = g.coverSize();
-                                      if (C < branchHandler.refValue()) // user's condition to see if it's worth it to make branch call
-                                      {
-                                          int newDepth = depth + 1;
-                                          hol_r.holdArgs(newDepth, g);
-                                          return true; // it's worth it
-                                      }
-                                      else
-                                          return false; // it's not worth it
-                                  });
+            g.removeNv(v);
+            g.clean_graph();
+            //g.removeZeroVertexDegree();
+            int C = g.coverSize();
+            if (C < branchHandler.refValue()) // user's condition to see if it's worth it to make branch call
+            {
+                int newDepth = depth + 1;
+                hol_r.holdArgs(newDepth, g);
+                return true; // it's worth it
+            } else
+                return false; // it's not worth it
+        });
 
-        if (hol_l.evaluate_branch_checkIn())
-        {
+        if (hol_l.evaluate_branch_checkIn()) {
             //int nbVertices = std::get<1>(hol_l.getArgs()).size(); //temp
             //if (nbVertices < 50)
             //	branchHandler.forward<void>(_f, id, hol_l);
             //else
             branchHandler.try_push_MT<void>(_f, id, hol_l);
         }
-        if (hol_r.evaluate_branch_checkIn())
-        {
+        if (hol_r.evaluate_branch_checkIn()) {
             branchHandler.forward<void>(_f, id, hol_r);
         }
 
@@ -189,11 +173,9 @@ public:
     }
 
 private:
-    void terminate_condition(Graph &graph, int id, int depth)
-    {
+    void terminate_condition(Graph &graph, int id, int depth) {
         std::scoped_lock<std::mutex> lck(mtx);
-        if (graph.coverSize() < branchHandler.refValue())
-        {
+        if (graph.coverSize() < branchHandler.refValue()) {
             int SZ = graph.coverSize(); // debuggin line
             branchHandler.holdSolution(graph);
 
@@ -201,13 +183,12 @@ private:
             foundAtDepth = depth;
             recurrent_msg(id);
 
-            if (depth > (int)measured_Depth)
-                measured_Depth = (size_t)depth;
+            if (depth > (int) measured_Depth)
+                measured_Depth = (size_t) depth;
 
             ++leaves;
         }
 
-        return;
     }
 };
 
