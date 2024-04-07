@@ -1,26 +1,14 @@
 #ifdef VC_VOID
 
-#include "../include/main.h"
 #include "../include/Graph.hpp"
 
 #include "../include/VC_void.hpp"
 
-#include "../include/resultholder/ResultHolder.hpp"
-#include "../include/BranchHandler.hpp"
-
-#include <chrono>
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-
-#include <istream>
-#include <sstream>
-#include <iterator>
+#include "BranchHandler/BranchHandler.hpp"
 #include <string>
-#include <vector>
 
-int main_void(int numThreads, int prob, std::string &filename)
-{
+int main_void(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int cpus_per_task, int prob,
+              std::string &filename_directory) {
 
     auto &handler = GemPBA::BranchHandler::getInstance(); // parallel GemPBA
 
@@ -28,11 +16,11 @@ int main_void(int numThreads, int prob, std::string &filename)
     Graph oGraph;
     VC_void cover;
 
-    graph.readEdges(filename);
+    graph.readEdges(filename_directory);
     //graph.readDimacs(filename);
 
-    cover.init(graph, numThreads, filename, prob);
-    cover.findCover(1);
+    cover.init(graph, ntasks_per_node, filename_directory, prob);
+    cover.findCover(job_id);
     cover.printSolution();
 
     return 0;
