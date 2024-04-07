@@ -9,12 +9,11 @@
 
 #include "ResultHolderBase.hpp"
 
-namespace GemPBA
-{
+namespace GemPBA {
 
-    template <typename _Ret, typename... Args>
-    class ResultHolderInt<_Ret, typename std::enable_if<!std::is_void<_Ret>::value>::type, Args...> : virtual public ResultHolderBase<Args...>
-    {
+    template<typename _Ret, typename... Args>
+    class ResultHolderInt<_Ret, typename std::enable_if<!std::is_void<_Ret>::value>::type, Args...>
+            : virtual public ResultHolderBase<Args...> {
         friend class DLB_Handler;
 
     protected:
@@ -24,20 +23,16 @@ namespace GemPBA
     public:
         ResultHolderInt(DLB_Handler &dlb) : ResultHolderBase<Args...>(dlb) {}
 
-        void hold_future(std::future<_Ret> &&expectedFut)
-        {
+        void hold_future(std::future<_Ret> &&expectedFut) {
             this->expectedFut = std::move(expectedFut);
         }
 
-        void hold_actual_result(_Ret &expected)
-        {
+        void hold_actual_result(_Ret &expected) {
             this->expected = std::move(expected);
         }
 
-        _Ret get()
-        {
-            if (this->isPushed)
-            {
+        _Ret get() {
+            if (this->isPushed) {
                 auto begin = std::chrono::steady_clock::now();
                 this->expected = expectedFut.get();
                 auto end = std::chrono::steady_clock::now();
@@ -49,12 +44,11 @@ namespace GemPBA
         }
 
 #ifdef MPI_ENABLED
+
         // in construction
-        template <typename F_deser>
-        _Ret get(F_deser &&f_deser)
-        {
-            if (this->isPushed)
-            {
+        template<typename F_deser>
+        _Ret get(F_deser &&f_deser) {
+            if (this->isPushed) {
                 std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
                 this->expected = this->expectedFut.get();
                 std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
@@ -63,9 +57,7 @@ namespace GemPBA
                             changes it, since it is atomic, this operation is already well defined*/
 
                 this->dlb.add_on_idle_time(begin, end);
-            }
-            else if (this->isMPISent)
-            {
+            } else if (this->isMPISent) {
                 this->branchHandler.lock_mpi(); /* this blocks any other thread to use an MPI function since MPI_Recv is blocking
                                                         thus, mpi_thread_serialized is guaranteed */
 #ifdef DEBUG_COMMENTS
@@ -76,11 +68,14 @@ namespace GemPBA
                 MPI_Status status;
                 int Bytes;
 
-                MPI_Probe(this->dest_rank, MPI::ANY_TAG, this->branchHandler.getCommunicator(), &status); // receives status before receiving the message
-                MPI_Get_count(&status, MPI::CHAR, &Bytes);                                                // receives total number of datatype elements of the message
+                MPI_Probe(this->dest_rank, MPI::ANY_TAG, this->branchHandler.getCommunicator(),
+                          &status); // receives status before receiving the message
+                MPI_Get_count(&status, MPI::CHAR,
+                              &Bytes);                                                // receives total number of datatype elements of the message
 
                 char *in_buffer = new char[Bytes];
-                MPI_Recv(in_buffer, Bytes, MPI::CHAR, this->dest_rank, MPI::ANY_TAG, this->branchHandler.getCommunicator(), &status);
+                MPI_Recv(in_buffer, Bytes, MPI::CHAR, this->dest_rank, MPI::ANY_TAG,
+                         this->branchHandler.getCommunicator(), &status);
 
 #ifdef DEBUG_COMMENTS
                 // printf("rank %d received %d Bytes from %d! \n", branchHandler.world_rank, Bytes, dest_rank);
