@@ -22,20 +22,20 @@
 int main_void(int numThreads, int prob, std::string &filename)
 {
 
-	auto &handler = GemPBA::BranchHandler::getInstance(); // parallel GemPBA
+    auto &handler = GemPBA::BranchHandler::getInstance(); // parallel GemPBA
 
-	Graph graph;
-	Graph oGraph;
-	VC_void cover;
+    Graph graph;
+    Graph oGraph;
+    VC_void cover;
 
-	graph.readEdges(filename);
-	//graph.readDimacs(filename);
+    graph.readEdges(filename);
+    //graph.readDimacs(filename);
 
-	cover.init(graph, numThreads, filename, prob);
-	cover.findCover(1);
-	cover.printSolution();
+    cover.init(graph, numThreads, filename, prob);
+    cover.findCover(1);
+    cover.printSolution();
 
-	return 0;
+    return 0;
 }
 
 #endif

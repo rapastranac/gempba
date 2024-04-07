@@ -21,13 +21,11 @@
  * rapastranac@gmail.com
  */
 
-namespace GemPBA
-{
+namespace GemPBA {
     class DLB_Handler;
 
-    template <typename... Args>
-    class ResultHolderBase
-    {
+    template<typename... Args>
+    class ResultHolderBase {
         friend class DLB_Handler;
 
     protected:
@@ -57,37 +55,30 @@ namespace GemPBA
 #endif
 
     public:
-        ResultHolderBase(DLB_Handler &dlb) : dlb(dlb)
-        {
+        ResultHolderBase(DLB_Handler &dlb) : dlb(dlb) {
         }
 
-        void holdArgs(Args &...args)
-        {
+        void holdArgs(Args &...args) {
             this->tup = std::make_tuple(std::forward<Args &&>(args)...);
         }
 
-        std::tuple<Args...> &getArgs()
-        {
+        std::tuple<Args...> &getArgs() {
             return tup;
         }
 
-        void setDepth(int depth)
-        {
+        void setDepth(int depth) {
             this->depth = depth;
         }
 
-        size_t getId()
-        {
+        size_t getId() {
             return id;
         }
 
-        auto getThreadId()
-        {
+        auto getThreadId() {
             return threadId;
         }
 
-        bool isFetchable()
-        {
+        bool isFetchable() {
 #ifdef MPI_ENABLED
             // return (isPushed || isForwarded || isMPISent) && !isRetrieved;
             return false;
@@ -96,18 +87,15 @@ namespace GemPBA
 #endif
         }
 
-        bool is_forwarded()
-        {
+        bool is_forwarded() {
             return isPushed || isForwarded;
         }
 
-        bool is_pushed()
-        {
+        bool is_pushed() {
             return isPushed;
         }
 
-        bool isTreated()
-        {
+        bool isTreated() {
 #ifdef MPI_ENABLED
             return isPushed || isForwarded || isDiscarded || isRetrieved || isMPISent;
 #else
@@ -115,31 +103,26 @@ namespace GemPBA
 #endif
         }
 
-        bool is_discarded()
-        {
+        bool is_discarded() {
             return isDiscarded;
         }
 
-        void setForwardStatus(bool val = true)
-        {
+        void setForwardStatus(bool val = true) {
             this->isForwarded = val;
             this->fw_count++;
         }
 
-        void setPushStatus(bool val = true)
-        {
+        void setPushStatus(bool val = true) {
             this->ph_count++;
             this->isPushed = val;
         }
 
-        void setDiscard(bool val = true)
-        {
+        void setDiscard(bool val = true) {
             this->isDiscarded = val;
         }
 
-        template <typename F>
-        void bind_branch_checkIn(F &&branch_checkIn)
-        {
+        template<typename F>
+        void bind_branch_checkIn(F &&branch_checkIn) {
             this->branch_checkIn = std::bind(std::forward<F>(branch_checkIn));
         }
 
@@ -161,34 +144,33 @@ namespace GemPBA
             if a void function is being used, this should be a problem, since
 
             */
-        bool evaluate_branch_checkIn()
-        {
+        bool evaluate_branch_checkIn() {
             if (isForwarded || isPushed || isDiscarded)
                 return false;
             else
                 return branch_checkIn();
         }
+
 #ifdef MPI_ENABLED
-        bool is_MPI_Sent()
-        {
+
+        bool is_MPI_Sent() {
             return this->isMPISent;
         }
 
-        void setMPISent(bool val = true)
-        {
+        void setMPISent(bool val = true) {
             this->isMPISent = val;
             // this->dest_rank = dest_rank;
         }
 
-        void setMPISent(bool val, int dest_rank)
-        {
+        void setMPISent(bool val, int dest_rank) {
             this->isMPISent = val;
             this->dest_rank = dest_rank;
         }
+
 #endif
     };
 
-    template <typename _Ret, typename Enable = void, typename... Args>
+    template<typename _Ret, typename Enable = void, typename... Args>
     class ResultHolderInt;
 }
 

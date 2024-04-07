@@ -23,15 +23,15 @@ is to be a root. This allows to track all levels of the exploration tree, and th
 all holders are potentally pushable
 */
 
-namespace GemPBA
-{
-    template <typename _Ret, typename... Args>
+namespace GemPBA {
+    template<typename _Ret, typename... Args>
     class ResultHolder;
+
     // Dynamic Load Balancing
-    class DLB_Handler
-    {
-        template <typename _Ret, typename... Args>
-        friend class ResultHolder;
+    class DLB_Handler {
+        template<typename _Ret, typename... Args>
+        friend
+        class ResultHolder;
 
     private:
         std::map<int, void *> roots; // every thread will be solving a sub tree, this point to their roots
@@ -48,34 +48,29 @@ namespace GemPBA
         DLB_Handler() {}
 
     public:
-        static DLB_Handler &getInstance()
-        {
+        static DLB_Handler &getInstance() {
             static DLB_Handler instance;
             return instance;
         }
 
-        size_t getUniqueId()
-        {
+        size_t getUniqueId() {
             std::scoped_lock<std::mutex> lck(mtx);
             return ++idCounter;
         }
 
-        void add_on_idle_time(std::chrono::steady_clock::time_point begin, std::chrono::steady_clock::time_point end)
-        {
+        void add_on_idle_time(std::chrono::steady_clock::time_point begin, std::chrono::steady_clock::time_point end) {
             double time_tmp = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
             idleTime.fetch_add(time_tmp, std::memory_order_relaxed);
         }
 
         // thread safe: root creation or root switching
-        void assign_root(int threadId, void *root)
-        {
+        void assign_root(int threadId, void *root) {
             std::scoped_lock<std::mutex> lck(mtx);
             roots[threadId] = root;
         }
 
-        template <typename Holder>
-        Holder *find_top_holder(Holder *holder)
-        {
+        template<typename Holder>
+        Holder *find_top_holder(Holder *holder) {
 
             Holder *leftMost = nullptr; // this is the branch that led us to the root
             Holder *root = nullptr;     // local pointer to root, to avoid "*" use
@@ -94,11 +89,9 @@ namespace GemPBA
                     // TODO ... verify
 
                     leftMost = root->children.front(); // TODO ... check if branch has been pushed or forwarded
-                }
-                else
+                } else
                     return nullptr; // parent == root
-            }
-            else
+            } else
                 return nullptr; // there is no parent
 
             /*
@@ -128,8 +121,7 @@ namespace GemPBA
             and then leftMost element will no longer need a parent, which is the first condition to explore
             this level of the tree*/
 
-            if (root->children.size() > 2)
-            {
+            if (root->children.size() > 2) {
                 /* TO BE VERIFIED
                 this condition is for multiple recursion, the diference with the one below is that
                 the root does not move after returning one of the waiting nodes,
@@ -144,9 +136,7 @@ namespace GemPBA
                 root->children.erase(second);                       // removes second node from the root's children
 
                 return secondHolder;
-            }
-            else if (root->children.size() == 2)
-            {
+            } else if (root->children.size() == 2) {
                 //#ifdef DEBUG_COMMENTS
                 //                fmt::print("rank {}, about to choose an upperHolder \n", -1);
                 //#endif
@@ -166,13 +156,11 @@ namespace GemPBA
                 // leftMost->lowerRoot(); // it sets leftMost as the new root
 
                 rootCorrecting(leftMost); // if leftMost has no pending branch, then root will be assigned to the next
-                                          // descendant with at least two children (which is at least a pending branch),
-                                          // or the lowest branch which is th one giving priority to root's children
+                // descendant with at least two children (which is at least a pending branch),
+                // or the lowest branch which is th one giving priority to root's children
 
                 return right;
-            }
-            else
-            {
+            } else {
                 fmt::print("fw_count : {} \n ph_count : {}\n isVirtual :{} \n isDiscarded : {} \n",
                            root->fw_count,
                            root->ph_count,
@@ -184,9 +172,8 @@ namespace GemPBA
         }
 
         // controls the root when sequential calls
-        template <typename Holder>
-        void checkLeftSibling(Holder *holder)
-        {
+        template<typename Holder>
+        void checkLeftSibling(Holder *holder) {
 
             /* What does it do?. Having the following figure
                           root == parent
@@ -223,8 +210,7 @@ namespace GemPBA
                         * to use a loop, then this While is entitled to just a single loop. 4 testing!!
                         */
                         auto leftMost_cpy = leftMost;
-                        while (leftMost != holder)
-                        {
+                        while (leftMost != holder) {
                             holder->parent->children.pop_front();        // removes pb from the parent's children
                             leftMost = holder->parent->children.front(); // it gets the second element from the parent's children
                         }
@@ -245,8 +231,7 @@ namespace GemPBA
                         // holder->parent = nullptr;
                         // holder->prune(); //not even required, nullptr is sent
                     }
-                }
-                else if (holder->parent != *holder->root) // any other level,
+                } else if (holder->parent != *holder->root) // any other level,
                 {
                     /*
                          root != parent
@@ -285,9 +270,8 @@ namespace GemPBA
         }
 
         // controls the root when succesfull parallel calls ( if not upperHolder available)
-        template <typename Holder>
-        void pop_left_sibling(Holder *holder)
-        {
+        template<typename Holder>
+        void pop_left_sibling(Holder *holder) {
             /* this method is invoked when DLB_Handler is enabled and the method find_top_holder() was not able to find
         a top branch to push, because it means the next right sibling will become a root(for binary recursion)
         or just the leftMost will be unlisted from the parent's children. This method is invoked if and only if
@@ -321,41 +305,36 @@ namespace GemPBA
                 if (_parent->children.size() > 2) // this is for more than two recursions per scope
                 {
                     _parent->children.pop_front();
-                }
-                else if (_parent->children.size() == 2) // this verifies that  it's binary and the rightMost will become a new root
+                } else if (_parent->children.size() ==
+                           2) // this verifies that  it's binary and the rightMost will become a new root
                 {
                     _parent->children.pop_front();
                     auto right = _parent->children.front();
                     _parent->children.pop_front();
                     // right->lowerRoot();
                     this->lowerRoot(*right);
-                }
-                else
-                {
+                } else {
                     throw std::runtime_error("4 Testing, it's not supposed to happen, pop_left_sibling()\n");
                 }
             }
         }
 
-        template <typename Holder>
-        void linkVirtualRoot_helper(Holder *parent, Holder &child)
-        {
+        template<typename Holder>
+        void linkVirtualRoot_helper(Holder *parent, Holder &child) {
             child.parent = parent->itself;
             child.root = parent->root;
             parent->children.push_back(&child);
         }
 
-        template <typename Holder, typename... Args>
-        void linkVirtualRoot_helper(Holder *virtualRoot, Holder &child, Args &...args)
-        {
+        template<typename Holder, typename... Args>
+        void linkVirtualRoot_helper(Holder *virtualRoot, Holder &child, Args &...args) {
             child.parent = virtualRoot->itself;
             child.root = virtualRoot->root;
             virtualRoot->children.push_back(&child);
         }
 
-        template <typename Holder, typename... Args>
-        void linkVirtualRoot(int threadId, Holder *virtualRoot, Holder &child, Args &...args)
-        {
+        template<typename Holder, typename... Args>
+        void linkVirtualRoot(int threadId, Holder *virtualRoot, Holder &child, Args &...args) {
             virtualRoot->setDepth(child.depth);
             {
                 std::scoped_lock<std::mutex> lck(mtx);
@@ -366,17 +345,15 @@ namespace GemPBA
             linkVirtualRoot_helper(virtualRoot, args...);
         }
 
-        template <typename Holder>
-        void prune(Holder *holder)
-        {
+        template<typename Holder>
+        void prune(Holder *holder) {
             // holder.prune();
             holder->root = nullptr;
             holder->parent = nullptr;
         }
 
-        template <typename Holder>
-        void lowerRoot(Holder &holder)
-        {
+        template<typename Holder>
+        void lowerRoot(Holder &holder) {
             this->assign_root(holder.threadId, &holder);
             holder.parent = nullptr;
         }
@@ -405,9 +382,8 @@ namespace GemPBA
         then root should lower down where it finds a node with at least two children or
         the deepest node
          */
-        template <typename Holder>
-        void rootCorrecting(Holder *root)
-        {
+        template<typename Holder>
+        void rootCorrecting(Holder *root) {
             Holder *_root = root;
 
             while (_root->children.size() == 1) // lowering the root
@@ -419,9 +395,13 @@ namespace GemPBA
         }
 
         ~DLB_Handler() = default;
+
         DLB_Handler(const DLB_Handler &) = delete;
+
         DLB_Handler(DLB_Handler &&) = delete;
+
         DLB_Handler &operator=(const DLB_Handler &) = delete;
+
         DLB_Handler &operator=(DLB_Handler &&) = delete;
     };
 }
