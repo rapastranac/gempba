@@ -11,6 +11,7 @@
 #include "args_handler.hpp"
 #include <DLB/DLB_Handler.hpp>
 #include "ThreadPool.hpp"
+#include "utils/utils.h"
 
 #ifdef MPI_ENABLED
 
@@ -123,9 +124,7 @@ namespace GemPBA {
 
         */
         void wait() {
-#ifdef DEBUG_COMMENTS
-            fmt::print("Main thread waiting results \n");
-#endif
+            utils::print_mpi_debug_comments("Main thread waiting results \n");
             this->thread_pool->wait();
         }
 
@@ -593,8 +592,7 @@ namespace GemPBA {
             return instance;
         }
 
-        ~BranchHandler() {
-        }
+        ~BranchHandler() = default;
 
         BranchHandler(const BranchHandler &) = delete;
 
@@ -658,27 +656,22 @@ namespace GemPBA {
         template<typename _ret, typename Holder, typename Serialize,
                 std::enable_if_t<!std::is_void_v<_ret>, int> = 0>
         void reply(Serialize &&serialize, Holder &holder, int src) {
-            _ret res; // default construction of return type "_ret"
-#ifdef DEBUG_COMMENTS
-            fmt::print("rank {} entered reply! \n", world_rank);
-#endif
+            utils::print_mpi_debug_comments("rank {} entered reply! \n", world_rank);
+            // default construction of return type "_ret"
+            _ret res; // TODO .. why in separate lines?
             res = holder.get();
 
-            if (src == 0) // termination, since all recursions return to center node
-            {
-#ifdef DEBUG_COMMENTS
-                fmt::print("Cover size() : {}, sending to center \n", res.coverSize());
-#endif
+            // termination, since all recursions return to center node
+            if (src == 0) {
+                utils::print_mpi_debug_comments("cover size() : {}, sending to center \n", res.coverSize());
 
                 bestSolution_serialized.first = refValue();
                 auto &ss = bestSolution_serialized.second; // it should be empty
                 serialize(ss, res);
-            } else // some other node requested help and it is surely waiting for the return value
-            {
+            } else {
+                // some other node requested help, and it is surely waiting for the return value
 
-#ifdef DEBUG_COMMENTS
-                fmt::print("rank {} about to reply to {}! \n", world_rank, src);
-#endif
+                utils::print_mpi_debug_comments("rank {} about to reply to {}! \n", world_rank, src);
                 std::unique_lock<std::mutex> lck(mtx_MPI); // no other thread can retrieve nor send via MPI
 
                 std::stringstream ss;
@@ -686,8 +679,9 @@ namespace GemPBA {
                 int count = ss.str().size();
 
                 int err = MPI_Ssend(ss.str().data(), count, MPI_CHAR, src, 0, *world_Comm);
-                if (err != MPI_SUCCESS)
+                if (err != MPI_SUCCESS) {
                     fmt::print("result could not be sent from rank {} to rank {}! \n", world_rank, src);
+                }
             }
         }
 
