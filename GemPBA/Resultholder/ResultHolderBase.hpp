@@ -14,6 +14,7 @@
 #include <future>
 #include <tuple>
 #include <type_traits>
+#include <utils/utils.h>
 
 /*
  * Created by Andres Pastrana on 2019
