@@ -458,7 +458,7 @@ int main(){
     If minimisation, reference value or best value so far is INT_MAX
     
     By default, GemPBA maximises, thus the below line is optional for maximisation*/
-	branchHandler.setRefValStrategyLookup("minimise");
+	branchHandler.setLookupStrategy(GemPBA::MAXIMISE);
 
     // Here we set the best value so far if known somehow, optional
     branchHandler.setRefValue(/* some integer*/); 
@@ -623,7 +623,7 @@ int main(){
     *   initial data reading
     */
     
-    branchHandler.setRefValStrategyLookup("minimise");
+    branchHandler.setLookupStrategy(GemPBA::MINIMISE);
     branchHandler.setRefValue(/* some integer*/); 
     if (rank == 0) {
         std::string buffer = serializer(instance, f, d);

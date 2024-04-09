@@ -40,6 +40,11 @@
 #include <utility>
 
 namespace GemPBA {
+
+    enum LookupStrategy {
+        MAXIMISE, MINIMISE
+    };
+
     template<typename _Ret, typename... Args>
     class ResultHolder;
 
@@ -611,20 +616,20 @@ namespace GemPBA {
 
 #endif
 
-        void setRefValStrategyLookup(std::string keyword) {
-            // convert string to upper case
-            std::for_each(keyword.begin(), keyword.end(), [](char &c) { c = std::toupper(c); });
-
-            if (keyword == "MAXIMISE") {
-                return; // maximise by default
-            } else if (keyword == "MINIMISE") {
-                maximisation = false;
-                refValueLocal = INT_MAX;
+        void setLookupStrategy(LookupStrategy strategy) {
+            switch (strategy) {
+                case MAXIMISE: {
+                    return; // maximise by default
+                }
+                case MINIMISE: {
+                    maximisation = false;
+                    refValueLocal = INT_MAX;
 #ifdef MPI_ENABLED
-                mpiScheduler->setRefValStrategyLookup(maximisation); // TODO redundant
+                    mpiScheduler->setRefValStrategyLookup(maximisation); // TODO redundant
 #endif
-            } else
-                throw std::runtime_error("in setRefValStrategyLookup(), keyword : " + keyword + " not recognised\n");
+                }
+            };
+
         }
 
         /*----------------Singleton----------------->>end*/
