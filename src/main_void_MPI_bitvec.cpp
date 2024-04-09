@@ -93,7 +93,7 @@ int main_void_MPI_bitvec(int job_id, int nodes, int ntasks_per_node, int ntasks_
     gbitset allones = ~allzeros;
 
     branchHandler.setRefValue(gsize); // thus, all processes know the best value so far
-    branchHandler.setRefValStrategyLookup("minimise");
+    branchHandler.setLookupStrategy(GemPBA::MINIMISE);
 
     int zero = 0;
     int solsize = graph.size();
