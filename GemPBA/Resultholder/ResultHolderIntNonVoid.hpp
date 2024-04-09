@@ -60,27 +60,22 @@ namespace GemPBA {
             } else if (this->isMPISent) {
                 this->branchHandler.lock_mpi(); /* this blocks any other thread to use an MPI function since MPI_Recv is blocking
                                                         thus, mpi_thread_serialized is guaranteed */
-#ifdef DEBUG_COMMENTS
+
                 // printf("rank %d entered get() to retrieve from %d! \n", branchHandler.world_rank, dest_rank);
-                fmt::print("rank {} entered get() to retrieve from {}! \n", this->branchHandler.world_rank, this->dest_rank);
-#endif
+                utils::print_mpi_debug_comments("rank {} entered get() to retrieve from {}! \n", this->branchHandler.world_rank, this->dest_rank);
 
                 MPI_Status status;
                 int Bytes;
 
-                MPI_Probe(this->dest_rank, MPI::ANY_TAG, this->branchHandler.getCommunicator(),
-                          &status); // receives status before receiving the message
-                MPI_Get_count(&status, MPI::CHAR,
-                              &Bytes);                                                // receives total number of datatype elements of the message
+                MPI_Probe(this->dest_rank, MPI::ANY_TAG, this->branchHandler.getCommunicator(), &status); // receives status before receiving the message
+                MPI_Get_count(&status, MPI::CHAR, &Bytes);                                                // receives total number of datatype elements of the message
 
                 char *in_buffer = new char[Bytes];
                 MPI_Recv(in_buffer, Bytes, MPI::CHAR, this->dest_rank, MPI::ANY_TAG,
                          this->branchHandler.getCommunicator(), &status);
 
-#ifdef DEBUG_COMMENTS
                 // printf("rank %d received %d Bytes from %d! \n", branchHandler.world_rank, Bytes, dest_rank);
-                fmt::print("rank {} received {} Bytes from {}! \n", this->branchHandler.world_rank, Bytes, this->dest_rank);
-#endif
+                utils::print_mpi_debug_comments("rank {} received {} Bytes from {}! \n", this->branchHandler.world_rank, Bytes, this->dest_rank);
 
                 std::stringstream ss;
                 for (int i = 0; i < Bytes; i++)

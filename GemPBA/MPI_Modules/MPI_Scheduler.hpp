@@ -3,7 +3,7 @@
 #define MPI_SCHEDULER_HPP
 
 #include "Tree.hpp"
-#include "Utils/Queue.hpp"
+#include "utils/Queue.hpp"
 #include <algorithm>
 #include <condition_variable>
 #include <cstring>
@@ -23,6 +23,7 @@
 #include <unistd.h>
 #include <atomic>
 #include <memory>
+#include <utils/utils.h>
 
 #define CENTER 0
 
@@ -165,9 +166,7 @@ namespace GemPBA {
                 }
                 MPI_Get_count(&status, MPI_CHAR, &count); // receives total number of datatype elements of the message
 
-#ifdef DEBUG_COMMENTS
-                fmt::print("rank {}, received message from rank {}, count : {}\n", world_rank, status.MPI_SOURCE, count);
-#endif
+                utils::print_mpi_debug_comments("rank {}, received message from rank {}, count : {}\n", world_rank, status.MPI_SOURCE, count);
                 char *message = new char[count];
                 MPI_Recv(message, count, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, world_Comm, &status);
 
@@ -181,9 +180,7 @@ namespace GemPBA {
 
                 //  push to the thread pool *********************************************************************
                 auto *holder = bufferDecoder(message, count); // holder might be useful for non-void functions
-#ifdef DEBUG_COMMENTS
-                fmt::print("rank {}, pushed buffer to thread pool \n", world_rank, status.MPI_SOURCE);
-#endif
+                utils::print_mpi_debug_comments("rank {}, pushed buffer to thread pool \n", world_rank, status.MPI_SOURCE);
                 // **********************************************************************************************
 
                 taskFunneling(branchHandler);
@@ -212,9 +209,7 @@ namespace GemPBA {
 
             transmitting = true;
             dest_rank_tmp = nextProcess();
-#ifdef DEBUG_COMMENTS
-            fmt::print("rank {} entered MPI_Scheduler::push(..) for the node {}\n", world_rank, dest_rank_tmp);
-#endif
+            utils::print_mpi_debug_comments("rank {} entered MPI_Scheduler::push(..) for the node {}\n", world_rank, dest_rank_tmp);
             shift_left(next_process.data(), world_size);
 
             auto pck = std::make_shared<std::string>(std::forward<std::string &&>(message));
@@ -274,9 +269,7 @@ namespace GemPBA {
                         break;
                 }
             }
-#ifdef DEBUG_COMMENTS
-            fmt::print("rank {} sent {} tasks\n", world_rank, nTasksSent);
-#endif
+            utils::print_mpi_debug_comments("rank {} sent {} tasks\n", world_rank, nTasksSent);
 
             if (!q.empty())
                 throw std::runtime_error("leaving process with a pending message\n");
@@ -293,15 +286,11 @@ namespace GemPBA {
             MPI_Iprobe(CENTER, REFVAL_UPDATE_TAG, refValueGlobal_Comm, &flag, &status);
 
             if (flag) {
-#ifdef DEBUG_COMMENTS
-                fmt::print("rank {}, about to receive refValue from Center\n", world_rank);
-#endif
+                utils::print_mpi_debug_comments("rank {}, about to receive refValue from Center\n", world_rank);
 
                 MPI_Recv(&refValueGlobal, 1, MPI_INT, CENTER, REFVAL_UPDATE_TAG, refValueGlobal_Comm, &status);
 
-#ifdef DEBUG_COMMENTS
-                fmt::print("rank {}, received refValue: {} from Center\n", world_rank, refValueGlobal);
-#endif
+                utils::print_mpi_debug_comments("rank {}, received refValue: {} from Center\n", world_rank, refValueGlobal);
             }
 
             return flag;
@@ -317,15 +306,11 @@ namespace GemPBA {
             if (flag) {
                 MPI_Get_count(&status, MPI_INT, &count); // 0 < count < world_size   -- safe
 
-#ifdef DEBUG_COMMENTS
-                fmt::print("rank {}, about to receive nextProcess from Center, count : {}\n", world_rank, count);
-#endif
+                utils::print_mpi_debug_comments("rank {}, about to receive nextProcess from Center, count : {}\n", world_rank, count);
 
                 MPI_Recv(next_process.data(), count, MPI_INT, CENTER, NEXT_PROCESS_TAG, nextProcess_Comm, &status);
 
-#ifdef DEBUG_COMMENTS
-                fmt::print("rank {}, received nextProcess from Center, count : {}\n", world_rank, count);
-#endif
+                utils::print_mpi_debug_comments("rank {}, received nextProcess from Center, count : {}\n", world_rank, count);
             }
 
             return flag;
@@ -370,9 +355,7 @@ namespace GemPBA {
         void notifyAvailableState() {
             int buffer = 0;
             MPI_Send(&buffer, 1, MPI_INT, 0, STATE_AVAILABLE, world_Comm);
-#ifdef DEBUG_COMMENTS
-            fmt::print("rank {} entered notifyAvailableState()\n", world_rank);
-#endif
+            utils::print_mpi_debug_comments("rank {} entered notifyAvailableState()\n", world_rank);
         }
 
         void notifyRunningState() {
@@ -386,13 +369,9 @@ namespace GemPBA {
                     auto msg = "rank " + std::to_string(world_rank) + " attempting to send to itself !!!\n";
                     throw std::runtime_error(msg);
                 }
-#ifdef DEBUG_COMMENTS
-                fmt::print("rank {} about to send buffer to rank {}\n", world_rank, dest_rank_tmp);
-#endif
+                utils::print_mpi_debug_comments("rank {} about to send buffer to rank {}\n", world_rank, dest_rank_tmp);
                 MPI_Send(message.data(), message.size(), MPI_CHAR, dest_rank_tmp, 0, world_Comm);
-#ifdef DEBUG_COMMENTS
-                fmt::print("rank {} sent buffer to rank {}\n", world_rank, dest_rank_tmp);
-#endif
+                utils::print_mpi_debug_comments("rank {} sent buffer to rank {}\n", world_rank, dest_rank_tmp);
                 dest_rank_tmp = -1;
             } else {
                 auto msg = "rank " + std::to_string(world_rank) + ", could not send task to rank " +
@@ -495,9 +474,7 @@ namespace GemPBA {
                     {
                         processState[status.MPI_SOURCE] = STATE_RUNNING; // node was assigned, now it's running
                         ++nRunning;
-#ifdef DEBUG_COMMENTS
-                        fmt::print("rank {} reported running, nRunning :{}\n", status.MPI_SOURCE, nRunning);
-#endif
+                        utils::print_mpi_debug_comments("rank {} reported running, nRunning :{}\n", status.MPI_SOURCE, nRunning);
 
                         if (processTree[status.MPI_SOURCE].isAssigned())
                             processTree[status.MPI_SOURCE].release();
@@ -522,11 +499,10 @@ namespace GemPBA {
                         ++nAvailable;
                         --nRunning;
 
-                        if (processTree[status.MPI_SOURCE].isAssigned())
+                        if (processTree[status.MPI_SOURCE].isAssigned()) {
                             processTree[status.MPI_SOURCE].release();
-#ifdef DEBUG_COMMENTS
-                        fmt::print("rank {} reported available, nRunning :{}\n", status.MPI_SOURCE, nRunning);
-#endif
+                        }
+                        utils::print_mpi_debug_comments("rank {} reported available, nRunning :{}\n", status.MPI_SOURCE, nRunning);
                         std::random_device rd;                                    // Will be used to obtain a seed for the random number engine
                         std::mt19937 gen(
                                 rd());                                    // Standard mersenne_twister_engine seeded with rd()
@@ -549,9 +525,7 @@ namespace GemPBA {
                                                 status.MPI_SOURCE);      // assigns returning node to the running node
                                         processState[status.MPI_SOURCE] = STATE_ASSIGNED; // it flags returning node as assigned
                                         --nAvailable;                                      // assigned, not available any more
-#ifdef DEBUG_COMMENTS
-                                        fmt::print("ASSIGNEMENT:\trank {} <-- [{}]\n", rank, status.MPI_SOURCE);
-#endif
+                                        utils::print_mpi_debug_comments("ASSIGNEMENT:\trank {} <-- [{}]\n", rank, status.MPI_SOURCE);
                                         break; // breaks for-loop
                                     }
                                 }
@@ -563,9 +537,7 @@ namespace GemPBA {
                         /* if center reaches this point, for sure nodes have attained a better reference value
                                 or they are not up-to-date, thus it is required to broadcast it whether this value
                                 changes or not  */
-#ifdef DEBUG_COMMENTS
-                        fmt::print("center received refValue {} from rank {}\n", buffer, status.MPI_SOURCE);
-#endif
+                        utils::print_mpi_debug_comments("center received refValue {} from rank {}\n", buffer, status.MPI_SOURCE);
                         bool signal = false;
 
                         if ((maximisation && buffer > refValueGlobal) || (!maximisation && buffer < refValueGlobal)) {
@@ -582,13 +554,11 @@ namespace GemPBA {
                         if (signal) {
                             static int success = 0;
                             success++;
-                            fmt::print("refValueGlobal updated to : {} by rank {}\n", refValueGlobal,
-                                       status.MPI_SOURCE);
+                            fmt::print("refValueGlobal updated to : {} by rank {}\n", refValueGlobal, status.MPI_SOURCE);
                         } else {
                             static int failures = 0;
                             failures++;
-                            fmt::print("FAILED updates : {}, refValueGlobal : {} by rank {}\n", failures,
-                                       refValueGlobal, status.MPI_SOURCE);
+                            fmt::print("FAILED updates : {}, refValueGlobal : {} by rank {}\n", failures, refValueGlobal, status.MPI_SOURCE);
                         }
                     }
                         break;
@@ -667,9 +637,7 @@ namespace GemPBA {
                 char *buffer = new char[count];
                 MPI_Recv(buffer, count, MPI_CHAR, rank, MPI_ANY_TAG, world_Comm, &status);
 
-#ifdef DEBUG_COMMENTS
-                fmt::print("fetching result from rank {} \n", rank);
-#endif
+                utils::print_mpi_debug_comments("fetching result from rank {} \n", rank);
 
                 switch (status.MPI_TAG) {
                     case HAS_RESULT_TAG: {
@@ -821,17 +789,11 @@ namespace GemPBA {
         }
 
         void finalize() {
-#ifdef DEBUG_COMMENTS
-            fmt::print("rank {}, before deallocate \n", world_rank);
-#endif
+            utils::print_mpi_debug_comments("rank {}, before deallocate \n", world_rank);
             deallocateMPI();
-#ifdef DEBUG_COMMENTS
-            fmt::print("rank {}, after deallocate \n", world_rank);
-#endif
+            utils::print_mpi_debug_comments("rank {}, after deallocate \n", world_rank);
             MPI_Finalize();
-#ifdef DEBUG_COMMENTS
-            fmt::print("rank {}, after MPI_Finalize() \n", world_rank);
-#endif
+            utils::print_mpi_debug_comments("rank {}, after MPI_Finalize() \n", world_rank);
         }
     };
 
