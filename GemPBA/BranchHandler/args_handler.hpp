@@ -20,19 +20,20 @@
 namespace std {
 
     class args_handler {
-    public:
+    private:
         template<typename F, typename... Args>
         //,  // typename std::enable_if<std::is_same<P, ThreadPool::Pool>::value>::type * = nullptr>
         static constexpr decltype(auto) helper(ThreadPool::Pool &pool, F &&f, Args &&...args) {
             return pool.push(std::forward<F>(f), std::forward<Args>(args)..., std::forward<nullptr_t>(nullptr));
         }
 
+    public:
+
         /*begin<----------	This unpacks tuple before pushing to pool -------------------*/
         // void Callable
 
         template<typename F, typename Tuple, size_t... I>
-        static constexpr decltype(auto)
-        unpack_and_push_void(ThreadPool::Pool &pool, F &&f, Tuple &&t, std::index_sequence<I...>) {
+        static constexpr decltype(auto) unpack_and_push_void(ThreadPool::Pool &pool, F &&f, Tuple &&t, std::index_sequence<I...>) {
             return helper(pool, std::forward<F>(f), std::get<I>(std::forward<Tuple>(t))...);
         }
 
@@ -83,8 +84,7 @@ namespace std {
         /* same as above, not tracking stack */ // TO IMPROVE
 
         template<typename F, typename Tuple, size_t... I>
-        static constexpr decltype(auto)
-        unpack_and_forward_void(F &&f, int id, Tuple &&t, void *holder, std::index_sequence<I...>) {
+        static constexpr decltype(auto) unpack_and_forward_void(F &&f, int id, Tuple &&t, void *holder, std::index_sequence<I...>) {
             return std::invoke(std::forward<F>(f),
                                std::forward<int>(id),
                                std::get<I>(std::forward<Tuple>(t))...,

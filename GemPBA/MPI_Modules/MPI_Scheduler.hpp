@@ -8,22 +8,22 @@
 #include <condition_variable>
 #include <cstring>
 #include <random>
-#include <stdlib.h> /* srand, rand */
+#include <cstdlib> /* srand, rand */
 #include <fstream>
 #include <iostream>
-#include <limits.h>
+#include <climits>
 #include <mpi.h>
 #include <string>
 #include <sstream>
 #include <stdexcept>
-#include <stdio.h>
-#include <time.h>
+#include <cstdio>
+#include <ctime>
 #include <thread>
 #include <queue>
 #include <unistd.h>
 #include <atomic>
 #include <memory>
-#include <utils/utils.h>
+#include "utils/utils.hpp"
 
 #define CENTER 0
 
@@ -52,7 +52,7 @@ namespace GemPBA {
             return instance;
         }
 
-        int rank_me() {
+        int rank_me() const {
             return world_rank;
         }
 
@@ -78,7 +78,7 @@ namespace GemPBA {
             fmt::print("\n \n \n");
         }
 
-        double elapsedTime() {
+        double elapsedTime() const {
             return (end_time - start_time) - static_cast<double>(TIMEOUT_TIME);
         }
 
@@ -87,21 +87,19 @@ namespace GemPBA {
             MPI_Barrier(world_Comm);
         }
 
-        void
-        gather(void *sendbuf, int sendcount, MPI_Datatype sendtype, void *recvbuf, int recvcount, MPI_Datatype recvtype,
-               int root) {
+        void gather(void *sendbuf, int sendcount, MPI_Datatype sendtype, void *recvbuf, int recvcount, MPI_Datatype recvtype, int root) {
             MPI_Gather(sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, root, world_Comm);
         }
 
-        int getWorldSize() {
+        int getWorldSize() const {
             return world_size;
         }
 
-        int tasksRecvd() {
+        int tasksRecvd() const {
             return nTasksRecvd;
         }
 
-        int tasksSent() {
+        int tasksSent() const {
             return nTasksSent;
         }
 
@@ -131,16 +129,17 @@ namespace GemPBA {
             mtx.unlock();
         }
 
-        // returns the process rank assigned to receive task from this process
-        int nextProcess() {
+        // returns the process rank assigned to receive a task from this process
+        int nextProcess() const {
             return this->nxtProcess;
         }
 
         void setRefValStrategyLookup(bool maximisation) {
             this->maximisation = maximisation;
 
-            if (!maximisation) // minimisation
+            if (!maximisation) { // minimisation
                 refValueGlobal = INT_MAX;
+            }
         }
 
         void runNode(auto &branchHandler, auto &&bufferDecoder, auto &&resultFetcher, auto &&serializer) {
@@ -152,8 +151,8 @@ namespace GemPBA {
                 int count; // count to be received
                 int flag = 0;
 
-                while (!flag) // this allows  to receive refValue or nextProcess even if this process has turned into waiting mode
-                {
+                // this allows receiving refValue or nextProcess even if this process has turned into waiting mode
+                while (!flag) {
                     if (probe_refValue()) // different communicator
                         continue;          // center might update this value even if this process is idle
 
@@ -198,11 +197,11 @@ namespace GemPBA {
         }
 
         /* enqueue a message which will be sent to the next assigned process
-            message pushing is only possible when the preceeding message has been successfully pushed
+            message pushing is only possible when the preceding message has been successfully pushed
             to another process, to avoid enqueuing.
         */
         void push(std::string &&message) {
-            if (message.size() == 0) {
+            if (message.empty()) {
                 auto str = fmt::format("rank {}, attempted to send empty buffer \n", world_rank);
                 throw std::runtime_error(str);
             }
@@ -220,7 +219,6 @@ namespace GemPBA {
             }
 
             q.push(_message);
-
             closeSendingChannel();
         }
 
@@ -231,10 +229,9 @@ namespace GemPBA {
             // nice(18); // this method changes OS priority of current thread, it should be carefully used
 
             while (true) {
-                while (isPop) // as long as there is a message
-                {
-                    std::scoped_lock<std::mutex> lck(mtx);
+                while (isPop) { // as long as there is a message
 
+                    std::scoped_lock<std::mutex> lck(mtx);
                     std::unique_ptr<std::string> ptr(message);
                     nTasksSent++;
 
@@ -242,9 +239,9 @@ namespace GemPBA {
 
                     isPop = q.pop(message);
 
-                    if (!isPop)
+                    if (!isPop) {
                         transmitting = false;
-                    else {
+                    } else {
                         throw std::runtime_error("Task found in queue, this should not happen in taskFunneling()\n");
                     }
                 }
@@ -265,14 +262,16 @@ namespace GemPBA {
                         another buffer might have been pushed, which should be verified in the next line*/
                     isPop = q.pop(message);
 
-                    if (!isPop)
+                    if (!isPop) {
                         break;
+                    }
                 }
             }
             utils::print_mpi_debug_comments("rank {} sent {} tasks\n", world_rank, nTasksSent);
 
-            if (!q.empty())
+            if (!q.empty()) {
                 throw std::runtime_error("leaving process with a pending message\n");
+            }
             /* to reuse the task funneling, otherwise it will exit
             right away the second time the process receives a task*/
 
@@ -287,9 +286,7 @@ namespace GemPBA {
 
             if (flag) {
                 utils::print_mpi_debug_comments("rank {}, about to receive refValue from Center\n", world_rank);
-
                 MPI_Recv(&refValueGlobal, 1, MPI_INT, CENTER, REFVAL_UPDATE_TAG, refValueGlobal_Comm, &status);
-
                 utils::print_mpi_debug_comments("rank {}, received refValue: {} from Center\n", world_rank, refValueGlobal);
             }
 
@@ -305,11 +302,8 @@ namespace GemPBA {
 
             if (flag) {
                 MPI_Get_count(&status, MPI_INT, &count); // 0 < count < world_size   -- safe
-
                 utils::print_mpi_debug_comments("rank {}, about to receive nextProcess from Center, count : {}\n", world_rank, count);
-
                 MPI_Recv(next_process.data(), count, MPI_INT, CENTER, NEXT_PROCESS_TAG, nextProcess_Comm, &status);
-
                 utils::print_mpi_debug_comments("rank {}, received nextProcess from Center, count : {}\n", world_rank, count);
             }
 
@@ -317,7 +311,7 @@ namespace GemPBA {
         }
 
         // if ref value received, it attempts updating local value
-        // if local value is better than the one in center, then local best value is sent to center
+        // if local value is better than the one in center, then the local best value is sent to center
         void updateRefValue(auto &branchHandler) {
             int _refGlobal = refValueGlobal;          // constant within this scope
             int _refLocal = branchHandler.refValue(); // constant within this scope
@@ -335,7 +329,7 @@ namespace GemPBA {
             - priority released automatically if a message is pushed, otherwise it should be released manually
             - only ONE buffer will be enqueued at a time
             - if the taskFunneling is transmitting the buffer to another node, this method will return false
-            - if previous conditions are met, then actual condition for pushing is evaluated next_process[0] > 0
+            - if previous conditions are met, then the actual condition for pushing is evaluated next_process[0] > 0
         */
 
         // it separates receiving buffer from the local
@@ -364,29 +358,34 @@ namespace GemPBA {
         }
 
         void sendTask(std::string &message) {
+            size_t messageLength = message.size();
+            if (messageLength > std::numeric_limits<int>::max()) {
+                throw std::runtime_error("message is to long to be sent in a single message, currently not supported");
+            }
+
             if (dest_rank_tmp > 0) {
                 if (dest_rank_tmp == world_rank) {
                     auto msg = "rank " + std::to_string(world_rank) + " attempting to send to itself !!!\n";
                     throw std::runtime_error(msg);
                 }
                 utils::print_mpi_debug_comments("rank {} about to send buffer to rank {}\n", world_rank, dest_rank_tmp);
-                MPI_Send(message.data(), message.size(), MPI_CHAR, dest_rank_tmp, 0, world_Comm);
+                MPI_Send(message.data(), (int) messageLength, MPI_CHAR, dest_rank_tmp, 0, world_Comm);
                 utils::print_mpi_debug_comments("rank {} sent buffer to rank {}\n", world_rank, dest_rank_tmp);
                 dest_rank_tmp = -1;
             } else {
-                auto msg = "rank " + std::to_string(world_rank) + ", could not send task to rank " +
-                           std::to_string(dest_rank_tmp) + "\n";
+                auto msg = "rank " + std::to_string(world_rank) + ", could not send task to rank " + std::to_string(dest_rank_tmp) + "\n";
                 throw std::runtime_error(msg);
             }
         }
 
         /* shift a position to left of an array, leaving -1 as default value*/
-        void shift_left(int v[], const int size) {
+        static void shift_left(int v[], const int size) {
             for (int i = 0; i < (size - 1); i++) {
-                if (v[i] != -1)
+                if (v[i] != -1) {
                     v[i] = v[i + 1]; // shift one cell to the left
-                else
+                } else {
                     break; // no more data
+                }
             }
         }
 
@@ -405,7 +404,7 @@ namespace GemPBA {
 
     public:
     private:
-        /*	each nodes has an array containing its children were it is going to send tasks,
+        /*	each node has an array containing its children were it is going to send tasks,
             this method puts the rank of these nodes into the array in the order that they
             are supposed to help the parent
         */
@@ -419,17 +418,18 @@ namespace GemPBA {
                     processState[child] = STATE_ASSIGNED;
                     --nAvailable;
                 }
-                if (buffer_tmp.size() != 0)
-                    MPI_Ssend(buffer_tmp.data(), buffer_tmp.size(), MPI_INT, rank, NEXT_PROCESS_TAG, nextProcess_Comm);
+                if (!buffer_tmp.empty()) {
+                    MPI_Ssend(buffer_tmp.data(), (int) buffer_tmp.size(), MPI_INT, rank, NEXT_PROCESS_TAG, nextProcess_Comm);
+                }
             }
         }
 
         // already adapted for multibranching
-        int getNextProcess(int j, int pi, int b, int depth) {
+        static int getNextProcess(int j, int pi, int b, int depth) {
             return (j * pow(b, depth)) + pi;
         }
 
-        /*	send solution attained from node to the center node */
+        /*	send a solution achieved from node to the center node */
         void sendSolution(auto &&resultFetcher) {
             auto [refVal, buffer] = resultFetcher();
             if (buffer.starts_with("Empty")) {
@@ -730,7 +730,7 @@ namespace GemPBA {
         int nTasksSent = 0;
         int nRunning = 0;
         int nAvailable = 0;
-        std::vector<int> processState; // state of the nodes : running, assigned or available
+        std::vector<int> processState; // state of the nodes: running, assigned or available
         Tree processTree;
 
         std::mutex mtx;
@@ -740,7 +740,7 @@ namespace GemPBA {
         Queue<std::string *> q;
         bool exit = false;
 
-        // MPI_Group world_group;		  // all ranks belong to this group
+        // MPI_Group world_group;	// all ranks belong to this group
         MPI_Comm refValueGlobal_Comm; // attached to win_refValueGlobal
         MPI_Comm nextProcess_Comm;      // attached to win_nextProcess
         MPI_Comm world_Comm;          // world communicator
