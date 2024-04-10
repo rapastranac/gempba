@@ -11,12 +11,12 @@
 #include "args_handler.hpp"
 #include <DLB/DLB_Handler.hpp>
 #include "ThreadPool.hpp"
-#include "utils/utils.h"
+#include "utils/utils.hpp"
 
 #ifdef MPI_ENABLED
 
 #include <mpi.h>
-#include <stdio.h>
+#include <cstdio>
 
 #endif
 
@@ -26,10 +26,10 @@
 #include <chrono>
 #include <future>
 #include <functional>
-#include <limits.h>
+#include <climits>
 #include <list>
 #include <iostream>
-#include <math.h>
+#include <cmath>
 #include <mutex>
 #include <queue>
 #include <sstream>
@@ -45,38 +45,25 @@ namespace GemPBA {
         MAXIMISE, MINIMISE
     };
 
-    template<typename _Ret, typename... Args>
+    template<typename Ret, typename... Args>
     class ResultHolder;
-
-    template<typename _Ret, typename... Args>
-    class Emulator;
 
     class MPI_Scheduler;
 
     class BranchHandler {
-        template<typename _Ret, typename... Args>
+
+        template<typename Ret, typename... Args>
         friend
         class GemPBA::ResultHolder;
 
-        template<typename _Ret, typename... Args>
-        friend
-        class GemPBA::Emulator;
-
         friend class MPI_Scheduler;
-
-    protected:
-        void add_on_idle_time(std::chrono::steady_clock::time_point begin, std::chrono::steady_clock::time_point end) {
-            double time_tmp = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-            idleTime.fetch_add(time_tmp, std::memory_order_relaxed);
-        }
 
     public:
         double getPoolIdleTime() {
             return thread_pool->idle_time() / (double) processor_count;
         }
 
-        int getPoolSize() // ParBranchHandler::getInstance().MaxThreads() = 10;
-        {
+        int getPoolSize() {
             return this->thread_pool->size();
         }
 
@@ -192,41 +179,40 @@ namespace GemPBA {
         }
 
     private:
-        template<typename _ret, typename F, typename Holder,
-                std::enable_if_t<std::is_void_v<_ret>, int> = 0>
-        bool
-        try_top_holder(F &f,
-                       Holder &holder) { // this method should not be possibly accessed if priority (Thread Pool) not acquired
+        /**
+         * this method should not possibly be accessed if priority (Thread Pool) is not acquired
+         */
+        template<typename Ret, typename F, typename Holder, std::enable_if_t<std::is_void_v<Ret>, int> = 0>
+        bool try_top_holder(F &f, Holder &holder) {
             if (is_DLB) {
                 Holder *upperHolder = dlb.find_top_holder(&holder);
                 if (upperHolder) {
                     if (upperHolder->isTreated())
                         throw std::runtime_error("Attempt to push a treated holder\n");
 
-                    if (upperHolder->evaluate_branch_checkIn()) // checks if it's worth it to push
-                    {
+                    if (upperHolder->evaluate_branch_checkIn()) { // checks if it's worth it to push
                         this->numThreadRequests++;
                         upperHolder->setPushStatus();
                         std::args_handler::unpack_and_push_void(*thread_pool, f, upperHolder->getArgs());
-                    } else // discard otherwise
-                    {
+                    } else { // discard otherwise
                         upperHolder->setDiscard();
                     }
                     return true; // top holder found whether discarded or pushed
                 }
                 dlb.pop_left_sibling(&holder); // pops holder from parent's children
             }
-            return false; // top holder not found or just DLB disabled
+            return false; // top holder isn't found or just DLB is disabled
         }
 
 #ifdef MPI_ENABLED
 
+        /**
+         *  this method should not be possibly accessed if priority (MPI) not acquired
+         */
         template<typename Holder>
-        bool try_top_holder(auto &getBuffer,
-                            Holder &holder) { // this method should not be possibly accessed if priority (MPI) not acquired
+        bool try_top_holder(auto &getBuffer, Holder &holder) {
             if (is_DLB) {
-                Holder *upperHolder = dlb.find_top_holder(
-                        &holder); //  if it finds it, then root has already been lowered
+                Holder *upperHolder = dlb.find_top_holder(&holder); //  if it finds it, then the root has already been lowered
                 if (upperHolder) {
                     if (upperHolder->isTreated())
                         throw std::runtime_error("Attempt to push a treated holder\n");
@@ -236,7 +222,7 @@ namespace GemPBA {
                         mpiScheduler->push(getBuffer(upperHolder->getArgs()));
                     } else {
                         upperHolder->setDiscard();
-                        // WARNING, ATTENTION, CUIDADO! : holder discarded, flagged as sent but not really sent, then sending channel should be realeased!!!!
+                        // WARNING, ATTENTION, CUIDADO! holder discarded, flagged as sent but not really sent, then sendingChannel should be released!!!!
                         mpiScheduler->closeSendingChannel();
                     }
                     return true; // top holder found whether discarded or pushed
@@ -249,23 +235,21 @@ namespace GemPBA {
 #endif
 
     public:
-        /* Asyncrhonous operation:
+        /* Asynchronous operation:
 
         Special care should be taken with this method, otherwise deadlocks
         might appear.
 
         It could be used once for the pushing the first time
         */
-        template<typename _ret, typename F, typename Holder,
-                std::enable_if_t<std::is_void_v<_ret>, int> = 0>
+        template<typename Ret, typename F, typename Holder, std::enable_if_t<std::is_void_v<Ret>, int> = 0>
         void force_push(F &f, int id, Holder &holder) {
             holder.setPushStatus();
             dlb.prune(&holder);
             std::args_handler::unpack_and_push_void(*thread_pool, f, holder.getArgs());
         }
 
-        template<typename _ret, typename F, typename Holder,
-                std::enable_if_t<!std::is_void_v<_ret>, int> = 0>
+        template<typename Ret, typename F, typename Holder, std::enable_if_t<!std::is_void_v<Ret>, int> = 0>
         void force_push(F &f, int id, Holder &holder) {
             holder.setPushStatus();
             dlb.prune(&holder);
@@ -273,8 +257,7 @@ namespace GemPBA {
         }
 
     private:
-        template<typename _ret, typename F, typename Holder,
-                std::enable_if_t<std::is_void_v<_ret>, int> = 0>
+        template<typename Ret, typename F, typename Holder, std::enable_if_t<std::is_void_v<Ret>, int> = 0>
         bool push_multithreading(F &&f, int id, Holder &holder) {
             /* the underlying loop breaks under one of the following scenarios:
                 - mutex cannot be acquired
@@ -288,7 +271,7 @@ namespace GemPBA {
                 if (lck.try_lock()) {
                     if (thread_pool->n_idle() > 0) {
 
-                        if (try_top_holder<_ret>(f, holder)) {
+                        if (try_top_holder<Ret>(f, holder)) {
                             continue; // keeps iterating from root to current level
                         } else {
                             if (holder.isTreated())
@@ -300,7 +283,7 @@ namespace GemPBA {
                             dlb.prune(&holder);
 
                             std::args_handler::unpack_and_push_void(*thread_pool, f, holder.getArgs());
-                            return true; // pushed to pool
+                            return true; // pushed to the pool
                         }
                     }
                     break; // mutex released at destruction
@@ -308,12 +291,11 @@ namespace GemPBA {
                     break;
                 }
             }
-            this->forward<_ret>(f, id, holder);
+            this->forward<Ret>(f, id, holder);
             return false;
         }
 
-        template<typename _ret, typename F, typename Holder,
-                std::enable_if_t<!std::is_void_v<_ret>, int> = 0>
+        template<typename Ret, typename F, typename Holder, std::enable_if_t<!std::is_void_v<Ret>, int> = 0>
         bool push_multithreading(F &f, int id, Holder &holder) {
             /*This lock must be performed before checking the condition,
             even though numThread is atomic*/
@@ -321,7 +303,7 @@ namespace GemPBA {
             // if (busyThreads < thread_pool->size())
             if (thread_pool->n_idle() > 0) {
                 if (is_DLB) {
-                    // bool res = try_top_holder<_ret>(lck, f, holder);
+                    // bool res = try_top_holder<Ret>(lck, f, holder);
                     // if (res)
                     //	return false; //if top holder found, then it should return false to keep trying
 
@@ -337,10 +319,10 @@ namespace GemPBA {
             } else {
                 lck.unlock();
                 if (is_DLB) {
-                    auto ret = this->forward<_ret>(f, id, holder, true);
+                    auto ret = this->forward<Ret>(f, id, holder, true);
                     holder.hold_actual_result(ret);
                 } else {
-                    auto ret = this->forward<_ret>(f, id, holder);
+                    auto ret = this->forward<Ret>(f, id, holder);
                     holder.hold_actual_result(ret);
                 }
                 return true;
@@ -348,25 +330,25 @@ namespace GemPBA {
         }
 
     public:
-        template<typename _ret, typename F, typename Holder>
+        template<typename Ret, typename F, typename Holder>
         bool try_push_MT(F &&f, int id, Holder &holder) {
-            return push_multithreading<_ret>(f, id, holder);
+            return push_multithreading<Ret>(f, id, holder);
         }
 
 #ifdef MPI_ENABLED
 
         /* 	it attempts pushing on another process by default, if none found,
-            it attempts pushing on another thread, if none found
+            it attempts to push on another thread, if none found
             it will proceed sequentially
         */
-        template<typename _ret, typename F, typename Holder, typename Serializer>
+        template<typename Ret, typename F, typename Holder, typename Serializer>
         bool try_push_MP(F &f, int id, Holder &holder, Serializer &&serializer) {
             bool _flag = push_multiprocess(id, holder, serializer);
 
             if (_flag)
                 return _flag;
             else
-                return try_push_MT<_ret>(f, id, holder);
+                return try_push_MT<Ret>(f, id, holder);
         }
 
     private:
@@ -410,34 +392,35 @@ namespace GemPBA {
             return false;
         }
 
-        template<typename _ret, typename F, typename Holder, typename F_SERIAL>
+        template<typename Ret, typename F, typename Holder, typename F_SERIAL>
         bool push_multiprocess(F &f, int id, Holder &holder, F_SERIAL &f_serial, bool) {
             bool _flag = false;
-            while (!_flag)
-                _flag = push_multiprocess<_ret>(f, id, holder, f_serial);
+            while (!_flag) {
+                _flag = push_multiprocess<Ret>(f, id, holder, f_serial);
+            }
 
             return _flag;
         }
 
-        template<typename _ret, typename F, typename Holder, typename F_SERIAL,
-                std::enable_if_t<!std::is_void_v<_ret>, int> = 0>
+        template<typename Ret, typename F, typename Holder, typename F_SERIAL, std::enable_if_t<!std::is_void_v<Ret>, int> = 0>
         bool push_multiprocess(F &f, int id, Holder &holder, F_SERIAL &f_serial) {
-            int r = try_another_process(holder, f_serial);
-            if (r == 0)
+            int r = try_another_process(holder, f_serial);  // TODO .. this method does not exist, maybe remove!
+            if (r == 0) {
                 return true;
-            if (r == 2)
+            }
+            if (r == 2) {
                 return false;
+            }
 
-            return push_multithreading<_ret>(f, id, holder);
+            return push_multithreading<Ret>(f, id, holder);
         }
 
 #endif
     public:
         // no DLB_Handler begin **********************************************************************
 
-        template<typename _ret, typename F, typename Holder,
-                std::enable_if_t<!std::is_void_v<_ret>, int> = 0>
-        _ret forward(F &f, int threadId, Holder &holder) {
+        template<typename Ret, typename F, typename Holder, std::enable_if_t<!std::is_void_v<Ret>, int> = 0>
+        Ret forward(F &f, int threadId, Holder &holder) {
             // TODO this is related to non-void function on multithreading mode
             // DLB not supported
             holder.setForwardStatus();
@@ -446,11 +429,11 @@ namespace GemPBA {
 
         // no DLB_Handler ************************************************************************* end
 
-        template<typename _ret, typename F, typename Holder,
-                std::enable_if_t<std::is_void_v<_ret>, int> = 0>
-        _ret forward(F &f, int threadId, Holder &holder) {
-            if (holder.isTreated())
+        template<typename Ret, typename F, typename Holder, std::enable_if_t<std::is_void_v<Ret>, int> = 0>
+        Ret forward(F &f, int threadId, Holder &holder) {
+            if (holder.isTreated()) {
                 throw std::runtime_error("Attempt to push a treated holder\n");
+            }
 
 #ifdef MPI_ENABLED
             if (holder.is_pushed() || holder.is_MPI_Sent())
@@ -459,97 +442,98 @@ namespace GemPBA {
             if (holder.is_pushed())
                 return;
 #endif
-            if (is_DLB)
+            if (is_DLB) {
                 dlb.checkLeftSibling(&holder); // it checks if root must be moved
+            }
 
             holder.setForwardStatus();
             std::args_handler::unpack_and_forward_void(f, threadId, holder.getArgs(), &holder);
         }
 
-        template<typename _ret, typename F, typename Holder,
-                std::enable_if_t<!std::is_void_v<_ret>, int> = 0>
-        _ret forward(F &f, int threadId, Holder &holder, bool) {
+        template<typename Ret, typename F, typename Holder, std::enable_if_t<!std::is_void_v<Ret>, int> = 0>
+        Ret forward(F &f, int threadId, Holder &holder, bool) {
             // TODO this is related to non-void function on multithreading mode
             // in construction, DLB may be supported
-            if (holder.is_pushed())
+            if (holder.is_pushed()) {
                 return holder.get();
+            }
 
-            if (is_DLB)
+            if (is_DLB) {
                 dlb.checkLeftSibling(&holder);
+            }
 
-            return forward<_ret>(f, threadId, holder);
+            return forward<Ret>(f, threadId, holder);
         }
 
 #ifdef MPI_ENABLED
 
-        template<typename _ret, typename F, typename Holder, typename F_DESER,
-                std::enable_if_t<!std::is_void_v<_ret>, int> = 0>
-        _ret forward(F &f, int threadId, Holder &holder, F_DESER &f_deser, bool) {
+        template<typename Ret, typename F, typename Holder, typename F_DESER, std::enable_if_t<!std::is_void_v<Ret>, int> = 0>
+        Ret forward(F &f, int threadId, Holder &holder, F_DESER &f_deser, bool) {
             // TODO this is related to non-void function on multiprocessing mode
             // in construction
 
-            if (holder.is_pushed() ||
-                holder.is_MPI_Sent()) // TODO.. this should be considered when using DLB_Handler and pushing to another processsI
-                return holder.get(
-                        f_deser);                    // return {}; // nope, if it was pushed, then result should be retrieved in here
+            if (holder.is_pushed() || holder.is_MPI_Sent()) {
+                // TODO.. this should be considered when using DLB_Handler and pushing to another process
+                return holder.get(f_deser);
+                // return {}; // nope, if it was pushed, then the result should be retrieved in here
+            }
 
-            if (is_DLB)
+            if (is_DLB) {
                 dlb.checkLeftSibling(&holder);
+            }
 
-            return forward<_ret>(f, threadId, holder);
+            return forward<Ret>(f, threadId, holder);
         }
 
         /*
-            types must be passed through the brackets constructBufferDecoder<_Ret, Args...>(..), so it is
+            Types must be passed through the brackets constructBufferDecoder<Ret, Args...>(..), so it is
             known at compile time.
 
-            _Ret: stands for the return type of the main function
-            Args...: is the type list of original type of the function, without considering int id, and void* parent
+            Ret: stands for the return type of the main function
+            Args...: is the type list of the original type of the function, without considering int id, and void* parent
 
             input: this method receives the main algorithm and a deserializer.
 
             return:  a lambda object who is in charge of receiving a raw buffer in MPI_Scheduler::runNode(...), this
             lambda object will deserialize the buffer and create a new Holder containing
-            the deserialized arguments. Lambda object will push to thread pool and it
-            will return a pointer to the holder
+            the deserialized arguments.
+            Lambda object will push to the thread pool, and it will return a pointer to the holder
             */
-        template<typename _Ret, typename... Args>
+        template<typename Ret, typename... Args>
         [[nodiscard]] auto constructBufferDecoder(auto &&callable, auto &&deserializer) {
+            using HolderType = GemPBA::ResultHolder<Ret, Args...>;
             return [this, callable, deserializer](const char *buffer, const int count) {
-                using HolderType = GemPBA::ResultHolder<_Ret, Args...>;
-                HolderType *holder = new HolderType(dlb, -1);
+                auto *holder = new HolderType(dlb, -1);
 
                 std::stringstream ss;
                 for (int i = 0; i < count; i++) {
                     ss << buffer[i];
                 }
-                auto _deser = std::bind_front(deserializer, std::ref(ss));
-                std::apply(_deser, holder->getArgs());
+                auto _deserializer = std::bind_front(deserializer, std::ref(ss));
+                std::apply(_deserializer, holder->getArgs());
 
-                force_push<_Ret>(callable, -1, *holder);
+                force_push<Ret>(callable, -1, *holder);
 
                 return holder;
             };
         }
 
+
         // this returns a lambda function which returns the best results as raw data
-        [[nodiscard]] auto constructResultFetcher() {
+        [[nodiscard]] std::function<std::pair<int, std::string>()> constructResultFetcher() {
             return [this]() {
-                if (bestSolution_serialized.first == -1)
-                    return std::make_pair(0, static_cast<std::string>("Empty buffer, no result"));
-                else
+                if (bestSolution_serialized.first == -1) {
+                    return EMPTY_RESULT;
+                } else {
                     return bestSolution_serialized;
+                }
             };
         }
 
         // meant to be used with non-void functions
-        // in construction
-        [[nodiscard]] auto constructResultFetcher(auto *holder, auto &&deserializer) {
+        [[maybe_unused]] auto constructResultFetcher(auto *holder, auto &&deserializer) {
             return [this]() {
-                if (bestSolution_serialized.first == -1)
-                    return std::make_pair(0, static_cast<std::string>("Empty buffer, no result"));
-                else
-                    return bestSolution_serialized;
+                throw std::runtime_error("Not yet implemented");
             };
         }
 
@@ -560,13 +544,15 @@ namespace GemPBA {
             this->processor_count = std::thread::hardware_concurrency();
             this->idleTime = 0;
             this->numThreadRequests = 0;
-            this->bestSolution_serialized.first = -1; // this allows to avoid sending empty buffers
+            this->bestSolution_serialized.first = -1; // this allows avoiding sending empty buffers
         }
+
+        const std::pair<int, std::string> EMPTY_RESULT = std::make_pair(0, static_cast<std::string>("Empty buffer, no result"));
 
         std::atomic<size_t> numThreadRequests;
 
         /*This section refers to the strategy wrapping a function
-            then pruning data to be use by the wrapped function<<---*/
+            then pruning data to be used by the wrapped function<<---*/
         std::any bestSolution;
         std::pair<int, std::string> bestSolution_serialized;
 
@@ -578,7 +564,7 @@ namespace GemPBA {
 #endif
 
         /*------------------------------------------------------>>end*/
-        /* "processor_count" would allow to set by default the maximum number of threads
+        /* "processor_count" would allow setting by default the maximum number of threads
             that the machine can handle unless the user invokes setMaxThreads() */
 
         unsigned int processor_count;
@@ -658,12 +644,11 @@ namespace GemPBA {
             forwarded to the process it was generated from
         */
 
-        template<typename _ret, typename Holder, typename Serialize,
-                std::enable_if_t<!std::is_void_v<_ret>, int> = 0>
+        template<typename Ret, typename Holder, typename Serialize, std::enable_if_t<!std::is_void_v<Ret>, int> = 0>
         void reply(Serialize &&serialize, Holder &holder, int src) {
             utils::print_mpi_debug_comments("rank {} entered reply! \n", world_rank);
-            // default construction of return type "_ret"
-            _ret res; // TODO .. why in separate lines?
+            // default construction of a return type "Ret"
+            Ret res; // TODO .. why in separate lines?
             res = holder.get();
 
             // termination, since all recursions return to center node
@@ -690,8 +675,7 @@ namespace GemPBA {
             }
         }
 
-        template<typename _ret, typename Holder, typename Serialize,
-                std::enable_if_t<std::is_void_v<_ret>, int> = 0>
+        template<typename Ret, typename Holder, typename Serialize, std::enable_if_t<std::is_void_v<Ret>, int> = 0>
         void reply(Serialize &&, Holder &, int) {
             thread_pool->wait();
         }

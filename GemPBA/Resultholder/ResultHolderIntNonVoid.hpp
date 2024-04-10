@@ -11,27 +11,26 @@
 
 namespace GemPBA {
 
-    template<typename _Ret, typename... Args>
-    class ResultHolderInt<_Ret, typename std::enable_if<!std::is_void<_Ret>::value>::type, Args...>
-            : virtual public ResultHolderBase<Args...> {
+    template<typename Ret, typename... Args>
+    class ResultHolderInt<Ret, typename std::enable_if<!std::is_void<Ret>::value>::type, Args...> : virtual public ResultHolderBase<Args...> {
         friend class DLB_Handler;
 
     protected:
-        std::future<_Ret> expectedFut;
-        _Ret expected;
+        std::future<Ret> expectedFut;
+        Ret expected;
 
     public:
-        ResultHolderInt(DLB_Handler &dlb) : ResultHolderBase<Args...>(dlb) {}
+        explicit ResultHolderInt(DLB_Handler &dlb) : ResultHolderBase<Args...>(dlb) {}
 
-        void hold_future(std::future<_Ret> &&expectedFut) {
+        void hold_future(std::future<Ret> &&expectedFut) {
             this->expectedFut = std::move(expectedFut);
         }
 
-        void hold_actual_result(_Ret &expected) {
+        void hold_actual_result(Ret &expected) {
             this->expected = std::move(expected);
         }
 
-        _Ret get() {
+        Ret get() {
             if (this->isPushed) {
                 auto begin = std::chrono::steady_clock::now();
                 this->expected = expectedFut.get();
@@ -47,14 +46,14 @@ namespace GemPBA {
 
         // in construction
         template<typename F_deser>
-        _Ret get(F_deser &&f_deser) {
+        Ret get(F_deser &&f_deser) {
             if (this->isPushed) {
                 std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
                 this->expected = this->expectedFut.get();
                 std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
                 /*If a thread comes in this scope, then it is clear that numThread
                             must be decremented in one, also it should be locked before another thread
-                            changes it, since it is atomic, this operation is already well defined*/
+                            changes it, since it is atomic, this operation is already well-defined*/
 
                 this->dlb.add_on_idle_time(begin, end);
             } else if (this->isMPISent) {
@@ -81,7 +80,7 @@ namespace GemPBA {
                 for (int i = 0; i < Bytes; i++)
                     ss << in_buffer[i];
 
-                _Ret temp;
+                Ret temp;
                 f_deser(ss, temp);
                 delete[] in_buffer;
 

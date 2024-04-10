@@ -39,7 +39,7 @@ namespace ThreadPool {
     public:
         Pool() { this->init(); }
 
-        Pool(int size) {
+        explicit Pool(int size) {
             this->init();
             this->setSize(size);
         }
