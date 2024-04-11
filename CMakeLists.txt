@@ -20,6 +20,8 @@ Set(CMAKE_EXE_LINKER_FLAGS "-lboost_system -lboost_serialization  -lboost_fiber"
 # Other project-specific configurations
 add_subdirectory(external)
 
+add_definitions(-DUSE_MPI)
+add_definitions(-DUSE_UPC)
 
 add_definitions(-DR_SEARCH=true)
 add_definitions(-DMPI_ENABLED)

@@ -731,7 +731,7 @@ As you may have noticed, within the termination condition, the solution is captu
 
 As for the parallel calls, the method ```BranchHandler::try_push_MT(...)``` is changed to ```BranchHandler::try_push_MP(..., serializer)```.
 
-This ```MT``` suffix stands for Multithreading whereas the ```MP``` suffix stands for Multiprocessing.
+This ```MT``` suffix stands for Multithreading whereas the ```MessagePassing``` suffix stands for Multiprocessing.
 
 Internally, ```try_push_MP``` will invoke the ```MpiScheduler``` to ascertain for any available processor, if none, then it will invoke ```try_push_MT``` for a local thread.
 

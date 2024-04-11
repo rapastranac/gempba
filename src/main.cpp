@@ -1,12 +1,25 @@
 #include "../include/main.h"
 #include "fmt/format.h"
 
+#include "schedulers/SchedulerFactory.hpp"
+
 #include <argparse/argparse.hpp>
 
 #include <iostream>
 
-//#include <mpi.h>
 int main(int argc, char *argv[]) {
+
+    Scheduler &scheduler = SchedulerFactory::createScheduler(SchedulerFactory::UPC);
+    Scheduler &instance = Scheduler::getInstance();
+
+    scheduler.initialize();
+    instance.initialize();
+
+    Scheduler &scheduler2 = SchedulerFactory::createScheduler(SchedulerFactory::MPI);
+    scheduler2.initialize();
+    scheduler.initialize();
+
+
     argparse::ArgumentParser program("main");
 
     program.add_argument("-job_id", "--job_id")
