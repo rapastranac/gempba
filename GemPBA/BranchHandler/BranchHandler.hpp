@@ -193,7 +193,7 @@ namespace gempba {
                     if (upperHolder->evaluate_branch_checkIn()) { // checks if it's worth it to push
                         this->numThreadRequests++;
                         upperHolder->setPushStatus();
-                        std::args_handler::unpack_and_push_void(*thread_pool, f, upperHolder->getArgs());
+                        gempba::args_handler::unpack_and_push_void(*thread_pool, f, upperHolder->getArgs());
                     } else { // discard otherwise
                         upperHolder->setDiscard();
                     }
@@ -246,14 +246,14 @@ namespace gempba {
         void force_push(F &f, int id, Holder &holder) {
             holder.setPushStatus();
             dlb.prune(&holder);
-            std::args_handler::unpack_and_push_void(*thread_pool, f, holder.getArgs());
+            gempba::args_handler::unpack_and_push_void(*thread_pool, f, holder.getArgs());
         }
 
         template<typename Ret, typename F, typename Holder, std::enable_if_t<!std::is_void_v<Ret>, int> = 0>
         void force_push(F &f, int id, Holder &holder) {
             holder.setPushStatus();
             dlb.prune(&holder);
-            std::args_handler::unpack_and_forward_non_void(f, id, holder.getArgs(), holder);
+            gempba::args_handler::unpack_and_forward_non_void(f, id, holder.getArgs(), holder);
         }
 
     private:
@@ -282,7 +282,7 @@ namespace gempba {
                             holder.setPushStatus();
                             dlb.prune(&holder);
 
-                            std::args_handler::unpack_and_push_void(*thread_pool, f, holder.getArgs());
+                            gempba::args_handler::unpack_and_push_void(*thread_pool, f, holder.getArgs());
                             return true; // pushed to the pool
                         }
                     }
@@ -313,7 +313,7 @@ namespace gempba {
                 holder.setPushStatus();
 
                 lck.unlock();
-                auto ret = std::args_handler::unpack_and_push_non_void(*thread_pool, f, holder.getArgs());
+                auto ret = gempba::args_handler::unpack_and_push_non_void(*thread_pool, f, holder.getArgs());
                 holder.hold_future(std::move(ret));
                 return true;
             } else {
@@ -424,7 +424,7 @@ namespace gempba {
             // TODO this is related to non-void function on multithreading mode
             // DLB not supported
             holder.setForwardStatus();
-            return std::args_handler::unpack_and_forward_non_void(f, threadId, holder.getArgs(), &holder);
+            return gempba::args_handler::unpack_and_forward_non_void(f, threadId, holder.getArgs(), &holder);
         }
 
         // no DLB_Handler ************************************************************************* end
@@ -447,7 +447,7 @@ namespace gempba {
             }
 
             holder.setForwardStatus();
-            std::args_handler::unpack_and_forward_void(f, threadId, holder.getArgs(), &holder);
+            gempba::args_handler::unpack_and_forward_void(f, threadId, holder.getArgs(), &holder);
         }
 
         template<typename Ret, typename F, typename Holder, std::enable_if_t<!std::is_void_v<Ret>, int> = 0>

@@ -15,7 +15,7 @@
  * rapastranac@gmail.com
  */
 
-namespace std {
+namespace gempba {
 
     class args_handler {
     private:
