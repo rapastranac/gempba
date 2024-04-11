@@ -3,7 +3,7 @@
 #include "VertexCover.hpp"
 
 class VC_void : public VertexCover {
-    using HolderType = GemPBA::ResultHolder<void, int, Graph>;
+    using HolderType = gempba::ResultHolder<void, int, Graph>;
 
 private:
     std::function<void(int, int, Graph &, void *)> _f;

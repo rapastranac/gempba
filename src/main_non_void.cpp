@@ -21,7 +21,7 @@
 
 int main_non_void(int numThreads,int prob, std::string &filename)
 {
-    auto &handler = GemPBA::BranchHandler::getInstance(); // parallel GemPBA
+    auto &handler = gempba::BranchHandler::getInstance(); // parallel GemPBA
 
     Graph graph;
     Graph oGraph;

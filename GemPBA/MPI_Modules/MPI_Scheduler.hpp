@@ -40,7 +40,7 @@
 
 #define TIMEOUT_TIME 3
 
-namespace GemPBA {
+namespace gempba {
     class BranchHandler;
 
     // inter process communication handler
@@ -797,6 +797,6 @@ namespace GemPBA {
         }
     };
 
-} // namespace GemPBA
+}
 
 #endif

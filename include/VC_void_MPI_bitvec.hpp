@@ -96,8 +96,8 @@ auto deserializer = [](std::stringstream &ss, auto &...args) {
 };
 
 class VC_void_MPI_bitvec : public VertexCover {
-    //using HolderType = GemPBA::ResultHolder<void, int, gbitset, int, std::vector<int>>;
-    using HolderType = GemPBA::ResultHolder<void, int, gbitset, int>;
+    //using HolderType = gempba::ResultHolder<void, int, gbitset, int, std::vector<int>>;
+    using HolderType = gempba::ResultHolder<void, int, gbitset, int>;
 
 private:
     std::function<void(int, int, gbitset &, int, void *)> _f;

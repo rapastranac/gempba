@@ -9,8 +9,6 @@
 #include <tuple>
 #include <utility>
 
-// This is just a GemPBA to handle arguments
-
 /*
  * Created by Andres Pastrana on 2019
  * pasr1602@usherbrooke.ca
