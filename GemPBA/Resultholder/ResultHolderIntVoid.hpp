@@ -9,7 +9,7 @@
 
 #include "ResultHolderBase.hpp"
 
-namespace GemPBA {
+namespace gempba {
     template<typename Ret, typename... Args>
     class ResultHolderInt<Ret, typename std::enable_if<std::is_void<Ret>::value>::type, Args...> : virtual public ResultHolderBase<Args...> {
         friend class DLB_Handler;

@@ -23,7 +23,7 @@ is to be a root. This allows to track all levels of the exploration tree, and th
 all holders are potentally pushable
 */
 
-namespace GemPBA {
+namespace gempba {
     template<typename Ret, typename... Args>
     class ResultHolder;
 

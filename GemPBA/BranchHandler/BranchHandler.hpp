@@ -39,7 +39,7 @@
 #include <typeinfo>
 #include <utility>
 
-namespace GemPBA {
+namespace gempba {
 
     enum LookupStrategy {
         MAXIMISE, MINIMISE
@@ -54,7 +54,7 @@ namespace GemPBA {
 
         template<typename Ret, typename... Args>
         friend
-        class GemPBA::ResultHolder;
+        class gempba::ResultHolder;
 
         friend class MPI_Scheduler;
 
@@ -501,7 +501,7 @@ namespace GemPBA {
             */
         template<typename Ret, typename... Args>
         [[nodiscard]] auto constructBufferDecoder(auto &&callable, auto &&deserializer) {
-            using HolderType = GemPBA::ResultHolder<Ret, Args...>;
+            using HolderType = gempba::ResultHolder<Ret, Args...>;
             return [this, callable, deserializer](const char *buffer, const int count) {
                 auto *holder = new HolderType(dlb, -1);
 
@@ -556,7 +556,7 @@ namespace GemPBA {
         std::any bestSolution;
         std::pair<int, std::string> bestSolution_serialized;
 
-        DLB_Handler &dlb = GemPBA::DLB_Handler::getInstance();
+        DLB_Handler &dlb = gempba::DLB_Handler::getInstance();
 #ifdef R_SEARCH
         bool is_DLB = true; // enables the novel dynamic load balancing
 #else
@@ -682,6 +682,6 @@ namespace GemPBA {
 
 #endif
     };
-} // namespace GemPBA
+}
 
 #endif

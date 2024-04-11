@@ -10,7 +10,7 @@
 #include "ResultHolderIntVoid.hpp"
 #include "ResultHolderIntNonVoid.hpp"
 
-namespace GemPBA {
+namespace gempba {
 
     template<typename Ret, typename... Args>
     class ResultHolder : public ResultHolderInt<Ret, void, Args...> {

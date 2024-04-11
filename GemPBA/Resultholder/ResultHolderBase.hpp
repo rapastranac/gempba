@@ -22,7 +22,7 @@
  * rapastranac@gmail.com
  */
 
-namespace GemPBA {
+namespace gempba {
     class DLB_Handler;
 
     template<typename... Args>

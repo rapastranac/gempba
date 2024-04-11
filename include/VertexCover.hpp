@@ -338,8 +338,8 @@ protected:
     }
 
 protected:
-    GemPBA::DLB_Handler &dlb = GemPBA::DLB_Handler::getInstance();
-    GemPBA::BranchHandler &branchHandler = GemPBA::BranchHandler::getInstance();
+    gempba::DLB_Handler &dlb = gempba::DLB_Handler::getInstance();
+    gempba::BranchHandler &branchHandler = gempba::BranchHandler::getInstance();
 
     Graph graph;
     Graph graph_res;

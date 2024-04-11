@@ -24,8 +24,8 @@
 #include <vector>
 #include <unistd.h>
 
-auto &dlb = GemPBA::DLB_Handler::getInstance();
-auto &branchHandler = GemPBA::BranchHandler::getInstance(); // parallel library
+auto &dlb = gempba::DLB_Handler::getInstance();
+auto &branchHandler = gempba::BranchHandler::getInstance(); // parallel library
 
 std::mutex mtx;
 size_t leaves = 0;
@@ -35,7 +35,7 @@ size_t multiple = 1024; //static_cast<size_t>(pow(2, 18));
 
 void foo(int id, int depth, float treeIdx, void *parent)
 {
-    using HolderType = GemPBA::ResultHolder<void, int, float>;
+    using HolderType = gempba::ResultHolder<void, int, float>;
     //fmt::print("rank {}, id : {} depth : {} treeIdx : {}\n", branchHandler.rank_me(), id, depth, treeIdx); // node id in the tree
 
     if (depth >= k)
@@ -90,7 +90,7 @@ void foo(int id, int depth, float treeIdx, void *parent)
 
 int main_void_MPI(int numThreads, int prob, std::string &filename)
 {
-    //using HolderType = GemPBA::ResultHolder<void, int, Graph>;
+    //using HolderType = gempba::ResultHolder<void, int, Graph>;
 
     Graph graph;
     Graph oGraph;
@@ -98,11 +98,11 @@ int main_void_MPI(int numThreads, int prob, std::string &filename)
 
     auto mainAlgo = std::bind(&VC_void_MPI::mvc, &cover, _1, _2, _3, _4); // target algorithm [all arguments]
 
-    auto &mpiScheduler = GemPBA::MPI_Scheduler::getInstance(); // MPI MPI_Scheduler
+    auto &mpiScheduler = gempba::MPI_Scheduler::getInstance(); // MPI MPI_Scheduler
     int rank = mpiScheduler.rank_me();
     //HolderType holder(handler);									//it creates a ResultHolder, required to retrive result
     branchHandler.passMPIScheduler(&mpiScheduler);
-    GemPBA::ResultHolder<void, int, float> hldr(dlb, -1, nullptr);
+    gempba::ResultHolder<void, int, float> hldr(dlb, -1, nullptr);
     //float val = 845.515;
 
     //	int frst = 0;
@@ -126,8 +126,8 @@ int main_void_MPI(int numThreads, int prob, std::string &filename)
 
     /* previous input and output required before following condition
     thus, other nodes know the data type*/
-    //using HolderType = GemPBA::ResultHolder<void, int, float>;
-    using HolderType = GemPBA::ResultHolder<void, int, Graph>;
+    //using HolderType = gempba::ResultHolder<void, int, float>;
+    using HolderType = gempba::ResultHolder<void, int, Graph>;
 
     HolderType holder(dlb, -1); //it creates a ResultHolder, required to retrive result
     int depth = 0;
