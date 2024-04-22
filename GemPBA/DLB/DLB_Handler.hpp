@@ -124,6 +124,10 @@ namespace gempba {
             roots[threadId] = root;
         }
 
+        void **getRoot(int threadId) {
+            return &roots[threadId];
+        }
+
         template<typename HolderType>
         HolderType *find_top_holder(HolderType *holder) {
             HolderType *leftMost = nullptr; // this is the branch that led us to the root
