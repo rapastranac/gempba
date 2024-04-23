@@ -404,12 +404,11 @@ public:
 
         hol_l.setDepth(depth);
         hol_r.setDepth(depth);
-#ifdef R_SEARCH
-        if (!parent) {
+        if (branchHandler.getLoadBalancingStrategy() == gempba::QUASI_HORIZONTAL) {
             dummyParent = new HolderType(dlb, id);
             dlb.linkVirtualRoot(id, dummyParent, hol_l, hol_r);
         }
-#endif
+
         hol_l.bind_branch_checkIn([&] {
             int bestVal = branchHandler.refValue();
             gbitset ingraph1 = bits_in_graph;

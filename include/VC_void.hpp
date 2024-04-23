@@ -110,12 +110,10 @@ public:
         HolderType hol_r(dlb, id, parent);
         hol_l.setDepth(depth);
         hol_r.setDepth(depth);
-#ifdef R_SEARCH
-        if (!parent) {
+        if (branchHandler.getLoadBalancingStrategy() == gempba::QUASI_HORIZONTAL) {
             dummyParent = new HolderType(dlb, id);
             dlb.linkVirtualRoot(id, dummyParent, hol_l, hol_r);
         }
-#endif
 
         hol_l.bind_branch_checkIn([&] {
             Graph g = graph;
