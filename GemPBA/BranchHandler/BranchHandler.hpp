@@ -46,6 +46,11 @@ namespace gempba {
         MAXIMISE, MINIMISE
     };
 
+    enum LoadBalancingStrategy {
+        QUASI_HORIZONTAL, // Our Novel Dynamic Load Balancer
+        WORK_STEALING
+    };
+
     template<typename Ret, typename... Args>
     class ResultHolder;
 
@@ -68,11 +73,7 @@ namespace gempba {
         std::pair<int, std::string> bestSolution_serialized;
 
         DLB_Handler &dlb = gempba::DLB_Handler::getInstance();
-#ifdef R_SEARCH
-        bool is_DLB = true; // enables the novel dynamic load balancing
-#else
-        bool is_DLB = false; // it leaves the greedy or work-stealing dynamic load balancing by default
-#endif
+        LoadBalancingStrategy _loadBalancingStrategy = QUASI_HORIZONTAL;
 
         int refValueLocal = INT_MIN;
         bool maximisation = true;
@@ -100,7 +101,7 @@ namespace gempba {
       */
         template<typename Ret, typename F, typename HolderType, std::enable_if_t<std::is_void_v<Ret>, int> = 0>
         bool try_top_holder(F &f, HolderType &holder) {
-            if (is_DLB) {
+            if (_loadBalancingStrategy == QUASI_HORIZONTAL) {
                 HolderType *upperHolder = dlb.find_top_holder(&holder);
                 if (upperHolder) {
                     if (upperHolder->isTreated())
@@ -165,7 +166,7 @@ namespace gempba {
             std::unique_lock<std::mutex> lck(mtx);
             // if (busyThreads < thread_pool->size())
             if (thread_pool->n_idle() > 0) {
-                if (is_DLB) {
+                if (_loadBalancingStrategy == QUASI_HORIZONTAL) {
                     // bool res = try_top_holder<Ret>(lck, f, holder);
                     // if (res)
                     //	return false; //if top holder found, then it should return false to keep trying
@@ -181,7 +182,7 @@ namespace gempba {
                 return true;
             } else {
                 lck.unlock();
-                if (is_DLB) {
+                if (_loadBalancingStrategy == QUASI_HORIZONTAL) {
                     auto ret = this->forward<Ret>(f, id, holder, true);
                     holder.hold_actual_result(ret);
                 } else {
@@ -211,6 +212,14 @@ namespace gempba {
 
         BranchHandler &operator=(BranchHandler &&) = delete;
         //</editor-fold>
+
+        void setLoadBalancingStrategy(LoadBalancingStrategy strategy) {
+            this->_loadBalancingStrategy = strategy;
+        };
+
+        LoadBalancingStrategy getLoadBalancingStrategy() const {
+            return _loadBalancingStrategy;
+        }
 
         double getPoolIdleTime() {
             return thread_pool->idle_time() / (double) processor_count;
@@ -435,7 +444,7 @@ namespace gempba {
             if (holder.is_pushed())
                 return;
 #endif
-            if (is_DLB) {
+            if (_loadBalancingStrategy == QUASI_HORIZONTAL) {
                 dlb.checkLeftSibling(&holder); // it checks if root must be moved
             }
 
@@ -451,7 +460,7 @@ namespace gempba {
                 return holder.get();
             }
 
-            if (is_DLB) {
+            if (_loadBalancingStrategy == QUASI_HORIZONTAL) {
                 dlb.checkLeftSibling(&holder);
             }
 
@@ -595,7 +604,7 @@ namespace gempba {
          */
         template<typename HolderType>
         bool try_top_holder(auto &getBuffer, HolderType &holder) {
-            if (is_DLB) {
+            if (_loadBalancingStrategy == QUASI_HORIZONTAL) {
                 HolderType *upperHolder = dlb.find_top_holder(&holder); //  if it finds it, then the root has already been lowered
                 if (upperHolder) {
                     if (upperHolder->isTreated())
@@ -638,7 +647,7 @@ namespace gempba {
                 // return {}; // nope, if it was pushed, then the result should be retrieved in here
             }
 
-            if (is_DLB) {
+            if (_loadBalancingStrategy == QUASI_HORIZONTAL) {
                 dlb.checkLeftSibling(&holder);
             }
 
