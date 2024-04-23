@@ -47,7 +47,7 @@ void foo(MyClass instance, float f, double d){
         return;
     }
 
-    /* intance, f and d are used to create sub instances for the
+    /* instance, f and d are used to create sub instances for the
         recursions, for left, middle and right branches.
     */
 
@@ -120,7 +120,7 @@ void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
 
     /*  if parent is nullptr, then a virtual root is should be created
     such that branches within this scope can be accessed from below */
-    if (!parent){
+    if (branchHandler.getLoadBalancingStrategy() == gempba::QUASI_HORIZONTAL) {
         dummyParent = new HolderType(dlb, id);
         dlb.linkVirtualRoot(id, dummyParent, rHolder_l, rHolder_m, rHolder_r);
     }
@@ -204,7 +204,7 @@ void foo1(int id, MyClass instance, float f, double d, void *parent = nullptr)
     HolderType rHolder_m(dlb, id, parent);
     HolderType rHolder_r(dlb, id, parent);
 
-    if (!parent){
+    if (branchHandler.getLoadBalancingStrategy() == gempba::QUASI_HORIZONTAL) {
         dummyParent = new HolderType(dlb, id);
         dlb.linkVirtualRoot(id, dummyParent, rHolder_l, rHolder_m, rHolder_r);
     }
@@ -246,7 +246,7 @@ void foo(MyClass instance, float f, double d){
         return;
     }
 
-    /* intance, f and d are used to create sub instances for the
+    /* instance, f and d are used to create sub instances for the
         recursions, for left, middle and right branches.
     */
     if( /* left branch leads to a better solution */)
@@ -291,7 +291,7 @@ void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
     HolderType rHolder_m(dlb, id, parent);
     HolderType rHolder_r(dlb, id, parent);
 
-    if (!parent){
+    if (branchHandler.getLoadBalancingStrategy() == gempba::QUASI_HORIZONTAL){
         dummyParent = new HolderType(dlb, id);
         dlb.linkVirtualRoot(id, dummyParent, rHolder_l, rHolder_m, rHolder_r);
     }
@@ -680,7 +680,7 @@ void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
     HolderType rHolder_m(dlb, id, parent);
     HolderType rHolder_r(dlb, id, parent);
 
-    if (!parent){
+    if (branchHandler.getLoadBalancingStrategy()==gempba::QUASI_HORIZONTAL){
         dummyParent = new HolderType(dlb, id);
         dlb.linkVirtualRoot(id, dummyParent, rHolder_l, rHolder_m, rHolder_r);
     }

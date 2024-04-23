@@ -4,6 +4,7 @@
 #include <atomic>
 #include <map>
 #include <mutex>
+#include "fmt/core.h"
 
 /*
  * Created by Andres Pastrana on 2019
@@ -35,12 +36,6 @@ namespace gempba {
         std::map<int, void *> roots; // every thread will be solving a subtree, this point to their roots
         std::mutex mtx;
         std::atomic<long long> idleTime{0};
-
-#ifdef R_SEARCH
-        bool rootSearch = R_SEARCH;
-#else
-        bool rootSearch = false;
-#endif
         size_t idCounter = 0;
 
         DLB_Handler() = default;
