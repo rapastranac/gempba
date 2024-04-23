@@ -33,6 +33,7 @@
 #include <type_traits>
 #include <typeinfo>
 #include <utility>
+#include <thread>
 
 /*
  * Created by Andres Pastrana on 2019
@@ -87,7 +88,7 @@ namespace gempba {
         std::unique_ptr<ThreadPool::Pool> thread_pool;
 
         BranchHandler() {
-            processor_count = thread::hardware_concurrency();
+            processor_count = std::thread::hardware_concurrency();
             idleTime = 0;
             numThreadRequests = 0;
             bestSolution_serialized.first = -1; // this allows avoiding sending empty buffers
@@ -542,6 +543,10 @@ namespace gempba {
         // if multiprocessing, BranchHandler should have access to the mpi scheduler
         void passMPIScheduler(MPI_Scheduler *mpiScheduler) {
             this->mpiScheduler = mpiScheduler;
+        }
+
+        int getWorldRank() const {
+            return world_rank;
         }
 
 
