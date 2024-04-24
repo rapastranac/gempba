@@ -1,13 +1,39 @@
 cmake_minimum_required(VERSION 3.2)
 
-#------------------------------------------------------------------------------
-# Build the google test library
+project(gempba_tests)
 
-# We compile Google Test ourselves instead of using pre-compiled libraries.
-# See the Google Test FAQ "Why is it not recommended to install a
-# pre-compiled copy of Google Test (for example, into /usr/local)?"
-# at http://code.google.com/p/googletest/wiki/FAQ for more details.
-add_library(gmock STATIC
-        gmock-gtest-all.cc gmock/gmock.h gtest/gtest.h gtest/gtest-spi.h)
-target_compile_definitions(gmock PUBLIC GTEST_HAS_STD_WSTRING=1)
-target_include_directories(gmock SYSTEM PUBLIC . gmock gtest)
+# Set the output directory to be the same as the main project
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+# Set up the main test directory
+set(TEST_DIR "${CMAKE_SOURCE_DIR}/tests")
+
+message("Tests source dir: ${TEST_DIR}\n")
+
+
+# Collect all test source files recursively
+file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS "${TEST_DIR}/*.cpp")
+
+# Ensure that source files are found
+if(NOT TEST_SOURCES)
+    message(FATAL_ERROR "No test source files found in ${TEST_DIR}\n")
+endif()
+
+# Create a single test executable
+add_executable(all_tests.out ${TEST_SOURCES})
+message("Should have created an exec: ${TEST_SOURCES}\n")
+
+# Include necessary directories
+target_include_directories(all_tests.out PRIVATE "${TEST_DIR}")
+
+# Link necessary libraries (e.g., Google Test)
+target_link_libraries(all_tests.out
+        PRIVATE
+        GTest::gtest
+        GTest::gtest_main
+        fmt
+        ${MPI_LIBRARIES}
+        )
+
+# Add the test to the testing system
+add_test(NAME all_tests.out COMMAND all_tests.out)
