@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.22.1)
 
 project(gempba)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 
 find_package(OpenMP REQUIRED)
 find_package(Threads REQUIRED)
@@ -35,7 +35,7 @@ add_definitions(-DBITVECTOR_VC)
 #add_definitions(-DSCHEDULER_CENTRALIZED)
 #add_definitions(-DUSE_LARGE_ENCODING)
 
-add_compile_options("-std=c++2a" "-fconcepts" "-O3" "-Wall" "-Wpedantic" "-Wextra" "-fexceptions" "-pthread")
+add_compile_options("-std=c++23" "-fconcepts" "-O3" "-Wall" "-Wpedantic" "-Wextra" "-fexceptions" "-pthread")
 
 
 #valgrind
