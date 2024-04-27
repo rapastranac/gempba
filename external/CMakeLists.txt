@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.28)
 include(FetchContent)
 
 project(external)
@@ -12,7 +12,7 @@ set(FMT_INSTALL_LOCATION ${EXTERNAL_INSTALL_LOCATION} CACHE PATH "Fmt install lo
 FetchContent_Declare(
         fmt
         GIT_REPOSITORY https://github.com/fmtlib/fmt.git
-        GIT_TAG a0b8a92e3d1532361c2f7feb63babc5c18d00ef2    # release-10.0.0
+        GIT_TAG e69e5f977d458f2650bb346dadf2ad30c5320281    # release-10.2.1
         SOURCE_DIR ${FMT_INSTALL_LOCATION}/fmt
 )
 
@@ -45,7 +45,7 @@ set(ARGPARSE_INSTALL_LOCATION ${EXTERNAL_INSTALL_LOCATION} CACHE PATH "argparse 
 FetchContent_Declare(
         argparse
         GIT_REPOSITORY https://github.com/p-ranav/argparse.git
-        GIT_TAG 997da9255618311d1fcb0135ce86022729d1f1cb    # v2.9
+        GIT_TAG af442b4da0cd7a07b56fa709bd16571889dc7fda    # v3.0
         SOURCE_DIR ${ARGPARSE_INSTALL_LOCATION}/argparse
 )
 
