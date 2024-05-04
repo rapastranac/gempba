@@ -41,7 +41,7 @@ namespace gempba {
         size_t fw_count = 0;
         size_t ph_count = 0;
 
-        long long int id = -1;
+        int id = -1;
         int threadId = -1;
 
         int depth = -1;
@@ -71,7 +71,7 @@ namespace gempba {
             this->depth = depth;
         }
 
-        size_t getId() {
+        int getId() {
             return id;
         }
 
