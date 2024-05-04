@@ -36,7 +36,7 @@ namespace gempba {
         std::map<int, void *> roots; // every thread will be solving a subtree, this point to their roots
         std::mutex mtx;
         std::atomic<long long> idleTime{0};
-        size_t idCounter = 0;
+        int idCounter = 0;
 
         DLB_Handler() = default;
 
@@ -103,7 +103,7 @@ namespace gempba {
             return instance;
         }
 
-        size_t getUniqueId() {
+        int getUniqueId() {
             std::scoped_lock<std::mutex> lck(mtx);
             return ++idCounter;
         }
