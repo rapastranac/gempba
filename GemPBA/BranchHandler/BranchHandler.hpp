@@ -473,7 +473,7 @@ namespace gempba {
 
 #ifdef MPI_ENABLED
     private:
-        MPI_Scheduler *mpiScheduler = nullptr;
+        gempba::MPI_Scheduler *mpiScheduler = nullptr;
         std::mutex mtx_MPI;             // mutex to ensure MPI_THREAD_SERIALIZED
         int world_rank = -1;            // get the rank of the process
         int world_size = -1;            // get the number of processes/nodes
@@ -552,6 +552,7 @@ namespace gempba {
         // if multiprocessing, BranchHandler should have access to the mpi scheduler
         void passMPIScheduler(MPI_Scheduler *mpiScheduler) {
             this->mpiScheduler = mpiScheduler;
+            this->world_rank = this->mpiScheduler->rank_me();
         }
 
         int getWorldRank() const {
