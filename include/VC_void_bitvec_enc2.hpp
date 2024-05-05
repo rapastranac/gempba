@@ -4,6 +4,7 @@
 #include <atomic>
 #include <array>
 #include <random>
+#include <spdlog/spdlog.h>
 
 #include <map>
 #include <boost/dynamic_bitset.hpp>
@@ -493,9 +494,9 @@ private:
             auto clock = std::chrono::system_clock::now();
             std::time_t time = std::chrono::system_clock::to_time_t(clock); //it includes a "\n"
 
-            fmt::print("rank {}, MVC solution so far: {} @ depth : {}, {}", branchHandler.rank_me(), solsize, depth,
+            spdlog::info("rank {}, MVC solution so far: {} @ depth : {}, {}", branchHandler.rank_me(), solsize, depth,
                        std::ctime(&time));
-            //fmt::print("dummy[0,...,3] = [{}, {}, {}, {}]\n", dummy[0], dummy[1], dummy[2], dummy[3]);
+            //spdlog::info("dummy[0,...,3] = [{}, {}, {}, {}]\n", dummy[0], dummy[1], dummy[2], dummy[3]);
         }
 
         return;

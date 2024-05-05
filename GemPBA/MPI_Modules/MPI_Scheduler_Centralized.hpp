@@ -21,6 +21,7 @@
 #include <thread>
 #include <queue>
 #include <unistd.h>
+#include <spdlog/spdlog.h>
 #include <atomic>
 #include <memory>
 
@@ -210,8 +211,8 @@ namespace gempba {
         double time_centerfull_sent = 0;
 
 
-        vector <std::pair<char *, int>> local_outqueue;
-        vector <std::pair<char *, int>> local_inqueue;
+        std::vector <std::pair<char *, int>> local_outqueue;
+        std::vector <std::pair<char *, int>> local_inqueue;
 
     public:
         static MPI_Scheduler &getInstance() {
@@ -248,12 +249,12 @@ namespace gempba {
 
 
         void printStats() {
-            fmt::print("\n \n \n");
-            fmt::print("*****************************************************\n");
-            fmt::print("Elapsed time : {:4.3f} \n", elapsedTime());
-            fmt::print("Total number of requests : {} \n", totalRequests);
-            fmt::print("*****************************************************\n");
-            fmt::print("\n \n \n");
+            spdlog::info("\n \n \n");
+            spdlog::info("*****************************************************\n");
+            spdlog::info("Elapsed time : {:4.3f} \n", elapsedTime());
+            spdlog::info("Total number of requests : {} \n", totalRequests);
+            spdlog::info("*****************************************************\n");
+            spdlog::info("\n \n \n");
         }
 
         double getTotalRequests() {
@@ -346,7 +347,7 @@ namespace gempba {
                 MPI_Get_count(&status, MPI_CHAR, &count); // receives total number of datatype elements of the message
 
 #ifdef DEBUG_COMMENTS
-                fmt::print("rank {}, received message from rank {}, tag {}, count : {}\n", world_rank, status.MPI_SOURCE, status.MPI_TAG, count);
+                spdlog::info("rank {}, received message from rank {}, tag {}, count : {}\n", world_rank, status.MPI_SOURCE, status.MPI_TAG, count);
 #endif
                 char *message = new char[count];
                 MPI_Recv(message, count, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, world_Comm, &status);
@@ -362,12 +363,12 @@ namespace gempba {
                     nTasksRecvd++;
 
 #ifdef DEBUG_COMMENTS
-                    fmt::print("rank {}, pushing buffer to thread pool", world_rank, status.MPI_SOURCE);
+                    spdlog::info("rank {}, pushing buffer to thread pool", world_rank, status.MPI_SOURCE);
 #endif
                     //  push to the thread pool *********************************************************************
                     auto *holder = bufferDecoder(message, count); // holder might be useful for non-void functions
 #ifdef DEBUG_COMMENTS
-                    fmt::print("... DONE\n", world_rank, status.MPI_SOURCE);
+                    spdlog::info("... DONE\n", world_rank, status.MPI_SOURCE);
 #endif
                     // **********************************************************************************************
 
@@ -455,7 +456,7 @@ namespace gempba {
                 }
             }
 #ifdef DEBUG_COMMENTS
-            fmt::print("rank {} sent {} tasks\n", world_rank, nTasksSent);
+            spdlog::info("rank {} sent {} tasks\n", world_rank, nTasksSent);
 #endif
 
             if (!q.empty())
@@ -474,13 +475,13 @@ namespace gempba {
 
             if (flag) {
 #ifdef DEBUG_COMMENTS
-                fmt::print("rank {}, about to receive refValue from Center\n", world_rank);
+                spdlog::info("rank {}, about to receive refValue from Center\n", world_rank);
 #endif
 
                 MPI_Recv(&refValueGlobal, 1, MPI_INT, CENTER, REFVAL_UPDATE_TAG, refValueGlobal_Comm, &status);
 
 #ifdef DEBUG_COMMENTS
-                fmt::print("rank {}, received refValue: {} from Center\n", world_rank, refValueGlobal);
+                spdlog::info("rank {}, received refValue: {} from Center\n", world_rank, refValueGlobal);
 #endif
             }
 
@@ -534,7 +535,7 @@ namespace gempba {
 
         bool isTerminated(int TAG) {
             if (TAG == TERMINATION_TAG) {
-                fmt::print("rank {} exited\n", world_rank);
+                spdlog::info("rank {} exited\n", world_rank);
                 MPI_Barrier(world_Comm);
                 return true;
             }
@@ -543,7 +544,7 @@ namespace gempba {
 
         void notifyAvailableState() {
 #ifdef DEBUG_COMMENTS
-            fmt::print("rank {} entered notifyAvailableState()\n", world_rank);
+            spdlog::info("rank {} entered notifyAvailableState()\n", world_rank);
 #endif
 
             int buffer = 0;
@@ -716,7 +717,7 @@ namespace gempba {
                         break;
                     case STATE_AVAILABLE: {
 #ifdef DEBUG_COMMENTS
-                        fmt::print("center received state_available from rank {}\n", status.MPI_SOURCE);
+                        spdlog::info("center received state_available from rank {}\n", status.MPI_SOURCE);
 #endif
                         processState[status.MPI_SOURCE] = STATE_AVAILABLE;
                         ++nAvailable;
@@ -729,7 +730,7 @@ namespace gempba {
                                 or they are not up-to-date, thus it is required to broadcast it whether this value
                                 changes or not  */
 #ifdef DEBUG_COMMENTS
-                        fmt::print("center received refValue {} from rank {}\n", buffer, status.MPI_SOURCE);
+                        spdlog::info("center received refValue {} from rank {}\n", buffer, status.MPI_SOURCE);
 #endif
                         bool signal = false;
 
@@ -747,12 +748,12 @@ namespace gempba {
                         if (signal) {
                             static int success = 0;
                             success++;
-                            fmt::print("refValueGlobal updated to : {} by rank {}\n", refValueGlobal,
+                            spdlog::info("refValueGlobal updated to : {} by rank {}\n", refValueGlobal,
                                        status.MPI_SOURCE);
                         } else {
                             static int failures = 0;
                             failures++;
-                            fmt::print("FAILED updates : {}, refValueGlobal : {} by rank {}\n", failures,
+                            spdlog::info("FAILED updates : {}, refValueGlobal : {} by rank {}\n", failures,
                                        refValueGlobal, status.MPI_SOURCE);
                         }
                         ++totalRequests;
@@ -775,14 +776,14 @@ namespace gempba {
 
                         if (center_queue.size() > 2 * CENTER_NBSTORED_TASKS_PER_PROCESS * world_size) {
                             if (difftime(time_centerfull_sent, MPI_Wtime() > 1)) {
-                                fmt::print(
+                                spdlog::info(
                                         "Center queue size is twice the limit.  Contacting workers to let them know.\n");
                                 center_last_full_status = false;    //handleFullMessaging will see this and reontact workers
                             }
                         }
 
 #ifdef DEBUG_COMMENTS
-                        fmt::print("center received task from {}, current queue size is {}\n", status.MPI_SOURCE, center_queue.size());
+                        spdlog::info("center received task from {}, current queue size is {}\n", status.MPI_SOURCE, center_queue.size());
 #endif
                     }
                         break;
@@ -869,7 +870,7 @@ namespace gempba {
                 MPI_Recv(buffer, count, MPI_CHAR, rank, MPI_ANY_TAG, world_Comm, &status);
 
 #ifdef DEBUG_COMMENTS
-                fmt::print("fetching result from rank {} \n", rank);
+                spdlog::info("fetching result from rank {} \n", rank);
 #endif
 
                 switch (status.MPI_TAG) {
@@ -884,13 +885,13 @@ namespace gempba {
 
                         delete[] buffer;
 
-                        fmt::print("solution received from rank {}, count : {}, refVal {} \n", rank, count, refValue);
+                        spdlog::info("solution received from rank {}, count : {}, refVal {} \n", rank, count, refValue);
                     }
                         break;
 
                     case NO_RESULT_TAG: {
                         delete[] buffer;
-                        fmt::print("solution NOT received from rank {}\n", rank);
+                        spdlog::info("solution NOT received from rank {}\n", rank);
                     }
                         break;
                 }
@@ -906,9 +907,9 @@ namespace gempba {
 
             int err = MPI_Ssend(buffer, COUNT, MPI_CHAR, dest, TASK_FROM_CENTER_TAG, world_Comm); // send buffer
             if (err != MPI_SUCCESS)
-                fmt::print("buffer failed to send! \n");
+                spdlog::info("buffer failed to send! \n");
 
-            fmt::print("Seed sent \n");
+            spdlog::info("Seed sent \n");
         }
 
         void createCommunicators() {
@@ -923,7 +924,7 @@ namespace gempba {
 
             /*if (world_size < 2)
             {
-                fmt::print("At least two processes required !!\n");
+                spdlog::info("At least two processes required !!\n");
                 MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
             }*/
         }
@@ -1013,7 +1014,7 @@ namespace gempba {
             MPI_Init_thread(argc, &argv, MPI_THREAD_FUNNELED, &provided);
 
             if (provided < MPI_THREAD_FUNNELED) {
-                fmt::print("The threading support level is lesser than that demanded.\n");
+                spdlog::info("The threading support level is lesser than that demanded.\n");
                 MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
             }
 
@@ -1021,21 +1022,21 @@ namespace gempba {
 
             int namelen;
             MPI_Get_processor_name(processor_name, &namelen);
-            fmt::print("Process {} of {} is on {}\n", world_rank, world_size, processor_name);
+            spdlog::info("Process {} of {} is on {}\n", world_rank, world_size, processor_name);
             allocateMPI();
         }
 
         void finalize() {
 #ifdef DEBUG_COMMENTS
-            fmt::print("rank {}, before deallocate \n", world_rank);
+            spdlog::info("rank {}, before deallocate \n", world_rank);
 #endif
             deallocateMPI();
 #ifdef DEBUG_COMMENTS
-            fmt::print("rank {}, after deallocate \n", world_rank);
+            spdlog::info("rank {}, after deallocate \n", world_rank);
 #endif
             MPI_Finalize();
 #ifdef DEBUG_COMMENTS
-            fmt::print("rank {}, after MPI_Finalize() \n", world_rank);
+            spdlog::info("rank {}, after MPI_Finalize() \n", world_rank);
 #endif
         }
     };

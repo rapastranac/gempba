@@ -4,7 +4,7 @@
 #include <atomic>
 #include <map>
 #include <mutex>
-#include "fmt/core.h"
+#include <spdlog/spdlog.h>
 
 /*
  * Created by Andres Pastrana on 2019
@@ -217,7 +217,7 @@ namespace gempba {
 
                 return right;
             } else {
-                fmt::print("fw_count : {} \n ph_count : {}\n isVirtual :{} \n isDiscarded : {} \n",
+                spdlog::error("fw_count : {} \n ph_count : {}\n isVirtual :{} \n isDiscarded : {} \n",
                            root->fw_count,
                            root->ph_count,
                            root->isVirtual,

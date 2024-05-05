@@ -2,7 +2,6 @@
 #ifndef BRANCHHANDLER_H
 #define BRANCHHANDLER_H
 
-#include <fmt/format.h>
 #include "args_handler.hpp"
 #include <DLB/DLB_Handler.hpp>
 #include "ThreadPool.hpp"
@@ -34,6 +33,7 @@
 #include <typeinfo>
 #include <utility>
 #include <thread>
+#include <spdlog/spdlog.h>
 
 /*
  * Created by Andres Pastrana on 2019
@@ -587,7 +587,7 @@ namespace gempba {
 
                 int err = MPI_Ssend(ss.str().data(), count, MPI_CHAR, src, 0, *world_Comm);
                 if (err != MPI_SUCCESS) {
-                    fmt::print("result could not be sent from rank {} to rank {}! \n", world_rank, src);
+                    spdlog::error("result could not be sent from rank {} to rank {}! \n", world_rank, src);
                 }
             }
         }
