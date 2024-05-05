@@ -31,9 +31,9 @@ target_link_libraries(all_tests.out
         PRIVATE
         GTest::gtest
         GTest::gtest_main
-        fmt
+        spdlog::spdlog
         ${MPI_LIBRARIES}
-        )
+)
 
 # Add the test to the testing system
 add_test(NAME all_tests.out COMMAND all_tests.out)
