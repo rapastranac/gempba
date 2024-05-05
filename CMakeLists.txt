@@ -8,7 +8,7 @@ find_package(OpenMP REQUIRED)
 find_package(Threads REQUIRED)
 find_package(MPI REQUIRED)
 find_package(Boost COMPONENTS system serialization fiber REQUIRED)
-#find_package(Boost REQUIRED)
+find_package(spdlog REQUIRED)
 find_package(GTest REQUIRED)    # Find Google Test
 include_directories(${GTEST_INCLUDE_DIRS})
 
@@ -52,18 +52,14 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 include_directories("include")
 include_directories("GemPBA")
 add_subdirectory("tests")
-include_directories(${FMT_INCLUDE_DIR})
 include_directories(${ARGPARSE_INCLUDE_DIR})
 
 
-message("fmt dir: ${FMT_INCLUDE_DIR}")
 message("Parser dir: ${ARGPARSE_INCLUDE_DIR}")
 
 file(GLOB Sources "src/*.cpp")
 
-add_executable(a.out ${Sources}
-        ${FMT_INSTALL_LOCATION}/fmt/src/format.cc
-        ${FMT_INSTALL_LOCATION}/fmt/src/os.cc)
+add_executable(a.out ${Sources})
 
 target_link_libraries(a.out PRIVATE
         ${CMAKE_THREAD_LIBS_INIT}
@@ -72,6 +68,7 @@ target_link_libraries(a.out PRIVATE
         OpenMP::OpenMP_CXX
         ${GTEST_LIBRARIES}
         ${GTEST_MAIN_LIBRARIES}
+        spdlog::spdlog
         )
 
 if (MPI_COMPILE_FLAGS)
