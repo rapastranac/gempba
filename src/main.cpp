@@ -1,12 +1,15 @@
 #include "../include/main.h"
-#include "fmt/format.h"
 
 #include <argparse/argparse.hpp>
 
 #include <iostream>
+#include <spdlog/spdlog.h>
 
 //#include <mpi.h>
 int main(int argc, char *argv[]) {
+    spdlog::error("This is an error message");
+
+    return 1;
     argparse::ArgumentParser program("main");
 
     program.add_argument("-job_id", "--job_id")
@@ -69,7 +72,7 @@ int main(int argc, char *argv[]) {
     int prob = program.get<int>("--prob");
     auto filename = program.get<std::string>("--indir");
 
-    fmt::print(
+    spdlog::info(
             "argc: {}, nodes: {}, ntasks_per_node: {}, ntasks_per_socket: {}, cpus_per_task: {}, prob : {}, filename: {} \n",
             argc, nodes, ntasks_per_node, ntasks_per_socket, cpus_per_task, prob, filename);
 
