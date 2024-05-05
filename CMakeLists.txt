@@ -23,11 +23,12 @@ Set(CMAKE_EXE_LINKER_FLAGS "-lboost_system -lboost_serialization  -lboost_fiber"
 add_subdirectory(external)
 
 
+add_definitions(-DMULTIPROCESSING_ENABLED)
 add_definitions(-DMPI_ENABLED)
-#add_definitions(-DDEBUG_COMMENTS)
-#add_definitions(-DVC_VOID)
+add_definitions(-DDEBUG_COMMENTS)
+add_definitions(-DVC_VOID)
 #add_definitions(-DVC_VOID_MPI)
-add_definitions(-DBITVECTOR_VC)
+#add_definitions(-DBITVECTOR_VC)
 #add_definitions(-DBITVECTOR_VC_THREAD)
 #add_definitions(-DVC_NON_VOID)
 #add_definitions(-DVC_NON_VOID_MPI)
@@ -39,7 +40,7 @@ add_compile_options("-std=c++23" "-fconcepts" "-O3" "-Wall" "-Wpedantic" "-Wextr
 
 
 #valgrind
-#add_compile_options("-g" "-Wall" "-Wpedantic" "-Wextra" "-fexceptions" "-pthread" "-fconcepts" "-ggdb3")
+add_compile_options("-g" "-Wall" "-Wpedantic" "-Wextra" "-fexceptions" "-pthread" "-fconcepts" "-ggdb3")
 
 # Set CMake policy
 cmake_policy(SET CMP0110 NEW)
