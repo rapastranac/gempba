@@ -5,8 +5,60 @@
 
 #include <iostream>
 
+#include "function_trace/factory/trace_node_factory.hpp"
+
+#include "MPI_Modules/MPI_Scheduler.hpp"
+#include "branch_management/node_manager.hpp"
+
+struct Struct {
+    int value;
+};
+
+
+void foo(int a, float b, Struct aStruct) {
+//    gempba::ResultHolderVoid<void, int, float, Struct> holder;
+//    holder.holdArgs(a, b, aStruct);
+    // do something
+}
+
+float bar(int a, float b, Struct aStruct) {
+//    gempba::ResultHolderNonVoid<float, int, float, Struct> holder;
+//    holder.holdArgs(a, b, aStruct);
+    float *result;
+//    holder.get(result);
+    return *result;
+}
+
 //#include <mpi.h>
 int main(int argc, char *argv[]) {
+
+    gempba::NodeManager &nodeManager = gempba::NodeManager::getInstance();
+
+
+    auto &mpiScheduler = gempba::MPI_Scheduler::getInstance();
+
+    gempba::DLB_Handler &dlb = gempba::DLB_Handler::getInstance();
+
+    std::shared_ptr<gempba::TraceNode<float>> traceNodeVoid = gempba::TraceNodeFactory::createVirtual<float>(dlb, -1);
+    std::shared_ptr<gempba::TraceNode<int>> traceNodeNonVoid = gempba::TraceNodeFactory::createVirtual<int>(dlb, -1);
+
+    traceNodeVoid->setResult(nullptr);
+
+    float floatResult = 7.7f;
+    traceNodeNonVoid->setResult(floatResult);
+
+    auto &&resultPtr2 = traceNodeNonVoid->get<float>();
+
+    std::cout << "result is: " << resultPtr2 << std::endl;
+
+    return 0;
+
+
+    foo(6, 7.6f, Struct{5});
+
+    auto result = bar(6, 7.6f, Struct{5});
+
+
     argparse::ArgumentParser program("main");
 
     program.add_argument("-job_id", "--job_id")

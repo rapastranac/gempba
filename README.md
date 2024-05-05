@@ -133,10 +133,10 @@ void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
     rHolder_r.holdArgs(instance_r, f_r, d_r);
 
 
-    /*  The try_push_MT<>() method is aynchronous as long as an available
+    /*  The try_push_local<>() method is aynchronous as long as an available
     processor is found, other wise, it explore branch in a senquential fashion*/
-    branchHandler.try_push_MT<void>(foo, id, rHolder_l);
-    branchHandler.try_push_MT<void>(foo, id, rHolder_m);
+    branchHandler.try_push_local<void>(foo, id, rHolder_l);
+    branchHandler.try_push_local<void>(foo, id, rHolder_m);
     
 
     /*  it makes no sense to call asynchronously the last branch, since it
@@ -213,8 +213,8 @@ void foo1(int id, MyClass instance, float f, double d, void *parent = nullptr)
     rHolder_m.holdArgs(instance_m, f_m, d_m);
     rHolder_r.holdArgs(instance_r, f_r, d_r);
 
-    branchHandler.try_push_MT<void>(foo1, id, rHolder_l);
-    branchHandler.try_push_MT<void>(foo2, id, rHolder_m);
+    branchHandler.try_push_local<void>(foo1, id, rHolder_l);
+    branchHandler.try_push_local<void>(foo2, id, rHolder_m);
     branchHandler.forward<void>(foo3, id, rHolder_r);
 
     if (dummyParent)
@@ -325,10 +325,10 @@ void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
                                   });
 
     if (rHolder_l.evaluate_branch_checkIn()){
-        branchHandler.try_push_MT<void>(foo, id, rHolder_l);
+        branchHandler.try_push_local<void>(foo, id, rHolder_l);
     }
     if (rHolder_m.evaluate_branch_checkIn()){
-        branchHandler.try_push_MT<void>(foo, id, rHolder_m);
+        branchHandler.try_push_local<void>(foo, id, rHolder_m);
     }
     if (rHolder_r.evaluate_branch_checkIn()){
         branchHandler.forward<void>(foo, id, rHolder_r);
@@ -484,7 +484,7 @@ int main(){
 			numThreads could be the number of physical cores managed by this process - 1
 		*/
         // only workers need to initialized a pool
-		branchHandler.initThreadPool(numThreads);
+		branchHandler.setThreadCount(numThreads);
         
         /*  Workers need to know the type of the incoming buffers, for this we invoke the method
             constructBufferDecoder<returnType, Type1, Type2>(foo, deserializer)
@@ -630,7 +630,7 @@ int main(){
         mpiScheduler.runCenter(buffer.data(), buffer.size());
     }
     else {
-        branchHandler.initThreadPool(numThreads);
+        branchHandler.setThreadCount(numThreads);
         auto bufferDecoder = branchHandler.constructBufferDecoder<void, MyClass, float, double>(foo, deserializer);
         auto resultFetcher = branchHandler.constructResultFetcher();
         mpiScheduler.runNode(branchHandler, bufferDecoder, resultFetcher, serializer);
@@ -733,13 +733,13 @@ void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
 
 As you may have noticed, within the termination condition, the solution is captured in a serial fashion. This solution is stored in a ```std::pair<int, string>``` data type, where the integer is the reference value associated with the solution. This reference value is used by the ```MpiScheduler``` when retrieving the global solution by the means of comparing the best value so far against the solutions attained by each process.
 
-As for the parallel calls, the method ```BranchHandler::try_push_MT(...)``` is changed to ```BranchHandler::try_push_MP(..., serializer)```.
+As for the parallel calls, the method ```BranchHandler::try_push_local(...)``` is changed to ```BranchHandler::try_push_MP(..., serializer)```.
 
 This ```MT``` suffix stands for Multithreading whereas the ```MP``` suffix stands for Multiprocessing.
 
-Internally, ```try_push_MP``` will invoke the ```MpiScheduler``` to ascertain for any available processor, if none, then it will invoke ```try_push_MT``` for a local thread.
+Internally, ```try_push_MP``` will invoke the ```MpiScheduler``` to ascertain for any available processor, if none, then it will invoke ```try_push_local``` for a local thread.
 
-```try_push_MT``` and ```try_push_MP``` return ```true``` if the asynchronous operation was succeeding, otherwise, it will continue sequentially and when it returns, it will be ```false```.
+```try_push_local``` and ```try_push_MP``` return ```true``` if the asynchronous operation was succeeding, otherwise, it will continue sequentially and when it returns, it will be ```false```.
 
 ### Multiprocessing with Centralized Scheduler (Optional)
 

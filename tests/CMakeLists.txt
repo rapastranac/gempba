@@ -8,16 +8,20 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
 # Set up the main test directory
 set(TEST_DIR "${CMAKE_SOURCE_DIR}/tests")
 
+add_definitions(-DMULTIPROCESSING_ENABLED)
+
 message("Tests source dir: ${TEST_DIR}\n")
+
+add_compile_options("-g" "-Wall" "-Wpedantic" "-Wextra" "-fexceptions" "-pthread" "-fconcepts" "-ggdb3")
 
 
 # Collect all test source files recursively
 file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS "${TEST_DIR}/*.cpp")
 
 # Ensure that source files are found
-if(NOT TEST_SOURCES)
+if (NOT TEST_SOURCES)
     message(FATAL_ERROR "No test source files found in ${TEST_DIR}\n")
-endif()
+endif ()
 
 # Create a single test executable
 add_executable(all_tests.out ${TEST_SOURCES})
@@ -32,8 +36,9 @@ target_link_libraries(all_tests.out
         GTest::gtest
         GTest::gtest_main
         fmt
+        OpenMP::OpenMP_CXX
         ${MPI_LIBRARIES}
-        )
+)
 
 # Add the test to the testing system
 add_test(NAME all_tests.out COMMAND all_tests.out)

@@ -7,8 +7,10 @@
 #include <DLB/DLB_Handler.hpp>
 #include "ThreadPool.hpp"
 #include "utils/utils.hpp"
+#include "MPI_Modules/MPI_Scheduler.hpp"
 
-#ifdef MPI_ENABLED
+
+#ifdef MULTIPROCESSING_ENABLED
 
 #include <mpi.h>
 #include <cstdio>
@@ -51,6 +53,9 @@ namespace gempba {
         WORK_STEALING
     };
 
+    template<typename... Args>
+    class TraceNode;
+
     template<typename Ret, typename... Args>
     class ResultHolder;
 
@@ -63,6 +68,10 @@ namespace gempba {
         class ResultHolder;
 
         friend class MPI_Scheduler;
+
+        template<typename... Args>
+        friend
+        class TraceNode;
 
     private:
         const std::pair<int, std::string> EMPTY_RESULT = std::make_pair(0, static_cast<std::string>("Empty buffer, no result"));
@@ -272,7 +281,7 @@ namespace gempba {
                 case MINIMISE: {
                     maximisation = false;
                     refValueLocal = INT_MAX;
-#ifdef MPI_ENABLED
+#ifdef MULTIPROCESSING_ENABLED
                     mpiScheduler->setRefValStrategyLookup(maximisation); // TODO redundant
 #endif
                 }
@@ -282,7 +291,7 @@ namespace gempba {
 
         // get number for this rank
         int rank_me() {
-#ifdef MPI_ENABLED
+#ifdef MULTIPROCESSING_ENABLED
             return mpiScheduler->rank_me();
 #else
             return -1; // no multiprocessing enabled
@@ -437,7 +446,7 @@ namespace gempba {
                 throw std::runtime_error("Attempt to push a treated holder\n");
             }
 
-#ifdef MPI_ENABLED
+#ifdef MULTIPROCESSING_ENABLED
             if (holder.is_pushed() || holder.is_MPI_Sent())
                 return;
 #else
@@ -471,7 +480,7 @@ namespace gempba {
     public:
 
 
-#ifdef MPI_ENABLED
+#ifdef MULTIPROCESSING_ENABLED
     private:
         gempba::MPI_Scheduler *mpiScheduler = nullptr;
         std::mutex mtx_MPI;             // mutex to ensure MPI_THREAD_SERIALIZED
