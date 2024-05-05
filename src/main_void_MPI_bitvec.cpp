@@ -34,6 +34,7 @@
 #include <sstream>
 #include <iterator>
 #include <string>
+#include <spdlog/spdlog.h>
 #include <vector>
 
 #include <unistd.h>
@@ -112,7 +113,7 @@ int main_void_MPI_bitvec(int job_id, int nodes, int ntasks_per_node, int ntasks_
     mpiScheduler.barrier();
 
     int pid = getpid();                                       // for debugging purposes
-    fmt::print("rank {} is process ID : {}\n", rank, pid); // for debugging purposes
+    spdlog::info("rank {} is process ID : {}\n", rank, pid); // for debugging purposes
 
     mpiScheduler.barrier();
 
@@ -179,34 +180,34 @@ int main_void_MPI_bitvec(int job_id, int nodes, int ntasks_per_node, int ntasks_
         ss << buffer;
 
         deserializer(ss, solsize);
-        fmt::print("Cover size : {} \n", solsize);
+        spdlog::info("Cover size : {} \n", solsize);
 
         double global_cpu_idle_time = 0;
         for (int i = 1; i < world_size; i++) {
             global_cpu_idle_time += idleTime[i];
         }
-        fmt::print("\nGlobal cpu idle time: {0:.6f} seconds\n\n\n", global_cpu_idle_time);
+        spdlog::info("\nGlobal cpu idle time: {0:.6f} seconds\n\n\n", global_cpu_idle_time);
 
         // **************************************************************************
 
         for (int rank = 1; rank < world_size; rank++) {
-            fmt::print("tasks sent by rank {} = {} \n", rank, nTasksSent[rank]);
+            spdlog::info("tasks sent by rank {} = {} \n", rank, nTasksSent[rank]);
         }
-        fmt::print("\n");
+        spdlog::info("\n");
 
         for (int rank = 1; rank < world_size; rank++) {
-            fmt::print("tasks received by rank {} = {} \n", rank, nTasksRecvd[rank]);
+            spdlog::info("tasks received by rank {} = {} \n", rank, nTasksRecvd[rank]);
         }
-        fmt::print("\n");
+        spdlog::info("\n");
         size_t totalThreadRequests = 0;
         for (int rank = 1; rank < world_size; rank++) {
             size_t rank_thread_requests = threadRequests[rank];
             totalThreadRequests += rank_thread_requests;
 
-            fmt::print("rank {}, thread requests: {} \n", rank, rank_thread_requests);
+            spdlog::info("rank {}, thread requests: {} \n", rank, rank_thread_requests);
         }
 
-        fmt::print("\n\n\n");
+        spdlog::info("\n\n\n");
 
         // print stats to a file ***********
         printToSummaryFile(job_id, nodes, ntasks_per_node, ntasks_per_socket, cpus_per_task, filename_directory,

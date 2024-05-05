@@ -19,6 +19,7 @@
 #include <iterator>
 #include <string>
 #include <vector>
+#include <spdlog/spdlog.h>
 
 int main_non_void_MPI(int numThreads, int prob, std::string &filename)
 {
@@ -89,10 +90,10 @@ int main_non_void_MPI(int numThreads, int prob, std::string &filename)
         double sum = 0;
         for (size_t i = 0; i < idleTime.size(); i++)
         {
-            //fmt::print("idleTime[{}]: {} \n", i, idleTime[i]);
+            //spdlog::info("idleTime[{}]: {} \n", i, idleTime[i]);
             sum += idleTime[i];
         }
-        fmt::print("\nGlobal pool idle time: {0:.6f} seconds\n\n\n", sum);
+        spdlog::info("\nGlobal pool idle time: {0:.6f} seconds\n\n\n", sum);
     }
     scheduler.finalize();
 

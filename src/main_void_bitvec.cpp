@@ -12,6 +12,7 @@
 #include <iostream>
 #include <istream>
 #include <string>
+#include <spdlog/spdlog.h>
 
 #include <unistd.h>
 
@@ -62,16 +63,16 @@ int main_void_bitvec(int numThreads, int prob, std::string& filename)
     size_t rqst = branchHandler.number_thread_requests();
 
     int solution = branchHandler.fetchSolution<int>();
-    fmt::print("\n\n\nCover size : {} \n", solution);
+    spdlog::info("\n\n\nCover size : {} \n", solution);
 
-    fmt::print("Global pool idle time: {0:.6f} seconds\n\n\n", idl_tm);
-    fmt::print("Elapsed time: {}\n", end - start);
+    spdlog::info("Global pool idle time: {0:.6f} seconds\n\n\n", idl_tm);
+    spdlog::info("Elapsed time: {}\n", end - start);
 
     // **************************************************************************
 
-    fmt::print("thread requests: {} \n", rqst);
+    spdlog::info("thread requests: {} \n", rqst);
 
-    fmt::print("\n\n\n");
+    spdlog::info("\n\n\n");
 
     // **************************************************************************
 

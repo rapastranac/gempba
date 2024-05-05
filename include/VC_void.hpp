@@ -1,5 +1,6 @@
 #ifdef VC_VOID
 
+#include <spdlog/spdlog.h>
 #include "VertexCover.hpp"
 
 class VC_void : public VertexCover {
@@ -123,7 +124,7 @@ public:
             int C = g.coverSize();
 
             if (C == 0) {
-                fmt::print("rank {}, thread {}, cover is empty\n", branchHandler.rank_me(), id);
+                spdlog::info("rank {}, thread {}, cover is empty\n", branchHandler.rank_me(), id);
                 throw;
             }
             if (C < branchHandler.refValue()) // user's condition to see if it's worth it to make branch call
@@ -138,7 +139,7 @@ public:
         hol_r.bind_branch_checkIn([&] {
             Graph g = graph;
             if (g.empty())
-                fmt::print("rank {}, thread {}, Graph is empty\n", branchHandler.rank_me(), id);
+                spdlog::info("rank {}, thread {}, Graph is empty\n", branchHandler.rank_me(), id);
 
             g.removeNv(v);
             g.clean_graph();
