@@ -6,6 +6,7 @@
 #include <DLB/DLB_Handler.hpp>
 #include "ThreadPool.hpp"
 #include "utils/utils.hpp"
+#include "utils/gempba_utils.hpp"
 
 #ifdef MPI_ENABLED
 
@@ -42,14 +43,6 @@
  */
 namespace gempba {
 
-    enum LookupStrategy {
-        MAXIMISE, MINIMISE
-    };
-
-    enum LoadBalancingStrategy {
-        QUASI_HORIZONTAL, // Our Novel Dynamic Load Balancer
-        WORK_STEALING
-    };
 
     template<typename Ret, typename... Args>
     class ResultHolder;
