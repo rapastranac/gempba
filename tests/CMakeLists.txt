@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.2)
 
 project(gempba_tests)
 
+set(CMAKE_CXX_STANDARD 23)
+
 # Set the output directory to be the same as the main project
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
 
@@ -11,6 +13,8 @@ set(TEST_DIR "${CMAKE_SOURCE_DIR}/tests")
 add_definitions(-DMULTIPROCESSING_ENABLED)
 
 message("Tests source dir: ${TEST_DIR}\n")
+
+add_compile_options("-std=c++23" "-O0" "-g" "-Wall" "-Wpedantic" "-Wextra" "-fexceptions" "-pthread" "-fconcepts" "-ggdb3")
 
 
 # Collect all test source files recursively
@@ -35,6 +39,7 @@ target_link_libraries(all_tests.out
         GTest::gtest_main
         spdlog::spdlog
         ${MPI_LIBRARIES}
+        OpenMP::OpenMP_CXX
 )
 
 # Add the test to the testing system
