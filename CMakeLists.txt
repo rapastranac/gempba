@@ -58,7 +58,7 @@ include_directories(${ARGPARSE_INCLUDE_DIR})
 
 message("Parser dir: ${ARGPARSE_INCLUDE_DIR}")
 
-file(GLOB Sources "src/*.cpp")
+file(GLOB_RECURSE Sources "src/*.cpp" "GemPBA/*.cpp")
 
 add_executable(a.out ${Sources})
 
