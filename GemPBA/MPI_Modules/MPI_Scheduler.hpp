@@ -189,7 +189,7 @@ namespace gempba {
                 delete[] message;
             }
             /**
-             * TODO.. send results to the rank the task was sent from
+             * TODO.. send results back to the rank from which the task was sent.
              * this applies only when parallelising non-void functions
              */
 
