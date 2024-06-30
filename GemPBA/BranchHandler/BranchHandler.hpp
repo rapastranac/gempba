@@ -669,9 +669,8 @@ namespace gempba {
                 auto *holder = new HolderType(dlb, -1);
 
                 std::stringstream ss;
-                for (int i = 0; i < count; i++) {
-                    ss << buffer[i];
-                }
+                ss.write(buffer, count);
+
                 auto _deserializer = std::bind_front(deserializer, std::ref(ss));
                 std::apply(_deserializer, holder->getArgs());
 
