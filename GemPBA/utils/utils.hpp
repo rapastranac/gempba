@@ -16,6 +16,15 @@ namespace utils {
 #endif
     }
 
+    static void log_and_throw(const char *message) {
+        spdlog::error(message);
+        throw std::runtime_error(message);
+    }
+
+    static void log_and_throw(const std::string &message) {
+        log_and_throw(message.c_str());
+    }
+
 };
 
 #endif //UTILS_H
