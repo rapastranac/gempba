@@ -1,6 +1,8 @@
 #ifndef TREE_HPP
 #define TREE_HPP
 
+#include "spdlog/spdlog.h"
+
 #include <iostream>
 #include <vector>
 
@@ -35,8 +37,9 @@ private:
                 last = &tree[idx];
                 childrenCount++;
             } else {
-                std::cerr << "node " << idx << " is already assigned to " << tree[idx].parent->idx << "\n";
-                throw;
+                std::string errorMsg = "node " + std::to_string(idx) + " is already assigned to " + std::to_string(tree[idx].parent->idx) + "\n";
+                spdlog::error(errorMsg);
+                throw std::runtime_error(errorMsg);
             }
         }
 
@@ -79,7 +82,7 @@ private:
             if (next) {
                 if (next->rightSibling) {
                     // at least two nodes
-                    auto nextCpy = next;
+                    Node *nextCpy = next;
                     next = next->rightSibling;
                     next->leftSibling = nullptr;
 
@@ -94,8 +97,9 @@ private:
                 }
                 --childrenCount;
             } else {
-                std::cerr << "there's no next to pop\n";
-                throw;
+                std::string errorMsg = "there's no next to pop\n";
+                spdlog::error(errorMsg);
+                throw std::runtime_error(errorMsg);
             }
         }
 
@@ -116,7 +120,7 @@ private:
                     parent = nullptr;
                     rightSibling = nullptr;
                     leftSibling = nullptr;
-                } else if (leftSibling && !rightSibling) {
+                } else if (leftSibling) {
                     // last one
                     leftSibling->rightSibling = nullptr;
                     parent->last = leftSibling;
@@ -128,8 +132,9 @@ private:
                     parent->pop_front();
                 }
             } else {
-                std::cerr << "node " << idx << " is not assigned to any other node \n";
-                throw;
+                std::string errorMsg = "node " + std::to_string(idx) + " is not assigned to any other node \n";
+                spdlog::error(errorMsg);
+                throw std::runtime_error(errorMsg);
             }
         }
 
@@ -140,8 +145,7 @@ private:
         class Iterator {
         private:
             Node *node;
-
-            friend class Node;
+            friend struct Node;
 
             explicit Iterator(Node *node) : node(node) {}
 
@@ -157,7 +161,7 @@ private:
             }
 
             // overload post-increment operator
-            const Iterator operator++(int) {
+            Iterator operator++(int) {
                 Iterator ret = *this;
                 ++*(this);
                 return ret;
@@ -195,20 +199,22 @@ private:
 public:
     Tree() = default;
 
-    explicit Tree(size_t size) {
-        for (size_t i = 0; i < size; i++) {
+    explicit Tree(int size) {
+        C.reserve(size);
+        for (int i = 0; i < size; i++) {
             C.emplace_back(*this, (int) i);
         }
     }
 
-    void resize(size_t size) {
-        for (size_t i = 0; i < size; i++) {
+    void resize(int size) {
+        C.reserve(size);
+        for (int i = 0; i < size; i++) {
             C.emplace_back(*this, (int) i);
         }
     }
 
-    size_t size() {
-        return C.size();
+    int size() const {
+        return static_cast<int>(C.size());
     }
 
     Node &operator[](int idx) {
