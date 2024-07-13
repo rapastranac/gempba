@@ -5,7 +5,7 @@
 #include <spdlog/spdlog.h>
 #include "schedulers/api/scheduler.hpp"
 #include "BranchHandler/BranchHandler.hpp"
-#include "MPI_Modules/Tree.hpp"
+#include "utils/Tree.hpp"
 
 #define CENTER 0
 
