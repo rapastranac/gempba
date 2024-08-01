@@ -99,7 +99,7 @@ void foo(int tid, MyClass instance, float f, double d, void *parent = nullptr)
         found so far, which is usually the size of it. It is thread safe,
         and no synchronisation methods are required from the user's end
         as long as holdSolution() is not invoked.*/
-        branchHandler.updateRefValue(localSolution.size());
+        branchHandler.maybe_update_reference_value(localSolution.size());
         
         return;
     }
@@ -194,7 +194,7 @@ void foo1(int tid, MyClass instance, float f, double d, void *parent = nullptr)
     if (localSolution < branchHandler.refValue()){
         std::scoped_lock<std::mutex> lock(mtx); 
         branchHandler.holdSolution(localSolution);
-        branchHandler.updateRefValue(localSolution.size());
+        branchHandler.maybe_update_reference_value(localSolution.size());
         return;
     }
 
@@ -281,7 +281,7 @@ void foo(int tid, MyClass instance, float f, double d, void *parent = nullptr)
     if (localSolution < branchHandler.refValue()){
         std::scoped_lock<std::mutex> lock(mtx); 
         branchHandler.holdSolution(localSolution);
-        branchHandler.updateRefValue(localSolution.size());
+        branchHandler.maybe_update_reference_value(localSolution.size());
         
         return;
     }
@@ -666,7 +666,7 @@ void foo(int tid, MyClass instance, float f, double d, void *parent = nullptr)
     if (localSolution < branchHandler.refValue()){
         std::scoped_lock<std::mutex> lock(mtx); 
         branchHandler.holdSolution(localSolution.size(), localSolution, serializer);
-        branchHandler.updateRefValue(localSolution.size());
+        branchHandler.maybe_update_reference_value(localSolution.size());
         
         return;
     }

@@ -37,6 +37,35 @@ namespace utils {
         }
     }
 
+    static double difftime(double wTime0, double wTime1) {
+        return wTime1 - wTime0;
+    }
+
+
+    static void log_and_throw(const char *message) {
+        spdlog::error(message);
+        throw std::runtime_error(message);
+    }
+
+    static void log_and_throw(const std::string &message) {
+        log_and_throw(message.c_str());
+    }
+
+    /**
+        * shift a position to left of an array, leaving -1 as default value
+        * @param array
+        * @param size
+        */
+    static void shift_left(int array[], const int size) {
+        for (int i = 0; i < size - 1; i++) {
+            if (array[i] != -1) {
+                array[i] = array[i + 1]; // shift one cell to the left
+            } else {
+                break; // no more data
+            }
+        }
+    }
+
 };
 
 #endif //UTILS_H
