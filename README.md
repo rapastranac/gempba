@@ -351,6 +351,10 @@ Since this lambda function wraps the branch verification condition, there is no 
 
 This ```evaluate_branch_checkIn()``` method is also invoked internally in ***GemPBA*** so the ***DLB*** discards automatically a useless task, and skips to the next branch.
 
+<br />
+
+**Important**: In your main function (in which you initially call ```foo```), you need to instantiate an instance of ```BranchHandler``` and call ```branchHandler.initThreadPool(numOfThreads)``` with your desired number of threads.
+
 <br /> 
 <br />
 
@@ -413,8 +417,8 @@ Thus a way to set up the ```main.cpp``` would go like this.
 
 ```cpp
 
-#include "BranchHandler.hpp"
 #include "MPI_Scheduler.hpp"
+#include "BranchHandler.hpp"
 
 auto deserializer = [](std::stringstream &ss, auto &...args) {
     // - serialize arguments into stream ss
@@ -546,7 +550,7 @@ int main(){
     mpiScheduler.allgather(idleTime.data(), &idl_tm, MPI_DOUBLE);
 
     /* The user might want to print statistic or fetch the final solution, which is now stored 
-        in the center process, another if statement is required    */
+        in the center process, another if statement is required.    */
 
     if (rank == 0) { 
 		mpiScheduler.printStats();
@@ -659,9 +663,9 @@ Hence, the code modifications to convert the Multithreading function to Multipro
 std::mutex mtx;
 auto &dlb = GemPBA::DLB_Handler::getInstance();
 auto &branchHandler = GemPBA::BranchHandler::getInstance();
-using HType = GemPBA::ResultHolder<void, MyClass, float, double>;
+using HolderType = GemPBA::ResultHolder<void, MyClass, float, double>;
 
-void foo(int tid, MyClass instance, float f, double d, void *parent = nullptr)
+void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
 
     if (localSolution < branchHandler.refValue()){
         std::scoped_lock<std::mutex> lock(mtx); 
@@ -671,14 +675,14 @@ void foo(int tid, MyClass instance, float f, double d, void *parent = nullptr)
         return;
     }
 
-    HType *dummyParent = nullptr;
-    HType rHolder_l(dlb, tid, parent);
-    HType rHolder_m(dlb, tid, parent);
-    HType rHolder_r(dlb, tid, parent);
+    HolderType *dummyParent = nullptr;
+    HolderType rHolder_l(dlb, id, parent);
+    HolderType rHolder_m(dlb, id, parent);
+    HolderType rHolder_r(dlb, id, parent);
 
     if (!parent){
         dummyParent = new HolderType(dlb, id);
-        dlb.linkVirtualRoot(id, dummyParent, rHolder_l, rHolder_m,rHolder_r);
+        dlb.linkVirtualRoot(id, dummyParent, rHolder_l, rHolder_m, rHolder_r);
     }
     
 
@@ -736,6 +740,15 @@ This ```MT``` suffix stands for Multithreading whereas the ```MP``` suffix stand
 Internally, ```try_push_MP``` will invoke the ```MpiScheduler``` to ascertain for any available processor, if none, then it will invoke ```try_push_MT``` for a local thread.
 
 ```try_push_MT``` and ```try_push_MP``` return ```true``` if the asynchronous operation was succeeding, otherwise, it will continue sequentially and when it returns, it will be ```false```.
+
+### Multiprocessing with Centralized Scheduler (Optional)
+
+The *GemPBA* library includes an optional centralized scheduler for comparison purposes only. It can be activated by compiling with the flag ```-D SCHEDULER_CENTRALIZED```.
+
+To use this feature, simply include the ```MPI_Scheduler_Centralized.hpp``` header file instead of the semicentralized scheduler's header.
+
+
+**Note:** The centralized scheduler is not part of the project's scope, but it is mentioned here for completeness. Depending on your project structure, you might need to add additional imports due to hidden dependencies within the *GemPBA* library.
 
 #### Parallel Branch-and-Bound with centralized scheduler
 
