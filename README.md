@@ -76,9 +76,9 @@ void foo(int id, MyClass instance, float f, double d, void *parent = nullptr);
 
  ```cpp
 std::mutex mtx;
-auto &dlb = GemPBA::DLB_Handler::getInstance();
-auto &branchHandler = GemPBA::BranchHandler::getInstance();
-using HolderType = GemPBA::ResultHolder<void, MyClass, float, double>;
+auto &dlb = gempba::DLB_Handler::getInstance();
+auto &branchHandler = gempba::BranchHandler::getInstance();
+using HolderType = gempba::ResultHolder<void, MyClass, float, double>;
 
 void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
 
@@ -185,9 +185,9 @@ Parallelising the program would not be any different than the version presented 
 
  ```cpp
 std::mutex mtx;
-auto &dlb = GemPBA::DLB_Handler::getInstance();
-auto &branchHandler = GemPBA::BranchHandler::getInstance();
-using HolderType = GemPBA::ResultHolder<void, MyClass, float, double>;
+auto &dlb = gempba::DLB_Handler::getInstance();
+auto &branchHandler = gempba::BranchHandler::getInstance();
+using HolderType = gempba::ResultHolder<void, MyClass, float, double>;
 
 void foo1(int id, MyClass instance, float f, double d, void *parent = nullptr)
 
@@ -229,7 +229,7 @@ If there is no interest in parallelising a branch, it can simply be invoked as i
 
 ``` foo(id, instance_r, f_r, d_r, nullptr) ```
 
-If this branch is to be run sequentially, then no instance of ```GemPBA::ResultHolder``` should be created for it.
+If this branch is to be run sequentially, then no instance of ```gempba::ResultHolder``` should be created for it.
 
 
 Most of the time, the code of a branching algorithm is optimised to check if the branch is worth it to explore. What usually happens is that the instances to be passed are compared somehow against the best solution so far, and therefore it is possible to conclude that a branch is leading to a better or worse solution.
@@ -272,9 +272,9 @@ Let's optimise our reference parallel code.
 
  ```cpp
 std::mutex mtx;
-auto &dlb = GemPBA::DLB_Handler::getInstance();
-auto &branchHandler = GemPBA::BranchHandler::getInstance();
-using HolderType = GemPBA::ResultHolder<void, MyClass, float, double>;
+auto &dlb = gempba::DLB_Handler::getInstance();
+auto &branchHandler = gempba::BranchHandler::getInstance();
+using HolderType = gempba::ResultHolder<void, MyClass, float, double>;
 
 void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
 
@@ -432,9 +432,9 @@ auto serializer = [](auto &&...args) {
 
 int main(){
     // parallel library local reference (BranchHandler is a singleton )
-	auto &branchHandler = GemPBA::BranchHandler::getInstance(); 
+	auto &branchHandler = gempba::BranchHandler::getInstance(); 
     // Interprocess communication handler local reference (MPI_Scheduler is a singleton)
-	auto &mpiScheduler = GemPBA::MPI_Scheduler::getInstance();
+	auto &mpiScheduler = gempba::MPI_Scheduler::getInstance();
     /* gets the rank of the current process, so we know which process is 
         the center */
 	int rank = mpiScheduler.rank_me();
@@ -458,7 +458,7 @@ int main(){
     If minimisation, reference value or best value so far is INT_MAX
     
     By default, GemPBA maximises, thus the below line is optional for maximisation*/
-	branchHandler.setLookupStrategy(GemPBA::MAXIMISE);
+	branchHandler.setLookupStrategy(gempba::MAXIMISE);
 
     // Here we set the best value so far if known somehow, optional
     branchHandler.setRefValue(/* some integer*/); 
@@ -610,8 +610,8 @@ auto serializer = [](auto &&...args){
     };
 
 int main(){
-    auto &branchHandler = GemPBA::BranchHandler::getInstance(); 
-    auto &mpiScheduler = GemPBA::MPI_Scheduler::getInstance();
+    auto &branchHandler = gempba::BranchHandler::getInstance(); 
+    auto &mpiScheduler = gempba::MPI_Scheduler::getInstance();
     int rank = mpiScheduler.rank_me();
     branchHandler.passMPIScheduler(&mpiScheduler);
 
@@ -623,7 +623,7 @@ int main(){
     *   initial data reading
     */
     
-    branchHandler.setLookupStrategy(GemPBA::MINIMISE);
+    branchHandler.setLookupStrategy(gempba::MINIMISE);
     branchHandler.setRefValue(/* some integer*/); 
     if (rank == 0) {
         std::string buffer = serializer(instance, f, d);
@@ -661,9 +661,9 @@ Hence, the code modifications to convert the Multithreading function to Multipro
 
  ```cpp
 std::mutex mtx;
-auto &dlb = GemPBA::DLB_Handler::getInstance();
-auto &branchHandler = GemPBA::BranchHandler::getInstance();
-using HolderType = GemPBA::ResultHolder<void, MyClass, float, double>;
+auto &dlb = gempba::DLB_Handler::getInstance();
+auto &branchHandler = gempba::BranchHandler::getInstance();
+using HolderType = gempba::ResultHolder<void, MyClass, float, double>;
 
 void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
 

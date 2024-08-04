@@ -194,7 +194,7 @@ size_t getCurrentRSS() {
 #endif
 }
 
-namespace GemPBA {
+namespace gempba {
 
     class BranchHandler;
 
@@ -1040,6 +1040,6 @@ namespace GemPBA {
         }
     };
 
-} // namespace GemPBA
+}
 
 #endif

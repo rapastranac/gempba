@@ -17,10 +17,10 @@
 
 int main_void_bitvec(int numThreads, int prob, std::string& filename)
 {
-    using HolderType = GemPBA::ResultHolder<void, int, gbitset, int>;
+    using HolderType = gempba::ResultHolder<void, int, gbitset, int>;
 
-    auto &branchHandler = GemPBA::BranchHandler::getInstance(); // parallel library
-    auto &dlb = GemPBA::DLB_Handler::getInstance();
+    auto &branchHandler = gempba::BranchHandler::getInstance(); // parallel library
+    auto &dlb = gempba::DLB_Handler::getInstance();
 
     cout << "NUMTHREADS= " << numThreads << endl;
 
