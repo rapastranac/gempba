@@ -749,3 +749,16 @@ To use this feature, simply include the ```MPI_Scheduler_Centralized.hpp``` head
 
 
 **Note:** The centralized scheduler is not part of the project's scope, but it is mentioned here for completeness. Depending on your project structure, you might need to add additional imports due to hidden dependencies within the *GemPBA* library.
+
+#### Parallel Branch-and-Bound with centralized scheduler
+
+If the user would like to implement a parallel Brach-and-Bound algorithm using the centralized scheduler, there are a few things to consider:
+
+- Use boost for serialization
+- Use compile flag ```-D BRANCH_AND_BOUND```
+- If minimising: Use compile flag ```-D MINIMISING```
+- Always use the parent's objective value as first parameter of your branching function
+
+The last point requires to change the function signature as follows:
+
+```void foo(int tid, OBJECTIVE_TYPE previousObjective, MyClass instance, float f, double d, void *parent = nullptr)```
