@@ -499,14 +499,42 @@ namespace GemPBA {
 
             for (int rank = 1; rank < world_size; rank++) {
                 if (processState[rank] == STATE_AVAILABLE) {
-                    //pair<char *, size_t> msg = center_queue.back();
-                    //center_queue.pop_back();
-                    pair<char *, size_t> msg = center_queue.top();
-                    center_queue.pop();
+                    
+                    while ((processState[rank] != STATE_ASSIGNED) && !center_queue.empty())
+                    {
+                        //std::pair<char *, size_t> msg = center_queue.back();
+                        //center_queue.pop_back();
+                        std::pair<char *, size_t> msg = center_queue.top();
+                        center_queue.pop();
+                    
+                        #ifdef BRANCH_AND_BOUND
+                            OBJECTIVE_TYPE objValue = getObjectiveValue(msg.first);
+                            if (   ( maximisation && (objValue > refValueGlobal))
+                                || (!maximisation && (objValue < refValueGlobal)))
+                            {
+#ifdef DEBUG_COMMENTS
+				                fmt::print("center: using objective value {}\n", objValue); 
+#endif
 
-                    MPI_Send(msg.first, msg.second, MPI_CHAR, rank, TASK_FROM_CENTER_TAG, world_Comm);
-                    delete[] msg.first;
-                    processState[rank] = STATE_ASSIGNED;
+                                MPI_Send(msg.first, msg.second, MPI_CHAR, rank, TASK_FROM_CENTER_TAG, world_Comm);
+                                delete[] msg.first;
+                                processState[rank] = STATE_ASSIGNED;
+                            }
+			    
+                            else
+			                {
+#ifdef DEBUG_COMMENTS
+				                fmt::print("center: rejecting objective value {}\n", objValue); 
+#endif
+			                }
+
+                        #else
+                            MPI_Send(msg.first, msg.second, MPI_CHAR, rank, TASK_FROM_CENTER_TAG, world_Comm);
+                            delete[] msg.first;
+                            processState[rank] = STATE_ASSIGNED;
+                            
+                        #endif
+                    }
 
                     if (center_queue.empty())
                         return;

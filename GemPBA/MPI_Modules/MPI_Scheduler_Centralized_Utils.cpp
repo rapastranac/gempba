@@ -36,7 +36,35 @@
 #error "Cannot define getPeakRSS( ) or getCurrentRSS( ) for an unknown OS."
 #endif
 
+#ifdef BRANCH_AND_BOUND
+    #include <cstdlib>
 
+    OBJECTIVE_TYPE getObjectiveValue(char* archiveString)
+    {
+        // assumption the message is generated with boost serialization
+        // and starts with a string like "22 archive::serialization 18" 
+        // followed by the objective value
+        char* end{};
+    
+        // get the length of the archiv marker
+        int length  = strtol(archiveString, &end, 10);
+    
+        // calculate the start of version number
+        end++;
+        end += length;
+    
+        // forward "end" to the first semantic value and ignore archive version
+        // number
+        strtol(end, &end, 10);
+        end++;
+    
+        // read the objective value
+        double value = strtod(end, &end);
+    
+        return static_cast<OBJECTIVE_TYPE>(value);
+    }
+
+#else
     /**
       Return number of bits that are set to 1
     **/
@@ -53,14 +81,27 @@
         return nb;
     }
 
+#endif
 
 bool TaskComparator::operator()(std::pair<char *, int> t1, std::pair<char *, int> t2) {
 
+    #ifdef BRANCH_AND_BOUND
+        
+        #ifdef MINIMISATION
+            return getObjectiveValue(t1.first) <= getObjectiveValue(t2.first);
+
+        #else
+            return getObjectiveValue(t1.first) >= getObjectiveValue(t2.first);
+
+        #endif
+    
+    #else
         int n1 = getNbSetBits(t1);
 	    int n2 = getNbSetBits(t2);
 
 	    return (n1 <= n2);
 
+    #endif
 }
 
 

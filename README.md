@@ -62,12 +62,12 @@ In order to parallelise the previous code, the function signature should change 
 <br /> 
 
 ```cpp
-void foo(int tid, MyClass instance, float f, double d, void *parent = nullptr);
+void foo(int id, MyClass instance, float f, double d, void *parent = nullptr);
 ```
 
 <br />
 
- Where ```tid``` stands for thread ID and ```parent``` is designed to used the *Novel Dynamic Load Balancing*.
+ Where ```id``` stands for thread ID and ```parent``` is designed to used the *Novel Dynamic Load Balancing*.
 
  These additional arguments are to be used by the library only, yet the user could also use them to track like threads utilization and other scenarios that it might find applicable.
 
@@ -78,9 +78,9 @@ void foo(int tid, MyClass instance, float f, double d, void *parent = nullptr);
 std::mutex mtx;
 auto &dlb = GemPBA::DLB_Handler::getInstance();
 auto &branchHandler = GemPBA::BranchHandler::getInstance();
-using HType = GemPBA::ResultHolder<void, MyClass, float, double>;
+using HolderType = GemPBA::ResultHolder<void, MyClass, float, double>;
 
-void foo(int tid, MyClass instance, float f, double d, void *parent = nullptr)
+void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
 
     // local solution might be the size of any input argument
 
@@ -109,20 +109,20 @@ void foo(int tid, MyClass instance, float f, double d, void *parent = nullptr)
     */
     
 
-    HType *dummyParent = nullptr;   // in the case parent is nullptr
+    HolderType *dummyParent = nullptr;   // in the case parent is nullptr
 
     /* The dynamic load balancing uses tracks the search tree using these
     temporary arguments holders.*/
 
-    HType rHolder_l(dlb, tid, parent);
-    HType rHolder_m(dlb, tid, parent);
-    HType rHolder_r(dlb, tid, parent);
+    HolderType rHolder_l(dlb, id, parent);
+    HolderType rHolder_m(dlb, id, parent);
+    HolderType rHolder_r(dlb, id, parent);
 
     /*  if parent is nullptr, then a virtual root is should be created
     such that branches within this scope can be accessed from below */
     if (!parent){
         dummyParent = new HolderType(dlb, id);
-        dlb.linkVirtualRoot(id, dummyParent, rHolder_l, rHolder_m,rHolder_r);
+        dlb.linkVirtualRoot(id, dummyParent, rHolder_l, rHolder_m, rHolder_r);
     }
 
     /* arguments for each branch should be constructed before making any
@@ -135,8 +135,8 @@ void foo(int tid, MyClass instance, float f, double d, void *parent = nullptr)
 
     /*  The try_push_MT<>() method is aynchronous as long as an available
     processor is found, other wise, it explore branch in a senquential fashion*/
-    branchHandler.try_push_MT<void>(foo, tid, rHolder_l);
-    branchHandler.try_push_MT<void>(foo, tid, rHolder_m);
+    branchHandler.try_push_MT<void>(foo, id, rHolder_l);
+    branchHandler.try_push_MT<void>(foo, id, rHolder_m);
     
 
     /*  it makes no sense to call asynchronously the last branch, since it
@@ -187,9 +187,9 @@ Parallelising the program would not be any different than the version presented 
 std::mutex mtx;
 auto &dlb = GemPBA::DLB_Handler::getInstance();
 auto &branchHandler = GemPBA::BranchHandler::getInstance();
-using HType = GemPBA::ResultHolder<void, MyClass, float, double>;
+using HolderType = GemPBA::ResultHolder<void, MyClass, float, double>;
 
-void foo1(int tid, MyClass instance, float f, double d, void *parent = nullptr)
+void foo1(int id, MyClass instance, float f, double d, void *parent = nullptr)
 
     if (localSolution < branchHandler.refValue()){
         std::scoped_lock<std::mutex> lock(mtx); 
@@ -199,22 +199,22 @@ void foo1(int tid, MyClass instance, float f, double d, void *parent = nullptr)
     }
 
     
-    HType *dummyParent = nullptr;
-    HType rHolder_l(dlb, tid, parent);
-    HType rHolder_m(dlb, tid, parent);
-    HType rHolder_r(dlb, tid, parent);
+    HolderType *dummyParent = nullptr;
+    HolderType rHolder_l(dlb, id, parent);
+    HolderType rHolder_m(dlb, id, parent);
+    HolderType rHolder_r(dlb, id, parent);
 
     if (!parent){
         dummyParent = new HolderType(dlb, id);
-        dlb.linkVirtualRoot(id, dummyParent, rHolder_l, rHolder_m,rHolder_r);
+        dlb.linkVirtualRoot(id, dummyParent, rHolder_l, rHolder_m, rHolder_r);
     }
 
     rHolder_l.holdArgs(instance_l, f_l, d_l);
     rHolder_m.holdArgs(instance_m, f_m, d_m);
     rHolder_r.holdArgs(instance_r, f_r, d_r);
 
-    branchHandler.try_push_MT<void>(foo1, tid, rHolder_l);
-    branchHandler.try_push_MT<void>(foo2, tid, rHolder_m);
+    branchHandler.try_push_MT<void>(foo1, id, rHolder_l);
+    branchHandler.try_push_MT<void>(foo2, id, rHolder_m);
     branchHandler.forward<void>(foo3, id, rHolder_r);
 
     if (dummyParent)
@@ -227,7 +227,7 @@ void foo1(int tid, MyClass instance, float f, double d, void *parent = nullptr)
 
 If there is no interest in parallelising a branch, it can simply be invoked as its sequential fashion, however the two new arguments must be considered. For instance, the last branch.
 
-``` foo(tid, instance_r, f_r, d_r, nullptr) ```
+``` foo(id, instance_r, f_r, d_r, nullptr) ```
 
 If this branch is to be run sequentially, then no instance of ```GemPBA::ResultHolder``` should be created for it.
 
@@ -274,9 +274,9 @@ Let's optimise our reference parallel code.
 std::mutex mtx;
 auto &dlb = GemPBA::DLB_Handler::getInstance();
 auto &branchHandler = GemPBA::BranchHandler::getInstance();
-using HType = GemPBA::ResultHolder<void, MyClass, float, double>;
+using HolderType = GemPBA::ResultHolder<void, MyClass, float, double>;
 
-void foo(int tid, MyClass instance, float f, double d, void *parent = nullptr)
+void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
 
     if (localSolution < branchHandler.refValue()){
         std::scoped_lock<std::mutex> lock(mtx); 
@@ -286,14 +286,14 @@ void foo(int tid, MyClass instance, float f, double d, void *parent = nullptr)
         return;
     }
 
-    HType *dummyParent = nullptr;
-    HType rHolder_l(dlb, tid, parent);
-    HType rHolder_m(dlb, tid, parent);
-    HType rHolder_r(dlb, tid, parent);
+    HolderType *dummyParent = nullptr;
+    HolderType rHolder_l(dlb, id, parent);
+    HolderType rHolder_m(dlb, id, parent);
+    HolderType rHolder_r(dlb, id, parent);
 
     if (!parent){
         dummyParent = new HolderType(dlb, id);
-        dlb.linkVirtualRoot(id, dummyParent, rHolder_l, rHolder_m,rHolder_r);
+        dlb.linkVirtualRoot(id, dummyParent, rHolder_l, rHolder_m, rHolder_r);
     }
     
 
@@ -325,10 +325,10 @@ void foo(int tid, MyClass instance, float f, double d, void *parent = nullptr)
                                   });
 
     if (rHolder_l.evaluate_branch_checkIn()){
-        branchHandler.try_push_MT<void>(foo, tid, rHolder_l);
+        branchHandler.try_push_MT<void>(foo, id, rHolder_l);
     }
     if (rHolder_m.evaluate_branch_checkIn()){
-        branchHandler.try_push_MT<void>(foo, tid, rHolder_m);
+        branchHandler.try_push_MT<void>(foo, id, rHolder_m);
     }
     if (rHolder_r.evaluate_branch_checkIn()){
         branchHandler.forward<void>(foo, id, rHolder_r);
@@ -342,7 +342,7 @@ void foo(int tid, MyClass instance, float f, double d, void *parent = nullptr)
 ```
 
 
-As seen above, the ```HType``` instance wraps a lambda function, where the instantiation is delegated to it, and it must return a boolean. The purpose of this lambda function is to be able to tell the library if it is worth it to invoke a branch. Then, after the instantiation within the lambda function scope, this is verified. Since it is reading the most up-to-date values, now it is possible to use the custom verification to skip a branch or not. If it is worth it, then the ```HType``` instance holds the arguments as usual and the lambda function returns ```true```. If it is not worth it, there is no need to hold arguments, and the lambda function returns ```false```. Note that the lambda function captures by references, this is important if we implement this as a memory optimiser.
+As seen above, the ```HolderType``` instance wraps a lambda function, where the instantiation is delegated to it, and it must return a boolean. The purpose of this lambda function is to be able to tell the library if it is worth it to invoke a branch. Then, after the instantiation within the lambda function scope, this is verified. Since it is reading the most up-to-date values, now it is possible to use the custom verification to skip a branch or not. If it is worth it, then the ```HolderType``` instance holds the arguments as usual and the lambda function returns ```true```. If it is not worth it, there is no need to hold arguments, and the lambda function returns ```false```. Note that the lambda function captures by references, this is important if we implement this as a memory optimiser.
 
 
 Since this lambda function wraps the branch verification condition, there is no need to write it again in the main scope, since it can be simply invoked by calling the method ```evaluate_branch_checkIn()``` as shown above.
@@ -710,10 +710,10 @@ void foo(int tid, MyClass instance, float f, double d, void *parent = nullptr)
                                   });
 
     if (rHolder_l.evaluate_branch_checkIn()){
-        branchHandler.try_push_MP<void>(foo, tid, rHolder_l, serializer);
+        branchHandler.try_push_MP<void>(foo, id, rHolder_l, serializer);
     }
     if (rHolder_m.evaluate_branch_checkIn()){
-        branchHandler.try_push_MP<void>(foo, tid, rHolder_m, serializer);
+        branchHandler.try_push_MP<void>(foo, id, rHolder_m, serializer);
     }
     if (rHolder_r.evaluate_branch_checkIn()){
         branchHandler.forward<void>(foo, id, rHolder_r);
@@ -736,3 +736,16 @@ This ```MT``` suffix stands for Multithreading whereas the ```MP``` suffix stand
 Internally, ```try_push_MP``` will invoke the ```MpiScheduler``` to ascertain for any available processor, if none, then it will invoke ```try_push_MT``` for a local thread.
 
 ```try_push_MT``` and ```try_push_MP``` return ```true``` if the asynchronous operation was succeeding, otherwise, it will continue sequentially and when it returns, it will be ```false```.
+
+#### Parallel Branch-and-Bound with centralized scheduler
+
+If the user would like to implement a parallel Brach-and-Bound algorithm using the centralized scheduler, there are a few things to consider:
+
+- Use boost for serialization
+- Use compile flag ```-D BRANCH_AND_BOUND```
+- If minimising: Use compile flag ```-D MINIMISING```
+- Always use the parent's objective value as first parameter of your branching function
+
+The last point requires to change the function signature as follows:
+
+```void foo(int tid, OBJECTIVE_TYPE previousObjective, MyClass instance, float f, double d, void *parent = nullptr)```

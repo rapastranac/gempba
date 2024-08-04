@@ -12,12 +12,30 @@
 #include <cstddef>
 #include <utility>
 
+#ifdef BRANCH_AND_BOUND
+
+    #ifdef OBJECTIVE_DOUBLE
+        #define OBJECTIVE_TYPE double
+        #pragma message("objective type: double")
+    
+    #else
+        #define OBJECTIVE_TYPE int
+        #pragma message("objective type: int")
+
+    #endif
+
+    OBJECTIVE_TYPE getObjectiveValue(char* archiveString);
+
+#else
+
     /**
      * Return number of bits that are set to 1
      */
     int getNbSetBits(char c);
 
     int getNbSetBits(std::pair<char *, int> task);
+
+#endif
 
 class TaskComparator {
 public:
