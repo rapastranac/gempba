@@ -741,15 +741,11 @@ Internally, ```try_push_MP``` will invoke the ```MpiScheduler``` to ascertain fo
 
 ```try_push_MT``` and ```try_push_MP``` return ```true``` if the asynchronous operation was succeeding, otherwise, it will continue sequentially and when it returns, it will be ```false```.
 
-**Hint**: Depending on your project's structure, additional imports might be required because of hidden dependencies inside the *GemPBA* library.
+### Multiprocessing with Centralized Scheduler (Optional)
 
-### Multiprocessing with centralized scheduler
+The *GemPBA* library includes an optional centralized scheduler for comparison purposes only. It can be activated by compiling with the flag ```-D SCHEDULER_CENTRALIZED```.
 
-The *GemPBA* library includes a centralized scheduler as well. The usage is almost the same as with the semicentralized scheduler. It can be activated by using the compile flag ```-D SCHEDULER_CENTRALIZED```.
+To use this feature, simply include the ```MPI_Scheduler_Centralized.hpp``` header file instead of the semicentralized scheduler's header.
 
-Additionally one need to include the centralized scheduler instead of the semicentralized scheduler:
 
-```cpp
-
-#include "MPI_Scheduler_Centralized.hpp"
-```
+**Note:** The centralized scheduler is not part of the project's scope, but it is mentioned here for completeness. Depending on your project structure, you might need to add additional imports due to hidden dependencies within the *GemPBA* library.
