@@ -250,7 +250,8 @@ namespace GemPBA {
                     nTasksRecvd++;
 
 #ifdef DEBUG_COMMENTS
-                    fmt::print("rank {}, pushing buffer to thread pool", world_rank, status.MPI_SOURCE);
+                    std::string msg(message,count);
+                    fmt::print("rank {}, pushing buffer to thread pool, msg {}", world_rank, status.MPI_SOURCE, msg);
 #endif
                     //  push to the thread pool *********************************************************************
                     auto *holder = bufferDecoder(message, count); // holder might be useful for non-void functions
@@ -639,7 +640,9 @@ namespace GemPBA {
                         break;
                     case STATE_AVAILABLE: {
 #ifdef DEBUG_COMMENTS
-                        fmt::print("center received state_available from rank {}\n", status.MPI_SOURCE);
+                        fmt::print("center received state_available from rank {}, current queue size {}\n", 
+                                    status.MPI_SOURCE,
+                                    center_queue.size());
 #endif
                         processState[status.MPI_SOURCE] = STATE_AVAILABLE;
                         ++nAvailable;
@@ -712,7 +715,11 @@ namespace GemPBA {
                         }
 
 #ifdef DEBUG_COMMENTS
-                        fmt::print("center received task from {}, current queue size is {}\n", status.MPI_SOURCE, center_queue.size());
+                        std::string message(buffer_char, buffer_char_count);
+                        fmt::print("center received task from {},msg {}, current queue size is {}\n",
+                                   status.MPI_SOURCE,
+                                   message,
+                                   center_queue.size());
 #endif
                     }
                         break;
