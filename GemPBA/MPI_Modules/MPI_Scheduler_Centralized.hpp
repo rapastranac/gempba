@@ -24,6 +24,9 @@
 #include <atomic>
 #include <memory>
 
+#include <cstddef>
+#include <utility>
+
 // max memory is in mb, e.g. 1024 * 10 = 10 GB
 #define MAX_MEMORY_MB 1024 * 10
 
@@ -50,6 +53,17 @@
 
 
 #define CENTER_NBSTORED_TASKS_PER_PROCESS 1000
+
+#ifdef OBJECTIVE_DOUBLE
+    #include <cfloat>
+    #define OBJECTIVE_TYPE double
+    #pragma message("objective type: double")
+
+#else
+    #define OBJECTIVE_TYPE int
+    #pragma message("objective type: int")
+
+#endif
 
 /*
  * Author:  David Robert Nadeau
@@ -209,9 +223,8 @@ namespace GemPBA {
 
         double time_centerfull_sent = 0;
 
-
-        vector <std::pair<char *, int>> local_outqueue;
-        vector <std::pair<char *, int>> local_inqueue;
+        std::vector <std::pair<char *, int>> local_outqueue;
+        std::vector <std::pair<char *, int>> local_inqueue;
 
     public:
         static MPI_Scheduler &getInstance() {
@@ -223,10 +236,16 @@ namespace GemPBA {
             return world_rank;
         }
 
-        std::string fetchSolution() {
+        std::string fetchSolution(OBJECTIVE_TYPE* bestValue = nullptr) {
             for (int rank = 1; rank < world_size; rank++) {
                 if (bestResults[rank].first == refValueGlobal) {
-                    return bestResults[rank].second;
+                    
+		            if (nullptr != bestValue)
+                    {
+                	    *bestValue = refValueGlobal;
+            	    }
+			
+		            return bestResults[rank].second;
                 }
             }
             return {}; // no solution found
@@ -319,8 +338,18 @@ namespace GemPBA {
         void setRefValStrategyLookup(bool maximisation) {
             this->maximisation = maximisation;
 
-            if (!maximisation) // minimisation
-                refValueGlobal = INT_MAX;
+            if (!maximisation) { // minimisation
+                
+                #ifdef OBJECTIVE_DOUBLE
+
+                    refValueGlobal = DBL_MAX;
+
+                #else
+                    
+                    refValueGlobal = INT_MAX;
+
+                #endif
+            }
         }
 
         void runNode(auto &branchHandler, auto &&bufferDecoder, auto &&resultFetcher, auto &&serializer) {
@@ -477,7 +506,15 @@ namespace GemPBA {
                 fmt::print("rank {}, about to receive refValue from Center\n", world_rank);
 #endif
 
-                MPI_Recv(&refValueGlobal, 1, MPI_INT, CENTER, REFVAL_UPDATE_TAG, refValueGlobal_Comm, &status);
+                #ifdef OBJECTIVE_DOUBLE
+
+                    MPI_Recv(&refValueGlobal, 1, MPI_DOUBLE, CENTER, REFVAL_UPDATE_TAG, refValueGlobal_Comm, &status);
+
+                #else
+                
+                    MPI_Recv(&refValueGlobal, 1, MPI_INT, CENTER, REFVAL_UPDATE_TAG, refValueGlobal_Comm, &status);
+
+                #endif
 
 #ifdef DEBUG_COMMENTS
                 fmt::print("rank {}, received refValue: {} from Center\n", world_rank, refValueGlobal);
@@ -499,7 +536,7 @@ namespace GemPBA {
                 MPI_Recv(&buf, 1, MPI_CHAR, CENTER, CENTER_IS_FULL_TAG, centerFullness_Comm, &status);
                 isCenterFull = true;
 #if DEBUG_COMMENTS
-                cout << "Node " << rank_me() << " received full center" << endl;
+                std::cout << "Node " << rank_me() << " received full center" << std::endl;
 #endif
             }
 
@@ -510,7 +547,7 @@ namespace GemPBA {
                 MPI_Recv(&buf, 1, MPI_CHAR, CENTER, CENTER_IS_FREE_TAG, centerFullness_Comm, &status);
                 isCenterFull = false;
 #if DEBUG_COMMENTS
-                cout << "Node " << rank_me() << " received free center" << endl;
+                std::cout << "Node " << rank_me() << " received free center" << std::endl;
 #endif
             }
 
@@ -520,15 +557,24 @@ namespace GemPBA {
         // if ref value received, it attempts updating local value
         // if local value is better than the one in center, then local best value is sent to center
         void updateRefValue(auto &branchHandler) {
-            int _refGlobal = refValueGlobal;          // constant within this scope
-            int _refLocal = branchHandler.refValue(); // constant within this scope
+            OBJECTIVE_TYPE _refGlobal = refValueGlobal;          // constant within this scope
+            OBJECTIVE_TYPE _refLocal = branchHandler.refValue(); // constant within this scope
 
             // static size_t C = 0;
 
             if ((maximisation && _refGlobal > _refLocal) || (!maximisation && _refGlobal < _refLocal)) {
                 branchHandler.updateRefValue(_refGlobal);
             } else if ((maximisation && _refLocal > _refGlobal) || (!maximisation && _refLocal < _refGlobal)) {
-                MPI_Ssend(&_refLocal, 1, MPI_INT, 0, REFVAL_UPDATE_TAG, world_Comm);
+                
+                #ifdef OBJECTIVE_DOUBLE
+
+                    MPI_Ssend(&_refLocal, 1, MPI_DOUBLE, 0, REFVAL_UPDATE_TAG, world_Comm);
+
+                #else
+                    
+                    MPI_Ssend(&_refLocal, 1, MPI_INT, 0, REFVAL_UPDATE_TAG, world_Comm);
+
+                #endif
             }
         }
 
@@ -568,7 +614,16 @@ namespace GemPBA {
                 MPI_Send(buffer.data(), buffer.size(), MPI_CHAR, 0, NO_RESULT_TAG, world_Comm);
             } else {
                 MPI_Send(buffer.data(), buffer.size(), MPI_CHAR, 0, HAS_RESULT_TAG, world_Comm);
-                MPI_Send(&refVal, 1, MPI_INT, 0, HAS_RESULT_TAG, world_Comm);
+                
+                #ifdef OBJECTIVE_DOUBLE
+
+                    MPI_Send(&refVal, 1, MPI_DOUBLE, 0, HAS_RESULT_TAG, world_Comm);
+
+                #else
+                
+                    MPI_Send(&refVal, 1, MPI_INT, 0, HAS_RESULT_TAG, world_Comm);
+
+                #endif
             }
         }
 
@@ -614,7 +669,7 @@ namespace GemPBA {
                     center_last_full_status = true;
                     time_centerfull_sent = MPI_Wtime();
 
-                    //cout << "CENTER IS FULL" << endl;
+                    //std::cout << "CENTER IS FULL" << std::endl;
                 }
             } else {
                 // last iter, center was full but now it has space => warn others it's ok
@@ -626,14 +681,14 @@ namespace GemPBA {
                     }
                     center_last_full_status = false;
 
-                    //cout << "CENTER IS NOT FULL ANYMORE" << endl;
+                    //std::cout << "CENTER IS NOT FULL ANYMORE" << std::endl;
                 }
             }
         }
 
         /*	run the center node */
         void runCenter(const char *SEED, const int SEED_SIZE) {
-            cout << "Starting centralized scheduler" << endl;
+            std::cout << "Starting centralized scheduler" << std::endl;
             MPI_Barrier(world_Comm);
             start_time = MPI_Wtime();
 
@@ -642,7 +697,7 @@ namespace GemPBA {
             int nbloops = 0;
             while (true) {
                 nbloops++;
-                int buffer;
+                OBJECTIVE_TYPE buffer;
                 char *buffer_char = nullptr;
                 int buffer_char_count = 0;
                 MPI_Status status;
@@ -654,19 +709,19 @@ namespace GemPBA {
 
                 /*if (nbloops % 100 == 0)
                 {
-                    cout<<"CENTER nb loops = "<<nbloops<<" nrunning="<<nRunning<<endl;
-                    cout<<"STATES=";
+                    std::cout<<"CENTER nb loops = "<<nbloops<<" nrunning="<<nRunning<<std::endl;
+                    std::cout<<"STATES=";
                     for (int i = 1; i < world_size;++i)
                     {
-                        cout<<processState[i]<<"  ";
+                        std::cout<<processState[i]<<"  ";
                     }
-                    cout<<endl;
-                    cout<<"WARNED=";
+                    std::cout<<std::endl;
+                    std::cout<<"WARNED=";
                     for (int i = 1; i < world_size;++i)
                     {
-                        cout<<processes_center_asked[i]<<"  ";
+                        std::cout<<processes_center_asked[i]<<"  ";
                     }
-                    cout<<endl;
+                    std::cout<<std::endl;
                 }*/
 
                 if (!flag) {
@@ -702,7 +757,16 @@ namespace GemPBA {
                     MPI_Recv(buffer_char, buffer_char_count, MPI_CHAR, status.MPI_SOURCE, status.MPI_TAG, world_Comm,
                              &status);
                 } else {
-                    MPI_Recv(&buffer, 1, MPI_INT, status.MPI_SOURCE, status.MPI_TAG, world_Comm, &status);
+                    
+                    #ifdef OBJECTIVE_DOUBLE
+
+                        MPI_Recv(&buffer, 1, MPI_DOUBLE, status.MPI_SOURCE, status.MPI_TAG, world_Comm, &status);
+
+                    #else
+                        
+                        MPI_Recv(&buffer, 1, MPI_INT, status.MPI_SOURCE, status.MPI_TAG, world_Comm, &status);
+
+                    #endif
                 }
 
                 switch (status.MPI_TAG) {
@@ -738,7 +802,16 @@ namespace GemPBA {
                             refValueGlobal = buffer;
                             signal = true;
                             for (int rank = 1; rank < world_size; rank++) {
-                                MPI_Send(&refValueGlobal, 1, MPI_INT, rank, REFVAL_UPDATE_TAG, refValueGlobal_Comm);
+                                
+                                #ifdef OBJECTIVE_DOUBLE
+
+                                    MPI_Send(&refValueGlobal, 1, MPI_DOUBLE, rank, REFVAL_UPDATE_TAG, refValueGlobal_Comm);
+
+                                #else
+                                    
+                                    MPI_Send(&refValueGlobal, 1, MPI_INT, rank, REFVAL_UPDATE_TAG, refValueGlobal_Comm);
+
+                                #endif
                             }
 
                             // bcastPut(refValueGlobal, 1, MPI_INT, 0, win_refValueGlobal);
@@ -759,19 +832,17 @@ namespace GemPBA {
                     }
                         break;
                     case TASK_FOR_CENTER: {
-
-                        pair<char *, int> msg = make_pair(buffer_char, buffer_char_count);
+                        std::pair<char *, int> msg = std::make_pair(buffer_char, buffer_char_count);
                         //center_queue.push_back(msg);
                         center_queue.push(msg);
 
                         if (center_queue.size() > max_queue_size) {
                             if (center_queue.size() % 10000 == 0)
-                                cout << "CENTER queue size reached " << center_queue.size() << endl;
+                                std::cout << "CENTER queue size reached " << center_queue.size() << std::endl;
                             max_queue_size = center_queue.size();
                         }
 
                         ++totalRequests;
-
 
                         if (center_queue.size() > 2 * CENTER_NBSTORED_TASKS_PER_PROCESS * world_size) {
                             if (difftime(time_centerfull_sent, MPI_Wtime() > 1)) {
@@ -792,9 +863,9 @@ namespace GemPBA {
                 handleFullMessaging();
             }
 
-            cout << "CENTER HAS TERMINATED" << endl;
-            cout << "Max queue size = " << max_queue_size << ",   Peak memory (MB) = " << getPeakRSS() / (1024 * 1024)
-                 << endl;
+            std::cout << "CENTER HAS TERMINATED" << std::endl;
+            std::cout << "Max queue size = " << max_queue_size << ",   Peak memory (MB) = " << getPeakRSS() / (1024 * 1024)
+                 << std::endl;
 
             /*
             after breaking the previous loop, all jobs are finished and the only remaining step
@@ -876,8 +947,17 @@ namespace GemPBA {
                     case HAS_RESULT_TAG: {
                         std::string buf(buffer, count);
 
-                        int refValue;
-                        MPI_Recv(&refValue, 1, MPI_INT, rank, HAS_RESULT_TAG, world_Comm, &status);
+                        OBJECTIVE_TYPE refValue;
+
+                        #ifdef OBJECTIVE_DOUBLE
+
+                            MPI_Recv(&refValue, 1, MPI_DOUBLE, rank, HAS_RESULT_TAG, world_Comm, &status);
+
+                        #else
+                        
+                            MPI_Recv(&refValue, 1, MPI_INT, rank, HAS_RESULT_TAG, world_Comm, &status);
+
+                        #endif
 
                         bestResults[rank].first = refValue; // reference value corresponding to result
                         bestResults[rank].second = buf;        // best result so far from this rank
@@ -946,10 +1026,18 @@ namespace GemPBA {
             processTree.resize(world_size);
             max_queue_size = 0;
 
-            refValueGlobal = INT_MIN;
+            #ifdef OBJECTIVE_DOUBLE
+
+                refValueGlobal = DBL_MIN;
+
+            #else
+                
+                refValueGlobal = INT_MIN;
+
+            #endif
 
             if (world_rank == 0)
-                bestResults.resize(world_size, std::make_pair(-1, std::string()));
+                bestResults.resize(world_size, std::make_pair(static_cast<OBJECTIVE_TYPE>(-1), std::string()));
 
             transmitting = false;
         }
@@ -981,15 +1069,13 @@ namespace GemPBA {
 
         MPI_Comm world_Comm; // world communicator
 
-
-
-        int refValueGlobal;
+        OBJECTIVE_TYPE refValueGlobal;
 
         bool isCenterFull = false;
 
         bool maximisation = true; // true if maximising, false if minimising
 
-        std::vector<std::pair<int, std::string>> bestResults;
+        std::vector<std::pair<OBJECTIVE_TYPE, std::string>> bestResults;
 
         size_t threads_per_process = std::thread::hardware_concurrency(); // detects the number of logical processors in machine
 
