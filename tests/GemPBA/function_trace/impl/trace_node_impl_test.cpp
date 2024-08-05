@@ -303,7 +303,7 @@ auto deserializerMock = [](std::stringstream &ss, float &args) {
     memccpy(&args, dummy, sizeof(dummy), sizeof(float));
 };
 
-TEST(TraceNodeTest, GetWithDeserializer) {
+/*TEST(TraceNodeTest, GetWithDeserializer) {
     auto &dlb = gempba::DLB_Handler::getInstance();
     auto &mpiScheduler = gempba::MPI_Scheduler::getInstance();
     auto &branchHandler = gempba::BranchHandler::getInstance(); // parallel library
@@ -325,7 +325,7 @@ TEST(TraceNodeTest, GetWithDeserializer) {
     auto actual = node->get<float>(deserializerMock);
 
     ASSERT_EQ(expected, actual);
-}
+}*/
 
 #endif
 

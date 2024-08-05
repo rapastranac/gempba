@@ -25,10 +25,10 @@ add_subdirectory(external)
 
 add_definitions(-DMULTIPROCESSING_ENABLED)
 add_definitions(-DMPI_ENABLED)
-#add_definitions(-DDEBUG_COMMENTS)
-#add_definitions(-DVC_VOID)
+add_definitions(-DDEBUG_COMMENTS)
+add_definitions(-DVC_VOID)
 #add_definitions(-DVC_VOID_MPI)
-add_definitions(-DBITVECTOR_VC)
+#add_definitions(-DBITVECTOR_VC)
 #add_definitions(-DBITVECTOR_VC_THREAD)
 #add_definitions(-DVC_NON_VOID)
 #add_definitions(-DVC_NON_VOID_MPI)
@@ -36,11 +36,11 @@ add_definitions(-DBITVECTOR_VC)
 #add_definitions(-DSCHEDULER_CENTRALIZED)
 #add_definitions(-DUSE_LARGE_ENCODING)
 
-add_compile_options("-std=c++23" "-fconcepts" "-O3" "-Wall" "-Wpedantic" "-Wextra" "-fexceptions" "-pthread")
+add_compile_options("-std=c++23" "-fconcepts" "-O0" "-Wall" "-Wpedantic" "-Wextra" "-fexceptions" "-pthread")
 
 
 #valgrind
-#add_compile_options("-g" "-Wall" "-Wpedantic" "-Wextra" "-fexceptions" "-pthread" "-fconcepts" "-ggdb3")
+add_compile_options("-g" "-Wall" "-Wpedantic" "-Wextra" "-fexceptions" "-pthread" "-fconcepts" "-ggdb3")
 
 # Set CMake policy
 cmake_policy(SET CMP0110 NEW)
@@ -70,7 +70,7 @@ target_link_libraries(a.out PRIVATE
         ${GTEST_LIBRARIES}
         ${GTEST_MAIN_LIBRARIES}
         spdlog::spdlog
-        )
+)
 
 if (MPI_COMPILE_FLAGS)
     set_target_properties(a.out PROPERTIES COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")

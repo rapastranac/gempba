@@ -46,6 +46,9 @@
 namespace gempba {
 
 
+    template<typename... Args>
+    class TraceNode;
+
     template<typename Ret, typename... Args>
     class ResultHolder;
 
@@ -58,6 +61,10 @@ namespace gempba {
         class ResultHolder;
 
         friend class MPI_Scheduler;
+
+        template<typename... Args>
+        friend
+        class TraceNode;
 
     private:
         const std::pair<int, std::string> EMPTY_RESULT = std::make_pair(0, static_cast<std::string>("Empty buffer, no result"));
@@ -680,6 +687,98 @@ namespace gempba {
 
                 return holder;
             };
+        }
+
+
+        FunctionType _functionType;
+        std::map<int, RawNonVoidFunc> _raw_non_void_types;
+        std::map<int, RawVoidFunc> _raw_void_types;
+        std::map<int, std::function<RawArgs(std::string)>> _deserializer_map;
+        // this receives a raw pointer, which casts it to its corresponding type and returns its serialized value
+        std::map<int, std::function<std::string(void *)>> _return_value_serializer_map;
+
+        std::optional<std::shared_future<std::string>> processIncomingBuffer(const std::unique_ptr<char[]> &buffer, int count, int function_id) {
+            /* TODO... given the functionID:
+             *  - identify the parameters type
+             *  - deserialize to the proper types
+             *  - instantiate ResultType/TraceNode
+             *  - TO STORE THE FUNCTIONS:
+             *   - We could use a map with the raw function as per the stackoverflow question
+             *
+             * */
+
+            if (!_deserializer_map.contains(function_id)) {
+                utils::log_and_throw("No deserializer found for function id " + std::to_string(function_id));
+            }
+            if (!_raw_void_types.contains(function_id)) {
+                utils::log_and_throw("No raw void type found for function id " + std::to_string(function_id));
+            }
+            if (!_raw_non_void_types.contains(function_id)) {
+                utils::log_and_throw("No raw non void type found for function id " + std::to_string(function_id));
+            }
+
+            std::stringstream ss;
+            ss.write(buffer.get(), count);
+            std::string serialized_args = ss.str();
+
+            switch (_functionType) {
+                case VOID: {
+                    RawArgs raw_args = _deserializer_map[function_id](serialized_args);
+                    RawVoidFunc raw_function = _raw_void_types[function_id];
+
+                    auto dummy_function = [&](int id, auto &&unusedMidArgs, void *parent) {
+                        raw_function(raw_args);
+                    };
+                    thread_pool->push(dummy_function, -1, nullptr);
+
+                    return std::nullopt;
+                }
+                case NON_VOID: {
+                    throw std::runtime_error("Non void functions are not supported yet");
+                    //TODO ... future support! proposed code as follows: This might just work
+                    //<editor-fold desc="Future Support">
+                    std::shared_future<std::string> returned_value_future;
+
+                    RawArgs raw_args = _deserializer_map[function_id](serialized_args);
+                    RawNonVoidFunc raw_function = _raw_non_void_types[function_id];
+
+                    auto dummy_function = [&](int id, auto &&unusedMidArgs, void *parent) {
+                        void *raw_result = raw_function(raw_args);
+                        std::string serialized_returned_value = _return_value_serializer_map[function_id](raw_result);
+                        return serialized_returned_value;
+                    };
+
+                    std::future<std::string> future = thread_pool->push(dummy_function, -1, nullptr);
+                    std::shared_future<std::string> shared_future = future.share();
+
+                    return std::make_optional<>(shared_future);
+                    //</editor-fold>
+                }
+                default:
+                    throw std::runtime_error("Unknown function type");
+            }
+
+            /**
+             * TODO... conditions for void and non-void
+             *  for void:
+             *   - we only need to invoke the function without expecting any returned value, therefore
+             *    the above call is sufficient
+             *  for non-void:
+             *   - we need to invoke the function and expect a return value, therefore we need to
+             *     create a new holder and invoke the function, and then we need to serialize the
+             *     return value to the buffer.
+             *
+             */
+
+        }
+
+        void storeFunctions(std::map<int, void (*)(void *, void **)> map) {
+
+        }
+
+
+        [[nodiscard]] std::optional<std::pair<int, std::string>> getSerializedBestSolution() const {
+            return bestSolution_serialized.first != -1 ? std::make_optional<>(bestSolution_serialized) : std::nullopt;
         }
 
 

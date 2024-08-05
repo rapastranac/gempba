@@ -52,6 +52,10 @@ namespace gempba {
             return instance;
         }
 
+        ~MPI_Scheduler() {
+            finalize();
+        }
+
         int rank_me() const {
             return world_rank;
         }
@@ -764,10 +768,6 @@ namespace gempba {
         /* singleton*/
         MPI_Scheduler() {
             init(NULL, NULL);
-        }
-
-        ~MPI_Scheduler() {
-            finalize();
         }
 
         void init(int *argc, char *argv[]) {
