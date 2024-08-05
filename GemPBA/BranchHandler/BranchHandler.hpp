@@ -7,6 +7,8 @@
 #include "ThreadPool.hpp"
 #include "utils/utils.hpp"
 #include "utils/gempba_utils.hpp"
+#include "MPI_Modules/MPI_Scheduler.hpp"
+
 
 #ifdef MULTIPROCESSING_ENABLED
 
