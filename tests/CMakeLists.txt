@@ -14,7 +14,19 @@ add_definitions(-DMULTIPROCESSING_ENABLED)
 
 message("Tests source dir: ${TEST_DIR}\n")
 
-add_compile_options("-std=c++23" "-O0" "-g" "-Wall" "-Wpedantic" "-Wextra" "-fexceptions" "-pthread" "-fconcepts" "-ggdb3")
+# Compiler and linker options
+add_compile_options(
+        -std=c++23
+        -fconcepts
+        -O0         # 0 - for debugging purpose, 3 - for release
+        -pthread
+        -Wall
+        -Wpedantic
+        -Wextra
+        -fexceptions
+        -g          # for debugging purpose
+        -ggdb3      # for debugging purpose
+)
 
 
 # Collect all test source files recursively
