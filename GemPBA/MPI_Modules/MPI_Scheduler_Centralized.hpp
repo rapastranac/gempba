@@ -99,12 +99,12 @@ namespace GemPBA {
             for (int rank = 1; rank < world_size; rank++) {
                 if (bestResults[rank].first == refValueGlobal) {
                     
-		            if (nullptr != bestValue)
+                    if (nullptr != bestValue)
                     {
-                	    *bestValue = refValueGlobal;
-            	    }
-			
-		            return bestResults[rank].second;
+                        *bestValue = refValueGlobal;
+                    }
+
+                    return bestResults[rank].second;
                 }
             }
             return {}; // no solution found
@@ -198,13 +198,13 @@ namespace GemPBA {
             this->maximisation = maximisation;
 
             if (!maximisation) { // minimisation
-                
+
                 #ifdef OBJECTIVE_DOUBLE
 
                     refValueGlobal = DBL_MAX;
 
                 #else
-                    
+
                     refValueGlobal = INT_MAX;
 
                 #endif
@@ -371,7 +371,7 @@ namespace GemPBA {
                     MPI_Recv(&refValueGlobal, 1, MPI_DOUBLE, CENTER, REFVAL_UPDATE_TAG, refValueGlobal_Comm, &status);
 
                 #else
-                
+
                     MPI_Recv(&refValueGlobal, 1, MPI_INT, CENTER, REFVAL_UPDATE_TAG, refValueGlobal_Comm, &status);
 
                 #endif
@@ -467,7 +467,7 @@ namespace GemPBA {
 
     public:
     private:
-        /*	send solution attained from node to the center node */
+        /*  send solution attained from node to the center node */
         void sendSolution(auto &&resultFetcher) {
             auto [refVal, buffer] = resultFetcher();
             if (buffer.starts_with("Empty")) {
@@ -513,20 +513,20 @@ namespace GemPBA {
                                 || (!maximisation && (objValue < refValueGlobal)))
                             {
 #ifdef DEBUG_COMMENTS
-				                fmt::print("center: using objective value {}\n", objValue); 
+                                fmt::print("center: using objective value {}\n", objValue);
 #endif
 
                                 MPI_Send(msg.first, msg.second, MPI_CHAR, rank, TASK_FROM_CENTER_TAG, world_Comm);
                                 delete[] msg.first;
                                 processState[rank] = STATE_ASSIGNED;
                             }
-			    
+
                             else
-			                {
+                            {
 #ifdef DEBUG_COMMENTS
-				                fmt::print("center: rejecting objective value {}\n", objValue); 
+                                fmt::print("center: rejecting objective value {}\n", objValue);
 #endif
-			                }
+                            }
 
                         #else
                             MPI_Send(msg.first, msg.second, MPI_CHAR, rank, TASK_FROM_CENTER_TAG, world_Comm);
@@ -574,7 +574,7 @@ namespace GemPBA {
             }
         }
 
-        /*	run the center node */
+        /*  run the center node */
         void runCenter(const char *SEED, const int SEED_SIZE) {
             std::cout << "Starting centralized scheduler" << std::endl;
             MPI_Barrier(world_Comm);
@@ -698,7 +698,7 @@ namespace GemPBA {
                                     MPI_Send(&refValueGlobal, 1, MPI_DOUBLE, rank, REFVAL_UPDATE_TAG, refValueGlobal_Comm);
 
                                 #else
-                                    
+
                                     MPI_Send(&refValueGlobal, 1, MPI_INT, rank, REFVAL_UPDATE_TAG, refValueGlobal_Comm);
 
                                 #endif
@@ -818,7 +818,7 @@ namespace GemPBA {
             return -1; // all nodes are running
         }
 
-        /*	receive solution from nodes */
+        /*  receive solution from nodes */
         void receiveSolution() {
             for (int rank = 1; rank < world_size; rank++) {
 
@@ -848,7 +848,7 @@ namespace GemPBA {
                             MPI_Recv(&refValue, 1, MPI_DOUBLE, rank, HAS_RESULT_TAG, world_Comm, &status);
 
                         #else
-                        
+
                             MPI_Recv(&refValue, 1, MPI_INT, rank, HAS_RESULT_TAG, world_Comm, &status);
 
                         #endif
@@ -925,7 +925,7 @@ namespace GemPBA {
                 refValueGlobal = DBL_MIN;
 
             #else
-                
+
                 refValueGlobal = INT_MIN;
 
             #endif
@@ -957,7 +957,7 @@ namespace GemPBA {
         Queue<std::string *> q;
         bool exit = false;
 
-        // MPI_Group world_group;		  // all ranks belong to this group
+        // MPI_Group world_group;         // all ranks belong to this group
         MPI_Comm refValueGlobal_Comm; // attached to win_refValueGlobal
         MPI_Comm centerFullness_Comm;
 

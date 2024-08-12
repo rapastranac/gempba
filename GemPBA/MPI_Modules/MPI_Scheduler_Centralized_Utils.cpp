@@ -97,9 +97,9 @@ bool TaskComparator::operator()(std::pair<char *, int> t1, std::pair<char *, int
     
     #else
         int n1 = getNbSetBits(t1);
-	    int n2 = getNbSetBits(t2);
+        int n2 = getNbSetBits(t2);
 
-	    return (n1 <= n2);
+        return (n1 <= n2);
 
     #endif
 }

@@ -39,13 +39,13 @@
 #include <utility>
 
 #ifdef OBJECTIVE_DOUBLE
-	#include <cfloat>
-	#define OBJECTIVE_TYPE double
-	#pragma message("objective type: double")
+    #include <cfloat>
+    #define OBJECTIVE_TYPE double
+    #pragma message("objective type: double")
 
 #else
-	#define OBJECTIVE_TYPE int
-	#pragma message("objective type: int")
+    #define OBJECTIVE_TYPE int
+    #pragma message("objective type: int")
 
 #endif
 
@@ -180,7 +180,7 @@ namespace GemPBA {
             this->refValueLocal = refValue;
         }
 
-        /*	This method is thread safe:
+        /*  This method is thread safe:
 
             - returns false if there exists already a better value, this better value is copied
                 to the second parameter mostUpToDate if provided by reference
@@ -330,7 +330,7 @@ namespace GemPBA {
                 if (is_DLB) {
                     // bool res = try_top_holder<_ret>(lck, f, holder);
                     // if (res)
-                    //	return false; //if top holder found, then it should return false to keep trying
+                    // return false; //if top holder found, then it should return false to keep trying
 
                     dlb.pop_left_sibling(&holder);
                 }
@@ -362,7 +362,7 @@ namespace GemPBA {
 
 #ifdef MPI_ENABLED
 
-        /* 	it attempts pushing on another process by default, if none found,
+        /*  it attempts pushing on another process by default, if none found,
             it attempts pushing on another thread, if none found
             it will proceed sequentially
         */
@@ -633,15 +633,15 @@ namespace GemPBA {
             } else if (keyword == "MINIMISE") {
                 maximisation = false;
 
-				#ifdef OBJECTIVE_DOUBLE
+                #ifdef OBJECTIVE_DOUBLE
 
-					refValueLocal = DBL_MAX;
+                    refValueLocal = DBL_MAX;
 
-				#else
-				
-                	refValueLocal = INT_MAX;
+                #else
 
-				#endif
+                    refValueLocal = INT_MAX;
+
+                #endif
 
 #ifdef MPI_ENABLED
                 mpiScheduler->setRefValStrategyLookup(maximisation); // TODO redundant
@@ -652,16 +652,16 @@ namespace GemPBA {
 
         /*----------------Singleton----------------->>end*/
     protected:
-    	
-		#ifdef OBJECTIVE_DOUBLE
 
-			OBJECTIVE_TYPE refValueLocal = DBL_MIN;
+        #ifdef OBJECTIVE_DOUBLE
 
-		#else	
-	   
-			OBJECTIVE_TYPE refValueLocal = INT_MIN;
+            OBJECTIVE_TYPE refValueLocal = DBL_MIN;
 
-		#endif
+        #else
+
+            OBJECTIVE_TYPE refValueLocal = INT_MIN;
+
+        #endif
 
         bool maximisation = true;
 
@@ -681,7 +681,7 @@ namespace GemPBA {
             return *world_Comm;
         }
 
-        /*	reply methods are under construction: these methodes are meant to hanle
+        /*  reply methods are under construction: these methodes are meant to hanle
             non-void functions on MPI such that the returned value can be
             forwarded to the process it was generated from
         */
