@@ -52,7 +52,7 @@ include_directories(${ARGPARSE_INCLUDE_DIR})
 message("fmt dir: ${FMT_INCLUDE_DIR}")
 message("Parser dir: ${ARGPARSE_INCLUDE_DIR}")
 
-file(GLOB Sources "src/*.cpp")
+file(GLOB Sources "src/*.cpp" "GemPBA/MPI_Modules/MPI_Scheduler_Centralized_Utils.cpp")
 
 add_executable(a.out ${Sources}
         ${FMT_INSTALL_LOCATION}/fmt/src/format.cc

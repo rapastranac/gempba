@@ -38,6 +38,17 @@
 #include <typeinfo>
 #include <utility>
 
+#ifdef OBJECTIVE_DOUBLE
+    #include <cfloat>
+    #define OBJECTIVE_TYPE double
+    #pragma message("objective type: double")
+
+#else
+    #define OBJECTIVE_TYPE int
+    #pragma message("objective type: int")
+
+#endif
+
 namespace GemPBA {
     template<typename _Ret, typename... Args>
     class ResultHolder;
@@ -98,7 +109,7 @@ namespace GemPBA {
             this->bestSolution = std::make_any<decltype(bestLocalSolution)>(bestLocalSolution);
         }
 
-        void holdSolution(int refValueLocal, auto &solution, auto &serializer) {
+        void holdSolution(OBJECTIVE_TYPE refValueLocal, auto &solution, auto &serializer) {
             std::unique_lock<std::mutex> lck(mtx);
             this->bestSolution_serialized.first = refValueLocal;
             this->bestSolution_serialized.second = serializer(solution);
@@ -160,22 +171,22 @@ namespace GemPBA {
             return std::any_cast<RESULT_TYPE>(bestSolution);
         }
 
-        int refValue() const {
+        OBJECTIVE_TYPE refValue() const {
             return refValueLocal;
         }
 
         // if multi-processing, then every process should call this method before starting
-        void setRefValue(int refValue) {
+        void setRefValue(OBJECTIVE_TYPE refValue) {
             this->refValueLocal = refValue;
         }
 
-        /*	This method is thread safe:
+        /*  This method is thread safe:
 
             - returns false if there exists already a better value, this better value is copied
                 to the second parameter mostUpToDate if provided by reference
 
             - return true if successfuly updated*/
-        bool updateRefValue(int new_refValue, int *mostUpToDate = nullptr) {
+        bool updateRefValue(OBJECTIVE_TYPE new_refValue, OBJECTIVE_TYPE *mostUpToDate = nullptr) {
             std::scoped_lock<std::mutex> lck(mtx);
             if ((maximisation && new_refValue > refValueLocal) || (!maximisation && new_refValue < refValueLocal)) {
                 refValueLocal = new_refValue;
@@ -319,7 +330,7 @@ namespace GemPBA {
                 if (is_DLB) {
                     // bool res = try_top_holder<_ret>(lck, f, holder);
                     // if (res)
-                    //	return false; //if top holder found, then it should return false to keep trying
+                    // return false; //if top holder found, then it should return false to keep trying
 
                     dlb.pop_left_sibling(&holder);
                 }
@@ -351,7 +362,7 @@ namespace GemPBA {
 
 #ifdef MPI_ENABLED
 
-        /* 	it attempts pushing on another process by default, if none found,
+        /*  it attempts pushing on another process by default, if none found,
             it attempts pushing on another thread, if none found
             it will proceed sequentially
         */
@@ -532,7 +543,7 @@ namespace GemPBA {
         [[nodiscard]] auto constructResultFetcher() {
             return [this]() {
                 if (bestSolution_serialized.first == -1)
-                    return std::make_pair(0, static_cast<std::string>("Empty buffer, no result"));
+                    return std::make_pair(static_cast<OBJECTIVE_TYPE>(0), static_cast<std::string>("Empty buffer, no result"));
                 else
                     return bestSolution_serialized;
             };
@@ -564,7 +575,7 @@ namespace GemPBA {
         /*This section refers to the strategy wrapping a function
             then pruning data to be use by the wrapped function<<---*/
         std::any bestSolution;
-        std::pair<int, std::string> bestSolution_serialized;
+        std::pair<OBJECTIVE_TYPE, std::string> bestSolution_serialized;
 
         DLB_Handler &dlb = GemPBA::DLB_Handler::getInstance();
 #ifdef R_SEARCH
@@ -621,7 +632,17 @@ namespace GemPBA {
                 return; // maximise by default
             } else if (keyword == "MINIMISE") {
                 maximisation = false;
-                refValueLocal = INT_MAX;
+
+                #ifdef OBJECTIVE_DOUBLE
+
+                    refValueLocal = DBL_MAX;
+
+                #else
+
+                    refValueLocal = INT_MAX;
+
+                #endif
+
 #ifdef MPI_ENABLED
                 mpiScheduler->setRefValStrategyLookup(maximisation); // TODO redundant
 #endif
@@ -631,7 +652,17 @@ namespace GemPBA {
 
         /*----------------Singleton----------------->>end*/
     protected:
-        int refValueLocal = INT_MIN;
+
+        #ifdef OBJECTIVE_DOUBLE
+
+            OBJECTIVE_TYPE refValueLocal = DBL_MIN;
+
+        #else
+
+            OBJECTIVE_TYPE refValueLocal = INT_MIN;
+
+        #endif
+
         bool maximisation = true;
 
 #ifdef MPI_ENABLED
@@ -650,7 +681,7 @@ namespace GemPBA {
             return *world_Comm;
         }
 
-        /*	reply methods are under construction: these methodes are meant to hanle
+        /*  reply methods are under construction: these methodes are meant to hanle
             non-void functions on MPI such that the returned value can be
             forwarded to the process it was generated from
         */
