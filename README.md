@@ -1,5 +1,15 @@
 # Generic Massive Parallelisation of Branching Algorithms
 
+<p align="center">
+<a href="https://github.com/rapastranac/gempba/actions">
+    <img src="https://github.com/rapastranac/gempba/actions/workflows/c-cpp.yml/badge.svg" alt="CI Status"/>
+  </a>
+  <a href="https://github.com/p-ranav/argparse/blob/master/LICENSE">
+    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="license"/>
+  </a>
+  <img src="https://img.shields.io/badge/version-1.0-blue.svg?cacheSeconds=2592000" alt="version"/>
+</p>
+
 <br /> 
 
  This tool will help you parallelise almost any branching algorithm that seemed initially impossible or super complex to do. Please refer to this [MSc. Thesis](http://hdl.handle.net/11143/18687) and [Paper](https://doi.org/10.1016/j.parco.2023.103024), for a performance report.
