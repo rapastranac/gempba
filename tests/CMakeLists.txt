@@ -47,6 +47,9 @@ target_include_directories(all_tests.out PRIVATE "${TEST_DIR}")
 # Link necessary libraries (e.g., Google Test)
 target_link_libraries(all_tests.out
         PRIVATE
+        Boost::system
+        Boost::serialization
+        Boost::fiber
         GTest::gtest
         GTest::gtest_main
         spdlog::spdlog
