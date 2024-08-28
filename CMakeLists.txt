@@ -76,6 +76,7 @@ target_link_libraries(a.out PRIVATE
         Boost::fiber
         OpenMP::OpenMP_CXX
         GTest::GTest
+        GTest::gmock_main
         GTest::Main
         spdlog::spdlog
 )

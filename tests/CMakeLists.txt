@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.28)
 
 project(gempba_tests)
 
@@ -51,6 +51,7 @@ target_link_libraries(all_tests.out
         Boost::serialization
         Boost::fiber
         GTest::gtest
+        GTest::gmock_main
         GTest::gtest_main
         spdlog::spdlog
         ${MPI_LIBRARIES}
