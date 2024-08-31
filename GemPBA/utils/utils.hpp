@@ -2,6 +2,9 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include <any>
+#include <future>
+
 #include <spdlog/spdlog.h>
 
 /**
@@ -14,6 +17,16 @@ namespace utils {
 #ifdef DEBUG_COMMENTS
         spdlog::info(formatString, std::forward<T>(args)...);
 #endif
+    }
+
+    template<typename T>
+    static std::future<std::any> convert_to_any_future(std::future<T> &&future) {
+        std::future<std::any> anyFuture = std::async(std::launch::async, [_future = std::move(future)]() mutable {
+            _future.wait();
+            T result = _future.get();
+            return std::make_any<T>(result);
+        });
+        return anyFuture;
     }
 
 };
