@@ -366,7 +366,7 @@ namespace gempba {
                     _parent->children.pop_front();
                     this->lowerRoot(*right);
                 } else {
-                    throw std::runtime_error("4 Testing, it's not supposed to happen, pop_left_sibling()\n");
+                    throw std::runtime_error("4 Testing, it's not supposed to happen, popLeftSibling()\n");
                 }
             }
         }
