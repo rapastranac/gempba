@@ -2,7 +2,7 @@
 #ifndef MPI_SCHEDULER_HPP
 #define MPI_SCHEDULER_HPP
 
-#include "Tree.hpp"
+#include "utils/Tree.hpp"
 #include "utils/Queue.hpp"
 #include <algorithm>
 #include <condition_variable>
