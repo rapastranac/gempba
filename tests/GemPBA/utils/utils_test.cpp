@@ -105,3 +105,40 @@ TEST(UtilsTest, BuildTopologyThreeChildrenPerNode) {
     EXPECT_EQ(0, tree[25].getChildrenCount());
     EXPECT_EQ(0, tree[26].getChildrenCount());
 }
+
+TEST(UtilsTest, ShiftLeft) {
+    // Test: Fully populated vector with no -1 values
+    {
+        std::vector<int> vec = {1, 2, 3, 4, 5, 6};
+        utils::shift_left(vec);
+        EXPECT_EQ(vec, std::vector<int>({2, 3, 4, 5, 6, -1}));
+
+        utils::shift_left(vec);
+        EXPECT_EQ(vec, std::vector<int>({3, 4, 5, 6, -1, -1}));
+
+        utils::shift_left(vec);
+        EXPECT_EQ(vec, std::vector<int>({4, 5, 6, -1, -1, -1}));
+
+        utils::shift_left(vec);
+        EXPECT_EQ(vec, std::vector<int>({5, 6, -1, -1, -1, -1}));
+
+        utils::shift_left(vec);
+        EXPECT_EQ(vec, std::vector<int>({6, -1, -1, -1, -1, -1}));
+
+        utils::shift_left(vec);
+        EXPECT_EQ(vec, std::vector<int>({-1, -1, -1, -1, -1, -1}));
+
+        //nothing else happens
+        utils::shift_left(vec);
+        EXPECT_EQ(vec, std::vector<int>({-1, -1, -1, -1, -1, -1}));
+
+        // empty vector
+        try {
+            std::vector<int> vec2 = {7};
+            utils::shift_left(vec2);
+            EXPECT_EQ(vec2, std::vector<int>({7}));
+        } catch (const std::exception &e) {
+            EXPECT_STRNE(e.what(), "Attempted to shift an empty vector");
+        }
+    }
+}
