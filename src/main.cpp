@@ -1,15 +1,18 @@
 #include "../include/main.h"
+#include "../include/TestOnly.hpp"
 
 #include <argparse/argparse.hpp>
 
 #include <iostream>
 #include <spdlog/spdlog.h>
 
+#include "function_trace/factory/trace_node_factory.hpp"
+
+
 //#include <mpi.h>
 int main(int argc, char *argv[]) {
-    spdlog::error("This is an error message");
-
-    return 1;
+    main2();
+    return 0;
     argparse::ArgumentParser program("main");
 
     program.add_argument("-job_id", "--job_id")
