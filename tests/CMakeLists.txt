@@ -5,7 +5,7 @@ project(gempba_tests)
 set(CMAKE_CXX_STANDARD 23)
 
 # Set the output directory to be the same as the main project
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 
 # Set up the main test directory
 set(TEST_DIR "${CMAKE_SOURCE_DIR}/tests")
