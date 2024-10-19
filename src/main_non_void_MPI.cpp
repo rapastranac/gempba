@@ -19,12 +19,13 @@
 #include <iterator>
 #include <string>
 #include <vector>
+#include <spdlog/spdlog.h>
 
 int main_non_void_MPI(int numThreads, int prob, std::string &filename)
 {
-    using HolderType = GemPBA::ResultHolder<Graph, int, Graph>;
+    using HolderType = gempba::ResultHolder<Graph, int, Graph>;
 
-    auto &handler = GemPBA::BranchHandler::getInstance(); // parallel GemPBA
+    auto &handler = gempba::BranchHandler::getInstance(); // parallel GemPBA
 
     Graph graph;
     Graph oGraph;
@@ -35,7 +36,7 @@ int main_non_void_MPI(int numThreads, int prob, std::string &filename)
     auto mainAlgo = std::bind(&VC_non_void_MPI::mvc, &cover, _1, _2, _3, _4); // target algorithm [all arguments]
     //graph.readEdges(file);
 
-    auto &scheduler = GemPBA::Scheduler::getInstance(handler); // MPI Scheduler
+    auto &scheduler = gempba::Scheduler::getInstance(handler); // MPI Scheduler
     int rank = scheduler.init(NULL, NULL);					// initialize MPI and member variable linkin
                                                                 //HolderType holder(handler);									//it creates a ResultHolder, required to retrive result
 
@@ -89,10 +90,10 @@ int main_non_void_MPI(int numThreads, int prob, std::string &filename)
         double sum = 0;
         for (size_t i = 0; i < idleTime.size(); i++)
         {
-            //fmt::print("idleTime[{}]: {} \n", i, idleTime[i]);
+            //spdlog::info("idleTime[{}]: {} \n", i, idleTime[i]);
             sum += idleTime[i];
         }
-        fmt::print("\nGlobal pool idle time: {0:.6f} seconds\n\n\n", sum);
+        spdlog::info("\nGlobal pool idle time: {0:.6f} seconds\n\n\n", sum);
     }
     scheduler.finalize();
 

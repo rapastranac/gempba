@@ -34,12 +34,13 @@
 #include <sstream>
 #include <iterator>
 #include <string>
+#include <spdlog/spdlog.h>
 #include <vector>
 
 #include <unistd.h>
 
 void printToSummaryFile(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int cpus_per_task,
-                        const string &filename_directory, GemPBA::MPI_Scheduler &mpiScheduler, int gsize,
+                        const string &filename_directory, gempba::MPI_Scheduler &mpiScheduler, int gsize,
                         int world_size, const vector<size_t> &threadRequests, const vector<int> &nTasksRecvd,
                         const vector<int> &nTasksSent, int solSize, double global_cpu_idle_time,
                         size_t totalThreadRequests);
@@ -58,10 +59,10 @@ int main_void_MPI_bitvec(int job_id, int nodes, int ntasks_per_node, int ntasks_
 #endif
 
 
-    auto &branchHandler = GemPBA::BranchHandler::getInstance(); // parallel library
+    auto &branchHandler = gempba::BranchHandler::getInstance(); // parallel library
 
     // NOTE: instantiated object depends on SCHEDULER_CENTRALIZED macro
-    auto &mpiScheduler = GemPBA::MPI_Scheduler::getInstance();
+    auto &mpiScheduler = gempba::MPI_Scheduler::getInstance();
 
     int rank = mpiScheduler.rank_me();
     branchHandler.passMPIScheduler(&mpiScheduler);
@@ -93,7 +94,7 @@ int main_void_MPI_bitvec(int job_id, int nodes, int ntasks_per_node, int ntasks_
     gbitset allones = ~allzeros;
 
     branchHandler.setRefValue(gsize); // thus, all processes know the best value so far
-    branchHandler.setRefValStrategyLookup("minimise");
+    branchHandler.setLookupStrategy(gempba::MINIMISE);
 
     int zero = 0;
     int solsize = graph.size();
@@ -112,7 +113,7 @@ int main_void_MPI_bitvec(int job_id, int nodes, int ntasks_per_node, int ntasks_
     mpiScheduler.barrier();
 
     int pid = getpid();                                       // for debugging purposes
-    fmt::print("rank {} is process ID : {}\n", rank, pid); // for debugging purposes
+    spdlog::info("rank {} is process ID : {}\n", rank, pid); // for debugging purposes
 
     mpiScheduler.barrier();
 
@@ -179,34 +180,34 @@ int main_void_MPI_bitvec(int job_id, int nodes, int ntasks_per_node, int ntasks_
         ss << buffer;
 
         deserializer(ss, solsize);
-        fmt::print("Cover size : {} \n", solsize);
+        spdlog::info("Cover size : {} \n", solsize);
 
         double global_cpu_idle_time = 0;
         for (int i = 1; i < world_size; i++) {
             global_cpu_idle_time += idleTime[i];
         }
-        fmt::print("\nGlobal cpu idle time: {0:.6f} seconds\n\n\n", global_cpu_idle_time);
+        spdlog::info("\nGlobal cpu idle time: {0:.6f} seconds\n\n\n", global_cpu_idle_time);
 
         // **************************************************************************
 
         for (int rank = 1; rank < world_size; rank++) {
-            fmt::print("tasks sent by rank {} = {} \n", rank, nTasksSent[rank]);
+            spdlog::info("tasks sent by rank {} = {} \n", rank, nTasksSent[rank]);
         }
-        fmt::print("\n");
+        spdlog::info("\n");
 
         for (int rank = 1; rank < world_size; rank++) {
-            fmt::print("tasks received by rank {} = {} \n", rank, nTasksRecvd[rank]);
+            spdlog::info("tasks received by rank {} = {} \n", rank, nTasksRecvd[rank]);
         }
-        fmt::print("\n");
+        spdlog::info("\n");
         size_t totalThreadRequests = 0;
         for (int rank = 1; rank < world_size; rank++) {
             size_t rank_thread_requests = threadRequests[rank];
             totalThreadRequests += rank_thread_requests;
 
-            fmt::print("rank {}, thread requests: {} \n", rank, rank_thread_requests);
+            spdlog::info("rank {}, thread requests: {} \n", rank, rank_thread_requests);
         }
 
-        fmt::print("\n\n\n");
+        spdlog::info("\n\n\n");
 
         // print stats to a file ***********
         printToSummaryFile(job_id, nodes, ntasks_per_node, ntasks_per_socket, cpus_per_task, filename_directory,
@@ -241,7 +242,7 @@ std::string createDir(std::string root, std::string folder, T... dir) {
 }
 
 void printToSummaryFile(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int cpus_per_task,
-                        const string &filename_directory, GemPBA::MPI_Scheduler &mpiScheduler, int gsize,
+                        const string &filename_directory, gempba::MPI_Scheduler &mpiScheduler, int gsize,
                         int world_size, const vector<size_t> &threadRequests, const vector<int> &nTasksRecvd,
                         const vector<int> &nTasksSent, int solSize, double global_cpu_idle_time,
                         size_t totalThreadRequests) {

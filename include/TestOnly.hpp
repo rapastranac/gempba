@@ -1,0 +1,6 @@
+#ifndef GEMPBA_TESTONLY_HPP
+#define GEMPBA_TESTONLY_HPP
+
+void main2();
+
+#endif //GEMPBA_TESTONLY_HPP

@@ -23,7 +23,6 @@ using namespace std;
 
 #endif
 
-#include <fmt/format.h>
 #include "util.hpp"
 
 #include <climits>
@@ -32,6 +31,7 @@ using namespace std;
 #include <mutex>
 #include <random>
 #include <sstream>
+#include <spdlog/spdlog.h>
 
 class Graph {
 private:
@@ -543,7 +543,7 @@ public:
     int removeVertex(int v) {
         try {
             if (!adj.contains(v)) {
-                fmt::print("_VERTEX_NOT_FOUND\n");
+                spdlog::error("_VERTEX_NOT_FOUND\n");
                 throw "_VERTEX_NOT_FOUND";
             }
             numEdges = numEdges - adj[v].size();

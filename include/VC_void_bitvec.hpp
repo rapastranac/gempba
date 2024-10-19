@@ -4,6 +4,7 @@
 #include <atomic>
 #include <array>
 #include <random>
+#include <spdlog/spdlog.h>
 
 #include <boost/dynamic_bitset.hpp>
 #include <boost/container/set.hpp>
@@ -15,7 +16,7 @@ using namespace boost;
 
 class VC_void_bitvec : public VertexCover
 {
-    using HolderType = GemPBA::ResultHolder<void, int, gbitset, int>;
+    using HolderType = gempba::ResultHolder<void, int, gbitset, int>;
 
 private:
     std::function<void(int, int, gbitset &, int, void *)> _f;
@@ -288,13 +289,12 @@ public:
 
         hol_l.setDepth(depth);
         hol_r.setDepth(depth);
-#ifdef R_SEARCH
-        if (!parent)
-        {
+
+        if (branchHandler.getLoadBalancingStrategy() == gempba::QUASI_HORIZONTAL) {
             dummyParent = new HolderType(dlb, id);
             dlb.linkVirtualRoot(id, dummyParent, hol_l, hol_r);
         }
-#endif
+
         hol_l.bind_branch_checkIn([&]
                                   {
                                       int bestVal = branchHandler.refValue();
@@ -377,7 +377,7 @@ private:
             auto clock = std::chrono::system_clock::now();
             std::time_t time = std::chrono::system_clock::to_time_t(clock); //it includes a "\n"
 
-            fmt::print("rank {}, MVC solution so far: {} @ depth : {}, {}", branchHandler.rank_me(), solsize, depth, std::ctime(&time));
+            spdlog::info("rank {}, MVC solution so far: {} @ depth : {}, {}", branchHandler.rank_me(), solsize, depth, std::ctime(&time));
         }
 
         return;

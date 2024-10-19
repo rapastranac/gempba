@@ -5,6 +5,7 @@ Makefile
 cmake_install.cmake
 .vscode
 build
+build-with-coverage
 cmake-build-debug
 cmake-build-debug-wsl
 .cmake
@@ -13,7 +14,6 @@ global.cbp
 Testing
 output
 results
-test
 external
 
 

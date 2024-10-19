@@ -1,5 +1,7 @@
 #ifdef VC_VOID_MPI
 
+#include <spdlog/spdlog.h>
+
 #include "VertexCover.hpp"
 
 void helper_ser(auto &archive, auto &first)
@@ -49,7 +51,7 @@ auto deserializer = [](std::stringstream &ss, auto &...args)
 
 class VC_void_MPI : public VertexCover
 {
-    using HolderType = GemPBA::ResultHolder<void, int, Graph>;
+    using HolderType = gempba::ResultHolder<void, int, Graph>;
 
 private:
     std::function<void(int, int, Graph, void *)> _f;
@@ -94,13 +96,10 @@ public:
         HolderType hol_r(dlb, id, parent);
         hol_l.setDepth(depth);
         hol_r.setDepth(depth);
-#ifdef R_SEARCH
-        if (!parent)
-        {
+        if(branchHandler.getLoadBalancingStrategy() == gempba::QUASI_HORIZONTAL) {
             dummyParent = new HolderType(dlb, id);
             dlb.linkVirtualRoot(id, dummyParent, hol_l, hol_r);
         }
-#endif
 
         hol_l.bind_branch_checkIn([&]
                                   {
@@ -112,7 +111,7 @@ public:
 
                                       if (C == 0)
                                       {
-                                          fmt::print("rank {}, thread {}, cover is empty\n", branchHandler.rank_me(), id);
+                                          spdlog::info("rank {}, thread {}, cover is empty\n", branchHandler.rank_me(), id);
                                           throw;
                                       }
                                       if (C < branchHandler.refValue()) // user's condition to see if it's worth it to make branch call
@@ -129,7 +128,7 @@ public:
                                   {
                                       Graph g = graph;
                                       if (g.empty())
-                                          fmt::print("rank {}, thread {}, Graph is empty\n", branchHandler.rank_me(), id);
+                                          spdlog::info("rank {}, thread {}, Graph is empty\n", branchHandler.rank_me(), id);
 
                                       g.removeNv(v);
                                       g.clean_graph();

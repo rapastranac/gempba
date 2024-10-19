@@ -1,12 +1,18 @@
 #include "../include/main.h"
-#include "fmt/format.h"
+#include "../include/TestOnly.hpp"
 
 #include <argparse/argparse.hpp>
 
 #include <iostream>
+#include <spdlog/spdlog.h>
+
+#include "function_trace/factory/trace_node_factory.hpp"
+
 
 //#include <mpi.h>
 int main(int argc, char *argv[]) {
+    main2();
+    return 0;
     argparse::ArgumentParser program("main");
 
     program.add_argument("-job_id", "--job_id")
@@ -69,7 +75,7 @@ int main(int argc, char *argv[]) {
     int prob = program.get<int>("--prob");
     auto filename = program.get<std::string>("--indir");
 
-    fmt::print(
+    spdlog::info(
             "argc: {}, nodes: {}, ntasks_per_node: {}, ntasks_per_socket: {}, cpus_per_task: {}, prob : {}, filename: {} \n",
             argc, nodes, ntasks_per_node, ntasks_per_socket, cpus_per_task, prob, filename);
 

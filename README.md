@@ -1,5 +1,15 @@
 # Generic Massive Parallelisation of Branching Algorithms
 
+<p align="center">
+<a href="https://github.com/rapastranac/gempba/actions">
+    <img src="https://github.com/rapastranac/gempba/actions/workflows/c-cpp.yml/badge.svg" alt="CI Status"/>
+  </a>
+  <a href="https://github.com/p-ranav/argparse/blob/master/LICENSE">
+    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="license"/>
+  </a>
+  <img src="https://img.shields.io/badge/version-1.0-blue.svg?cacheSeconds=2592000" alt="version"/>
+</p>
+
 <br /> 
 
  This tool will help you parallelise almost any branching algorithm that seemed initially impossible or super complex to do. Please refer to this [MSc. Thesis](http://hdl.handle.net/11143/18687) and [Paper](https://doi.org/10.1016/j.parco.2023.103024), for a performance report.
@@ -47,7 +57,7 @@ void foo(MyClass instance, float f, double d){
         return;
     }
 
-    /* intance, f and d are used to create sub instances for the
+    /* instance, f and d are used to create sub instances for the
         recursions, for left, middle and right branches.
     */
 
@@ -76,9 +86,9 @@ void foo(int id, MyClass instance, float f, double d, void *parent = nullptr);
 
  ```cpp
 std::mutex mtx;
-auto &dlb = GemPBA::DLB_Handler::getInstance();
-auto &branchHandler = GemPBA::BranchHandler::getInstance();
-using HolderType = GemPBA::ResultHolder<void, MyClass, float, double>;
+auto &dlb = gempba::DLB_Handler::getInstance();
+auto &branchHandler = gempba::BranchHandler::getInstance();
+using HolderType = gempba::ResultHolder<void, MyClass, float, double>;
 
 void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
 
@@ -120,7 +130,7 @@ void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
 
     /*  if parent is nullptr, then a virtual root is should be created
     such that branches within this scope can be accessed from below */
-    if (!parent){
+    if (branchHandler.getLoadBalancingStrategy() == gempba::QUASI_HORIZONTAL) {
         dummyParent = new HolderType(dlb, id);
         dlb.linkVirtualRoot(id, dummyParent, rHolder_l, rHolder_m, rHolder_r);
     }
@@ -185,9 +195,9 @@ Parallelising the program would not be any different than the version presented 
 
  ```cpp
 std::mutex mtx;
-auto &dlb = GemPBA::DLB_Handler::getInstance();
-auto &branchHandler = GemPBA::BranchHandler::getInstance();
-using HolderType = GemPBA::ResultHolder<void, MyClass, float, double>;
+auto &dlb = gempba::DLB_Handler::getInstance();
+auto &branchHandler = gempba::BranchHandler::getInstance();
+using HolderType = gempba::ResultHolder<void, MyClass, float, double>;
 
 void foo1(int id, MyClass instance, float f, double d, void *parent = nullptr)
 
@@ -204,7 +214,7 @@ void foo1(int id, MyClass instance, float f, double d, void *parent = nullptr)
     HolderType rHolder_m(dlb, id, parent);
     HolderType rHolder_r(dlb, id, parent);
 
-    if (!parent){
+    if (branchHandler.getLoadBalancingStrategy() == gempba::QUASI_HORIZONTAL) {
         dummyParent = new HolderType(dlb, id);
         dlb.linkVirtualRoot(id, dummyParent, rHolder_l, rHolder_m, rHolder_r);
     }
@@ -229,7 +239,7 @@ If there is no interest in parallelising a branch, it can simply be invoked as i
 
 ``` foo(id, instance_r, f_r, d_r, nullptr) ```
 
-If this branch is to be run sequentially, then no instance of ```GemPBA::ResultHolder``` should be created for it.
+If this branch is to be run sequentially, then no instance of ```gempba::ResultHolder``` should be created for it.
 
 
 Most of the time, the code of a branching algorithm is optimised to check if the branch is worth it to explore. What usually happens is that the instances to be passed are compared somehow against the best solution so far, and therefore it is possible to conclude that a branch is leading to a better or worse solution.
@@ -246,7 +256,7 @@ void foo(MyClass instance, float f, double d){
         return;
     }
 
-    /* intance, f and d are used to create sub instances for the
+    /* instance, f and d are used to create sub instances for the
         recursions, for left, middle and right branches.
     */
     if( /* left branch leads to a better solution */)
@@ -272,9 +282,9 @@ Let's optimise our reference parallel code.
 
  ```cpp
 std::mutex mtx;
-auto &dlb = GemPBA::DLB_Handler::getInstance();
-auto &branchHandler = GemPBA::BranchHandler::getInstance();
-using HolderType = GemPBA::ResultHolder<void, MyClass, float, double>;
+auto &dlb = gempba::DLB_Handler::getInstance();
+auto &branchHandler = gempba::BranchHandler::getInstance();
+using HolderType = gempba::ResultHolder<void, MyClass, float, double>;
 
 void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
 
@@ -291,7 +301,7 @@ void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
     HolderType rHolder_m(dlb, id, parent);
     HolderType rHolder_r(dlb, id, parent);
 
-    if (!parent){
+    if (branchHandler.getLoadBalancingStrategy() == gempba::QUASI_HORIZONTAL){
         dummyParent = new HolderType(dlb, id);
         dlb.linkVirtualRoot(id, dummyParent, rHolder_l, rHolder_m, rHolder_r);
     }
@@ -432,9 +442,9 @@ auto serializer = [](auto &&...args) {
 
 int main(){
     // parallel library local reference (BranchHandler is a singleton )
-	auto &branchHandler = GemPBA::BranchHandler::getInstance(); 
+	auto &branchHandler = gempba::BranchHandler::getInstance(); 
     // Interprocess communication handler local reference (MPI_Scheduler is a singleton)
-	auto &mpiScheduler = GemPBA::MPI_Scheduler::getInstance();
+	auto &mpiScheduler = gempba::MPI_Scheduler::getInstance();
     /* gets the rank of the current process, so we know which process is 
         the center */
 	int rank = mpiScheduler.rank_me();
@@ -458,7 +468,7 @@ int main(){
     If minimisation, reference value or best value so far is INT_MAX
     
     By default, GemPBA maximises, thus the below line is optional for maximisation*/
-	branchHandler.setRefValStrategyLookup("minimise");
+	branchHandler.setLookupStrategy(gempba::MAXIMISE);
 
     // Here we set the best value so far if known somehow, optional
     branchHandler.setRefValue(/* some integer*/); 
@@ -610,8 +620,8 @@ auto serializer = [](auto &&...args){
     };
 
 int main(){
-    auto &branchHandler = GemPBA::BranchHandler::getInstance(); 
-    auto &mpiScheduler = GemPBA::MPI_Scheduler::getInstance();
+    auto &branchHandler = gempba::BranchHandler::getInstance(); 
+    auto &mpiScheduler = gempba::MPI_Scheduler::getInstance();
     int rank = mpiScheduler.rank_me();
     branchHandler.passMPIScheduler(&mpiScheduler);
 
@@ -623,7 +633,7 @@ int main(){
     *   initial data reading
     */
     
-    branchHandler.setRefValStrategyLookup("minimise");
+    branchHandler.setLookupStrategy(gempba::MINIMISE);
     branchHandler.setRefValue(/* some integer*/); 
     if (rank == 0) {
         std::string buffer = serializer(instance, f, d);
@@ -661,9 +671,9 @@ Hence, the code modifications to convert the Multithreading function to Multipro
 
  ```cpp
 std::mutex mtx;
-auto &dlb = GemPBA::DLB_Handler::getInstance();
-auto &branchHandler = GemPBA::BranchHandler::getInstance();
-using HolderType = GemPBA::ResultHolder<void, MyClass, float, double>;
+auto &dlb = gempba::DLB_Handler::getInstance();
+auto &branchHandler = gempba::BranchHandler::getInstance();
+using HolderType = gempba::ResultHolder<void, MyClass, float, double>;
 
 void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
 
@@ -680,7 +690,7 @@ void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
     HolderType rHolder_m(dlb, id, parent);
     HolderType rHolder_r(dlb, id, parent);
 
-    if (!parent){
+    if (branchHandler.getLoadBalancingStrategy()==gempba::QUASI_HORIZONTAL){
         dummyParent = new HolderType(dlb, id);
         dlb.linkVirtualRoot(id, dummyParent, rHolder_l, rHolder_m, rHolder_r);
     }
