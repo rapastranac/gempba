@@ -1,20 +1,21 @@
-#ifdef VC_VOID
+#ifndef MT_GRAPH_VOID_SEMI_HPP
+#define MT_GRAPH_VOID_SEMI_HPP
 
 #include <spdlog/spdlog.h>
 #include "VertexCover.hpp"
 
-class VC_void : public VertexCover {
+class MT_graph_void_semi : public VertexCover {
     using HolderType = gempba::ResultHolder<void, int, Graph>;
 
 private:
     std::function<void(int, int, Graph &, void *)> _f;
 
 public:
-    VC_void() {
-        this->_f = std::bind(&VC_void::mvc, this, _1, _2, _3, _4);
+    MT_graph_void_semi() {
+        this->_f = std::bind(&MT_graph_void_semi::mvc, this, _1, _2, _3, _4);
     }
 
-    ~VC_void() override = default;
+    ~MT_graph_void_semi() override = default;
 
     bool findCover(int run) {
         string msg_center = fmt::format("run # {} ", run);
@@ -191,4 +192,4 @@ private:
     }
 };
 
-#endif
+#endif // MT_GRAPH_VOID_SEMI_HPP

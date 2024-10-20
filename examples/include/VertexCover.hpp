@@ -1,16 +1,15 @@
 #ifndef VERTEXCOVER_HPP
 #define VERTEXCOVER_HPP
 
-//#include <cereal/archives/binary.hpp>
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
 
 #include "Graph.hpp"
-#include <BranchHandler/BranchHandler.hpp>
-#include <Resultholder/ResultHolder.hpp>
+#include "BranchHandler/BranchHandler.hpp"
+#include "Resultholder/ResultHolder.hpp"
 #include "util.hpp"
 #include "fmt/core.h"
-#include <DLB/DLB_Handler.hpp>
+#include "DLB/DLB_Handler.hpp"
 
 #include <algorithm>
 #include <filesystem>
@@ -25,8 +24,7 @@ namespace fs = std::filesystem;
 
 class VertexCover {
 public:
-    VertexCover() {
-    }
+    VertexCover() = default;
 
     virtual ~VertexCover() = default;
 
