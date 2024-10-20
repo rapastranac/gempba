@@ -1,8 +1,8 @@
 #ifdef VC_VOID
 
-#include "../include/Graph.hpp"
+#include "../examples/include/Graph.hpp"
 
-#include "../include/VC_void.hpp"
+#include "../examples/include/example4.hpp"
 
 #include "BranchHandler/BranchHandler.hpp"
 #include <string>
@@ -10,11 +10,11 @@
 int main_void(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int cpus_per_task, int prob,
               std::string &filename_directory) {
 
-    auto &handler = GemPBA::BranchHandler::getInstance(); // parallel GemPBA
+    auto &handler = gempba::BranchHandler::getInstance(); // parallel GemPBA
 
     Graph graph;
     Graph oGraph;
-    VC_void cover;
+    example4 cover;
 
     graph.readEdges(filename_directory);
     //graph.readDimacs(filename);

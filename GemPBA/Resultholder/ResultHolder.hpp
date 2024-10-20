@@ -10,38 +10,33 @@
 #include "ResultHolderIntVoid.hpp"
 #include "ResultHolderIntNonVoid.hpp"
 
-namespace GemPBA {
+namespace gempba {
 
     template<typename Ret, typename... Args>
     class ResultHolder : public ResultHolderInt<Ret, void, Args...> {
         friend class DLB_Handler;
 
     private:
-        void **root = nullptr;                // raw pointer
-        ResultHolder *parent = nullptr;        // smart pointer
-        ResultHolder *itself = nullptr;        // this;		// raw pointer
-        std::list<ResultHolder *> children; // smart pointer, it keeps the order in which they were appended
+        void **root = nullptr;                 // raw pointer
+        ResultHolder *parent = nullptr;        // raw pointer
+        ResultHolder *itself = nullptr;        // this;	raw pointer
+        std::list<ResultHolder *> children;    // raw pointers, it keeps the order in which they were appended
 
     public:
         // default constructor, it has no parent, used for virtual roots
-        ResultHolder(DLB_Handler &dlb, int threadId) : ResultHolderInt<Ret, void, Args...>(dlb),
-                                                       ResultHolderBase<Args...>(dlb) {
+        ResultHolder(DLB_Handler &dlb, int threadId) : ResultHolderInt<Ret, void, Args...>(dlb), ResultHolderBase<Args...>(dlb) {
             this->threadId = threadId;
             this->id = dlb.getUniqueId();
-            // this->expectedFut.reset(new std::future<_Ret>);
             this->itself = this;
-
             this->dlb.assign_root(threadId, this);
             this->root = &dlb.roots[threadId];
-
             this->isVirtual = true;
         }
 
-        ResultHolder(DLB_Handler &dlb, int threadId, void *parent) : ResultHolderInt<Ret, void, Args...>(dlb),
-                                                                     ResultHolderBase<Args...>(dlb) {
+        ResultHolder(DLB_Handler &dlb, int threadId, void *parent) : ResultHolderInt<Ret, void, Args...>(dlb), ResultHolderBase<Args...>(dlb) {
             this->threadId = threadId;
             this->id = this->dlb.getUniqueId();
-            itself = this;
+            this->itself = this;
 
             if (parent) {
                 this->root = &dlb.roots[threadId];
@@ -53,22 +48,14 @@ namespace GemPBA {
                 // no one else is supposed to be using it
                 this->dlb.assign_root(threadId, this);
                 this->root = &dlb.roots[threadId];
-                return;
             }
         }
 
-        ~ResultHolder() {
-            //#ifdef DEBUG_COMMENTS
-            //			if (this->isVirtual)
-            //				fmt::print("Destructor called for virtual root, id : {}, \t threadId :{}, \t depth : {} \n", this->id, this->threadId, this->depth);
-            ////else
-            ////	fmt::print("Destructor called for  id : {} \n", this->id);
-            //#endif
-        }
+        ~ResultHolder() = default;
 
         ResultHolder(ResultHolder &&src) = delete;
 
         ResultHolder(ResultHolder &src) = delete;
     };
-} // namespace library
+}
 #endif

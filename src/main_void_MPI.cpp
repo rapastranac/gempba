@@ -10,7 +10,7 @@
 #include "../include/BranchHandler.hpp"
 #include "../include/DLB_Handler.hpp"
 
-#include "Tree.hpp"
+#include "utils/Tree.hpp"
 
 #include <chrono>
 #include <filesystem>
@@ -21,11 +21,12 @@
 #include <sstream>
 #include <iterator>
 #include <string>
+#include <spdlog/spdlog.h>
 #include <vector>
 #include <unistd.h>
 
-auto &dlb = GemPBA::DLB_Handler::getInstance();
-auto &branchHandler = GemPBA::BranchHandler::getInstance(); // parallel library
+auto &dlb = gempba::DLB_Handler::getInstance();
+auto &branchHandler = gempba::BranchHandler::getInstance(); // parallel library
 
 std::mutex mtx;
 size_t leaves = 0;
@@ -35,8 +36,8 @@ size_t multiple = 1024; //static_cast<size_t>(pow(2, 18));
 
 void foo(int id, int depth, float treeIdx, void *parent)
 {
-    using HolderType = GemPBA::ResultHolder<void, int, float>;
-    //fmt::print("rank {}, id : {} depth : {} treeIdx : {}\n", branchHandler.rank_me(), id, depth, treeIdx); // node id in the tree
+    using HolderType = gempba::ResultHolder<void, int, float>;
+    //spdlog::info("rank {}, id : {} depth : {} treeIdx : {}\n", branchHandler.rank_me(), id, depth, treeIdx); // node id in the tree
 
     if (depth >= k)
     {
@@ -49,7 +50,7 @@ void foo(int id, int depth, float treeIdx, void *parent)
             if (leaves % multiple == 0)
                 branchHandler.updateRefValue(leaves);
 
-        //fmt::print("rank {}, Leaves : {}\n", branchHandler.rank_me(), leaves);
+        //spdlog::info("rank {}, Leaves : {}\n", branchHandler.rank_me(), leaves);
         return;
     }
     int newDepth = depth + 1;
@@ -90,7 +91,7 @@ void foo(int id, int depth, float treeIdx, void *parent)
 
 int main_void_MPI(int numThreads, int prob, std::string &filename)
 {
-    //using HolderType = GemPBA::ResultHolder<void, int, Graph>;
+    //using HolderType = gempba::ResultHolder<void, int, Graph>;
 
     Graph graph;
     Graph oGraph;
@@ -98,11 +99,11 @@ int main_void_MPI(int numThreads, int prob, std::string &filename)
 
     auto mainAlgo = std::bind(&VC_void_MPI::mvc, &cover, _1, _2, _3, _4); // target algorithm [all arguments]
 
-    auto &mpiScheduler = GemPBA::MPI_Scheduler::getInstance(); // MPI MPI_Scheduler
+    auto &mpiScheduler = gempba::MPI_Scheduler::getInstance(); // MPI MPI_Scheduler
     int rank = mpiScheduler.rank_me();
     //HolderType holder(handler);									//it creates a ResultHolder, required to retrive result
     branchHandler.passMPIScheduler(&mpiScheduler);
-    GemPBA::ResultHolder<void, int, float> hldr(dlb, -1, nullptr);
+    gempba::ResultHolder<void, int, float> hldr(dlb, -1, nullptr);
     //float val = 845.515;
 
     //	int frst = 0;
@@ -114,20 +115,20 @@ int main_void_MPI(int numThreads, int prob, std::string &filename)
     //	//auto res = bar(-1, 0, -1, nullptr);
     //
     //	//while (!branchHandler.isDone())
-    //	//	fmt::print("Not done yet !!\n");
+    //	//	spdlog::info("Not done yet !!\n");
     //
     //	branchHandler.try_push_MT<void>(foo, -1, hldr);
     //	std::this_thread::sleep_for(1s); //emulates quick task
     //	branchHandler.wait();
-    //	fmt::print("Leaves : {}\n", leaves);
-    //	fmt::print("Thread calls : {}\n", branchHandler.number_thread_requests());
+    //	spdlog::info("Leaves : {}\n", leaves);
+    //	spdlog::info("Thread calls : {}\n", branchHandler.number_thread_requests());
     //
     //	return 0;
 
     /* previous input and output required before following condition
     thus, other nodes know the data type*/
-    //using HolderType = GemPBA::ResultHolder<void, int, float>;
-    using HolderType = GemPBA::ResultHolder<void, int, Graph>;
+    //using HolderType = gempba::ResultHolder<void, int, float>;
+    using HolderType = gempba::ResultHolder<void, int, Graph>;
 
     HolderType holder(dlb, -1); //it creates a ResultHolder, required to retrive result
     int depth = 0;
@@ -175,7 +176,7 @@ int main_void_MPI(int numThreads, int prob, std::string &filename)
     branchHandler.setRefValStrategyLookup("minimise");
 
     int pid = getpid();
-    fmt::print("rank {} is process ID : {}\n", rank, pid);
+    spdlog::info("rank {} is process ID : {}\n", rank, pid);
 
     if (rank == 0)
         mpiScheduler.runCenter(buffer.data(), buffer.size());
@@ -234,8 +235,8 @@ int main_void_MPI(int numThreads, int prob, std::string &filename)
             if (solutions[i].first != -1)
                 summation += solutions[i].first;
         }
-        fmt::print("\n\n");
-        fmt::print("Summation of refValGlobal : {}\n", summation);
+        spdlog::info("\n\n");
+        spdlog::info("Summation of refValGlobal : {}\n", summation);
 
         //std::this_thread::sleep_for(std::chrono::milliseconds(2000)); // to let other processes to print
         mpiScheduler.printStats();
@@ -249,35 +250,35 @@ int main_void_MPI(int numThreads, int prob, std::string &filename)
 
         deserializer(ss, oGraph);
         auto cv = oGraph.postProcessing();
-        fmt::print("Cover size : {} \n", cv.size());
+        spdlog::info("Cover size : {} \n", cv.size());
 
         double sum = 0;
         for (int i = 1; i < world_size; i++)
         {
             sum += idleTime[i];
         }
-        fmt::print("\nGlobal pool idle time: {0:.6f} seconds\n\n\n", sum);
+        spdlog::info("\nGlobal pool idle time: {0:.6f} seconds\n\n\n", sum);
 
         // **************************************************************************
 
         for (int rank = 1; rank < world_size; rank++)
         {
-            fmt::print("tasks sent by rank {} = {} \n", rank, nTasksSent[rank]);
+            spdlog::info("tasks sent by rank {} = {} \n", rank, nTasksSent[rank]);
         }
-        fmt::print("\n");
+        spdlog::info("\n");
 
         for (int rank = 1; rank < world_size; rank++)
         {
-            fmt::print("tasks received by rank {} = {} \n", rank, nTasksRecvd[rank]);
+            spdlog::info("tasks received by rank {} = {} \n", rank, nTasksRecvd[rank]);
         }
-        fmt::print("\n");
+        spdlog::info("\n");
 
         for (int rank = 1; rank < world_size; rank++)
         {
-            fmt::print("rank {}, thread requests: {} \n", rank, threadRequests[rank]);
+            spdlog::info("rank {}, thread requests: {} \n", rank, threadRequests[rank]);
         }
 
-        fmt::print("\n\n\n");
+        spdlog::info("\n\n\n");
 
         // **************************************************************************
     }
