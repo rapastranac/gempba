@@ -39,7 +39,7 @@
 #include <unistd.h>
 
 void printToSummaryFile(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int cpus_per_task,
-                        const string &filename_directory, GemPBA::MPI_Scheduler &mpiScheduler, int gsize,
+                        const string &filename_directory, gempba::MPI_Scheduler &mpiScheduler, int gsize,
                         int world_size, const vector<size_t> &threadRequests, const vector<int> &nTasksRecvd,
                         const vector<int> &nTasksSent, int solSize, double global_cpu_idle_time,
                         size_t totalThreadRequests);
@@ -58,10 +58,10 @@ int main_void_MPI_bitvec(int job_id, int nodes, int ntasks_per_node, int ntasks_
 #endif
 
 
-    auto &branchHandler = GemPBA::BranchHandler::getInstance(); // parallel library
+    auto &branchHandler = gempba::BranchHandler::getInstance(); // parallel library
 
     // NOTE: instantiated object depends on SCHEDULER_CENTRALIZED macro
-    auto &mpiScheduler = GemPBA::MPI_Scheduler::getInstance();
+    auto &mpiScheduler = gempba::MPI_Scheduler::getInstance();
 
     int rank = mpiScheduler.rank_me();
     branchHandler.passMPIScheduler(&mpiScheduler);
@@ -93,7 +93,7 @@ int main_void_MPI_bitvec(int job_id, int nodes, int ntasks_per_node, int ntasks_
     gbitset allones = ~allzeros;
 
     branchHandler.setRefValue(gsize); // thus, all processes know the best value so far
-    branchHandler.setRefValStrategyLookup("minimise");
+    branchHandler.setLookupStrategy(gempba::MINIMISE);
 
     int zero = 0;
     int solsize = graph.size();
@@ -241,7 +241,7 @@ std::string createDir(std::string root, std::string folder, T... dir) {
 }
 
 void printToSummaryFile(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int cpus_per_task,
-                        const string &filename_directory, GemPBA::MPI_Scheduler &mpiScheduler, int gsize,
+                        const string &filename_directory, gempba::MPI_Scheduler &mpiScheduler, int gsize,
                         int world_size, const vector<size_t> &threadRequests, const vector<int> &nTasksRecvd,
                         const vector<int> &nTasksSent, int solSize, double global_cpu_idle_time,
                         size_t totalThreadRequests) {

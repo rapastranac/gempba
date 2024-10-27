@@ -15,7 +15,7 @@ using namespace boost;
 
 class VC_void_bitvec : public VertexCover
 {
-    using HolderType = GemPBA::ResultHolder<void, int, gbitset, int>;
+    using HolderType = gempba::ResultHolder<void, int, gbitset, int>;
 
 private:
     std::function<void(int, int, gbitset &, int, void *)> _f;

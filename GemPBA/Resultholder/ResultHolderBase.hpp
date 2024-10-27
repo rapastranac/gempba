@@ -2,7 +2,7 @@
 #define BASE_HPP
 
 #include <mpi.h>
-#include <stdio.h>
+#include <cstdio>
 
 #include <omp.h>
 
@@ -14,6 +14,7 @@
 #include <future>
 #include <tuple>
 #include <type_traits>
+#include "utils/utils.hpp"
 
 /*
  * Created by Andres Pastrana on 2019
@@ -21,7 +22,7 @@
  * rapastranac@gmail.com
  */
 
-namespace GemPBA {
+namespace gempba {
     class DLB_Handler;
 
     template<typename... Args>
@@ -55,7 +56,7 @@ namespace GemPBA {
 #endif
 
     public:
-        ResultHolderBase(DLB_Handler &dlb) : dlb(dlb) {
+        explicit ResultHolderBase(DLB_Handler &dlb) : dlb(dlb) {
         }
 
         void holdArgs(Args &...args) {
@@ -126,29 +127,30 @@ namespace GemPBA {
             this->branch_checkIn = std::bind(std::forward<F>(branch_checkIn));
         }
 
-        /* this should be invoked always before calling a branch, since
+        /* This should be invoked always before calling a branch, since
             it invokes user's instructions to prepare data that will be pushed
             If not invoked, input for a specific branch handled by ResultHolder instance
             will be empty.
 
-            This method allows to always have input data ready before a branch call, avoiding to
-            have data in the stack before it is actually needed.
+            This method allows always having input data ready before a branch call, avoiding having
+            data in the stack before it is actually needed.
 
             Thus, the user can evaluate any condition to check if a branch call is worth it or
-            not, while creating a temporarily a input data set.
+            not, while creating temporarily an input data set.
 
-            If user's condition is met then this temporarily input is held by the ResultHolder::holdArgs(...)
+            If user's condition is met, then this temporarily input is held by the ResultHolder::holdArgs(...)
             and it should return true
-            If user's condition is not met, no input is held and it should return false
+            If user's condition is not met, no input is held, and it should return false
 
-            if a void function is being used, this should be a problem, since
+            If a void function is being used, this should be a problem, since
 
             */
         bool evaluate_branch_checkIn() {
-            if (isForwarded || isPushed || isDiscarded)
+            if (isForwarded || isPushed || isDiscarded) {
                 return false;
-            else
+            } else {
                 return branch_checkIn();
+            }
         }
 
 #ifdef MPI_ENABLED
@@ -170,7 +172,7 @@ namespace GemPBA {
 #endif
     };
 
-    template<typename _Ret, typename Enable = void, typename... Args>
+    template<typename Ret, typename Enable = void, typename... Args>
     class ResultHolderInt;
 }
 

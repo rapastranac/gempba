@@ -1,7 +1,7 @@
 #ifndef OMP_THREADPOOL_H
 #define OMP_THREADPOOL_H
 
-#include "Utils/Queue.hpp"
+#include "utils/Queue.hpp"
 
 #include <any>
 #include <atomic>
@@ -39,7 +39,7 @@ namespace ThreadPool {
     public:
         Pool() { this->init(); }
 
-        Pool(int size) {
+        explicit Pool(int size) {
             this->init();
             this->setSize(size);
         }

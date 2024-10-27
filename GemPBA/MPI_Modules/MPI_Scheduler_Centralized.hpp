@@ -3,7 +3,7 @@
 #define MPI_SCHEDULER_CENTRALIZED_HPP
 
 #include "Tree.hpp"
-#include "Utils/Queue.hpp"
+#include "utils/Queue.hpp"
 #include <algorithm>
 #include <condition_variable>
 #include <cstring>
@@ -194,7 +194,7 @@ size_t getCurrentRSS() {
 #endif
 }
 
-namespace GemPBA {
+namespace gempba {
 
     class BranchHandler;
 
@@ -1040,6 +1040,6 @@ namespace GemPBA {
         }
     };
 
-} // namespace GemPBA
+}
 
 #endif

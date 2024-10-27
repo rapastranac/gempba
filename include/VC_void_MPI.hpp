@@ -49,7 +49,7 @@ auto deserializer = [](std::stringstream &ss, auto &...args)
 
 class VC_void_MPI : public VertexCover
 {
-    using HolderType = GemPBA::ResultHolder<void, int, Graph>;
+    using HolderType = gempba::ResultHolder<void, int, Graph>;
 
 private:
     std::function<void(int, int, Graph, void *)> _f;

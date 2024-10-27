@@ -14,27 +14,27 @@
 /*
 - by default every holder is a root of itself and has no parent
 
-- if a parent is passed at construction time, then a holder will have this as a parent
+- if a parent is passed at construction time, then a holder will have this as a parent,
 and it will adopt the parent's root as its root as well
 
 - if two or more holders that don't have a parent get linked, at linking time, a dummy holder will
-be constructed which will act as a root and it is considered virtual since its only purpose
+be constructed which will act as a root, and it is considered virtual since its only purpose
 is to be a root. This allows to track all levels of the exploration tree, and therefore
 all holders are potentally pushable
 */
 
-namespace GemPBA {
-    template<typename _Ret, typename... Args>
+namespace gempba {
+    template<typename Ret, typename... Args>
     class ResultHolder;
 
     // Dynamic Load Balancing
     class DLB_Handler {
-        template<typename _Ret, typename... Args>
+        template<typename Ret, typename... Args>
         friend
         class ResultHolder;
 
     private:
-        std::map<int, void *> roots; // every thread will be solving a sub tree, this point to their roots
+        std::map<int, void *> roots; // every thread will be solving a subtree, this point to their roots
         std::mutex mtx;
         std::atomic<long long> idleTime{0};
 
@@ -45,7 +45,7 @@ namespace GemPBA {
 #endif
         size_t idCounter = 0;
 
-        DLB_Handler() {}
+        DLB_Handler() = default;
 
     public:
         static DLB_Handler &getInstance() {
@@ -59,7 +59,7 @@ namespace GemPBA {
         }
 
         void add_on_idle_time(std::chrono::steady_clock::time_point begin, std::chrono::steady_clock::time_point end) {
-            double time_tmp = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
+            long time_tmp = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
             idleTime.fetch_add(time_tmp, std::memory_order_relaxed);
         }
 
@@ -167,7 +167,6 @@ namespace GemPBA {
                            root->isVirtual,
                            root->isDiscarded);
                 throw std::runtime_error("4 Testing, it's not supposed to happen, find_top_holder()");
-                return nullptr;
             }
         }
 
@@ -360,7 +359,7 @@ namespace GemPBA {
 
         /* this is useful because at level zero of a root, there might be multiple
         waiting nodes, though the leftMost branch (at zero level) might be at one of
-        the very right sub branches deep down, which means that there is a line of
+        the very right sub-branches deep down, which means that there is a line of
          multiple nodes with a single child.
          A node with a single child means that it has already been solved and
          also its siblings, because children are unlinked from their parent node
