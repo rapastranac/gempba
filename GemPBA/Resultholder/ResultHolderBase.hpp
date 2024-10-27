@@ -1,6 +1,8 @@
 #ifndef BASE_HPP
 #define BASE_HPP
 
+#include "ResultHolderParent.hpp"
+
 #include <mpi.h>
 #include <cstdio>
 
@@ -26,7 +28,7 @@ namespace gempba {
     class DLB_Handler;
 
     template<typename... Args>
-    class ResultHolderBase {
+    class ResultHolderBase : public ResultHolderParent {
         friend class DLB_Handler;
 
     protected:
@@ -41,7 +43,7 @@ namespace gempba {
         size_t fw_count = 0;
         size_t ph_count = 0;
 
-        long long int id = -1;
+        int id = -1;
         int threadId = -1;
 
         int depth = -1;
@@ -71,7 +73,7 @@ namespace gempba {
             this->depth = depth;
         }
 
-        size_t getId() {
+        int getId() {
             return id;
         }
 

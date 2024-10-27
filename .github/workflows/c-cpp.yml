@@ -1,0 +1,71 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ "${NUMBER}-*" ]
+  pull_request:
+    branches: [ "main", "${NUMBER}-*" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential
+          sudo apt-get install -y cmake 
+          sudo apt-get install -y gcc 
+          sudo apt-get install -y make 
+          sudo apt-get install -y git
+          sudo apt-get install -y libboost-all-dev 
+          sudo apt-get install -y libopenmpi-dev 
+          sudo apt-get install -y libspdlog-dev 
+
+      - name: Echo Dependencies Version
+        run: |
+          g++ --version
+          cmake --version
+          make --version
+          git --version
+          dpkg -s libboost-dev | grep 'Version'
+          dpkg -s libopenmpi-dev | grep 'Version'
+          dpkg -s libspdlog-dev | grep 'Version'
+
+      - name: clone GemPBA
+        run: |
+          git clone https://github.com/rapastranac/gempba.git
+          cd gempba
+
+      # Step to download and build external libraries
+      - name: Install External Libraries
+        run: |
+          cd external
+          git clone --branch "v2.9" --depth 1 https://github.com/p-ranav/argparse.git argparse
+
+      - name: Install Gtests
+        run: |
+          cd ~
+          git clone https://github.com/google/googletest.git
+          cd googletest
+          mkdir build && cd build
+          cmake .. -DBUILD_SHARED_LIBS=ON -DINSTALL_GTEST=ON -DBUILD_GMOCK=ON -DCMAKE_INSTALL_PREFIX:PATH=/usr
+          make -j8
+          sudo make install
+          sudo ldconfig
+
+      - name: Build
+        run: |
+          cd ${GITHUB_WORKSPACE}
+          mkdir build && cd build
+          cmake ..
+          make -j 2
+
+      - name: Run Tests
+        run: |
+          cd ${GITHUB_WORKSPACE}/bin
+          ./all_tests.out
