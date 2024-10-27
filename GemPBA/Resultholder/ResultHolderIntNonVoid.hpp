@@ -42,7 +42,7 @@ namespace gempba {
             return this->expected; // returns empty object of type _Ret,
         }
 
-#ifdef MPI_ENABLED
+#ifdef MULTIPROCESSING_ENABLED
 
         // in construction
         template<typename F_deser>

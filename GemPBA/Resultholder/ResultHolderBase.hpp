@@ -47,7 +47,7 @@ namespace gempba {
         int depth = -1;
         bool isVirtual = false;
 
-#ifdef MPI_ENABLED
+#ifdef MULTIPROCESSING_ENABLED
         // MPI attributes in construction, specially for non-void functions ******
         bool isMPISent = false; // flag to check if was sent via MPI
         int dest_rank = -1;     // rank destination
@@ -80,7 +80,7 @@ namespace gempba {
         }
 
         bool isFetchable() {
-#ifdef MPI_ENABLED
+#ifdef MULTIPROCESSING_ENABLED
             // return (isPushed || isForwarded || isMPISent) && !isRetrieved;
             return false;
 #else
@@ -97,7 +97,7 @@ namespace gempba {
         }
 
         bool isTreated() {
-#ifdef MPI_ENABLED
+#ifdef MULTIPROCESSING_ENABLED
             return isPushed || isForwarded || isDiscarded || isRetrieved || isMPISent;
 #else
             return isPushed || isForwarded || isDiscarded || isRetrieved;
@@ -153,7 +153,7 @@ namespace gempba {
             }
         }
 
-#ifdef MPI_ENABLED
+#ifdef MULTIPROCESSING_ENABLED
 
         bool is_MPI_Sent() {
             return this->isMPISent;
