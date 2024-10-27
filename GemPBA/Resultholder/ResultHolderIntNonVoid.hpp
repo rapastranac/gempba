@@ -22,6 +22,8 @@ namespace gempba {
     public:
         explicit ResultHolderInt(DLB_Handler &dlb) : ResultHolderBase<Args...>(dlb) {}
 
+        ~ResultHolderInt() override = default;
+
         void hold_future(std::future<Ret> &&expectedFut) {
             this->expectedFut = std::move(expectedFut);
         }

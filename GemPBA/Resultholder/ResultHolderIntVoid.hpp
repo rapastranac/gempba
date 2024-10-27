@@ -16,6 +16,8 @@ namespace gempba {
 
     public:
         explicit ResultHolderInt(DLB_Handler &dlb) : ResultHolderBase<Args...>(dlb) {}
+
+        ~ResultHolderInt() override= default;
     };
 }
 #endif
