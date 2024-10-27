@@ -650,9 +650,9 @@ public:
         adj[v].insert(u);
     }
 
-    void readEdges(string NameOfFile) {
+    void readEdges(string fileName) {
 
-        std::ifstream file(NameOfFile);
+        std::ifstream file(fileName);
 
         if (!file.is_open()) {
             throw std::runtime_error("Input file not found\n");

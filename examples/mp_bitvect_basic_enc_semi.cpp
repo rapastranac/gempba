@@ -1,62 +1,85 @@
-#ifdef BITVECTOR_VC
+#include "include/mp_bitvect_basic_enc.hpp"
+#include "include/main.hpp"
 
-#include "../include/main.h"
-#include "../include/Graph.hpp"
-
-#ifdef SCHEDULER_CENTRALIZED
-#include "../GemPBA/MPI_Modules/MPI_Scheduler_Centralized.hpp"
-#else
-
-#include "../GemPBA/MPI_Modules/MPI_Scheduler.hpp"
-
-#endif
-
-
-#ifdef USE_LARGE_ENCODING
-#include "../include/VC_void_bitvec_enc2.hpp"
-#else
-
-#include "../include/VC_void_MPI_bitvec.hpp"
-
-#endif
-
-
-#include "../GemPBA/Resultholder/ResultHolder.hpp"
-#include "../GemPBA/BranchHandler/BranchHandler.hpp"
-#include "../GemPBA/DLB/DLB_Handler.hpp"
-
-#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-
 #include <istream>
 #include <sstream>
-#include <iterator>
 #include <string>
 #include <spdlog/spdlog.h>
 #include <vector>
-
 #include <unistd.h>
 
-void printToSummaryFile(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int cpus_per_task,
-                        const string &filename_directory, gempba::MPI_Scheduler &mpiScheduler, int gsize,
-                        int world_size, const vector<size_t> &threadRequests, const vector<int> &nTasksRecvd,
-                        const vector<int> &nTasksSent, int solSize, double global_cpu_idle_time,
-                        size_t totalThreadRequests);
+using namespace std::placeholders;
 
-int main_void_MPI_bitvec(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int cpus_per_task, int prob,
+std::string createDir(std::string root) {
+    if (!fs::is_directory(root) || !fs::exists(root)) {
+        fs::create_directory(root);
+    }
+    return root;
+}
+
+std::string createDir(std::string root, std::string folder) {
+    if (!fs::is_directory(root) || !fs::exists(root)) {
+        fs::create_directory(root);
+    }
+    return createDir(root + "/" + folder + "/");
+}
+
+template<typename... T>
+std::string createDir(std::string root, std::string folder, T... dir) {
+    if (!fs::is_directory(root) || !fs::exists(root)) {
+        fs::create_directory(root);
+    }
+    return createDir(root + "/" + folder, dir...);
+}
+
+void printToSummaryFile(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int cpus_per_task,
+                        const std::string &filename_directory, gempba::Scheduler0 &mpiScheduler, int gsize,
+                        int world_size, const std::vector<size_t> &threadRequests, const std::vector<int> &nTasksRecvd,
+                        const std::vector<int> &nTasksSent, int solSize, double global_cpu_idle_time,
+                        size_t totalThreadRequests) {
+    std::string file_name = filename_directory.substr(filename_directory.find_last_of("/\\") + 1);
+    const std::string targetDir = createDir("results", std::to_string(gsize), std::to_string(nodes));
+
+    ofstream myfile;
+    myfile.open(targetDir + file_name);
+    myfile << "job id:\t" << job_id << std::endl;
+    myfile << "nodes:\t" << nodes << std::endl;
+    myfile << "ntasks-per-node:\t" << ntasks_per_node << std::endl;
+    myfile << "ntasks-per-socket:\t" << ntasks_per_socket << std::endl;
+    myfile << "cpus-per-task:\t" << cpus_per_task << std::endl;
+    myfile << "graph size:\t\t" << gsize << std::endl;
+    myfile << "cover size:\t\t" << solSize << std::endl;
+    myfile << "thread requests:\t\t" << totalThreadRequests << std::endl;
+    myfile << "elapsed time:\t\t" << mpiScheduler.elapsedTime() << std::endl;
+    myfile << "cpu idle time (global):\t" << global_cpu_idle_time << std::endl;
+    myfile << "wall idle time (global):\t" << global_cpu_idle_time / (world_size - 1) << std::endl;
+
+    myfile << std::endl;
+
+    for (int rank = 1; rank < world_size; rank++) {
+        myfile << "tasks sent by rank " << rank << ":\t" << nTasksSent[rank] << std::endl;
+    }
+    myfile << std::endl;
+
+    for (int rank = 1; rank < world_size; rank++) {
+        myfile << "tasks received by rank " << rank << ":\t" << nTasksRecvd[rank] << std::endl;
+    }
+    myfile << std::endl;
+
+    for (int rank = 1; rank < world_size; rank++) {
+        myfile << "rank " << rank << ", thread requests:\t" << threadRequests[rank] << std::endl;
+    }
+    myfile.close();
+}
+
+int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int cpus_per_task, int prob,
                          std::string &filename_directory) {
-#ifdef USE_LARGE_ENCODING
-    cout<<"USING LARGE ENCODING"<<endl;
-#else
-    cout << "USING OPTIMIZED ENCODING" << endl;
-#endif
-#ifdef SCHEDULER_CENTRALIZED
-    cout<<"USING CENTRALIZED STRATEGY"<<endl;
-#else
-    cout << "USING SEMI-CENTRALIZED STRATEGY" << endl;
-#endif
+
+    std::cout << "USING LARGE ENCODING" << std::endl;
+    std::cout << "USING SEMI-CENTRALIZED STRATEGY" << std::endl;
 
 
     auto &branchHandler = gempba::BranchHandler::getInstance(); // parallel library
@@ -67,16 +90,12 @@ int main_void_MPI_bitvec(int job_id, int nodes, int ntasks_per_node, int ntasks_
     int rank = mpiScheduler.rank_me();
     branchHandler.passMPIScheduler(&mpiScheduler);
 
-    cout << "NUMTHREADS= " << cpus_per_task << endl;
+    std::cout << "NUMTHREADS= " << cpus_per_task << std::endl;
 
-#ifdef USE_LARGE_ENCODING
+
     VC_void_MPI_bitvec_enc2 cover;
     auto function = std::bind(&VC_void_MPI_bitvec_enc2::mvcbitset, &cover, _1, _2, _3, _4, _5); // target algorithm [all arguments]
-#else
-    VC_void_MPI_bitvec cover;
-    auto function = std::bind(&VC_void_MPI_bitvec::mvcbitset, &cover, _1, _2, _3, _4,
-                              _5); // target algorithm [all arguments]
-#endif
+
 
     // initialize MPI and member variable linkin
 
@@ -98,15 +117,12 @@ int main_void_MPI_bitvec(int job_id, int nodes, int ntasks_per_node, int ntasks_
 
     int zero = 0;
     int solsize = graph.size();
-    std::cout << "solsize=" << solsize << endl;
+    std::cout << "solsize=" << solsize << std::endl;
     mpiScheduler.barrier();
-#ifdef USE_LARGE_ENCODING
+
     BitGraph bg;
     bg.bits_in_graph = allones;
     std::string buffer = serializer(zero, bg, zero);
-#else
-    std::string buffer = serializer(zero, allones, zero);
-#endif
 
     std::cout << "Starting MPI node " << branchHandler.rank_me() << std::endl;
 
@@ -126,14 +142,10 @@ int main_void_MPI_bitvec(int job_id, int nodes, int ntasks_per_node, int ntasks_
             numThreads could be the number of physical cores managed by this process - 1
         */
         branchHandler.initThreadPool(cpus_per_task - 1);
-#ifdef USE_LARGE_ENCODING
-        auto bufferDecoder = branchHandler.constructBufferDecoder<void, int, BitGraph, int>(function, deserializer);
-#else
-        auto bufferDecoder = branchHandler.constructBufferDecoder<void, int, gbitset, int>(function, deserializer);
-#endif
 
-        auto resultFetcher = branchHandler.constructResultFetcher();
-        mpiScheduler.runNode(branchHandler, bufferDecoder, resultFetcher, serializer);
+        std::function<std::shared_ptr<gempba::ResultHolderParent>(char *, int)> bufferDecoder = branchHandler.constructBufferDecoder<void, int, BitGraph, int>(function,deserializer);
+        std::function<std::pair<int, std::string>()> resultFetcher = branchHandler.constructResultFetcher();
+        mpiScheduler.runNode(branchHandler, bufferDecoder, resultFetcher);
     }
     mpiScheduler.barrier();
     // *****************************************************************************************
@@ -175,7 +187,7 @@ int main_void_MPI_bitvec(int job_id, int nodes, int ntasks_per_node, int ntasks_
         // print sumation of refValGlobal
         int solsize;
         std::stringstream ss;
-        std::string buffer = mpiScheduler.fetchSolution(); // returns a stringstream
+        std::string buffer = mpiScheduler.fetchSolution(); // returns a std::stringstream
 
         ss << buffer;
 
@@ -219,69 +231,16 @@ int main_void_MPI_bitvec(int job_id, int nodes, int ntasks_per_node, int ntasks_
     return 0;
 }
 
-std::string createDir(std::string root) {
-    if (!fs::is_directory(root) || !fs::exists(root)) {
-        fs::create_directory(root);
-    }
-    return root;
+int main(int argc, char *argv[]) {
+    Params params = parse(argc, argv);
+
+    int job_id = params.job_id;
+    int nodes = params.nodes;
+    int ntasks_per_node = params.ntasks_per_node;
+    int ntasks_per_socket = params.ntasks_per_socket;
+    int cpus_per_task = params.cpus_per_task;
+    int prob = params.prob;
+    auto filename = params.filename;
+
+    return run(job_id, nodes, ntasks_per_node, ntasks_per_socket, cpus_per_task, prob, filename);
 }
-
-std::string createDir(std::string root, std::string folder) {
-    if (!fs::is_directory(root) || !fs::exists(root)) {
-        fs::create_directory(root);
-    }
-    return createDir(root + "/" + folder + "/");
-}
-
-template<typename... T>
-std::string createDir(std::string root, std::string folder, T... dir) {
-    if (!fs::is_directory(root) || !fs::exists(root)) {
-        fs::create_directory(root);
-    }
-    return createDir(root + "/" + folder, dir...);
-}
-
-void printToSummaryFile(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int cpus_per_task,
-                        const string &filename_directory, gempba::MPI_Scheduler &mpiScheduler, int gsize,
-                        int world_size, const vector<size_t> &threadRequests, const vector<int> &nTasksRecvd,
-                        const vector<int> &nTasksSent, int solSize, double global_cpu_idle_time,
-                        size_t totalThreadRequests) {
-    string file_name = filename_directory.substr(filename_directory.find_last_of("/\\") + 1);
-    const std::string targetDir = createDir("results", std::to_string(gsize), std::to_string(nodes));
-
-    ofstream myfile;
-    myfile.open(targetDir + file_name);
-    myfile << "job id:\t" << job_id << endl;
-    myfile << "nodes:\t" << nodes << endl;
-    myfile << "ntasks-per-node:\t" << ntasks_per_node << endl;
-    myfile << "ntasks-per-socket:\t" << ntasks_per_socket << endl;
-    myfile << "cpus-per-task:\t" << cpus_per_task << endl;
-    myfile << "graph size:\t\t" << gsize << endl;
-    myfile << "cover size:\t\t" << solSize << endl;
-#ifdef SCHEDULER_CENTRALIZED
-    myfile << "process requests:\t\t" << mpiScheduler.getTotalRequests() << endl;
-#endif
-    myfile << "thread requests:\t\t" << totalThreadRequests << endl;
-    myfile << "elapsed time:\t\t" << mpiScheduler.elapsedTime() << endl;
-    myfile << "cpu idle time (global):\t" << global_cpu_idle_time << endl;
-    myfile << "wall idle time (global):\t" << global_cpu_idle_time / (world_size - 1) << endl;
-
-    myfile << endl;
-
-    for (int rank = 1; rank < world_size; rank++) {
-        myfile << "tasks sent by rank " << rank << ":\t" << nTasksSent[rank] << endl;
-    }
-    myfile << endl;
-
-    for (int rank = 1; rank < world_size; rank++) {
-        myfile << "tasks received by rank " << rank << ":\t" << nTasksRecvd[rank] << endl;
-    }
-    myfile << endl;
-
-    for (int rank = 1; rank < world_size; rank++) {
-        myfile << "rank " << rank << ", thread requests:\t" << threadRequests[rank] << endl;
-    }
-    myfile.close();
-}
-
-#endif

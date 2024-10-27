@@ -4,20 +4,24 @@
 
 #include "utils/Tree.hpp"
 #include "utils/Queue.hpp"
+#include "Resultholder/ResultHolderParent.hpp"
+#include "scheduler0.hpp"
+#include "centralized_utils.hpp"
+
 #include <algorithm>
 #include <condition_variable>
 #include <cstring>
 #include <random>
-#include <stdlib.h> /* srand, rand */
+#include <cstdlib> /* srand, rand */
 #include <fstream>
 #include <iostream>
-#include <limits.h>
+#include <climits>
 #include <mpi.h>
 #include <string>
 #include <sstream>
 #include <stdexcept>
-#include <stdio.h>
-#include <time.h>
+#include <cstdio>
+#include <ctime>
 #include <thread>
 #include <queue>
 #include <unistd.h>
@@ -52,155 +56,12 @@
 
 #define CENTER_NBSTORED_TASKS_PER_PROCESS 1000
 
-/*
- * Author:  David Robert Nadeau
- * Site:    http://NadeauSoftware.com/
- * License: Creative Commons Attribution 3.0 Unported License
- *          http://creativecommons.org/licenses/by/3.0/deed.en_US
- */
-
-#if defined(_WIN32)
-#include <windows.h>
-#include <psapi.h>
-
-#elif defined(__unix__) || defined(__unix) || defined(unix) || (defined(__APPLE__) && defined(__MACH__))
-
-#include <unistd.h>
-#include <sys/resource.h>
-
-#if defined(__APPLE__) && defined(__MACH__)
-#include <mach/mach.h>
-
-#elif (defined(_AIX) || defined(__TOS__AIX__)) || (defined(__sun__) || defined(__sun) || defined(sun) && (defined(__SVR4) || defined(__svr4__)))
-#include <fcntl.h>
-#include <procfs.h>
-
-#elif defined(__linux__) || defined(__linux) || defined(linux) || defined(__gnu_linux__)
-
-#include <stdio.h>
-
-#endif
-
-#else
-#error "Cannot define getPeakRSS( ) or getCurrentRSS( ) for an unknown OS."
-#endif
-
-
-/**
-  Return number of bits that are set to 1
-**/
-int getNbSetBits(char c) {
-    //all credits to https://stackoverflow.com/questions/697978/c-code-to-count-the-number-of-1-bits-in-an-unsigned-char
-    return (c * 01001001001ULL & 042104210421ULL) % 017;
-}
-
-int getNbSetBits(std::pair<char *, int> task) {
-    int nb = 0;
-    for (int i = 0; i < task.second; ++i) {
-        nb += getNbSetBits(task.first[i]);
-    }
-    return nb;
-}
-
-class TaskComparator {
-public:
-    bool operator()(std::pair<char *, int> t1, std::pair<char *, int> t2) {
-
-        int n1 = getNbSetBits(t1);
-        int n2 = getNbSetBits(t2);
-
-        return (n1 <= n2);
-    }
-};
-
-
-/**
- * Returns the peak (maximum so far) resident set size (physical
- * memory use) measured in bytes, or zero if the value cannot be
- * determined on this OS.
- */
-size_t getPeakRSS() {
-#if defined(_WIN32)
-    /* Windows -------------------------------------------------- */
-    PROCESS_MEMORY_COUNTERS info;
-    GetProcessMemoryInfo(GetCurrentProcess(), &info, sizeof(info));
-    return (size_t)info.PeakWorkingSetSize;
-
-#elif (defined(_AIX) || defined(__TOS__AIX__)) || (defined(__sun__) || defined(__sun) || defined(sun) && (defined(__SVR4) || defined(__svr4__)))
-    /* AIX and Solaris ------------------------------------------ */
-    struct psinfo psinfo;
-    int fd = -1;
-    if ((fd = open("/proc/self/psinfo", O_RDONLY)) == -1)
-        return (size_t)0L; /* Can't open? */
-    if (read(fd, &psinfo, sizeof(psinfo)) != sizeof(psinfo))
-    {
-        close(fd);
-        return (size_t)0L; /* Can't read? */
-    }
-    close(fd);
-    return (size_t)(psinfo.pr_rssize * 1024L);
-
-#elif defined(__unix__) || defined(__unix) || defined(unix) || (defined(__APPLE__) && defined(__MACH__))
-    /* BSD, Linux, and OSX -------------------------------------- */
-    struct rusage rusage;
-    getrusage(RUSAGE_SELF, &rusage);
-#if defined(__APPLE__) && defined(__MACH__)
-    return (size_t)rusage.ru_maxrss;
-#else
-    return (size_t) (rusage.ru_maxrss * 1024L);
-#endif
-
-#else
-    /* Unknown OS ----------------------------------------------- */
-    return (size_t)0L; /* Unsupported. */
-#endif
-}
-
-/**
- * Returns the current resident set size (physical memory use) measured
- * in bytes, or zero if the value cannot be determined on this OS.
- */
-size_t getCurrentRSS() {
-#if defined(_WIN32)
-    /* Windows -------------------------------------------------- */
-    PROCESS_MEMORY_COUNTERS info;
-    GetProcessMemoryInfo(GetCurrentProcess(), &info, sizeof(info));
-    return (size_t)info.WorkingSetSize;
-
-#elif defined(__APPLE__) && defined(__MACH__)
-    /* OSX ------------------------------------------------------ */
-    struct mach_task_basic_info info;
-    mach_msg_type_number_t infoCount = MACH_TASK_BASIC_INFO_COUNT;
-    if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO,
-                  (task_info_t)&info, &infoCount) != KERN_SUCCESS)
-        return (size_t)0L; /* Can't access? */
-    return (size_t)info.resident_size;
-
-#elif defined(__linux__) || defined(__linux) || defined(linux) || defined(__gnu_linux__)
-    /* Linux ---------------------------------------------------- */
-    long rss = 0L;
-    FILE *fp = NULL;
-    if ((fp = fopen("/proc/self/statm", "r")) == NULL)
-        return (size_t) 0L; /* Can't open? */
-    if (fscanf(fp, "%*s%ld", &rss) != 1) {
-        fclose(fp);
-        return (size_t) 0L; /* Can't read? */
-    }
-    fclose(fp);
-    return (size_t) rss * (size_t) sysconf(_SC_PAGESIZE);
-
-#else
-    /* AIX, BSD, Solaris, and Unknown OS ------------------------ */
-    return (size_t)0L; /* Unsupported. */
-#endif
-}
-
 namespace gempba {
 
     class BranchHandler;
 
     // inter process communication handler
-    class MPI_Scheduler {
+    class MPI_SchedulerCentralized final : public gempba::Scheduler0 {
 
         std::priority_queue<std::pair<char *, int>, std::vector<std::pair<char *, int>>, TaskComparator> center_queue;    //message, size
         //std::vector<std::pair<char *, int>> center_queue;
@@ -211,20 +72,24 @@ namespace gempba {
         double time_centerfull_sent = 0;
 
 
-        std::vector <std::pair<char *, int>> local_outqueue;
-        std::vector <std::pair<char *, int>> local_inqueue;
+        std::vector<std::pair<char *, int>> local_outqueue;
+        std::vector<std::pair<char *, int>> local_inqueue;
 
     public:
-        static MPI_Scheduler &getInstance() {
-            static MPI_Scheduler instance;
+        ~MPI_SchedulerCentralized() override {
+            finalize();
+        }
+
+        static MPI_SchedulerCentralized &getInstance() {
+            static MPI_SchedulerCentralized instance;
             return instance;
         }
 
-        int rank_me() {
+        int rank_me() const override {
             return world_rank;
         }
 
-        std::string fetchSolution() {
+        std::string fetchSolution() override {
             for (int rank = 1; rank < world_size; rank++) {
                 if (bestResults[rank].first == refValueGlobal) {
                     return bestResults[rank].second;
@@ -233,7 +98,7 @@ namespace gempba {
             return {}; // no solution found
         }
 
-        auto fetchResVec() {
+        std::vector<std::pair<int, std::string>> fetchResVec() override {
             return bestResults;
         }
 
@@ -248,7 +113,7 @@ namespace gempba {
         }*/
 
 
-        void printStats() {
+        void printStats() override {
             spdlog::info("\n \n \n");
             spdlog::info("*****************************************************\n");
             spdlog::info("Elapsed time : {:4.3f} \n", elapsedTime());
@@ -257,47 +122,46 @@ namespace gempba {
             spdlog::info("\n \n \n");
         }
 
-        double getTotalRequests() {
+        double getTotalRequests() const override {
             return totalRequests;
         }
 
-        double elapsedTime() {
+        double elapsedTime() const override {
             return (end_time - start_time) - static_cast<double>(TIMEOUT_TIME);
         }
 
-        int nextProcess() {
+        int nextProcess() const override {
             return 0;
         }
 
-        void allgather(void *recvbuf, void *sendbuf, MPI_Datatype mpi_datatype) {
+        void allgather(void *recvbuf, void *sendbuf, MPI_Datatype mpi_datatype) override {
             MPI_Allgather(sendbuf, 1, mpi_datatype, recvbuf, 1, mpi_datatype, world_Comm);
             MPI_Barrier(world_Comm);
         }
 
-        void
-        gather(void *sendbuf, int sendcount, MPI_Datatype sendtype, void *recvbuf, int recvcount, MPI_Datatype recvtype,
-               int root) {
+        void gather(void *sendbuf, int sendcount, MPI_Datatype sendtype, void *recvbuf, int recvcount, MPI_Datatype recvtype,
+                    int root) override {
             MPI_Gather(sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, root, world_Comm);
         }
 
-        int getWorldSize() {
+        int getWorldSize() const override {
             return world_size;
         }
 
-        int tasksRecvd() {
+        int tasksRecvd() const override {
             return nTasksRecvd;
         }
 
-        int tasksSent() {
+        int tasksSent() const override {
             return nTasksSent;
         }
 
-        void barrier() {
+        void barrier() override {
             if (world_Comm != MPI_COMM_NULL)
                 MPI_Barrier(world_Comm);
         }
 
-        bool openSendingChannel() {
+        bool openSendingChannel() override {
             if (mtx.try_lock()) // acquires mutex
             {
                 if (!transmitting.load()) // check if transmission in progress
@@ -313,18 +177,20 @@ namespace gempba {
         }
 
         /* this should be invoked only if channel is open*/
-        void closeSendingChannel() {
+        void closeSendingChannel() override {
             mtx.unlock();
         }
 
-        void setRefValStrategyLookup(bool maximisation) {
+        void setRefValStrategyLookup(bool maximisation) override {
             this->maximisation = maximisation;
 
             if (!maximisation) // minimisation
                 refValueGlobal = INT_MAX;
         }
 
-        void runNode(auto &branchHandler, auto &&bufferDecoder, auto &&resultFetcher, auto &&serializer) {
+
+        void runNode(BranchHandler &branchHandler, std::function<std::shared_ptr<ResultHolderParent>(char *, int)> &bufferDecoder,
+                     std::function<std::pair<int, std::string>()> &resultFetcher) override {
             MPI_Barrier(world_Comm);
 
             while (true) {
@@ -366,7 +232,7 @@ namespace gempba {
                     spdlog::info("rank {}, pushing buffer to thread pool", world_rank, status.MPI_SOURCE);
 #endif
                     //  push to the thread pool *********************************************************************
-                    auto *holder = bufferDecoder(message, count); // holder might be useful for non-void functions
+                    std::shared_ptr<ResultHolderParent> holder = bufferDecoder(message, count); // holder might be useful for non-void functions
 #ifdef DEBUG_COMMENTS
                     spdlog::info("... DONE\n", world_rank, status.MPI_SOURCE);
 #endif
@@ -375,7 +241,6 @@ namespace gempba {
                     taskFunneling(branchHandler);
                     notifyAvailableState();
 
-                    delete holder;
                     delete[] message;
 
                     // TODO: refVal
@@ -391,7 +256,7 @@ namespace gempba {
 
         /* enqueue a message which will be sent to the center
          */
-        void push(std::string &&message) {
+        void push(std::string &&message) override {
             if (message.size() == 0) {
                 auto str = fmt::format("rank {}, attempted to send empty buffer \n", world_rank);
                 throw std::runtime_error(str);
@@ -413,59 +278,7 @@ namespace gempba {
 
     private:
         // when a node is working, it loops through here
-        void taskFunneling(auto &branchHandler) {
-            std::string *message = nullptr;
-            bool isPop = q.pop(message);
-
-            while (true) {
-                while (isPop) // as long as there is a message
-                {
-                    std::scoped_lock<std::mutex> lck(mtx);
-
-                    std::unique_ptr<std::string> ptr(message);
-                    nTasksSent++;
-
-                    sendTaskToCenter(*message);
-
-                    isPop = q.pop(message);
-
-                    if (!isPop)
-                        transmitting = false;
-                    else {
-                        throw std::runtime_error("Task found in queue, this should not happen in taskFunneling()\n");
-                    }
-                }
-                {
-                    /* this section protects MPI calls */
-                    std::scoped_lock<std::mutex> lck(mtx);
-                    probe_refValue();
-                    probe_centerRequest();
-
-                    updateRefValue(branchHandler);
-                }
-
-                isPop = q.pop(message);
-
-                if (!isPop && branchHandler.isDone()) {
-                    /* by the time this thread realises that the thread pool has no more tasks,
-                        another buffer might have been pushed, which should be verified in the next line*/
-                    isPop = q.pop(message);
-
-                    if (!isPop)
-                        break;
-                }
-            }
-#ifdef DEBUG_COMMENTS
-            spdlog::info("rank {} sent {} tasks\n", world_rank, nTasksSent);
-#endif
-
-            if (!q.empty())
-                throw std::runtime_error("leaving process with a pending message\n");
-            /* to reuse the task funneling, otherwise it will exit
-            right away the second time the process receives a task*/
-
-            // nice(0);
-        }
+        void taskFunneling(BranchHandler &branchHandler);
 
         // checks for a ref value update from center
         int probe_refValue() {
@@ -500,7 +313,7 @@ namespace gempba {
                 MPI_Recv(&buf, 1, MPI_CHAR, CENTER, CENTER_IS_FULL_TAG, centerFullness_Comm, &status);
                 isCenterFull = true;
 #if DEBUG_COMMENTS
-                cout << "Node " << rank_me() << " received full center" << endl;
+                std::cout << "Node " << rank_me() << " received full center" << std::endl;
 #endif
             }
 
@@ -511,7 +324,7 @@ namespace gempba {
                 MPI_Recv(&buf, 1, MPI_CHAR, CENTER, CENTER_IS_FREE_TAG, centerFullness_Comm, &status);
                 isCenterFull = false;
 #if DEBUG_COMMENTS
-                cout << "Node " << rank_me() << " received free center" << endl;
+                std::cout << "Node " << rank_me() << " received free center" << std::endl;
 #endif
             }
 
@@ -520,18 +333,7 @@ namespace gempba {
 
         // if ref value received, it attempts updating local value
         // if local value is better than the one in center, then local best value is sent to center
-        void updateRefValue(auto &branchHandler) {
-            int _refGlobal = refValueGlobal;          // constant within this scope
-            int _refLocal = branchHandler.refValue(); // constant within this scope
-
-            // static size_t C = 0;
-
-            if ((maximisation && _refGlobal > _refLocal) || (!maximisation && _refGlobal < _refLocal)) {
-                branchHandler.updateRefValue(_refGlobal);
-            } else if ((maximisation && _refLocal > _refGlobal) || (!maximisation && _refLocal < _refGlobal)) {
-                MPI_Ssend(&_refLocal, 1, MPI_INT, 0, REFVAL_UPDATE_TAG, world_Comm);
-            }
-        }
+        void updateRefValue(BranchHandler &branchHandler);
 
         bool isTerminated(int TAG) {
             if (TAG == TERMINATION_TAG) {
@@ -587,7 +389,7 @@ namespace gempba {
                 if (processState[rank] == STATE_AVAILABLE) {
                     //pair<char *, size_t> msg = center_queue.back();
                     //center_queue.pop_back();
-                    pair<char *, size_t> msg = center_queue.top();
+                    std::pair<char *, size_t> msg = center_queue.top();
                     center_queue.pop();
 
                     MPI_Send(msg.first, msg.second, MPI_CHAR, rank, TASK_FROM_CENTER_TAG, world_Comm);
@@ -633,8 +435,8 @@ namespace gempba {
         }
 
         /*	run the center node */
-        void runCenter(const char *SEED, const int SEED_SIZE) {
-            cout << "Starting centralized scheduler" << endl;
+        void runCenter(const char *SEED, const int SEED_SIZE) override {
+            std::cout << "Starting centralized scheduler" << std::endl;
             MPI_Barrier(world_Comm);
             start_time = MPI_Wtime();
 
@@ -749,25 +551,25 @@ namespace gempba {
                             static int success = 0;
                             success++;
                             spdlog::info("refValueGlobal updated to : {} by rank {}\n", refValueGlobal,
-                                       status.MPI_SOURCE);
+                                         status.MPI_SOURCE);
                         } else {
                             static int failures = 0;
                             failures++;
                             spdlog::info("FAILED updates : {}, refValueGlobal : {} by rank {}\n", failures,
-                                       refValueGlobal, status.MPI_SOURCE);
+                                         refValueGlobal, status.MPI_SOURCE);
                         }
                         ++totalRequests;
                     }
                         break;
                     case TASK_FOR_CENTER: {
 
-                        pair<char *, int> msg = make_pair(buffer_char, buffer_char_count);
+                        std::pair<char *, int> msg = std::make_pair(buffer_char, buffer_char_count);
                         //center_queue.push_back(msg);
                         center_queue.push(msg);
 
                         if (center_queue.size() > max_queue_size) {
                             if (center_queue.size() % 10000 == 0)
-                                cout << "CENTER queue size reached " << center_queue.size() << endl;
+                                std::cout << "CENTER queue size reached " << center_queue.size() << std::endl;
                             max_queue_size = center_queue.size();
                         }
 
@@ -793,9 +595,9 @@ namespace gempba {
                 handleFullMessaging();
             }
 
-            cout << "CENTER HAS TERMINATED" << endl;
-            cout << "Max queue size = " << max_queue_size << ",   Peak memory (MB) = " << getPeakRSS() / (1024 * 1024)
-                 << endl;
+            std::cout << "CENTER HAS TERMINATED" << std::endl;
+            std::cout << "Max queue size = " << max_queue_size << ",   Peak memory (MB) = " << getPeakRSS() / (1024 * 1024)
+                      << std::endl;
 
             /*
             after breaking the previous loop, all jobs are finished and the only remaining step
@@ -1000,12 +802,8 @@ namespace gempba {
         double end_time = 0;
 
         /* singleton*/
-        MPI_Scheduler() {
+        MPI_SchedulerCentralized() {
             init(NULL, NULL);
-        }
-
-        ~MPI_Scheduler() {
-            finalize();
         }
 
         void init(int *argc, char *argv[]) {

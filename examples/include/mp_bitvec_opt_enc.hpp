@@ -1,4 +1,5 @@
-#ifdef BITVECTOR_VC
+#ifndef MP_BITVECT_OPT_ENC_CENTRAL_HPP
+#define MP_BITVECT_OPT_ENC_CENTRAL_HPP
 
 
 #include "VertexCover.hpp"
@@ -7,37 +8,29 @@
 #include <random>
 #include <spdlog/spdlog.h>
 
-#include <chrono>
-#include <map>
 #include <boost/dynamic_bitset.hpp>
 #include <boost/container/set.hpp>
 #include <boost/unordered_set.hpp>
-#include <boost/unordered_map.hpp>
-#include <boost/container/flat_map.hpp>
-
-#include <memory_resource>
 
 using namespace boost;
 
-
 #define gbitset dynamic_bitset<>
-#define gbits boost::container::flat_map<int, gbitset>
 
-
-struct BitGraph {
-    vector<int> in;
-    gbits *graphbits_ptr = nullptr;
-    gbits graphbits;
-};
-
-
-
-//SERIALIZE A DYNAMIC_BITSET
 namespace boost {
     namespace serialization {
 
         template<typename Ar, typename Block, typename Alloc>
-        void save(Ar &ar, dynamic_bitset<Block, Alloc> const &bs, unsigned) {
+        void save(Ar &ar, dynamic_bitset <Block, Alloc> const &bs, unsigned) {
+
+
+
+            /*dynamic_bitset<Block, Alloc> dummy(bs);
+            dummy.resize( bs.size() * 100 );
+
+            size_t num_bits = dummy.size();
+                std::vector<Block> blocks(dummy.num_blocks());
+                to_block_range(dummy, blocks.begin());
+                ar &num_bits &blocks;*/
 
             size_t num_bits = bs.size();
             std::vector<Block> blocks(bs.num_blocks());
@@ -46,7 +39,7 @@ namespace boost {
         }
 
         template<typename Ar, typename Block, typename Alloc>
-        void load(Ar &ar, dynamic_bitset<Block, Alloc> &bs, unsigned) {
+        void load(Ar &ar, dynamic_bitset <Block, Alloc> &bs, unsigned) {
             size_t num_bits;
             std::vector<Block> blocks;
             ar & num_bits & blocks;
@@ -59,138 +52,8 @@ namespace boost {
         }
 
         template<typename Ar, typename Block, typename Alloc>
-        void serialize(Ar &ar, dynamic_bitset<Block, Alloc> &bs, unsigned version) {
+        void serialize(Ar &ar, dynamic_bitset <Block, Alloc> &bs, unsigned version) {
             split_free(ar, bs, version);
-        }
-
-    }
-}
-
-
-
-
-
-
-
-
-
-//SERIALIZE A GRAPHBITS OBJECT
-namespace boost {
-    namespace serialization {
-
-        template<typename Ar>
-        void save(Ar &ar, gbits const &graphbits, unsigned) {
-
-
-            if (true) {
-                ar << graphbits.size();
-                for (const auto &keyvaluepair: graphbits) {
-                    ar << keyvaluepair.first;
-                    ar << keyvaluepair.second;
-                }
-                return;
-            }
-
-            //encoding format of each vertex is [vertex no] [nb neighbors] [list of nb neighbors ints]
-
-            int32_t nbbits_per_bitset = 0;
-            vector<int32_t> encoding;
-            encoding.reserve(graphbits.size() * graphbits.size() /
-                             10);    //heuristic way of reserving edges, because I don't want to count them
-
-
-            for (const auto &keyvaluepair: graphbits) {
-                encoding.push_back((int32_t) keyvaluepair.first);
-
-                const gbitset &nbrs = keyvaluepair.second;
-                nbbits_per_bitset = (int32_t) nbrs.size();
-
-                encoding.push_back(nbrs.count());
-                int poscount = encoding.size() - 1;
-
-                int nbfwd = 0;
-                for (int j = nbrs.find_first(); j != gbitset::npos; j = nbrs.find_next(j))
-                    //for (int j = nbrs.find_next(keyvaluepair.first); j != gbitset::npos; j = nbrs.find_next(j))
-                {
-                    if (graphbits.find(j) != graphbits.end()) {
-                        encoding.push_back((int32_t) j);
-                        ++nbfwd;
-                    }
-                }
-                encoding[poscount] = nbfwd;
-
-
-            }
-            size_t num_entries = encoding.size();
-
-
-            ar << num_entries << nbbits_per_bitset;
-
-            ar << boost::serialization::make_array(encoding.data(), encoding.size());
-        }
-
-        template<typename Ar>
-        void load(Ar &ar, gbits &graphbits, unsigned) {
-
-            if (true) {
-                size_t num_entries;
-                ar >> num_entries;
-
-
-                for (int i = 0; i < num_entries; ++i) {
-                    int v;
-                    gbitset bits;
-                    ar >> v;
-                    ar >> bits;
-                    graphbits[v] = bits;
-                }
-                return;
-            }
-
-            size_t num_entries;
-            int32_t nbbits_per_bitset;
-            ar >> num_entries;
-
-            ar >> nbbits_per_bitset;
-
-            std::vector<int32_t> encoding(num_entries);
-            ar >> boost::serialization::make_array(encoding.data(), encoding.size());
-
-            //map<int, vector<int>> future_edges;
-
-            size_t cpt = 0;
-            while (cpt < encoding.size()) {
-                int32_t v = encoding[cpt];
-                ++cpt;
-                int32_t nbnbrs = encoding[cpt];
-                ++cpt;
-
-                gbitset vvec(nbbits_per_bitset);
-
-                for (size_t i = 0; i < nbnbrs; ++i) {
-                    int32_t w = encoding[cpt];
-                    vvec[w] = true;
-
-                    //future_edges[w].push_back(v);
-                    ++cpt;
-                }
-
-                /*if (future_edges.find(v) != future_edges.end())
-                {
-                    for (auto z : future_edges[v])
-                    {
-                        vvec[z] = true;
-                    }
-                }*/
-
-                graphbits[(int) v] = vvec;
-            }
-
-        }
-
-        template<typename Ar>
-        void serialize(Ar &ar, gbits &graphbits, unsigned version) {
-            split_free(ar, graphbits, version);
         }
 
     }
@@ -235,12 +98,12 @@ auto deserializer = [](std::stringstream &ss, auto &...args) {
     //archive(args...);
 };
 
-class VC_void_MPI_bitvec_enc : public VertexCover {
+class VC_void_MPI_bitvec : public VertexCover {
     //using HolderType = gempba::ResultHolder<void, int, gbitset, int, std::vector<int>>;
-    using HolderType = gempba::ResultHolder<void, int, gbits, int>;
+    using HolderType = gempba::ResultHolder<void, int, gbitset, int>;
 
 private:
-    std::function<void(int, int, gbits &, int, void *)> _f;
+    std::function<void(int, int, gbitset &, int, void *)> _f;
     //std::function<void(int, int, gbitset &, int, std::vector<int>, void *)> _f;
 
 public:
@@ -249,21 +112,18 @@ public:
     long deglb_skips;
     long seen_skips;
 
-    long timecopying;
-
-    gbits init_graphbits;
-    size_t passes;
+    unordered_map<int, gbitset > graphbits;
+    std::atomic<size_t> passes;
     std::mutex mtx;
 
-    VC_void_MPI_bitvec_enc() {
-
-        this->_f = std::bind(&VC_void_MPI_bitvec_enc::mvcbitset, this, _1, _2, _3, _4, _5);
+    VC_void_MPI_bitvec() {
+        //this->_f = std::bind(&VC_void_MPI_bitvec::mvcbitset, this, _1, _2, _3, _4, _5, _6);
+        this->_f = std::bind(&VC_void_MPI_bitvec::mvcbitset, this, _1, _2, _3, _4, _5);
     }
 
-    ~VC_void_MPI_bitvec_enc() {}
+    ~VC_void_MPI_bitvec() {}
 
     void setGraph(Graph &graph) {
-        timecopying = 0;
         is_skips = 0;
         deglb_skips = 0;
         seen_skips = 0;
@@ -286,7 +146,7 @@ public:
         //for some reason, I decided to sort the vertices by degree.  I don't think it is useful.
         std::sort(deg_v.begin(), deg_v.end());
         map<int, int> remap;
-        for (int i = 0; i < deg_v.size(); i++) {
+        for (int i = 0; i < static_cast<int>(deg_v.size()); i++) {
             remap[deg_v[i].second] = deg_v.size() - 1 - i;
         }
         map<int, set<int>> adj2;
@@ -307,29 +167,20 @@ public:
             for (int i: it->second) {
                 vnbrs[i] = true;
             }
-            init_graphbits[v] = vnbrs;
+            graphbits[v] = vnbrs;
         }
 
         //check for evil degree 0 vertices
         for (int i = 0; i < gsize; ++i) {
-            if (init_graphbits.find(i) == init_graphbits.end()) {
-                init_graphbits[i] = gbitset(gsize);
+            if (!graphbits.contains(i)) {
+                graphbits[i] = gbitset(gsize);
             }
         }
     }
 
 
     //void mvcbitset(int id, int depth, gbitset &bits_in_graph, int solsize, std::vector<int> dummy, void *parent)
-    void mvcbitset(int id, int depth, gbits &graphbits, int solsize, void *parent = nullptr) {
-
-        gbitset bits_in_graph(init_graphbits.size());
-
-        for (const auto &kv_pair: graphbits) {
-            bits_in_graph[kv_pair.first] = true;
-        }
-
-
-
+    void mvcbitset(int id, int depth, gbitset &bits_in_graph, int solsize, void *parent = nullptr) {
 
         //{                                                   // 1 MB, emulates heavy messaging
         //    std::random_device rd;                          // Will be used to obtain a seed for the random number engine
@@ -357,12 +208,11 @@ public:
 
             auto str = fmt::format(
                     "WR= {} ID= {} passes={} gsize={} refvalue={} solsize={} isskips={} deglbskips={} {}",
-                    branchHandler.rank_me(), id, passes, bits_in_graph.count(),
+                    branchHandler.rank_me(), id, passes.load(), bits_in_graph.count(),
                     branchHandler.refValue(), cursol_size, is_skips, deglb_skips,
                     std::ctime(&time));
 
             cout << str;
-
 
             //<<" seen_skips="<<seen_skips<<" seen.size="<<seen[id].size()<<endl;
             //cout<<"ID="<<id<<" CSOL="<<cursol_size<<" REFVAL="<<branchHandler.getRefValue()<<endl;
@@ -370,7 +220,8 @@ public:
         }
 
         //cout<<"depth="<<depth<<" ref="<<branchHandler.getRefValue()<<"cursolsize="<<cursol_size<<" cnt="<<bits_in_graph.count()<<" sol="<<cur_sol<<endl;
-        if (graphbits.size() <= 1) {
+        if (bits_in_graph.count() <= 1) {
+
             terminate_condition_bits(cursol_size, id, depth);
             //terminate_condition_bits(cursol_size, id, depth, dummy);
             return;
@@ -380,6 +231,20 @@ public:
             return;
         }
 
+        /*if (bits_in_graph.count() <= 90 && bits_in_graph.count() >= 120 )
+		{
+			pair<gbitset, int> instance_key = make_pair(bits_in_graph, cursol_size);
+			if (seen[id].find(instance_key) != seen[id].end())
+			{
+				seen_skips++;
+				return;
+			}
+
+			if (seen[id].size() <= 4000000)
+			{
+				seen[id].insert(instance_key);
+			}
+		}*/
 
         //max degree dude
         int maxdeg = 0;
@@ -389,27 +254,19 @@ public:
 
         bool someRuleApplies = true;
 
-        std::list<int> to_erase;
-
         while (someRuleApplies) {
             nbEdgesDoubleCounted = 0;
             maxdeg = -1;
             maxdeg_v = 0;
             someRuleApplies = false;
 
-            for (const auto &kv_pair: graphbits) {
-                int i = kv_pair.first;
+            for (size_t i = bits_in_graph.find_first(); i != gbitset::npos; i = bits_in_graph.find_next(i)) {
 
-                if (!bits_in_graph[i]) {
-                    continue;
-                }
-
-                gbitset nbrs = (kv_pair.second & bits_in_graph);
+                gbitset nbrs = (graphbits[i] & bits_in_graph);
 
                 int cnt = nbrs.count();
                 if (cnt == 0) {
                     bits_in_graph[i] = false;
-                    to_erase.push_back(i);
                 } else if (cnt == 1) {
                     int the_nbr = nbrs.find_first();
                     //cur_sol[the_nbr] = true;
@@ -417,8 +274,6 @@ public:
                     bits_in_graph[i] = false;
                     bits_in_graph[the_nbr] = false;
                     someRuleApplies = true;
-                    to_erase.push_back(i);
-                    to_erase.push_back(the_nbr);
                 } else if (cnt > maxdeg) {
                     maxdeg = cnt;
                     maxdeg_v = i;
@@ -435,28 +290,39 @@ public:
                             bits_in_graph[n2] = false;
                             cursol_size += 2;
                             someRuleApplies = true;
-
-                            to_erase.push_back(i);
-                            to_erase.push_back(n1);
-                            to_erase.push_back(n2);
                         }
                     }
+                    /*
+					{
+						for (int j = nbrs.find_first(); j != gbitset::npos; j = nbrs.find_next(j))
+						{
+							gbitset nbrs_of_j = (graphbits[j] & bits_in_graph);
+							nbrs_of_j.set(i, false);
+							nbrs_of_j.set(j, true);
+							if ((nbrs_of_j & nbrs) == nbrs)
+							{
+								//cout<<"we have twins at (i, j)="<<i<<","<<j<<endl<<
+								//	nbrs<<endl<<(graphbits[j] & bits_in_graph)<<endl<<(nbrs_of_j & nbrs)<<endl;
+								cur_sol[j] = true;
+								cursol_size++;
+								//bits_in_graph[i] = false;
+								bits_in_graph[j] = false;
+								someRuleApplies = true;
+								break;
+							}
 
+						}
+					}*/
                 }
                 nbEdgesDoubleCounted += cnt;
             }
         }
 
-        for (int er: to_erase) {
-            if (er == maxdeg_v) {
-                cout << "MAXDEG_ERASED!" << endl;
-            }
-            graphbits.erase(er);
-        }
-
         int nbVertices = bits_in_graph.count();
         if (nbVertices <= 1) {
+            //cout<<"terminating 2"<<endl;
             terminate_condition_bits(cursol_size, id, depth);
+            //terminate_condition_bits(cursol_size, id, depth, dummy);
 
             return;
         }
@@ -472,6 +338,7 @@ public:
 
         int degLB = 0; //getDegLB(bits_in_graph, nbEdgesDoubleCounted/2);
         degLB = (nbEdgesDoubleCounted / 2) / maxdeg;
+        //cout<<"deglb="<<degLB<<" n="<<bits_in_graph.count()<<" refval="<<branchHandler.getRefValue()<<endl;
         if (degLB + cursol_size >= branchHandler.refValue()) {
             deglb_skips++;
             return;
@@ -493,22 +360,20 @@ public:
 
         hol_l.bind_branch_checkIn([&] {
             int bestVal = branchHandler.refValue();
+            gbitset ingraph1 = bits_in_graph;
 
-            //auto t1 = std::chrono::high_resolution_clock::now();
-            gbits graphbits_maxdegremoved = graphbits;
-            //auto t2 = std::chrono::high_resolution_clock::now();
-            //timecopying += duration_cast<std::chrono::milliseconds>(t2 - t1).count();
-            //for (const auto &kv : graphbits)
-            {
-                //	graphbits_maxdegremoved[kv.first] = kv.second;  //copies everything
+            if (!ingraph1[maxdeg_v]) {
+                cout << "ERROR : maxdeg_v already gone" << endl;
             }
-            graphbits_maxdegremoved.erase(
-                    maxdeg_v);    //note: others think they have v as neighbor, but bits_in_graph solve this
-
+            ingraph1.set(maxdeg_v, false);
+            //gbitset sol1 = cur_sol;
+            //sol1.set(maxdeg_v, true);
             int solsize1 = cursol_size + 1;
 
             if (solsize1 < bestVal) {
-                hol_l.holdArgs(newDepth, graphbits_maxdegremoved, solsize1);
+                //auto cpy = dummy;
+                //hol_l.holdArgs(newDepth, ingraph1, solsize1, cpy);
+                hol_l.holdArgs(newDepth, ingraph1, solsize1);
                 return true;
             } else
                 return false;
@@ -517,31 +382,17 @@ public:
         hol_r.bind_branch_checkIn([&] {
             int bestVal = branchHandler.refValue();
             //right branch = take out v nbrs
+            gbitset ingraph2 = bits_in_graph;
 
-
-
-            //auto t1 = std::chrono::high_resolution_clock::now();
-            gbits graphbits_nbrsremoved = graphbits; //copies everything
-            //auto t2 = std::chrono::high_resolution_clock::now();
-            //timecopying += duration_cast<std::chrono::milliseconds>(t2 - t1).count();
-            //for (const auto &kv : graphbits)
-            {
-                //	graphbits_nbrsremoved[kv.first] = kv.second;  //copies everything
-            }
-
-
-            gbitset nbrs = graphbits[maxdeg_v] & bits_in_graph;
-
-            for (int j = nbrs.find_first(); j != gbitset::npos; j = nbrs.find_next(j)) {
-                graphbits_nbrsremoved.erase(
-                        j);    //note: this works because we are iterating on graphbits, not graphbits_nbrsremoved
-            }
-
-
+            ingraph2 = bits_in_graph & (~graphbits[maxdeg_v]);
+            gbitset nbrs = (graphbits[maxdeg_v] & bits_in_graph);
+            //gbitset sol2 = cur_sol | nbrs;	//add all nbrs to solution
             int solsize2 = cursol_size + nbrs.count();
 
             if (solsize2 < bestVal) {
-                hol_r.holdArgs(newDepth, graphbits_nbrsremoved, solsize2);
+                hol_r.holdArgs(newDepth, ingraph2, solsize2);
+                //auto cpy = dummy;
+                //hol_r.holdArgs(newDepth, ingraph2, solsize2, cpy);
                 return true;
             } else
                 return false;
@@ -549,8 +400,8 @@ public:
 
         if (hol_l.evaluate_branch_checkIn()) {
             //if (nbVertices < 50)
-            //    branchHandler.try_push_MT<void>(_f, id, hol_l);
-            //else
+            //    branchHandler.forward<void>(_f, id, hol_l);
+            // else
             {
 
                 branchHandler.try_push_MP<void>(_f, id, hol_l, serializer);
@@ -588,7 +439,7 @@ private:
             std::time_t time = std::chrono::system_clock::to_time_t(clock); //it includes a "\n"
 
             spdlog::info("rank {}, MVC solution so far: {} @ depth : {}, {}", branchHandler.rank_me(), solsize, depth,
-                       std::ctime(&time));
+                         std::ctime(&time));
             //spdlog::info("dummy[0,...,3] = [{}, {}, {}, {}]\n", dummy[0], dummy[1], dummy[2], dummy[3]);
         }
 
@@ -596,4 +447,4 @@ private:
     }
 };
 
-#endif
+#endif // MP_BITVECT_OPT_ENC_CENTRAL_HPP

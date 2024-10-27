@@ -9,6 +9,7 @@
 #include "utils/utils.hpp"
 #include "utils/gempba_utils.hpp"
 #include "MPI_Modules/MPI_Scheduler.hpp"
+#include "Resultholder/ResultHolderParent.hpp"
 
 
 #ifdef MULTIPROCESSING_ENABLED
@@ -50,7 +51,7 @@ namespace gempba {
     template<typename Ret, typename... Args>
     class ResultHolder;
 
-    class MPI_Scheduler;
+    class Scheduler0;
 
     class BranchHandler {
 
@@ -58,7 +59,7 @@ namespace gempba {
         friend
         class ResultHolder;
 
-        friend class MPI_Scheduler;
+//        friend class MPI_Scheduler;
 
     private:
         const std::pair<int, std::string> EMPTY_RESULT = std::make_pair(0, static_cast<std::string>("Empty buffer, no result"));
@@ -469,7 +470,7 @@ namespace gempba {
 
 #ifdef MULTIPROCESSING_ENABLED
     private:
-        gempba::MPI_Scheduler *mpiScheduler = nullptr;
+        gempba::Scheduler0 *mpiScheduler = nullptr;
         std::mutex mtx_MPI;             // mutex to ensure MPI_THREAD_SERIALIZED
         int world_rank = -1;            // get the rank of the process
         int world_size = -1;            // get the number of processes/nodes
@@ -546,7 +547,7 @@ namespace gempba {
         }
 
         // if multiprocessing, BranchHandler should have access to the mpi scheduler
-        void passMPIScheduler(MPI_Scheduler *mpiScheduler) {
+        void passMPIScheduler(Scheduler0 *mpiScheduler) {
             this->mpiScheduler = mpiScheduler;
             this->world_rank = this->mpiScheduler->rank_me();
         }
@@ -666,9 +667,10 @@ namespace gempba {
             Lambda object will push to the thread pool, and it will return a pointer to the holder
             */
         template<typename Ret, typename... Args>
-        [[nodiscard]] auto constructBufferDecoder(auto &&callable, auto &&deserializer) {
+        [[nodiscard]] std::function<std::shared_ptr<ResultHolderParent>(char *, int)> &&constructBufferDecoder(auto &callable, auto &deserializer) {
             using HolderType = gempba::ResultHolder<Ret, Args...>;
-            return [this, callable, deserializer](const char *buffer, const int count) {
+            std::function<std::shared_ptr<ResultHolderParent>(char *, int)> decoder = [this, &callable, &deserializer](
+                    const char *buffer, const int count) {
                 auto *holder = new HolderType(dlb, -1);
 
                 std::stringstream ss;
@@ -679,8 +681,10 @@ namespace gempba {
 
                 force_push<Ret>(callable, -1, *holder);
 
-                return holder;
+                return std::shared_ptr<ResultHolderParent>(holder);
             };
+
+            return std::move(decoder);
         }
 
 

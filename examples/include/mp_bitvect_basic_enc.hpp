@@ -1,4 +1,6 @@
-#ifdef BITVECTOR_VC
+#ifndef MP_BITVECT_BASIC_ENC_CENTRAL_HPP
+#define MP_BITVECT_BASIC_ENC_CENTRAL_HPP
+
 
 #include "VertexCover.hpp"
 #include <atomic>
@@ -6,19 +8,35 @@
 #include <random>
 #include <spdlog/spdlog.h>
 
+#include <map>
 #include <boost/dynamic_bitset.hpp>
 #include <boost/container/set.hpp>
 #include <boost/unordered_set.hpp>
+#include <boost/unordered_map.hpp>
+#include <boost/container/flat_map.hpp>
+
+#include <memory_resource>
 
 using namespace boost;
 
+
 #define gbitset dynamic_bitset<>
+#define gbits boost::container::flat_map<int, gbitset>
+
+
+gbits global_graphbits;
+
+
+class BitGraph {
+public:
+    gbitset bits_in_graph;
+};
 
 namespace boost {
     namespace serialization {
 
         template<typename Ar, typename Block, typename Alloc>
-        void save(Ar &ar, dynamic_bitset <Block, Alloc> const &bs, unsigned) {
+        void save(Ar &ar, dynamic_bitset<Block, Alloc> const &bs, unsigned) {
 
 
 
@@ -37,7 +55,7 @@ namespace boost {
         }
 
         template<typename Ar, typename Block, typename Alloc>
-        void load(Ar &ar, dynamic_bitset <Block, Alloc> &bs, unsigned) {
+        void load(Ar &ar, dynamic_bitset<Block, Alloc> &bs, unsigned) {
             size_t num_bits;
             std::vector<Block> blocks;
             ar & num_bits & blocks;
@@ -50,12 +68,48 @@ namespace boost {
         }
 
         template<typename Ar, typename Block, typename Alloc>
-        void serialize(Ar &ar, dynamic_bitset <Block, Alloc> &bs, unsigned version) {
+        void serialize(Ar &ar, dynamic_bitset<Block, Alloc> &bs, unsigned version) {
             split_free(ar, bs, version);
         }
 
     }
 }
+
+
+namespace boost {
+    namespace serialization {
+
+        template<typename Ar>
+        void save(Ar &ar, BitGraph const &bg, unsigned) {
+            ar << bg.bits_in_graph;
+
+            for (int i = bg.bits_in_graph.find_first(); i != gbitset::npos; i = bg.bits_in_graph.find_next(i)) {
+                ar << (int32_t) i;
+                ar << global_graphbits[i];
+            }
+
+        }
+
+        template<typename Ar>
+        void load(Ar &ar, BitGraph &bg, unsigned) {
+            ar >> bg.bits_in_graph;
+
+            for (int c = 0; c < bg.bits_in_graph.count(); ++c) {
+                int32_t v;
+                ar >> v;
+                gbitset bits;
+                ar >> bits;
+            }
+        }
+
+        template<typename Ar>
+        void serialize(Ar &ar, BitGraph &bg, unsigned version) {
+            split_free(ar, bg, version);
+        }
+
+    }
+}
+
 
 void helper_ser(auto &archive, auto &first) {
     archive << first;
@@ -96,12 +150,12 @@ auto deserializer = [](std::stringstream &ss, auto &...args) {
     //archive(args...);
 };
 
-class VC_void_MPI_bitvec : public VertexCover {
+class VC_void_MPI_bitvec_enc2 : public VertexCover {
     //using HolderType = gempba::ResultHolder<void, int, gbitset, int, std::vector<int>>;
-    using HolderType = gempba::ResultHolder<void, int, gbitset, int>;
+    using HolderType = gempba::ResultHolder<void, int, BitGraph, int>;
 
 private:
-    std::function<void(int, int, gbitset &, int, void *)> _f;
+    std::function<void(int, int, BitGraph &, int, void *)> _f;
     //std::function<void(int, int, gbitset &, int, std::vector<int>, void *)> _f;
 
 public:
@@ -110,16 +164,16 @@ public:
     long deglb_skips;
     long seen_skips;
 
-    unordered_map<int, gbitset > graphbits;
+    gbits graphbits;
     std::atomic<size_t> passes;
     std::mutex mtx;
 
-    VC_void_MPI_bitvec() {
+    VC_void_MPI_bitvec_enc2() {
         //this->_f = std::bind(&VC_void_MPI_bitvec::mvcbitset, this, _1, _2, _3, _4, _5, _6);
-        this->_f = std::bind(&VC_void_MPI_bitvec::mvcbitset, this, _1, _2, _3, _4, _5);
+        this->_f = std::bind(&VC_void_MPI_bitvec_enc2::mvcbitset, this, _1, _2, _3, _4, _5);
     }
 
-    ~VC_void_MPI_bitvec() {}
+    ~VC_void_MPI_bitvec_enc2() {}
 
     void setGraph(Graph &graph) {
         is_skips = 0;
@@ -144,7 +198,7 @@ public:
         //for some reason, I decided to sort the vertices by degree.  I don't think it is useful.
         std::sort(deg_v.begin(), deg_v.end());
         map<int, int> remap;
-        for (int i = 0; i < static_cast<int>(deg_v.size()); i++) {
+        for (int i = 0; i < deg_v.size(); i++) {
             remap[deg_v[i].second] = deg_v.size() - 1 - i;
         }
         map<int, set<int>> adj2;
@@ -174,12 +228,15 @@ public:
                 graphbits[i] = gbitset(gsize);
             }
         }
+
+        global_graphbits = graphbits;
     }
 
 
     //void mvcbitset(int id, int depth, gbitset &bits_in_graph, int solsize, std::vector<int> dummy, void *parent)
-    void mvcbitset(int id, int depth, gbitset &bits_in_graph, int solsize, void *parent = nullptr) {
+    void mvcbitset(int id, int depth, BitGraph &bg, int solsize, void *parent = nullptr) {
 
+        gbitset &bits_in_graph = bg.bits_in_graph;
         //{                                                   // 1 MB, emulates heavy messaging
         //    std::random_device rd;                          // Will be used to obtain a seed for the random number engine
         //    std::mt19937 gen(rd());                         // Standard mersenne_twister_engine seeded with rd()
@@ -206,7 +263,7 @@ public:
 
             auto str = fmt::format(
                     "WR= {} ID= {} passes={} gsize={} refvalue={} solsize={} isskips={} deglbskips={} {}",
-                    branchHandler.rank_me(), id, passes.load(), bits_in_graph.count(),
+                    branchHandler.rank_me(), id, passes, bits_in_graph.count(),
                     branchHandler.refValue(), cursol_size, is_skips, deglb_skips,
                     std::ctime(&time));
 
@@ -237,7 +294,7 @@ public:
 				seen_skips++;
 				return;
 			}
-			
+
 			if (seen[id].size() <= 4000000)
 			{
 				seen[id].insert(instance_key);
@@ -258,7 +315,7 @@ public:
             maxdeg_v = 0;
             someRuleApplies = false;
 
-            for (size_t i = bits_in_graph.find_first(); i != gbitset::npos; i = bits_in_graph.find_next(i)) {
+            for (int i = bits_in_graph.find_first(); i != gbitset::npos; i = bits_in_graph.find_next(i)) {
 
                 gbitset nbrs = (graphbits[i] & bits_in_graph);
 
@@ -308,7 +365,7 @@ public:
 								someRuleApplies = true;
 								break;
 							}
-							
+
 						}
 					}*/
                 }
@@ -350,7 +407,6 @@ public:
 
         hol_l.setDepth(depth);
         hol_r.setDepth(depth);
-
         if (branchHandler.getLoadBalancingStrategy() == gempba::QUASI_HORIZONTAL) {
             dummyParent = new HolderType(dlb, id);
             dlb.linkVirtualRoot(id, dummyParent, hol_l, hol_r);
@@ -371,7 +427,9 @@ public:
             if (solsize1 < bestVal) {
                 //auto cpy = dummy;
                 //hol_l.holdArgs(newDepth, ingraph1, solsize1, cpy);
-                hol_l.holdArgs(newDepth, ingraph1, solsize1);
+                BitGraph bg;
+                bg.bits_in_graph = ingraph1;
+                hol_l.holdArgs(newDepth, bg, solsize1);
                 return true;
             } else
                 return false;
@@ -388,7 +446,9 @@ public:
             int solsize2 = cursol_size + nbrs.count();
 
             if (solsize2 < bestVal) {
-                hol_r.holdArgs(newDepth, ingraph2, solsize2);
+                BitGraph bg;
+                bg.bits_in_graph = ingraph2;
+                hol_r.holdArgs(newDepth, bg, solsize2);
                 //auto cpy = dummy;
                 //hol_r.holdArgs(newDepth, ingraph2, solsize2, cpy);
                 return true;
@@ -437,7 +497,7 @@ private:
             std::time_t time = std::chrono::system_clock::to_time_t(clock); //it includes a "\n"
 
             spdlog::info("rank {}, MVC solution so far: {} @ depth : {}, {}", branchHandler.rank_me(), solsize, depth,
-                       std::ctime(&time));
+                         std::ctime(&time));
             //spdlog::info("dummy[0,...,3] = [{}, {}, {}, {}]\n", dummy[0], dummy[1], dummy[2], dummy[3]);
         }
 
@@ -445,4 +505,5 @@ private:
     }
 };
 
-#endif
+
+#endif // MP_BITVECT_BASIC_ENC_CENTRAL_HPP

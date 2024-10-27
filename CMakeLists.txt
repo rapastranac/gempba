@@ -49,7 +49,7 @@ add_compile_options(
 add_definitions(-DMULTIPROCESSING_ENABLED)
 add_definitions(-DMPI_ENABLED)
 add_definitions(-DDEBUG_COMMENTS)
-add_definitions(-DVC_VOID)
+#add_definitions(-DVC_VOID)
 #add_definitions(-DVC_VOID_MPI)
 #add_definitions(-DBITVECTOR_VC)
 #add_definitions(-DBITVECTOR_VC_THREAD)
@@ -66,22 +66,52 @@ file(GLOB_RECURSE Sources "src/*.cpp" "GemPBA/*.cpp")
 #sets the executable in main folder
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
-add_executable(a.out ${Sources})
+#add_executable(a.out ${Sources})
+#
+#target_link_libraries(a.out PRIVATE
+#        Threads::Threads
+#        MPI::MPI_CXX
+#        Boost::system
+#        Boost::serialization
+#        Boost::fiber
+#        OpenMP::OpenMP_CXX
+#        GTest::GTest
+#        GTest::gmock_main
+#        GTest::Main
+#        spdlog::spdlog
+#)
+#
+## If MPI compile flags exist, apply them
+#if (MPI_COMPILE_FLAGS)
+#    set_target_properties(a.out PROPERTIES COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
+#endif ()
 
-target_link_libraries(a.out PRIVATE
-        Threads::Threads
-        MPI::MPI_CXX
-        Boost::system
-        Boost::serialization
-        Boost::fiber
-        OpenMP::OpenMP_CXX
-        GTest::GTest
-        GTest::gmock_main
-        GTest::Main
-        spdlog::spdlog
-)
+# Add the main library or executable
+add_library(gempba ${Sources})
 
-# If MPI compile flags exist, apply them
-if (MPI_COMPILE_FLAGS)
-    set_target_properties(a.out PROPERTIES COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
-endif ()
+# Add each example scenario
+file(GLOB EXAMPLES "examples/*.cpp")
+
+foreach(EXAMPLE ${EXAMPLES})
+    get_filename_component(EXAMPLE_NAME ${EXAMPLE} NAME_WE) # Get the name without extension
+    add_executable(${EXAMPLE_NAME} ${EXAMPLE})
+
+    target_link_libraries(${EXAMPLE_NAME} PRIVATE
+            gempba
+            Threads::Threads
+            MPI::MPI_CXX
+            Boost::system
+            Boost::serialization
+            Boost::fiber
+            OpenMP::OpenMP_CXX
+            GTest::GTest
+            GTest::gmock_main
+            GTest::Main
+            spdlog::spdlog
+    )
+
+    # If MPI compile flags exist, apply them
+    if (MPI_COMPILE_FLAGS)
+        set_target_properties(${EXAMPLE_NAME} PROPERTIES COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
+    endif ()
+endforeach()

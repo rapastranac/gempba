@@ -1,9 +1,5 @@
-#ifdef BITVECTOR_VC_THREAD
-
-#include "../include/main.h"
-#include "../include/Graph.hpp"
-
-#include "../include/VC_void_bitvec.hpp"
+#include "include/main.hpp"
+#include "include/mt_bitvect_opt_enc.hpp"
 
 #include <Resultholder/ResultHolder.hpp>
 #include <BranchHandler/BranchHandler.hpp>
@@ -16,8 +12,7 @@
 
 #include <unistd.h>
 
-int main_void_bitvec(int numThreads, int prob, std::string& filename)
-{
+int run(int numThreads, int prob, std::string &filename) {
     using HolderType = gempba::ResultHolder<void, int, gbitset, int>;
 
     auto &branchHandler = gempba::BranchHandler::getInstance(); // parallel library
@@ -26,8 +21,8 @@ int main_void_bitvec(int numThreads, int prob, std::string& filename)
     cout << "NUMTHREADS= " << numThreads << endl;
 
     VC_void_bitvec cover;
-    auto function = std::bind(&VC_void_bitvec ::mvcbitset, &cover, _1, _2, _3, _4, _5); // target algorithm [all arguments]
-                                                                                        // initialize MPI and member variable linkin
+    auto function = std::bind(&VC_void_bitvec::mvcbitset, &cover, _1, _2, _3, _4, _5); // target algorithm [all arguments]
+    // initialize MPI and member variable linkin
     Graph graph;
     graph.readEdges(filename);
 
@@ -41,7 +36,7 @@ int main_void_bitvec(int numThreads, int prob, std::string& filename)
     gbitset allones = ~allzeros;
 
     branchHandler.setRefValue(gsize);
-    branchHandler.setRefValStrategyLookup("minimise");
+    branchHandler.setLookupStrategy(gempba::MINIMISE);
 
     int zero = 0;
     int solsize = graph.size();
@@ -79,4 +74,17 @@ int main_void_bitvec(int numThreads, int prob, std::string& filename)
     return 0;
 }
 
-#endif
+
+int main(int argc, char *argv[]) {
+    Params params = parse(argc, argv);
+
+    int job_id = params.job_id;
+    int nodes = params.nodes;
+    int ntasks_per_node = params.ntasks_per_node;
+    int ntasks_per_socket = params.ntasks_per_socket;
+    int cpus_per_task = params.cpus_per_task;
+    int prob = params.prob;
+    auto filename = params.filename;
+
+    return run(ntasks_per_node, prob, filename);
+}
