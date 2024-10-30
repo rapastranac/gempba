@@ -22,6 +22,8 @@ namespace gempba {
     public:
         explicit ResultHolderInt(DLB_Handler &dlb) : ResultHolderBase<Args...>(dlb) {}
 
+        ~ResultHolderInt() override = default;
+
         void hold_future(std::future<Ret> &&expectedFut) {
             this->expectedFut = std::move(expectedFut);
         }
@@ -42,7 +44,7 @@ namespace gempba {
             return this->expected; // returns empty object of type _Ret,
         }
 
-#ifdef MPI_ENABLED
+#ifdef MULTIPROCESSING_ENABLED
 
         // in construction
         template<typename F_deser>

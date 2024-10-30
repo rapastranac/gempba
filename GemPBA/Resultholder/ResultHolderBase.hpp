@@ -1,6 +1,8 @@
 #ifndef BASE_HPP
 #define BASE_HPP
 
+#include "ResultHolderParent.hpp"
+
 #include <mpi.h>
 #include <cstdio>
 
@@ -26,7 +28,7 @@ namespace gempba {
     class DLB_Handler;
 
     template<typename... Args>
-    class ResultHolderBase {
+    class ResultHolderBase : public ResultHolderParent {
         friend class DLB_Handler;
 
     protected:
@@ -41,13 +43,13 @@ namespace gempba {
         size_t fw_count = 0;
         size_t ph_count = 0;
 
-        long long int id = -1;
+        int id = -1;
         int threadId = -1;
 
         int depth = -1;
         bool isVirtual = false;
 
-#ifdef MPI_ENABLED
+#ifdef MULTIPROCESSING_ENABLED
         // MPI attributes in construction, specially for non-void functions ******
         bool isMPISent = false; // flag to check if was sent via MPI
         int dest_rank = -1;     // rank destination
@@ -58,6 +60,8 @@ namespace gempba {
     public:
         explicit ResultHolderBase(DLB_Handler &dlb) : dlb(dlb) {
         }
+
+        ~ResultHolderBase() override = default;
 
         void holdArgs(Args &...args) {
             this->tup = std::make_tuple(std::forward<Args &&>(args)...);
@@ -71,7 +75,7 @@ namespace gempba {
             this->depth = depth;
         }
 
-        size_t getId() {
+        int getId() {
             return id;
         }
 
@@ -80,7 +84,7 @@ namespace gempba {
         }
 
         bool isFetchable() {
-#ifdef MPI_ENABLED
+#ifdef MULTIPROCESSING_ENABLED
             // return (isPushed || isForwarded || isMPISent) && !isRetrieved;
             return false;
 #else
@@ -97,7 +101,7 @@ namespace gempba {
         }
 
         bool isTreated() {
-#ifdef MPI_ENABLED
+#ifdef MULTIPROCESSING_ENABLED
             return isPushed || isForwarded || isDiscarded || isRetrieved || isMPISent;
 #else
             return isPushed || isForwarded || isDiscarded || isRetrieved;
@@ -153,7 +157,7 @@ namespace gempba {
             }
         }
 
-#ifdef MPI_ENABLED
+#ifdef MULTIPROCESSING_ENABLED
 
         bool is_MPI_Sent() {
             return this->isMPISent;

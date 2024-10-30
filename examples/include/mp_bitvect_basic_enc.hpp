@@ -1,9 +1,12 @@
-#ifdef BITVECTOR_VC
+#ifndef MP_BITVECT_BASIC_ENC_CENTRAL_HPP
+#define MP_BITVECT_BASIC_ENC_CENTRAL_HPP
+
 
 #include "VertexCover.hpp"
 #include <atomic>
 #include <array>
 #include <random>
+#include <spdlog/spdlog.h>
 
 #include <map>
 #include <boost/dynamic_bitset.hpp>
@@ -291,7 +294,7 @@ public:
 				seen_skips++;
 				return;
 			}
-			
+
 			if (seen[id].size() <= 4000000)
 			{
 				seen[id].insert(instance_key);
@@ -362,7 +365,7 @@ public:
 								someRuleApplies = true;
 								break;
 							}
-							
+
 						}
 					}*/
                 }
@@ -404,12 +407,11 @@ public:
 
         hol_l.setDepth(depth);
         hol_r.setDepth(depth);
-#ifdef R_SEARCH
-        if (!parent) {
+        if (branchHandler.getLoadBalancingStrategy() == gempba::QUASI_HORIZONTAL) {
             dummyParent = new HolderType(dlb, id);
             dlb.linkVirtualRoot(id, dummyParent, hol_l, hol_r);
         }
-#endif
+
         hol_l.bind_branch_checkIn([&] {
             int bestVal = branchHandler.refValue();
             gbitset ingraph1 = bits_in_graph;
@@ -494,13 +496,14 @@ private:
             auto clock = std::chrono::system_clock::now();
             std::time_t time = std::chrono::system_clock::to_time_t(clock); //it includes a "\n"
 
-            fmt::print("rank {}, MVC solution so far: {} @ depth : {}, {}", branchHandler.rank_me(), solsize, depth,
-                       std::ctime(&time));
-            //fmt::print("dummy[0,...,3] = [{}, {}, {}, {}]\n", dummy[0], dummy[1], dummy[2], dummy[3]);
+            spdlog::info("rank {}, MVC solution so far: {} @ depth : {}, {}", branchHandler.rank_me(), solsize, depth,
+                         std::ctime(&time));
+            //spdlog::info("dummy[0,...,3] = [{}, {}, {}, {}]\n", dummy[0], dummy[1], dummy[2], dummy[3]);
         }
 
         return;
     }
 };
 
-#endif
+
+#endif // MP_BITVECT_BASIC_ENC_CENTRAL_HPP

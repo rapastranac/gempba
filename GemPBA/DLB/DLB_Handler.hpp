@@ -4,6 +4,7 @@
 #include <atomic>
 #include <map>
 #include <mutex>
+#include <spdlog/spdlog.h>
 
 /*
  * Created by Andres Pastrana on 2019
@@ -11,17 +12,15 @@
  * rapastranac@gmail.com
  */
 
-/*
-- by default every holder is a root of itself and has no parent
-
-- if a parent is passed at construction time, then a holder will have this as a parent,
-and it will adopt the parent's root as its root as well
-
-- if two or more holders that don't have a parent get linked, at linking time, a dummy holder will
-be constructed which will act as a root, and it is considered virtual since its only purpose
-is to be a root. This allows to track all levels of the exploration tree, and therefore
-all holders are potentally pushable
-*/
+/**
+ * - By default, every holder is a root of itself and has no parent
+ * - If a parent is passed at construction time, then a holder will have this as a parent,
+ *   and it will adopt the parent's root as its root as well
+ * - If two or more holders that don't have a parent get linked, at linking time, a dummy holder will
+ *    be constructed which will act as a root, and it is considered virtual since its only purpose is to be a root.
+ *
+ * This allows tracking all levels of the exploration tree, and therefore all holders are potentially pushable
+ */
 
 namespace gempba {
     template<typename Ret, typename... Args>
@@ -37,15 +36,66 @@ namespace gempba {
         std::map<int, void *> roots; // every thread will be solving a subtree, this point to their roots
         std::mutex mtx;
         std::atomic<long long> idleTime{0};
-
-#ifdef R_SEARCH
-        bool rootSearch = R_SEARCH;
-#else
-        bool rootSearch = false;
-#endif
-        size_t idCounter = 0;
+        int idCounter = 0;
 
         DLB_Handler() = default;
+
+
+        template<typename HolderType>
+        void lowerRoot(HolderType &holder) {
+            this->assign_root(holder.threadId, &holder);
+            holder.parent = nullptr;
+        }
+
+        /* this is useful because at level zero of a root, there might be multiple
+        waiting nodes, though the leftMost branch (at zero level) might be at one of
+        the very right subbranches deep down, which means that there is a line of
+         multiple nodes with a single child.
+         A node with a single child means that it has already been solved and
+         also its siblings, because children are unlinked from their parent node
+         when these ones are pushed or fully solved (returned)
+
+                            root == parent
+                          /  |  \   \  \
+                         /   |   \	 \	 \
+                        /    |    \	  \	   \
+                leftMost     w1    w2  w3 ... wk
+                        \
+                         *
+                          \
+                           *
+                            \
+                        current_level
+
+        if there are available threads, and all waiting nodes at level zero are pushed,
+        then root should lower down where it finds a node with at least two children or
+        the deepest node
+         */
+        template<typename HolderType>
+        void rootCorrecting(HolderType *root) {
+            HolderType *_root = root;
+
+            while (_root->children.size() == 1) { // lowering the root
+                _root = _root->children.front();
+                _root->parent->children.pop_front();
+                this->lowerRoot(*_root);
+            }
+        }
+
+        template<typename HolderType>
+        [[maybe_unused]] void linkVirtualRoot_helper(HolderType *parent, HolderType &child) {
+            child.parent = parent->itself;
+            child.root = parent->root;
+            parent->children.push_back(&child);
+        }
+
+        template<typename HolderType, typename... Args>
+        void linkVirtualRoot_helper(HolderType *virtualRoot, HolderType &child, Args &...args) {
+            child.parent = virtualRoot->itself;
+            child.root = virtualRoot->root;
+            virtualRoot->children.push_back(&child);
+            linkVirtualRoot_helper(virtualRoot, args...);
+        }
 
     public:
         static DLB_Handler &getInstance() {
@@ -53,7 +103,7 @@ namespace gempba {
             return instance;
         }
 
-        size_t getUniqueId() {
+        int getUniqueId() {
             std::scoped_lock<std::mutex> lck(mtx);
             return ++idCounter;
         }
@@ -69,19 +119,20 @@ namespace gempba {
             roots[threadId] = root;
         }
 
-        template<typename Holder>
-        Holder *find_top_holder(Holder *holder) {
+        void **getRoot(int threadId) {
+            return &roots[threadId];
+        }
 
-            Holder *leftMost = nullptr; // this is the branch that led us to the root
-            Holder *root = nullptr;     // local pointer to root, to avoid "*" use
+        template<typename HolderType>
+        HolderType *find_top_holder(HolderType *holder) {
+            HolderType *leftMost = nullptr; // this is the branch that led us to the root
+            HolderType *root = nullptr;     // local pointer to root, to avoid "*" use
 
-            if (holder->parent) // this confirms there might be a root
-            {
-                if (holder->parent != *holder->root) // this confirms, the root isn't the parent
-                {
+            if (holder->parent) { // this confirms there might be a root
+                if (holder->parent != *holder->root) { // this confirms, the root isn't the parent
                     /* this condition complies if a branch has already
                      been pushed, to ensure pushing leftMost first */
-                    root = static_cast<Holder *>(*holder->root); // no need to iterate
+                    root = static_cast<HolderType *>(*holder->root); // no need to iterate
                     // int tmp = root->children.size(); // this probable fix the following
 
                     // the following is not true, it could be also the right branch
@@ -89,10 +140,12 @@ namespace gempba {
                     // TODO ... verify
 
                     leftMost = root->children.front(); // TODO ... check if branch has been pushed or forwarded
-                } else
+                } else {
                     return nullptr; // parent == root
-            } else
+                }
+            } else {
                 return nullptr; // there is no parent
+            }
 
             /*
             #ifdef DEBUG_COMMENTS
@@ -116,10 +169,10 @@ namespace gempba {
             leftMost = cb
             nextElt = w1
 
-            There will never be fewer than two elements, asuming multiple recursion per scope,
-            because as long as it remains two elements, it means than rightMost element will be pushed to pool
-            and then leftMost element will no longer need a parent, which is the first condition to explore
-            this level of the tree*/
+            There will never be fewer than two elements, assuming multiple recursions per scope,
+             because as long as there remain two elements, it implies that the rightMost element
+             will be pushed to the pool, and then the leftMost element will no longer need a parent.
+             This condition is the first one to explore at this level of the tree.*/
 
             if (root->children.size() > 2) {
                 /* TO BE VERIFIED
@@ -146,7 +199,7 @@ namespace gempba {
                     already pushed*/
 
                 root->children.pop_front();             // deletes leftMost from root's children
-                Holder *right = root->children.front(); // The one to be pushed
+                HolderType *right = root->children.front(); // The one to be pushed
                 root->children.clear();                 // ..
 
                 // right->prune();                         // just in case, right branch is not being sent anyway, only its data
@@ -155,13 +208,16 @@ namespace gempba {
                 this->lowerRoot(*leftMost);
                 // leftMost->lowerRoot(); // it sets leftMost as the new root
 
-                rootCorrecting(leftMost); // if leftMost has no pending branch, then root will be assigned to the next
-                // descendant with at least two children (which is at least a pending branch),
-                // or the lowest branch which is th one giving priority to root's children
+                rootCorrecting(leftMost);
+                /**
+                 * if leftMost has no pending branch, then root will be assigned to the next
+                 * descendant with at least two children (which is at least a pending branch),
+                 * or the lowest branch which is the one giving priority to root's children
+                 * */
 
                 return right;
             } else {
-                fmt::print("fw_count : {} \n ph_count : {}\n isVirtual :{} \n isDiscarded : {} \n",
+                spdlog::error("fw_count : {} \n ph_count : {}\n isVirtual :{} \n isDiscarded : {} \n",
                            root->fw_count,
                            root->ph_count,
                            root->isVirtual,
@@ -171,8 +227,8 @@ namespace gempba {
         }
 
         // controls the root when sequential calls
-        template<typename Holder>
-        void checkLeftSibling(Holder *holder) {
+        template<typename HolderType>
+        void checkLeftSibling(HolderType *holder) {
 
             /* What does it do?. Having the following figure
                           root == parent
@@ -192,13 +248,12 @@ namespace gempba {
                 is avoided because find_top_holder() pushes the second element of the children
             */
 
-            if (holder->parent) // this confirms the holder is not a root
-            {
-                if (holder->parent == *holder->root) // this confirms that it's the first level of the root
-                {
-                    Holder *leftMost = holder->parent->children.front();
-                    if (leftMost != holder) // This confirms pb has already been solved
-                    {                       /*
+            if (holder->parent) { // this confirms the holder is not a root
+                if (holder->parent == *holder->root) { // this confirms that it's the first level of the root
+                    HolderType *leftMost = holder->parent->children.front();
+
+                    if (leftMost != holder) { // This confirms pb has already been solved
+                        /*
                          root == parent
                           /  |  \   \  \
                          /   |   \	 \	 \
@@ -216,8 +271,9 @@ namespace gempba {
                         // after this line,this should be true leftMost == holder
 
                         // There might be more than one remaining sibling
-                        if (holder->parent->children.size() > 1)
+                        if (holder->parent->children.size() > 1) {
                             return; // root does not change
+                        }
 
                         /* if holder is the only remaining child from parent then this means
                         that it will have to become a new root*/
@@ -230,13 +286,12 @@ namespace gempba {
                         // holder->parent = nullptr;
                         // holder->prune(); //not even required, nullptr is sent
                     }
-                } else if (holder->parent != *holder->root) // any other level,
-                {
+                } else if (holder->parent != *holder->root) { // any other level,
                     /*
                          root != parent
                            /|  \   \  \
                           / |   \	 \	 \
-                    solved  *    w1  w2 . wk
+                    solved  *    w1  w2 . Wk
                            /|
                     solved	*
                            /|
@@ -245,19 +300,18 @@ namespace gempba {
                  solved(pb)  cb
 
 
-                    this is relevant, because eventhough the root still has some waiting nodes
+                    this is relevant because although the root still has some waiting nodes,
                     the thread in charge of the tree might be deep down solving everything sequentially.
                     Every time a leftMost branch is solved sequentially, this one should be removed from
                     the list to avoid failure attempts of solving a branch that has already been solved.
 
                     If a thread attempts to solve an already solved branch, this will throw an error
-                    because the node won't have information anymore since it has already been passed
+                    because the node won't have information any more since it has already been passed
                     */
 
-                    Holder *leftMost = holder->parent->children.front();
-                    if (leftMost != holder) // This confirms pb has already been solved
-                    {
-                        /*this scope only deletes leftMost holder, which is already
+                    HolderType *leftMost = holder->parent->children.front();
+                    if (leftMost != holder) { // This confirms pb has already been solved
+                        /*this scope only deletes the leftMost holder, which is already
                          * solved sequentially by here and leaves the parent with at
                          * least a child because the root still has at least a holder in
                          * the waiting list
@@ -268,9 +322,9 @@ namespace gempba {
             }
         }
 
-        // controls the root when succesfull parallel calls ( if not upperHolder available)
-        template<typename Holder>
-        void pop_left_sibling(Holder *holder) {
+        // controls the root when successful parallel calls (if not upperHolder available)
+        template<typename HolderType>
+        void pop_left_sibling(HolderType *holder) {
             /* this method is invoked when DLB_Handler is enabled and the method find_top_holder() was not able to find
         a top branch to push, because it means the next right sibling will become a root(for binary recursion)
         or just the leftMost will be unlisted from the parent's children. This method is invoked if and only if
@@ -299,18 +353,17 @@ namespace gempba {
 
         */
             auto *_parent = holder->parent;
-            if (_parent)                          // it should always comply, virtual parent is being created
-            {                                     // it also confirms that holder is not a parent (applies for DLB_Handler)
-                if (_parent->children.size() > 2) // this is for more than two recursions per scope
-                {
+            // it should always comply, virtual parent is being created
+            if (_parent) {
+                // it also confirms that holder is not a parent (applies for DLB_Handler)
+                if (_parent->children.size() > 2) {
+                    // this is for more than two recursions per scope
                     _parent->children.pop_front();
-                } else if (_parent->children.size() ==
-                           2) // this verifies that  it's binary and the rightMost will become a new root
-                {
+                } else if (_parent->children.size() == 2) {
+                    // this verifies that it's binary and the rightMost will become a new root
                     _parent->children.pop_front();
                     auto right = _parent->children.front();
                     _parent->children.pop_front();
-                    // right->lowerRoot();
                     this->lowerRoot(*right);
                 } else {
                     throw std::runtime_error("4 Testing, it's not supposed to happen, pop_left_sibling()\n");
@@ -318,79 +371,22 @@ namespace gempba {
             }
         }
 
-        template<typename Holder>
-        void linkVirtualRoot_helper(Holder *parent, Holder &child) {
-            child.parent = parent->itself;
-            child.root = parent->root;
-            parent->children.push_back(&child);
-        }
-
-        template<typename Holder, typename... Args>
-        void linkVirtualRoot_helper(Holder *virtualRoot, Holder &child, Args &...args) {
-            child.parent = virtualRoot->itself;
-            child.root = virtualRoot->root;
-            virtualRoot->children.push_back(&child);
-        }
-
-        template<typename Holder, typename... Args>
-        void linkVirtualRoot(int threadId, Holder *virtualRoot, Holder &child, Args &...args) {
+        template<typename HolderType, typename... Args>
+        void linkVirtualRoot(int threadId, HolderType *virtualRoot, HolderType &child, Args &...args) {
             virtualRoot->setDepth(child.depth);
             {
                 std::scoped_lock<std::mutex> lck(mtx);
-                child.parent = static_cast<Holder *>(roots[threadId]);
+                child.parent = static_cast<HolderType *>(roots[threadId]);
                 child.root = &roots[threadId];
             }
             virtualRoot->children.push_back(&child);
             linkVirtualRoot_helper(virtualRoot, args...);
         }
 
-        template<typename Holder>
-        void prune(Holder *holder) {
-            // holder.prune();
+        template<typename HolderType>
+        void prune(HolderType *holder) {
             holder->root = nullptr;
             holder->parent = nullptr;
-        }
-
-        template<typename Holder>
-        void lowerRoot(Holder &holder) {
-            this->assign_root(holder.threadId, &holder);
-            holder.parent = nullptr;
-        }
-
-        /* this is useful because at level zero of a root, there might be multiple
-        waiting nodes, though the leftMost branch (at zero level) might be at one of
-        the very right sub-branches deep down, which means that there is a line of
-         multiple nodes with a single child.
-         A node with a single child means that it has already been solved and
-         also its siblings, because children are unlinked from their parent node
-         when these ones are pushed or fully solved (returned)
-
-                            root == parent
-                          /  |  \   \  \
-                         /   |   \	 \	 \
-                        /    |    \	  \	   \
-                leftMost     w1    w2  w3 ... wk
-                        \
-                         *
-                          \
-                           *
-                            \
-                        current_level
-
-        if there are available threads, and all waiting nodes at level zero are pushed,
-        then root should lower down where it finds a node with at least two children or
-        the deepest node
-         */
-        template<typename Holder>
-        void rootCorrecting(Holder *root) {
-            Holder *_root = root;
-
-            while (_root->children.size() == 1) // lowering the root
-            {
-                _root = _root->children.front();
-                _root->parent->children.pop_front();
-                this->lowerRoot(*_root);
-            }
         }
 
         ~DLB_Handler() = default;

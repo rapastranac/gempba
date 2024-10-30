@@ -1,9 +1,9 @@
-﻿#ifndef GRAPH_HPP
+#ifndef GRAPH_HPP
 #define GRAPH_HPP
 
 using namespace std;
 
-#ifdef MPI_ENABLED
+#ifdef MULTIPROCESSING_ENABLED
 
 //#include <cereal/types/map.hpp>
 //#include <cereal/types/set.hpp>
@@ -23,7 +23,6 @@ using namespace std;
 
 #endif
 
-#include <fmt/format.h>
 #include "util.hpp"
 
 #include <climits>
@@ -32,10 +31,11 @@ using namespace std;
 #include <mutex>
 #include <random>
 #include <sstream>
+#include <spdlog/spdlog.h>
 
 class Graph {
 private:
-#ifdef MPI_ENABLED
+#ifdef MULTIPROCESSING_ENABLED
 
     //friend class cereal::access;
     friend class boost::serialization::access;
@@ -60,7 +60,7 @@ private:
             this->w = w;
         }
 
-#ifdef MPI_ENABLED
+#ifdef MULTIPROCESSING_ENABLED
         // cereal
         //template <class Archive>
         //void serialize(Archive &ar, const unsigned int version)
@@ -543,7 +543,7 @@ public:
     int removeVertex(int v) {
         try {
             if (!adj.contains(v)) {
-                fmt::print("_VERTEX_NOT_FOUND\n");
+                spdlog::error("_VERTEX_NOT_FOUND\n");
                 throw "_VERTEX_NOT_FOUND";
             }
             numEdges = numEdges - adj[v].size();
@@ -650,9 +650,9 @@ public:
         adj[v].insert(u);
     }
 
-    void readEdges(string NameOfFile) {
+    void readEdges(string fileName) {
 
-        std::ifstream file(NameOfFile);
+        std::ifstream file(fileName);
 
         if (!file.is_open()) {
             throw std::runtime_error("Input file not found\n");
@@ -1067,7 +1067,7 @@ public:
     //Graph &operator=(const Graph &) = default;
     //Graph &operator=(Graph &&) = default;
     //virtual ~Graph() = default;
-#ifdef MPI_ENABLED
+#ifdef MULTIPROCESSING_ENABLED
     /*
     template <class Archive>
     void serialize(Archive &ar)

@@ -1,9 +1,11 @@
-#ifdef BITVECTOR_VC_THREAD
+#ifndef MT_BITVECT_OPT_ENC_HPP
+#define MT_BITVECT_OPT_ENC_HPP
 
 #include "VertexCover.hpp"
 #include <atomic>
 #include <array>
 #include <random>
+#include <spdlog/spdlog.h>
 
 #include <boost/dynamic_bitset.hpp>
 #include <boost/container/set.hpp>
@@ -13,8 +15,7 @@ using namespace boost;
 
 #define gbitset dynamic_bitset<>
 
-class VC_void_bitvec : public VertexCover
-{
+class VC_void_bitvec : public VertexCover {
     using HolderType = gempba::ResultHolder<void, int, gbitset, int>;
 
 private:
@@ -26,17 +27,15 @@ public:
     long deglb_skips;
     long seen_skips;
 
-    unordered_map<int, gbitset> graphbits;
+    unordered_map<int, gbitset > graphbits;
     std::atomic<size_t> passes;
     std::mutex mtx;
 
-    VC_void_bitvec()
-    {
+    VC_void_bitvec() {
         this->_f = std::bind(&VC_void_bitvec::mvcbitset, this, _1, _2, _3, _4, _5);
     }
 
-    void setGraph(Graph &graph)
-    {
+    void setGraph(Graph &graph) {
         is_skips = 0;
         deglb_skips = 0;
         seen_skips = 0;
@@ -52,55 +51,46 @@ public:
 
         cout << "Graph has " << graph.adj.size() << " vertices and " << graph.getNumEdges() << " edges" << endl;
         vector<pair<int, int>> deg_v;
-        for (auto it = graph.adj.begin(); it != graph.adj.end(); ++it)
-        {
+        for (auto it = graph.adj.begin(); it != graph.adj.end(); ++it) {
             deg_v.push_back(make_pair(it->second.size(), it->first));
         }
 
         //for some reason, I decided to sort the vertices by degree.  I don't think it is useful.
         std::sort(deg_v.begin(), deg_v.end());
         map<int, int> remap;
-        for (int i = 0; i < deg_v.size(); i++)
-        {
+        for (int i = 0; i < deg_v.size(); i++) {
             remap[deg_v[i].second] = deg_v.size() - 1 - i;
         }
         map<int, set<int>> adj2;
-        for (auto it = graph.adj.begin(); it != graph.adj.end(); ++it)
-        {
+        for (auto it = graph.adj.begin(); it != graph.adj.end(); ++it) {
             int v = it->first;
             adj2[remap[v]] = set<int>();
-            for (auto w : graph.adj[v])
-            {
+            for (auto w: graph.adj[v]) {
                 adj2[remap[v]].insert(remap[w]);
             }
         }
 
         //for (auto it = graph.adj.begin(); it != graph.adj.end(); ++it)
-        for (auto it = adj2.begin(); it != adj2.end(); ++it)
-        {
+        for (auto it = adj2.begin(); it != adj2.end(); ++it) {
             int v = it->first;
 
             gbitset vnbrs(gsize);
 
-            for (int i : it->second)
-            {
+            for (int i: it->second) {
                 vnbrs[i] = true;
             }
             graphbits[v] = vnbrs;
         }
 
         //check for evil degree 0 vertices
-        for (int i = 0; i < gsize; ++i)
-        {
-            if (!graphbits.contains(i))
-            {
+        for (int i = 0; i < gsize; ++i) {
+            if (!graphbits.contains(i)) {
                 graphbits[i] = gbitset(gsize);
             }
         }
     }
 
-    void mvcbitset(int id, int depth, gbitset &bits_in_graph, int solsize, void *parent)
-    {
+    void mvcbitset(int id, int depth, gbitset &bits_in_graph, int solsize, void *parent) {
 
         //{                                                   // 1 MB, emulates heavy messaging
         //    std::random_device rd;                          // Will be used to obtain a seed for the random number engine
@@ -122,8 +112,7 @@ public:
 
         int cursol_size = solsize;
 
-        if (passes % (size_t)1e6 == 0)
-        {
+        if (passes % (size_t) 1e6 == 0) {
             auto clock = std::chrono::system_clock::now();
             std::time_t time = std::chrono::system_clock::to_time_t(clock); //it includes a "\n"
 
@@ -140,16 +129,14 @@ public:
         }
 
         //cout<<"depth="<<depth<<" ref="<<branchHandler.getRefValue()<<"cursolsize="<<cursol_size<<" cnt="<<bits_in_graph.count()<<" sol="<<cur_sol<<endl;
-        if (bits_in_graph.count() <= 1)
-        {
+        if (bits_in_graph.count() <= 1) {
 
             terminate_condition_bits(cursol_size, id, depth);
             //terminate_condition_bits(cursol_size, id, depth, dummy);
             return;
         }
 
-        if (cursol_size >= branchHandler.refValue())
-        {
+        if (cursol_size >= branchHandler.refValue()) {
             return;
         }
 
@@ -176,46 +163,35 @@ public:
 
         bool someRuleApplies = true;
 
-        while (someRuleApplies)
-        {
+        while (someRuleApplies) {
             nbEdgesDoubleCounted = 0;
             maxdeg = -1;
             maxdeg_v = 0;
             someRuleApplies = false;
 
-            for (int i = bits_in_graph.find_first(); i != gbitset::npos; i = bits_in_graph.find_next(i))
-            {
+            for (int i = bits_in_graph.find_first(); i != gbitset::npos; i = bits_in_graph.find_next(i)) {
 
                 gbitset nbrs = (graphbits[i] & bits_in_graph);
 
                 int cnt = nbrs.count();
-                if (cnt == 0)
-                {
+                if (cnt == 0) {
                     bits_in_graph[i] = false;
-                }
-                else if (cnt == 1)
-                {
+                } else if (cnt == 1) {
                     int the_nbr = nbrs.find_first();
                     //cur_sol[the_nbr] = true;
                     cursol_size++;
                     bits_in_graph[i] = false;
                     bits_in_graph[the_nbr] = false;
                     someRuleApplies = true;
-                }
-                else if (cnt > maxdeg)
-                {
+                } else if (cnt > maxdeg) {
                     maxdeg = cnt;
                     maxdeg_v = i;
-                }
-                else
-                {
+                } else {
                     //looking for a nbr with at least same nbrs as i
-                    if (cnt == 2)
-                    {
+                    if (cnt == 2) {
                         int n1 = nbrs.find_first();
                         int n2 = nbrs.find_next(n1);
-                        if (graphbits[n1][n2])
-                        {
+                        if (graphbits[n1][n2]) {
                             //cur_sol[n1] = true;
                             //cur_sol[n2] = true;
                             bits_in_graph[i] = false;
@@ -252,8 +228,7 @@ public:
         }
 
         int nbVertices = bits_in_graph.count();
-        if (nbVertices <= 1)
-        {
+        if (nbVertices <= 1) {
             //cout<<"terminating 2"<<endl;
             terminate_condition_bits(cursol_size, id, depth);
             //terminate_condition_bits(cursol_size, id, depth, dummy);
@@ -261,12 +236,11 @@ public:
             return;
         }
 
-        float tmp = (float)(1 - 8 * nbEdgesDoubleCounted / 2 - 4 * nbVertices + 4 * nbVertices * nbVertices);
-        int indsetub = (int)(0.5f * (1.0f + sqrt(tmp)));
+        float tmp = (float) (1 - 8 * nbEdgesDoubleCounted / 2 - 4 * nbVertices + 4 * nbVertices * nbVertices);
+        int indsetub = (int) (0.5f * (1.0f + sqrt(tmp)));
         int vclb = nbVertices - indsetub;
 
-        if (vclb + cursol_size >= branchHandler.refValue())
-        {
+        if (vclb + cursol_size >= branchHandler.refValue()) {
             is_skips++;
             return;
         }
@@ -274,8 +248,7 @@ public:
         int degLB = 0; //getDegLB(bits_in_graph, nbEdgesDoubleCounted/2);
         degLB = (nbEdgesDoubleCounted / 2) / maxdeg;
         //cout<<"deglb="<<degLB<<" n="<<bits_in_graph.count()<<" refval="<<branchHandler.getRefValue()<<endl;
-        if (degLB + cursol_size >= branchHandler.refValue())
-        {
+        if (degLB + cursol_size >= branchHandler.refValue()) {
             deglb_skips++;
             return;
         }
@@ -288,71 +261,58 @@ public:
 
         hol_l.setDepth(depth);
         hol_r.setDepth(depth);
-#ifdef R_SEARCH
-        if (!parent)
-        {
+
+        if (branchHandler.getLoadBalancingStrategy() == gempba::QUASI_HORIZONTAL) {
             dummyParent = new HolderType(dlb, id);
             dlb.linkVirtualRoot(id, dummyParent, hol_l, hol_r);
         }
-#endif
-        hol_l.bind_branch_checkIn([&]
-                                  {
-                                      int bestVal = branchHandler.refValue();
-                                      gbitset ingraph1 = bits_in_graph;
-                                      ingraph1.set(maxdeg_v, false);
-                                      //gbitset sol1 = cur_sol;
-                                      //sol1.set(maxdeg_v, true);
-                                      int solsize1 = cursol_size + 1;
 
-                                      if (solsize1 < bestVal)
-                                      {
-                                          //auto cpy = dummy;
-                                          //hol_l.holdArgs(newDepth, ingraph1, solsize1, cpy);
-                                          hol_l.holdArgs(newDepth, ingraph1, solsize1);
-                                          return true;
-                                      }
-                                      else
-                                          return false;
-                                  });
+        hol_l.bind_branch_checkIn([&] {
+            int bestVal = branchHandler.refValue();
+            gbitset ingraph1 = bits_in_graph;
+            ingraph1.set(maxdeg_v, false);
+            //gbitset sol1 = cur_sol;
+            //sol1.set(maxdeg_v, true);
+            int solsize1 = cursol_size + 1;
 
-        hol_r.bind_branch_checkIn([&]
-                                  {
-                                      int bestVal = branchHandler.refValue();
-                                      //right branch = take out v nbrs
-                                      gbitset ingraph2 = bits_in_graph;
+            if (solsize1 < bestVal) {
+                //auto cpy = dummy;
+                //hol_l.holdArgs(newDepth, ingraph1, solsize1, cpy);
+                hol_l.holdArgs(newDepth, ingraph1, solsize1);
+                return true;
+            } else
+                return false;
+        });
 
-                                      ingraph2 = bits_in_graph & (~graphbits[maxdeg_v]);
-                                      gbitset nbrs = (graphbits[maxdeg_v] & bits_in_graph);
-                                      //gbitset sol2 = cur_sol | nbrs;	//add all nbrs to solution
-                                      int solsize2 = cursol_size + nbrs.count();
+        hol_r.bind_branch_checkIn([&] {
+            int bestVal = branchHandler.refValue();
+            //right branch = take out v nbrs
+            gbitset ingraph2 = bits_in_graph;
 
-                                      if (solsize2 < bestVal)
-                                      {
-                                          hol_r.holdArgs(newDepth, ingraph2, solsize2);
-                                          //auto cpy = dummy;
-                                          //hol_r.holdArgs(newDepth, ingraph2, solsize2, cpy);
-                                          return true;
-                                      }
-                                      else
-                                          return false;
-                                  });
+            ingraph2 = bits_in_graph & (~graphbits[maxdeg_v]);
+            gbitset nbrs = (graphbits[maxdeg_v] & bits_in_graph);
+            //gbitset sol2 = cur_sol | nbrs;	//add all nbrs to solution
+            int solsize2 = cursol_size + nbrs.count();
 
-        if (hol_l.evaluate_branch_checkIn())
-        {
+            if (solsize2 < bestVal) {
+                hol_r.holdArgs(newDepth, ingraph2, solsize2);
+                //auto cpy = dummy;
+                //hol_r.holdArgs(newDepth, ingraph2, solsize2, cpy);
+                return true;
+            } else
+                return false;
+        });
+
+        if (hol_l.evaluate_branch_checkIn()) {
             branchHandler.try_push_MT<void>(_f, id, hol_l);
-        }
-        else
-        {
+        } else {
         }
 
         //cout<<"ok sol1 done, going to sol2 val="<<solsize2;
 
-        if (hol_r.evaluate_branch_checkIn())
-        {
+        if (hol_r.evaluate_branch_checkIn()) {
             branchHandler.forward<void>(_f, id, hol_r);
-        }
-        else
-        {
+        } else {
         }
 
         //cout<<"depth="<<depth<<" done"<<endl;
@@ -364,24 +324,22 @@ public:
     }
 
 private:
-    void terminate_condition_bits(int solsize, int id, int depth)
-    {
+    void terminate_condition_bits(int solsize, int id, int depth) {
         if (solsize == 0)
             return;
 
-        if (solsize < branchHandler.refValue())
-        {
+        if (solsize < branchHandler.refValue()) {
             branchHandler.holdSolution(solsize);
             branchHandler.updateRefValue(solsize);
 
             auto clock = std::chrono::system_clock::now();
             std::time_t time = std::chrono::system_clock::to_time_t(clock); //it includes a "\n"
 
-            fmt::print("rank {}, MVC solution so far: {} @ depth : {}, {}", branchHandler.rank_me(), solsize, depth, std::ctime(&time));
+            spdlog::info("rank {}, MVC solution so far: {} @ depth : {}, {}", branchHandler.rank_me(), solsize, depth, std::ctime(&time));
         }
 
         return;
     }
 };
 
-#endif
+#endif // MT_BITVECT_OPT_ENC_HPP
