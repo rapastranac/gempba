@@ -50,7 +50,7 @@ add_definitions(-DDEBUG_COMMENTS)
 
 
 # Ensure to link the correct libraries
-file(GLOB_RECURSE Sources "GemPBA/*.cpp")
+file(GLOB_RECURSE Sources "src" "GemPBA/*.cpp")
 
 #sets the executable in main folder
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin)
