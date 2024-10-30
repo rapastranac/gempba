@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <memory>
 #include "utils/Queue.hpp"
 
 struct MyStruct {
@@ -31,6 +32,35 @@ TEST(QueueTest, PushAndPop) {
 // Ensure the queue is empty after popping all elements
     EXPECT_TRUE(q.empty());
 }
+
+TEST(QueueTest, PushAndPopWithSharedPointer) {
+    Queue<std::shared_ptr<MyStruct>> q;
+
+    std::shared_ptr<MyStruct> a = std::make_shared<MyStruct>(1);
+    std::shared_ptr<MyStruct> b = std::make_shared<MyStruct>(2);
+    std::shared_ptr<MyStruct> c = std::make_shared<MyStruct>(3);
+
+// Push some values into the queue
+    ASSERT_TRUE(q.push(a));
+    ASSERT_TRUE(q.push(b));
+    ASSERT_TRUE(q.push(c));
+
+// Pop the values and ensure they are retrieved in the correct order
+    std::shared_ptr<MyStruct> result;
+    ASSERT_TRUE(q.pop(result));
+    EXPECT_EQ(a, result);
+
+    ASSERT_TRUE(q.pop(result));
+    EXPECT_EQ(b, result);
+
+    ASSERT_TRUE(q.pop(result));
+    EXPECT_EQ(c, result);
+
+// Ensure the queue is empty after popping all elements
+    EXPECT_TRUE(q.empty());
+}
+
+
 
 TEST(QueueTest, Empty) {
     Queue<MyStruct *> q;
