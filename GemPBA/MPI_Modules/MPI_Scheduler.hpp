@@ -64,8 +64,8 @@ namespace gempba {
             return world_rank;
         }
 
-        double getTotalRequests() const override {
-            spdlog::throw_spdlog_ex("Not implemented");
+        size_t getTotalRequests() const override {
+            return totalRequests;
         }
 
         std::string fetchSolution() override {

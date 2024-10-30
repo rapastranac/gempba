@@ -57,7 +57,7 @@ namespace gempba {
 
         virtual void runCenter(const char *SEED, const int SEED_SIZE) = 0;
 
-        virtual double getTotalRequests() const = 0;
+        virtual size_t getTotalRequests() const = 0;
 
     };
 }

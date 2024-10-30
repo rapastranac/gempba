@@ -122,7 +122,7 @@ namespace gempba {
             spdlog::info("\n \n \n");
         }
 
-        double getTotalRequests() const override {
+        size_t getTotalRequests() const override {
             return totalRequests;
         }
 
