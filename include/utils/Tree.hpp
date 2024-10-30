@@ -1,7 +1,32 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) 2024. Andrés Pastrana
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #ifndef TREE_HPP
 #define TREE_HPP
 
 #include <iostream>
+#include <spdlog/spdlog.h>
 #include <vector>
 
 class Tree {
@@ -35,8 +60,9 @@ private:
                 last = &tree[idx];
                 childrenCount++;
             } else {
-                std::cerr << "node " << idx << " is already assigned to " << tree[idx].parent->idx << "\n";
-                throw;
+                std::string errorMsg = "node " + std::to_string(idx) + " is already assigned to " + std::to_string(tree[idx].parent->idx) + "\n";
+                spdlog::error(errorMsg);
+                throw std::runtime_error(errorMsg);
             }
         }
 
@@ -79,7 +105,7 @@ private:
             if (next) {
                 if (next->rightSibling) {
                     // at least two nodes
-                    auto nextCpy = next;
+                    Node *nextCpy = next;
                     next = next->rightSibling;
                     next->leftSibling = nullptr;
 
@@ -94,8 +120,9 @@ private:
                 }
                 --childrenCount;
             } else {
-                std::cerr << "there's no next to pop\n";
-                throw;
+                std::string errorMsg = "there's no next to pop\n";
+                spdlog::error(errorMsg);
+                throw std::runtime_error(errorMsg);
             }
         }
 
@@ -116,7 +143,7 @@ private:
                     parent = nullptr;
                     rightSibling = nullptr;
                     leftSibling = nullptr;
-                } else if (leftSibling && !rightSibling) {
+                } else if (leftSibling) {
                     // last one
                     leftSibling->rightSibling = nullptr;
                     parent->last = leftSibling;
@@ -128,8 +155,9 @@ private:
                     parent->pop_front();
                 }
             } else {
-                std::cerr << "node " << idx << " is not assigned to any other node \n";
-                throw;
+                std::string errorMsg = "node " + std::to_string(idx) + " is not assigned to any other node \n";
+                spdlog::error(errorMsg);
+                throw std::runtime_error(errorMsg);
             }
         }
 
@@ -140,8 +168,8 @@ private:
         class Iterator {
         private:
             Node *node;
+            friend struct Node;
 
-            friend class Node;
 
             explicit Iterator(Node *node) : node(node) {}
 
@@ -157,7 +185,7 @@ private:
             }
 
             // overload post-increment operator
-            const Iterator operator++(int) {
+            Iterator operator++(int) {
                 Iterator ret = *this;
                 ++*(this);
                 return ret;
@@ -195,20 +223,22 @@ private:
 public:
     Tree() = default;
 
-    explicit Tree(size_t size) {
-        for (size_t i = 0; i < size; i++) {
+    explicit Tree(int size) {
+        C.reserve(size);
+        for (int i = 0; i < size; i++) {
             C.emplace_back(*this, (int) i);
         }
     }
 
-    void resize(size_t size) {
-        for (size_t i = 0; i < size; i++) {
+    void resize(int size) {
+        C.reserve(size);
+        for (int i = 0; i < size; i++) {
             C.emplace_back(*this, (int) i);
         }
     }
 
-    size_t size() {
-        return C.size();
+    int size() const {
+        return static_cast<int>(C.size());
     }
 
     Node &operator[](int idx) {
