@@ -2,8 +2,7 @@
 #include <future>
 #include <any>
 #include <string>
-#include <stdexcept>
-#include "../../../GemPBA/utils/utils.hpp"
+#include "utils/utils.hpp"
 
 /**
  * @author Andres Pastrana
