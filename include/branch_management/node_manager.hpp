@@ -2,7 +2,12 @@
 #define GEMPBA_NODEMANAGER_H
 
 #include <future>
+#include <optional>
 #include <spdlog/spdlog.h>
+#include <string>
+#include <thread>
+
+#include "BranchHandler/ThreadPool.hpp"
 
 /**
  * @author Andres Pastrana
@@ -12,7 +17,13 @@ namespace gempba {
 
     class NodeManager {
 
-        NodeManager() = default;
+        unsigned int processor_count;
+        std::unique_ptr<ThreadPool::Pool> thread_pool;
+
+
+        NodeManager() {
+            processor_count = std::thread::hardware_concurrency();
+        }
 
     public:
         static NodeManager &getInstance() {
@@ -60,11 +71,18 @@ namespace gempba {
             spdlog::throw_spdlog_ex("Not yet implemented");
         }
 
+        void initThreadPool(int poolSize);
+
+        template<typename F, typename ...Args>
+        auto force_push(F &&f, Args...args) -> std::future<decltype(f(0, args...))>{
+            return thread_pool->push(f, args...);
+        }
+
 
 #ifdef MULTIPROCESSING_ENABLED
-    private:
+        private:
 
-    public:
+        public:
 
 #endif
     };
