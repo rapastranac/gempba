@@ -50,6 +50,38 @@ namespace utils {
     }
 
 
+    static double diff_time(double wTime0, double wTime1) {
+        return wTime1 - wTime0;
+    }
+
+    /**
+    * @brief Shifts elements of the vector to the left by one position.
+    *
+    * Moves each element of the vector one position to the left, stopping when the first
+    * -1 is encountered. Assumes the vector is either fully populated or has -1 values
+    * on the right side.
+    *
+    * @param vec The vector to be shifted. It should have been initialized with at least
+    *            the required number of elements.
+    */
+    static void shift_left(std::vector<int> &vector) {
+        int size = static_cast<int>(vector.size());
+        if (size == 0) {
+            spdlog::throw_spdlog_ex("Attempted to shift an empty vector");
+        }
+        for (int i = 0; i < size - 1; i++) {
+            if (vector[i] != -1) {
+                vector[i] = vector[i + 1]; // shift one cell to the left
+                if (i == size - 2 && vector[i] != -1) {
+                    vector[i + 1] = -1; // set the last cell to -1
+                }
+            } else {
+                break; // Stop if the first -1 is encountered
+            }
+        }
+    }
+
+
 };
 
 #endif //UTILS_H
