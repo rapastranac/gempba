@@ -4,6 +4,7 @@
 
 #include "args_handler.hpp"
 #include <DLB/DLB_Handler.hpp>
+#include "load_balancing/api/load_balancer.hpp"
 #include "ThreadPool.hpp"
 #include "utils/utils.hpp"
 #include "utils/gempba_utils.hpp"

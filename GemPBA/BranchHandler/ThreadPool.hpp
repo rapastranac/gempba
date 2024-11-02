@@ -29,6 +29,7 @@
 #include <memory>
 #include <mutex>
 #include <queue>
+#include <stdexcept>
 #include <thread>
 #include <vector>
 
@@ -120,6 +121,10 @@ namespace ThreadPool {
 
         template<typename F, typename... Args>
         auto push(F &&f, Args &&...args) -> std::future<decltype(f(0, args...))> {
+            if (size() < 1) {
+                throw std::runtime_error("Thread pool size is less than 1");
+            }
+
             using namespace std::placeholders;
             auto pck = std::make_shared<std::packaged_task<decltype(f(0, args...))(int)>>(
                     std::bind(std::forward<F>(f), _1, std::forward<Args>(args)...));
