@@ -90,6 +90,7 @@ target_compile_options(gempba PRIVATE
 
 # 🔗 Linking
 target_link_libraries(gempba PUBLIC
+        external_libs
         Threads::Threads
         MPI::MPI_CXX
         OpenMP::OpenMP_CXX
