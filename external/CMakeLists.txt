@@ -26,8 +26,19 @@ CPMAddPackage(
         GIT_SHALLOW TRUE          # shallow clone: minimal history
 )
 
+CPMAddPackage(
+        NAME BS_thread_pool
+        GITHUB_REPOSITORY rapastranac/thread-pool
+        GIT_TAG master)
+add_library(BS_thread_pool INTERFACE)
+target_include_directories(BS_thread_pool INTERFACE ${BS_thread_pool_SOURCE_DIR}/include)
+
 # Define 'external_libs' as an INTERFACE library
 add_library(external_libs INTERFACE)
 
 # Link argparse to 'external_libs'
-target_link_libraries(external_libs INTERFACE argparse spdlog)
+target_link_libraries(external_libs
+        INTERFACE
+        argparse
+        spdlog
+        BS_thread_pool)
