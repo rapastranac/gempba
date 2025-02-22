@@ -655,7 +655,7 @@ public:
         std::ifstream file(fileName);
 
         if (!file.is_open()) {
-            throw std::runtime_error("Input file not found\n");
+            throw std::runtime_error("Input file not found: " + fileName + "\n");
         }
 
         int u, v;
