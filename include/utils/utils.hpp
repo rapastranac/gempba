@@ -1,34 +1,74 @@
-#pragma once
+/*
+ * MIT License
+ *
+ * Copyright (c) 2024. Andrés Pastrana
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 #ifndef UTILS_H
 #define UTILS_H
 
 #include <any>
 #include <future>
-
 #include <spdlog/spdlog.h>
+#include <utils/tree.hpp>
+
 
 /**
- * Created by Andres Pastrana on 2024-04-08.
+ * Created by Andrés Pastrana on 2024-04-08.
  */
 namespace utils {
-
-    template<typename ...T>
-    void print_mpi_debug_comments(const fmt::format_string<T...> &formatString, T &&... args) {
+    template <typename... T>
+    void print_mpi_debug_comments(const fmt::format_string<T...>& p_format_string, T&&... p_args) {
 #ifdef DEBUG_COMMENTS
-        spdlog::info(formatString, std::forward<T>(args)...);
+        spdlog::info(p_format_string, std::forward<T>(p_args)...);
 #endif
     }
 
-    template<typename T>
-    static std::future<std::any> convert_to_any_future(std::future<T> &&future) {
-        std::future<std::any> anyFuture = std::async(std::launch::async, [_future = std::move(future)]() mutable {
-            _future.wait();
-            T result = _future.get();
+    template <typename T>
+    static std::future<std::any> convert_to_any_future(std::future<T>&& p_future) {
+        std::future<std::any> any_future = std::async(std::launch::async, [fut = std::move(p_future)]() mutable {
+            fut.wait();
+            T result = fut.get();
             return std::make_any<T>(result);
         });
-        return anyFuture;
+        return any_future;
     }
 
-};
+    // already adapted for multi-branching
+    static int get_next_child(const int p_child, const int p_parent, const int p_children_per_node, const int p_depth) {
+        return p_child * static_cast<int>(pow(p_children_per_node, p_depth)) + p_parent;
+    }
 
-#endif //UTILS_H
+    static void build_topology(tree& p_tree, int p_parent, const int p_depth_start, const int p_children_per_node, const int p_total) {
+        for (int depth = p_depth_start; depth < log2(p_total); depth++) {
+            for (int child = 1; child < p_children_per_node; child++) {
+                int next_child = get_next_child(child, p_parent, p_children_per_node, depth);
+                if (next_child >= p_total || next_child <= 0) {
+                    continue;
+                }
+                p_tree[p_parent].add_next(next_child);
+                spdlog::info("process: {}, child: {}\n", p_parent, next_child);
+                build_topology(p_tree, next_child, depth + 1, p_children_per_node, p_total);
+            }
+        }
+    }
+}; // namespace utils
+
+#endif // UTILS_H
