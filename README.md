@@ -4,10 +4,8 @@
 <a href="https://github.com/rapastranac/gempba/actions">
     <img src="https://github.com/rapastranac/gempba/actions/workflows/c-cpp.yml/badge.svg" alt="CI Status"/>
   </a>
-  <a href="https://github.com/p-ranav/argparse/blob/master/LICENSE">
-    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="license"/>
-  </a>
-  <img src="https://img.shields.io/badge/version-1.0-blue.svg?cacheSeconds=2592000" alt="version"/>
+  <img alt="GitHub License" src="https://img.shields.io/github/license/rapastranac/gempba">
+  <img alt="GitHub Release" src="https://img.shields.io/github/v/release/rapastranac/gempba">
 </p>
 
 <br /> 
