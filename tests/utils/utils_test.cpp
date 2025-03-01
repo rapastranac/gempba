@@ -33,26 +33,26 @@
  * @date 2024-08-31
  */
 
-TEST(UtilsTest, ConvertToAnyFuture_Int) {
+TEST(utils_test, convert_to_any_future_int) {
 
     std::promise<int> promise;
     std::future<int> future = promise.get_future();
     promise.set_value(42);
 
     std::future<std::any> any_future = utils::convert_to_any_future(std::move(future));
-    std::any result = any_future.get();
+    const std::any result = any_future.get();
 
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(std::any_cast<int>(result), 42);
 }
 
-TEST(UtilsTest, ConvertToAnyFuture_String) {
+TEST(utils_test, convert_to_any_future_string) {
     std::promise<std::string> promise;
     std::future<std::string> future = promise.get_future();
     promise.set_value("hello");
 
     std::future<std::any> any_future = utils::convert_to_any_future(std::move(future));
-    std::any result = any_future.get();
+    const std::any result = any_future.get();
 
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(std::any_cast<std::string>(result), "hello");
@@ -127,4 +127,39 @@ TEST(utils_test, build_topology_three_children_per_node) {
     EXPECT_EQ(0, tree_instance[24].size());
     EXPECT_EQ(0, tree_instance[25].size());
     EXPECT_EQ(0, tree_instance[26].size());
+}
+
+TEST(utils_test, shift_left) {
+    // Test: Fully populated vector with no -1 values
+
+    std::vector vec = {1, 2, 3, 4, 5, 6};
+    utils::shift_left(vec);
+    EXPECT_EQ(vec, std::vector({2, 3, 4, 5, 6, -1}));
+
+    utils::shift_left(vec);
+    EXPECT_EQ(vec, std::vector({3, 4, 5, 6, -1, -1}));
+
+    utils::shift_left(vec);
+    EXPECT_EQ(vec, std::vector({4, 5, 6, -1, -1, -1}));
+
+    utils::shift_left(vec);
+    EXPECT_EQ(vec, std::vector({5, 6, -1, -1, -1, -1}));
+
+    utils::shift_left(vec);
+    EXPECT_EQ(vec, std::vector({6, -1, -1, -1, -1, -1}));
+
+    utils::shift_left(vec);
+    EXPECT_EQ(vec, std::vector({-1, -1, -1, -1, -1, -1}));
+
+    // nothing else happens
+    utils::shift_left(vec);
+    EXPECT_EQ(vec, std::vector({-1, -1, -1, -1, -1, -1}));
+
+    // empty vector
+    try {
+        std::vector<int> vec2;
+        utils::shift_left(vec2);
+    } catch (const std::exception& e) {
+        EXPECT_STREQ(e.what(), "Attempted to shift an empty vector");
+    }
 }
