@@ -362,7 +362,7 @@ namespace gempba {
             this method puts the rank of these nodes into the array in the order that they
             are supposed to help the parent
         */
-        void assignNodes() {
+        void broadcast_nodes_topology() {
             // send initial topology to each process
             for (int rank = 1; rank < world_size; rank++) {
                 std::vector<int> buffer_tmp;
@@ -408,7 +408,7 @@ namespace gempba {
             if (!m_custom_initial_topology) {
                 build_topology(1, 0, 2, world_size);
             }
-            assignNodes();
+            broadcast_nodes_topology();
 
             sendSeed(p_seed, p_seed_size);
 
