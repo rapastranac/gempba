@@ -410,7 +410,7 @@ namespace gempba {
             }
             broadcast_nodes_topology();
 
-            sendSeed(p_seed, p_seed_size);
+            send_seed(p_seed, p_seed_size);
 
             int rcv_availability = 0;
 
@@ -620,7 +620,7 @@ namespace gempba {
             }
         }
 
-        void sendSeed(const char* buffer, const int COUNT) {
+        void send_seed(const char *buffer, const int COUNT) {
             const int dest = 1;
             // global synchronisation **********************
             --nAvailable;
