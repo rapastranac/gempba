@@ -343,14 +343,14 @@ namespace gempba {
             }
         }
 
-        void buildWaitingList(int pi, int base_d, int b, int p) {
+        void build_topology(int pi, int base_d, int b, int p) {
             for (int depth = base_d; depth < log2(p); depth++) {
                 for (int j = 1; j < b; j++) {
                     int q = getNextProcess(j, pi, b, depth);
                     if (q < p && q > 0) {
                         processTree[pi].add_next(q);
                         spdlog::debug("process: {}, child: {}\n", pi, q);
-                        buildWaitingList(q, depth + 1, b, p);
+                        build_topology(q, depth + 1, b, p);
                     }
                 }
             }
@@ -406,7 +406,7 @@ namespace gempba {
             start_time = MPI_Wtime();
 
             if (!m_custom_initial_topology) {
-                buildWaitingList(1, 0, 2, world_size);
+                build_topology(1, 0, 2, world_size);
             }
             assignNodes();
 
