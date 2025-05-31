@@ -1,5 +1,5 @@
 #include "MPI_Scheduler.hpp"
-#include "../GemPBA/BranchHandler/BranchHandler.hpp"
+#include "BranchHandler/BranchHandler.hpp"
 
 namespace gempba {
     void gempba::MPI_Scheduler::taskFunneling(BranchHandler &branchHandler) {

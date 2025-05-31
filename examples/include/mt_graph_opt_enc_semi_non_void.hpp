@@ -1,7 +1,7 @@
 #ifndef GEMPBA_MT_GRAPH_OPT_ENC_SEMI_NON_VOID_HPP
 #define GEMPBA_MT_GRAPH_OPT_ENC_SEMI_NON_VOID_HPP
 
-#include "../GemPBA/DLB/DLB_Handler.hpp"
+#include "DLB/DLB_Handler.hpp"
 #include "VertexCover.hpp"
 
 // TODO... The whole algorithm passes by value, which is not efficient. We should pass by reference.
