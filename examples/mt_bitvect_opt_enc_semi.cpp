@@ -36,7 +36,7 @@ int run(int numThreads, int prob, std::string &filename) {
     gbitset allones = ~allzeros;
 
     branchHandler.setRefValue(gsize);
-    branchHandler.setLookupStrategy(gempba::MINIMISE);
+    branchHandler.set_lookup_strategy(gempba::MINIMISE);
 
     int zero = 0;
     int solsize = graph.size();

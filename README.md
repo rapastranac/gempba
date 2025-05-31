@@ -128,7 +128,7 @@ void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
 
     /*  if parent is nullptr, then a virtual root is should be created
     such that branches within this scope can be accessed from below */
-    if (branchHandler.getLoadBalancingStrategy() == gempba::QUASI_HORIZONTAL) {
+    if (branchHandler.get_load_balancing_strategy() == gempba::QUASI_HORIZONTAL) {
         dummyParent = new HolderType(dlb, id);
         dlb.linkVirtualRoot(id, dummyParent, rHolder_l, rHolder_m, rHolder_r);
     }
@@ -212,7 +212,7 @@ void foo1(int id, MyClass instance, float f, double d, void *parent = nullptr)
     HolderType rHolder_m(dlb, id, parent);
     HolderType rHolder_r(dlb, id, parent);
 
-    if (branchHandler.getLoadBalancingStrategy() == gempba::QUASI_HORIZONTAL) {
+    if (branchHandler.get_load_balancing_strategy() == gempba::QUASI_HORIZONTAL) {
         dummyParent = new HolderType(dlb, id);
         dlb.linkVirtualRoot(id, dummyParent, rHolder_l, rHolder_m, rHolder_r);
     }
@@ -299,7 +299,7 @@ void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
     HolderType rHolder_m(dlb, id, parent);
     HolderType rHolder_r(dlb, id, parent);
 
-    if (branchHandler.getLoadBalancingStrategy() == gempba::QUASI_HORIZONTAL){
+    if (branchHandler.get_load_balancing_strategy() == gempba::QUASI_HORIZONTAL){
         dummyParent = new HolderType(dlb, id);
         dlb.linkVirtualRoot(id, dummyParent, rHolder_l, rHolder_m, rHolder_r);
     }
@@ -466,7 +466,7 @@ int main(){
     If minimisation, reference value or best value so far is INT_MAX
     
     By default, GemPBA maximises, thus the below line is optional for maximisation*/
-	branchHandler.setLookupStrategy(gempba::MAXIMISE);
+	branchHandler.set_lookup_strategy(gempba::MAXIMISE);
 
     // Here we set the best value so far if known somehow, optional
     branchHandler.setRefValue(/* some integer*/); 
@@ -631,7 +631,7 @@ int main(){
     *   initial data reading
     */
     
-    branchHandler.setLookupStrategy(gempba::MINIMISE);
+    branchHandler.set_lookup_strategy(gempba::MINIMISE);
     branchHandler.setRefValue(/* some integer*/); 
     if (rank == 0) {
         std::string buffer = serializer(instance, f, d);
@@ -688,7 +688,7 @@ void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
     HolderType rHolder_m(dlb, id, parent);
     HolderType rHolder_r(dlb, id, parent);
 
-    if (branchHandler.getLoadBalancingStrategy()==gempba::QUASI_HORIZONTAL){
+    if (branchHandler.get_load_balancing_strategy()==gempba::QUASI_HORIZONTAL){
         dummyParent = new HolderType(dlb, id);
         dlb.linkVirtualRoot(id, dummyParent, rHolder_l, rHolder_m, rHolder_r);
     }

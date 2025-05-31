@@ -67,7 +67,7 @@ namespace gempba {
         std::pair<int, std::string> bestSolution_serialized;
 
         DLB_Handler &dlb = gempba::DLB_Handler::getInstance();
-        LoadBalancingStrategy _loadBalancingStrategy = QUASI_HORIZONTAL;
+        load_balancing_strategy _loadBalancingStrategy = QUASI_HORIZONTAL;
 
         int refValueLocal = INT_MIN;
         bool maximisation = true;
@@ -207,11 +207,11 @@ namespace gempba {
         BranchHandler &operator=(BranchHandler &&) = delete;
         //</editor-fold>
 
-        void setLoadBalancingStrategy(LoadBalancingStrategy strategy) {
+        void set_load_balancing_strategy(load_balancing_strategy strategy) {
             this->_loadBalancingStrategy = strategy;
         };
 
-        LoadBalancingStrategy getLoadBalancingStrategy() const {
+        load_balancing_strategy get_load_balancing_strategy() const {
             return _loadBalancingStrategy;
         }
 
@@ -258,7 +258,7 @@ namespace gempba {
             return numThreadRequests.load();
         }
 
-        void setLookupStrategy(LookupStrategy strategy) {
+        void set_lookup_strategy(lookup_strategy strategy) {
             switch (strategy) {
                 case MAXIMISE: {
                     return; // maximise by default

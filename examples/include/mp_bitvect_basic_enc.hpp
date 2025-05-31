@@ -409,7 +409,7 @@ public:
 
         hol_l.setDepth(depth);
         hol_r.setDepth(depth);
-        if (branchHandler.getLoadBalancingStrategy() == gempba::QUASI_HORIZONTAL) {
+        if (branchHandler.get_load_balancing_strategy() == gempba::QUASI_HORIZONTAL) {
             dummyParent = new HolderType(dlb, id);
             dlb.linkVirtualRoot(id, dummyParent, hol_l, hol_r);
         }
