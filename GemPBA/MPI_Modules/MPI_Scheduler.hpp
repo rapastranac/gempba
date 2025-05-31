@@ -382,10 +382,10 @@ namespace gempba {
         void sendSolution(auto &&resultFetcher) {
             auto [refVal, buffer] = resultFetcher();
             if (buffer.starts_with("Empty")) {
-                MPI_Send(buffer.data(), buffer.size(), MPI_CHAR, 0, NO_RESULT_TAG, world_Comm);
+                MPI_Send(buffer.data(), buffer.size(), MPI_CHAR, CENTER, NO_RESULT_TAG, world_Comm);
             } else {
-                MPI_Send(buffer.data(), buffer.size(), MPI_CHAR, 0, HAS_RESULT_TAG, world_Comm);
-                MPI_Send(&refVal, 1, MPI_INT, 0, HAS_RESULT_TAG, world_Comm);
+                MPI_Send(buffer.data(), buffer.size(), MPI_CHAR, CENTER, HAS_RESULT_TAG, world_Comm);
+                MPI_Send(&refVal, 1, MPI_INT, CENTER, HAS_RESULT_TAG, world_Comm);
             }
         }
 

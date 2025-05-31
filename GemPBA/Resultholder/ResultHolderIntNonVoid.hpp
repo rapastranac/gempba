@@ -68,11 +68,11 @@ namespace gempba {
                 MPI_Status status;
                 int Bytes;
 
-                MPI_Probe(this->dest_rank, MPI::ANY_TAG, this->branchHandler.getCommunicator(), &status); // receives status before receiving the message
-                MPI_Get_count(&status, MPI::CHAR, &Bytes);                                                // receives total number of datatype elements of the message
+                MPI_Probe(this->dest_rank, MPI_ANY_TAG, this->branchHandler.getCommunicator(), &status); // receives status before receiving the message
+                MPI_Get_count(&status, MPI_CHAR, &Bytes);                                                // receives total number of datatype elements of the message
 
                 char *in_buffer = new char[Bytes];
-                MPI_Recv(in_buffer, Bytes, MPI::CHAR, this->dest_rank, MPI::ANY_TAG,
+                MPI_Recv(in_buffer, Bytes, MPI_CHAR, this->dest_rank, MPI_ANY_TAG,
                          this->branchHandler.getCommunicator(), &status);
 
                 // printf("rank %d received %d Bytes from %d! \n", branchHandler.world_rank, Bytes, dest_rank);

@@ -66,7 +66,7 @@ namespace gempba {
         if ((maximisation && _refGlobal > _refLocal) || (!maximisation && _refGlobal < _refLocal)) {
             branchHandler.updateRefValue(_refGlobal);
         } else if ((maximisation && _refLocal > _refGlobal) || (!maximisation && _refLocal < _refGlobal)) {
-            MPI_Ssend(&_refLocal, 1, MPI_INT, 0, REFVAL_UPDATE_TAG, world_Comm);
+            MPI_Ssend(&_refLocal, 1, MPI_INT, CENTER, REFVAL_UPDATE_TAG, world_Comm);
         }
     }
 }

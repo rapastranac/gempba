@@ -14,6 +14,7 @@
 #include <boost/unordered_set.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/container/flat_map.hpp>
+#include <format>
 
 #include <memory_resource>
 
@@ -261,11 +262,12 @@ public:
             auto clock = std::chrono::system_clock::now();
             std::time_t time = std::chrono::system_clock::to_time_t(clock); //it includes a "\n"
 
-            auto str = fmt::format(
+            auto ctime = std::ctime(&time);
+            auto str = std::format(
                     "WR= {} ID= {} passes={} gsize={} refvalue={} solsize={} isskips={} deglbskips={} {}",
-                    branchHandler.rank_me(), id, passes, bits_in_graph.count(),
+                    branchHandler.rank_me(), id, passes.load(), bits_in_graph.count(),
                     branchHandler.refValue(), cursol_size, is_skips, deglb_skips,
-                    std::ctime(&time));
+                    ctime);
 
             cout << str;
 
