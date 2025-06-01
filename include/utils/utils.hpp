@@ -99,7 +99,13 @@ namespace utils {
         }
     }
 
-
+    static double wall_time() {
+        timeval time{};
+        if (gettimeofday(&time, nullptr)) {
+            return -1.0;
+        }
+        return static_cast<double>(time.tv_sec) + static_cast<double>(time.tv_usec) * .000001;
+    }
 }; // namespace utils
 
 #endif // UTILS_H
