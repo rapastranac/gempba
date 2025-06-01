@@ -2,7 +2,7 @@
 #ifndef MPI_SCHEDULER_CENTRALIZED_HPP
 #define MPI_SCHEDULER_CENTRALIZED_HPP
 
-#include "utils/Tree.hpp"
+#include "utils/tree.hpp"
 #include "utils/Queue.hpp"
 #include "Resultholder/ResultHolderParent.hpp"
 #include "scheduler_parent.hpp"
@@ -769,7 +769,7 @@ namespace gempba {
         int nRunning = 0;
         int nAvailable = 0;
         std::vector<int> processState; // state of the nodes : running, assigned or available
-        Tree processTree;
+        tree processTree;
 
         std::mutex mtx;
         std::atomic<bool> transmitting;

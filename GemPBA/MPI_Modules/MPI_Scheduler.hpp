@@ -3,7 +3,7 @@
 #define MPI_SCHEDULER_HPP
 
 #include "scheduler_parent.hpp"
-#include "utils/Tree.hpp"
+#include "utils/tree.hpp"
 #include "utils/Queue.hpp"
 #include "utils/utils.hpp"
 
@@ -343,7 +343,7 @@ namespace gempba {
                 for (int j = 1; j < b; j++) {
                     int q = getNextProcess(j, pi, b, depth);
                     if (q < p && q > 0) {
-                        processTree[pi].addNext(q);
+                        processTree[pi].add_next(q);
                         spdlog::info("process: {}, child: {}\n", pi, q);
                         buildWaitingList(q, depth + 1, b, p);
                     }
@@ -425,16 +425,16 @@ namespace gempba {
                         ++nRunning;
                         utils::print_mpi_debug_comments("rank {} reported running, nRunning :{}\n", status.MPI_SOURCE, nRunning);
 
-                        if (processTree[status.MPI_SOURCE].isAssigned())
+                        if (processTree[status.MPI_SOURCE].is_assigned())
                             processTree[status.MPI_SOURCE].release();
 
-                        if (!processTree[status.MPI_SOURCE].hasNext()) // checks if notifying node has a child to push to
+                        if (!processTree[status.MPI_SOURCE].has_next()) // checks if notifying node has a child to push to
                         {
                             int nxt = getAvailable();
                             if (nxt > 0) {
                                 // put(&nxt, 1, status.MPI_SOURCE, MPI_INT, 0, win_nextProcess);
                                 MPI_Send(&nxt, 1, MPI_INT, status.MPI_SOURCE, NEXT_PROCESS_TAG, nextProcess_Comm);
-                                processTree[status.MPI_SOURCE].addNext(nxt);
+                                processTree[status.MPI_SOURCE].add_next(nxt);
                                 processState[nxt] = STATE_ASSIGNED;
                                 --nAvailable;
                             }
@@ -448,7 +448,7 @@ namespace gempba {
                         ++nAvailable;
                         --nRunning;
 
-                        if (processTree[status.MPI_SOURCE].isAssigned()) {
+                        if (processTree[status.MPI_SOURCE].is_assigned()) {
                             processTree[status.MPI_SOURCE].release();
                         }
                         utils::print_mpi_debug_comments("rank {} reported available, nRunning :{}\n", status.MPI_SOURCE, nRunning);
@@ -465,12 +465,12 @@ namespace gempba {
                             if (rank > 0) {
                                 if (processState[rank] == STATE_RUNNING) // finds the first running node
                                 {
-                                    if (!processTree[rank].hasNext()) // checks if running node has a child to push to
+                                    if (!processTree[rank].has_next()) // checks if running node has a child to push to
                                     {
                                         MPI_Send(&status.MPI_SOURCE, 1, MPI_INT, rank, NEXT_PROCESS_TAG,
                                                  nextProcess_Comm);
 
-                                        processTree[rank].addNext(
+                                        processTree[rank].add_next(
                                                 status.MPI_SOURCE);      // assigns returning node to the running node
                                         processState[status.MPI_SOURCE] = STATE_ASSIGNED; // it flags returning node as assigned
                                         --nAvailable;                                      // assigned, not available any more
@@ -680,7 +680,7 @@ namespace gempba {
         int nRunning = 0;
         int nAvailable = 0;
         std::vector<int> processState; // state of the nodes: running, assigned or available
-        Tree processTree;
+        tree processTree;
 
         std::mutex mtx;
         std::atomic<bool> transmitting;
