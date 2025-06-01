@@ -2,8 +2,8 @@
 #ifndef MPI_SCHEDULER_CENTRALIZED_HPP
 #define MPI_SCHEDULER_CENTRALIZED_HPP
 
-#include "Tree.hpp"
-#include "../../include/utils/Queue.hpp"
+#include "utils/Tree.hpp"
+#include "utils/Queue.hpp"
 #include "Resultholder/ResultHolderParent.hpp"
 #include "scheduler_parent.hpp"
 #include "centralized_utils.hpp"

@@ -3,7 +3,7 @@
 #define MPI_SCHEDULER_HPP
 
 #include "scheduler_parent.hpp"
-#include "Tree.hpp"
+#include "utils/Tree.hpp"
 #include "utils/Queue.hpp"
 #include "utils/utils.hpp"
 
