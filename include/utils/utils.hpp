@@ -37,7 +37,7 @@ namespace utils {
     template <typename... T>
     void print_mpi_debug_comments(const fmt::format_string<T...>& p_format_string, T&&... p_args) {
 #ifdef DEBUG_COMMENTS
-        spdlog::info(p_format_string, std::forward<T>(p_args)...);
+        spdlog::debug(p_format_string, std::forward<T>(p_args)...);
 #endif
     }
 
@@ -64,7 +64,7 @@ namespace utils {
                     continue;
                 }
                 p_tree[p_parent].add_next(next_child);
-                spdlog::info("process: {}, child: {}\n", p_parent, next_child);
+                spdlog::debug("process: {}, child: {}\n", p_parent, next_child);
                 build_topology(p_tree, next_child, depth + 1, p_children_per_node, p_total);
             }
         }

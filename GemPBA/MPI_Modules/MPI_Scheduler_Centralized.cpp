@@ -45,7 +45,7 @@ namespace gempba {
             }
         }
 #ifdef DEBUG_COMMENTS
-        spdlog::info("rank {} sent {} tasks\n", world_rank, nTasksSent);
+        spdlog::debug("rank {} sent {} tasks\n", world_rank, nTasksSent);
 #endif
 
         if (!q.empty())

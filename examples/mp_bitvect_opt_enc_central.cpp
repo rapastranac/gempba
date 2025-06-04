@@ -67,7 +67,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
     mpiScheduler.barrier();
 
     int pid = getpid();                                       // for debugging purposes
-    spdlog::info("rank {} is process ID : {}\n", rank, pid); // for debugging purposes
+    spdlog::debug("rank {} is process ID : {}\n", rank, pid); // for debugging purposes
 
     mpiScheduler.barrier();
 
@@ -130,34 +130,34 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
         ss << buffer;
 
         deserializer(ss, solsize);
-        spdlog::info("Cover size : {} \n", solsize);
+        spdlog::debug("Cover size : {} \n", solsize);
 
         double global_cpu_idle_time = 0;
         for (int i = 1; i < world_size; i++) {
             global_cpu_idle_time += idleTime[i];
         }
-        spdlog::info("\nGlobal cpu idle time: {0:.6f} seconds\n\n\n", global_cpu_idle_time);
+        spdlog::debug("\nGlobal cpu idle time: {0:.6f} seconds\n\n\n", global_cpu_idle_time);
 
         // **************************************************************************
 
         for (int rank = 1; rank < world_size; rank++) {
-            spdlog::info("tasks sent by rank {} = {} \n", rank, nTasksSent[rank]);
+            spdlog::debug("tasks sent by rank {} = {} \n", rank, nTasksSent[rank]);
         }
-        spdlog::info("\n");
+        spdlog::debug("\n");
 
         for (int rank = 1; rank < world_size; rank++) {
-            spdlog::info("tasks received by rank {} = {} \n", rank, nTasksRecvd[rank]);
+            spdlog::debug("tasks received by rank {} = {} \n", rank, nTasksRecvd[rank]);
         }
-        spdlog::info("\n");
+        spdlog::debug("\n");
         size_t totalThreadRequests = 0;
         for (int rank = 1; rank < world_size; rank++) {
             size_t rank_thread_requests = threadRequests[rank];
             totalThreadRequests += rank_thread_requests;
 
-            spdlog::info("rank {}, thread requests: {} \n", rank, rank_thread_requests);
+            spdlog::debug("rank {}, thread requests: {} \n", rank, rank_thread_requests);
         }
 
-        spdlog::info("\n\n\n");
+        spdlog::debug("\n\n\n");
 
         // print stats to a file ***********
         printToSummaryFile(job_id, nodes, ntasks_per_node, ntasks_per_socket, threads_per_task, filename_directory,

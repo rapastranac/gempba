@@ -82,12 +82,12 @@ namespace gempba {
         }
 
         void printStats() override {
-            spdlog::info("\n \n \n");
-            spdlog::info("*****************************************************\n");
-            spdlog::info("Elapsed time : {:4.3f} \n", elapsedTime());
-            spdlog::info("Total number of requests : {} \n", totalRequests);
-            spdlog::info("*****************************************************\n");
-            spdlog::info("\n \n \n");
+            spdlog::debug("\n \n \n");
+            spdlog::debug("*****************************************************\n");
+            spdlog::debug("Elapsed time : {:4.3f} \n", elapsedTime());
+            spdlog::debug("Total number of requests : {} \n", totalRequests);
+            spdlog::debug("*****************************************************\n");
+            spdlog::debug("\n \n \n");
         }
 
         double elapsedTime() const override {
@@ -288,7 +288,7 @@ namespace gempba {
 
         bool isTerminated(int TAG) {
             if (TAG == TERMINATION_TAG) {
-                spdlog::info("rank {} exited\n", world_rank);
+                spdlog::debug("rank {} exited\n", world_rank);
                 MPI_Barrier(world_Comm);
                 return true;
             }
@@ -344,7 +344,7 @@ namespace gempba {
                     int q = getNextProcess(j, pi, b, depth);
                     if (q < p && q > 0) {
                         processTree[pi].add_next(q);
-                        spdlog::info("process: {}, child: {}\n", pi, q);
+                        spdlog::debug("process: {}, child: {}\n", pi, q);
                         buildWaitingList(q, depth + 1, b, p);
                     }
                 }
@@ -503,11 +503,11 @@ namespace gempba {
                         if (signal) {
                             static int success = 0;
                             success++;
-                            spdlog::info("refValueGlobal updated to : {} by rank {}\n", refValueGlobal, status.MPI_SOURCE);
+                            spdlog::debug("refValueGlobal updated to : {} by rank {}\n", refValueGlobal, status.MPI_SOURCE);
                         } else {
                             static int failures = 0;
                             failures++;
-                            spdlog::info("FAILED updates : {}, refValueGlobal : {} by rank {}\n", failures, refValueGlobal, status.MPI_SOURCE);
+                            spdlog::debug("FAILED updates : {}, refValueGlobal : {} by rank {}\n", failures, refValueGlobal, status.MPI_SOURCE);
                         }
                     }
                         break;
@@ -600,13 +600,13 @@ namespace gempba {
 
                         delete[] buffer;
 
-                        spdlog::info("solution received from rank {}, count : {}, refVal {} \n", rank, count, refValue);
+                        spdlog::debug("solution received from rank {}, count : {}, refVal {} \n", rank, count, refValue);
                     }
                         break;
 
                     case NO_RESULT_TAG: {
                         delete[] buffer;
-                        spdlog::info("solution NOT received from rank {}\n", rank);
+                        spdlog::debug("solution NOT received from rank {}\n", rank);
                     }
                         break;
                 }
@@ -622,9 +622,9 @@ namespace gempba {
 
             int err = MPI_Ssend(buffer, COUNT, MPI_CHAR, dest, 0, world_Comm); // send buffer
             if (err != MPI_SUCCESS)
-                spdlog::info("buffer failed to send! \n");
+                spdlog::debug("buffer failed to send! \n");
 
-            spdlog::info("Seed sent \n");
+            spdlog::debug("Seed sent \n");
         }
 
         void createCommunicators() {
@@ -639,7 +639,7 @@ namespace gempba {
 
             /*if (world_size < 2)
             {
-                spdlog::info("At least two processes required !!\n");
+                spdlog::debug("At least two processes required !!\n");
                 MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
             }*/
         }
@@ -721,7 +721,7 @@ namespace gempba {
             MPI_Init_thread(argc, &argv, MPI_THREAD_FUNNELED, &provided);
 
             if (provided < MPI_THREAD_FUNNELED) {
-                spdlog::info("The threading support level is lesser than that demanded.\n");
+                spdlog::debug("The threading support level is lesser than that demanded.\n");
                 MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
             }
 
@@ -729,7 +729,7 @@ namespace gempba {
 
             int namelen;
             MPI_Get_processor_name(processor_name, &namelen);
-            spdlog::info("Process {} of {} is on {}\n", world_rank, world_size, processor_name);
+            spdlog::debug("Process {} of {} is on {}\n", world_rank, world_size, processor_name);
             allocateMPI();
         }
 

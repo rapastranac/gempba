@@ -126,7 +126,7 @@ public:
             int C = g.coverSize();
 
             if (C == 0) {
-                spdlog::info("rank {}, thread {}, cover is empty\n", branchHandler.rank_me(), id);
+                spdlog::debug("rank {}, thread {}, cover is empty\n", branchHandler.rank_me(), id);
                 throw;
             }
             if (C < branchHandler.refValue()) // user's condition to see if it's worth it to make branch call
@@ -141,7 +141,7 @@ public:
         hol_r.bind_branch_checkIn([&] {
             Graph g = graph;
             if (g.empty())
-                spdlog::info("rank {}, thread {}, Graph is empty\n", branchHandler.rank_me(), id);
+                spdlog::debug("rank {}, thread {}, Graph is empty\n", branchHandler.rank_me(), id);
 
             g.removeNv(v);
             g.clean_graph();
