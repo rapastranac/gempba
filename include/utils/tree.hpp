@@ -106,7 +106,8 @@ class tree {
                 spdlog::throw_spdlog_ex("node " + std::to_string(m_index) + " is not assigned to any other node");
             }
 
-            if (m_left_sibling && m_right_sibling) { // both non-nullptr
+            if (m_left_sibling && m_right_sibling) {
+                // both non-nullptr
                 // in the middle
                 m_left_sibling->m_right_sibling = m_right_sibling;
                 m_right_sibling->m_left_sibling = m_left_sibling;
@@ -114,14 +115,16 @@ class tree {
                 m_parent = nullptr;
                 m_right_sibling = nullptr;
                 m_left_sibling = nullptr;
-            } else if (m_left_sibling && !m_right_sibling) { // left non-null and right null
+            } else if (m_left_sibling && !m_right_sibling) {
+                // left non-null and right null
                 // last one
                 m_left_sibling->m_right_sibling = nullptr;
                 m_parent->m_last = m_left_sibling;
                 --(m_parent->m_children_count);
                 m_parent = nullptr;
                 m_left_sibling = nullptr;
-            } else { // (!m_left_sibling && m_right_sibling) : left null and right non-null
+            } else {
+                // (!m_left_sibling && m_right_sibling) : left null and right non-null
                 // the only one or the first one
                 m_parent->pop_front();
             }
@@ -134,7 +137,9 @@ class tree {
 
             friend struct tree_node;
 
-            explicit m_iterator(tree_node* p_node) : m_node(p_node) {}
+            explicit m_iterator(tree_node* p_node) :
+                m_node(p_node) {
+            }
 
         public:
             int& operator*() const { return m_node->m_index; }
@@ -179,6 +184,15 @@ class tree {
 
 public:
     tree() = default;
+
+    // non-copyable
+    tree(const tree&) = delete;
+    tree& operator=(const tree&) = delete;
+
+    // movable
+    tree(tree&&) noexcept = default;
+    tree& operator=(tree&&) noexcept = default;
+
 
     explicit tree(const size_t p_size) {
         for (size_t i = 0; i < p_size; i++) {

@@ -68,6 +68,11 @@ namespace gempba {
             return totalRequests;
         }
 
+        void set_custom_initial_topology(tree&& p_tree) override {
+            processTree = std::move(p_tree);
+            m_custom_initial_topology = true;
+        }
+
         std::string fetchSolution() override {
             for (int rank = 1; rank < world_size; rank++) {
                 if (bestResults[rank].first == refValueGlobal) {
@@ -400,7 +405,9 @@ namespace gempba {
             MPI_Barrier(world_Comm);
             start_time = MPI_Wtime();
 
-            buildWaitingList(1, 0, 2, world_size);
+            if (!m_custom_initial_topology) {
+                buildWaitingList(1, 0, 2, world_size);
+            }
             assignNodes();
 
             sendSeed(SEED, SEED_SIZE);
@@ -680,6 +687,7 @@ namespace gempba {
         int nRunning = 0;
         int nAvailable = 0;
         std::vector<int> processState; // state of the nodes: running, assigned or available
+        bool m_custom_initial_topology = false; // true if the user has set a custom topology
         tree processTree;
 
         std::mutex mtx;

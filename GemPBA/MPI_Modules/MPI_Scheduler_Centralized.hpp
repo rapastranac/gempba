@@ -126,6 +126,11 @@ namespace gempba {
             return totalRequests;
         }
 
+        void set_custom_initial_topology(tree&& p_tree) override {
+            processTree = std::move(p_tree);
+            m_custom_initial_topology = true;
+        }
+
         double elapsedTime() const override {
             return (end_time - start_time) - static_cast<double>(TIMEOUT_TIME);
         }
@@ -769,6 +774,7 @@ namespace gempba {
         int nRunning = 0;
         int nAvailable = 0;
         std::vector<int> processState; // state of the nodes : running, assigned or available
+        bool m_custom_initial_topology = false; // true if the user has set a custom topology
         tree processTree;
 
         std::mutex mtx;

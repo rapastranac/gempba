@@ -6,6 +6,7 @@
 #include <string>
 #include <utility>
 #include "mpi/mpi.h"
+#include "utils/tree.hpp"
 
 namespace gempba {
 
@@ -58,6 +59,8 @@ namespace gempba {
         virtual void runCenter(const char *SEED, const int SEED_SIZE) = 0;
 
         virtual size_t getTotalRequests() const = 0;
+
+        virtual void set_custom_initial_topology(tree&& p_tree) = 0;
 
     };
 }
