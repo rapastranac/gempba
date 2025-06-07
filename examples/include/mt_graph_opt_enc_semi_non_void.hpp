@@ -81,7 +81,7 @@ namespace gempba {
             }
 
             if (graph.size() == 0) {
-#ifdef DEBUG_COMMENTS
+#ifdef GEMPBA_DEBUG_COMMENTS
                 printf("Leaf reached, depth : %d \n", depth);
 #endif
                 return termination(graph);

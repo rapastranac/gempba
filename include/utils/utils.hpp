@@ -36,7 +36,7 @@
 namespace utils {
     template <typename... T>
     void print_mpi_debug_comments(const fmt::format_string<T...>& p_format_string, T&&... p_args) {
-        #ifdef DEBUG_COMMENTS
+        #ifdef GEMPBA_DEBUG_COMMENTS
         spdlog::debug(p_format_string, std::forward<T>(p_args)...);
         #endif
     }

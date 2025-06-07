@@ -40,7 +40,7 @@ foreach (EXAMPLE ${EXAMPLES})
     # Compilation options by mode
     target_compile_options(${EXAMPLE_NAME} PRIVATE
             -Wall -Wextra -Wpedantic -pthread -fexceptions -fconcepts
-            $<$<CONFIG:Debug>:-g -O0 -ggdb3 -DDEBUG_COMMENTS>
+            $<$<CONFIG:Debug>:-g -O0 -ggdb3 -DGEMPBA_DEBUG_COMMENTS>
             $<$<CONFIG:Release>:-O3 -DNDEBUG>
     )
 endforeach ()

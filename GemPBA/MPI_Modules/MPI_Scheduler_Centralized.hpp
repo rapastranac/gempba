@@ -205,7 +205,7 @@ namespace gempba {
                 }
                 MPI_Get_count(&status, MPI_CHAR, &count); // receives total number of datatype elements of the message
 
-                #ifdef DEBUG_COMMENTS
+                #ifdef GEMPBA_DEBUG_COMMENTS
                 spdlog::debug("rank {}, received message from rank {}, tag {}, count : {}\n", world_rank, status.MPI_SOURCE, status.MPI_TAG, count);
                 #endif
                 char* message = new char[count];
@@ -221,12 +221,12 @@ namespace gempba {
                     notifyRunningState();
                     nTasksRecvd++;
 
-                    #ifdef DEBUG_COMMENTS
+                    #ifdef GEMPBA_DEBUG_COMMENTS
                     spdlog::debug("rank {}, pushing buffer to thread pool", world_rank, status.MPI_SOURCE);
                     #endif
                     //  push to the thread pool *********************************************************************
                     std::shared_ptr<ResultHolderParent> holder = bufferDecoder(message, count); // holder might be useful for non-void functions
-                    #ifdef DEBUG_COMMENTS
+                    #ifdef GEMPBA_DEBUG_COMMENTS
                     spdlog::debug("... DONE\n", world_rank, status.MPI_SOURCE);
                     #endif
                     // **********************************************************************************************
@@ -280,13 +280,13 @@ namespace gempba {
             MPI_Iprobe(CENTER, REFVAL_UPDATE_TAG, refValueGlobal_Comm, &flag, &status);
 
             if (flag) {
-                #ifdef DEBUG_COMMENTS
+                #ifdef GEMPBA_DEBUG_COMMENTS
                 spdlog::debug("rank {}, about to receive refValue from Center\n", world_rank);
                 #endif
 
                 MPI_Recv(&refValueGlobal, 1, MPI_INT, CENTER, REFVAL_UPDATE_TAG, refValueGlobal_Comm, &status);
 
-                #ifdef DEBUG_COMMENTS
+                #ifdef GEMPBA_DEBUG_COMMENTS
                 spdlog::debug("rank {}, received refValue: {} from Center\n", world_rank, refValueGlobal);
                 #endif
             }
@@ -305,7 +305,7 @@ namespace gempba {
                 char buf;
                 MPI_Recv(&buf, 1, MPI_CHAR, CENTER, CENTER_IS_FULL_TAG, centerFullness_Comm, &status);
                 isCenterFull = true;
-                #if DEBUG_COMMENTS
+                #if GEMPBA_DEBUG_COMMENTS
                 std::cout << "Node " << rank_me() << " received full center" << std::endl;
                 #endif
             }
@@ -316,7 +316,7 @@ namespace gempba {
                 char buf;
                 MPI_Recv(&buf, 1, MPI_CHAR, CENTER, CENTER_IS_FREE_TAG, centerFullness_Comm, &status);
                 isCenterFull = false;
-                #if DEBUG_COMMENTS
+                #if GEMPBA_DEBUG_COMMENTS
                 std::cout << "Node " << rank_me() << " received free center" << std::endl;
                 #endif
             }
@@ -338,7 +338,7 @@ namespace gempba {
         }
 
         void notifyAvailableState() {
-            #ifdef DEBUG_COMMENTS
+            #ifdef GEMPBA_DEBUG_COMMENTS
             spdlog::debug("rank {} entered notifyAvailableState()\n", world_rank);
             #endif
 
@@ -511,7 +511,7 @@ namespace gempba {
                 }
                 break;
                 case STATE_AVAILABLE: {
-                    #ifdef DEBUG_COMMENTS
+                    #ifdef GEMPBA_DEBUG_COMMENTS
                     spdlog::debug("center received state_available from rank {}\n", status.MPI_SOURCE);
                     #endif
                     processState[status.MPI_SOURCE] = STATE_AVAILABLE;
@@ -524,7 +524,7 @@ namespace gempba {
                     /* if center reaches this point, for sure nodes have attained a better reference value
                             or they are not up-to-date, thus it is required to broadcast it whether this value
                             changes or not  */
-                    #ifdef DEBUG_COMMENTS
+                    #ifdef GEMPBA_DEBUG_COMMENTS
                     spdlog::debug("center received refValue {} from rank {}\n", buffer, status.MPI_SOURCE);
                     #endif
                     bool signal = false;
@@ -577,7 +577,7 @@ namespace gempba {
                         }
                     }
 
-                    #ifdef DEBUG_COMMENTS
+                    #ifdef GEMPBA_DEBUG_COMMENTS
                     spdlog::debug("center received task from {}, current queue size is {}\n", status.MPI_SOURCE, center_queue.size());
                     #endif
                 }
@@ -664,7 +664,7 @@ namespace gempba {
                 char* buffer = new char[count];
                 MPI_Recv(buffer, count, MPI_CHAR, rank, MPI_ANY_TAG, world_Comm, &status);
 
-                #ifdef DEBUG_COMMENTS
+                #ifdef GEMPBA_DEBUG_COMMENTS
                 spdlog::debug("fetching result from rank {} \n", rank);
                 #endif
 
@@ -818,15 +818,15 @@ namespace gempba {
         }
 
         void finalize() {
-            #ifdef DEBUG_COMMENTS
+            #ifdef GEMPBA_DEBUG_COMMENTS
             spdlog::debug("rank {}, before deallocate \n", world_rank);
             #endif
             deallocateMPI();
-            #ifdef DEBUG_COMMENTS
+            #ifdef GEMPBA_DEBUG_COMMENTS
             spdlog::debug("rank {}, after deallocate \n", world_rank);
             #endif
             MPI_Finalize();
-            #ifdef DEBUG_COMMENTS
+            #ifdef GEMPBA_DEBUG_COMMENTS
             spdlog::debug("rank {}, after MPI_Finalize() \n", world_rank);
             #endif
         }

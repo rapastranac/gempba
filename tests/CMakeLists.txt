@@ -46,7 +46,7 @@ target_link_libraries(all_tests.out
 # Compilation options by mode
 target_compile_options(all_tests.out PRIVATE
         -Wall -Wextra -Wpedantic -pthread -fexceptions -fconcepts
-        $<$<CONFIG:Debug>:-g -O0 -ggdb3 -DDEBUG_COMMENTS>
+        $<$<CONFIG:Debug>:-g -O0 -ggdb3 -DGEMPBA_DEBUG_COMMENTS>
         $<$<CONFIG:Release>:-O3 -DNDEBUG>
 )
 

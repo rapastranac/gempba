@@ -151,7 +151,7 @@ namespace gempba {
             }
 
             /*
-            #ifdef DEBUG_COMMENTS
+            #ifdef GEMPBA_DEBUG_COMMENTS
             fmt::print("rank {}, likely to get an upperHolder \n", -1);
             int N_children = root->children.size();
             fmt::print("rank {}, root->children.size() = {} \n", -1, N_children);
@@ -193,7 +193,7 @@ namespace gempba {
 
                 return secondHolder;
             } else if (root->children.size() == 2) {
-                //#ifdef DEBUG_COMMENTS
+                //#ifdef GEMPBA_DEBUG_COMMENTS
                 //                fmt::print("rank {}, about to choose an upperHolder \n", -1);
                 //#endif
                 /*	this scope is meant to push right branch which was put in waiting line
