@@ -2,13 +2,14 @@
 #include "BranchHandler/BranchHandler.hpp"
 
 namespace gempba {
-    void gempba::MPI_Scheduler::taskFunneling(BranchHandler &branchHandler) {
-        std::string *message = nullptr;
+    void MPI_Scheduler::taskFunneling(BranchHandler& branchHandler) {
+        std::string* message = nullptr;
         bool isPop = q.pop(message);
         // nice(18); // this method changes OS priority of current thread, it should be carefully used
 
         while (true) {
-            while (isPop) { // as long as there is a message
+            while (isPop) {
+                // as long as there is a message
 
                 std::scoped_lock<std::mutex> lck(mtx);
                 std::unique_ptr<std::string> ptr(message);
@@ -57,8 +58,8 @@ namespace gempba {
         // nice(0);
     }
 
-    void MPI_Scheduler::updateRefValue(BranchHandler &branchHandler) {
-        int _refGlobal = refValueGlobal;          // constant within this scope
+    void MPI_Scheduler::updateRefValue(BranchHandler& branchHandler) {
+        int _refGlobal = refValueGlobal; // constant within this scope
         int _refLocal = branchHandler.refValue(); // constant within this scope
 
         // static size_t C = 0;

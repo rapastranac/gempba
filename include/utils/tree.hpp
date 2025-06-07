@@ -29,7 +29,8 @@
 
 class tree {
     struct tree_node {
-        explicit tree_node(tree& p_tree, const int p_index) : m_tree(p_tree) {
+        explicit tree_node(tree& p_tree, const int p_index) :
+            m_tree(p_tree) {
             this->m_index = p_index;
             this->m_children_count = 0;
             this->m_parent = nullptr;

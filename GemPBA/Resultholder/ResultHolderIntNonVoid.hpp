@@ -11,7 +11,7 @@
 
 namespace gempba {
 
-    template<typename Ret, typename... Args>
+    template <typename Ret, typename... Args>
     class ResultHolderInt<Ret, typename std::enable_if<!std::is_void<Ret>::value>::type, Args...> : virtual public ResultHolderBase<Args...> {
         friend class DLB_Handler;
 
@@ -20,15 +20,17 @@ namespace gempba {
         Ret expected;
 
     public:
-        explicit ResultHolderInt(DLB_Handler &dlb) : ResultHolderBase<Args...>(dlb) {}
+        explicit ResultHolderInt(DLB_Handler& dlb) :
+            ResultHolderBase<Args...>(dlb) {
+        }
 
         ~ResultHolderInt() override = default;
 
-        void hold_future(std::future<Ret> &&expectedFut) {
+        void hold_future(std::future<Ret>&& expectedFut) {
             this->expectedFut = std::move(expectedFut);
         }
 
-        void hold_actual_result(Ret &expected) {
+        void hold_actual_result(Ret& expected) {
             this->expected = std::move(expected);
         }
 
@@ -44,7 +46,7 @@ namespace gempba {
             return this->expected; // returns empty object of type _Ret,
         }
 
-#ifdef MULTIPROCESSING_ENABLED
+        #ifdef MULTIPROCESSING_ENABLED
 
         // in construction
         template<typename F_deser>
@@ -97,7 +99,7 @@ namespace gempba {
             return expected; // returns empty object of type _Ret,
         }
 
-#endif
+        #endif
     };
 }
 #endif

@@ -10,14 +10,16 @@
 #include "ResultHolderBase.hpp"
 
 namespace gempba {
-    template<typename Ret, typename... Args>
+    template <typename Ret, typename... Args>
     class ResultHolderInt<Ret, typename std::enable_if<std::is_void<Ret>::value>::type, Args...> : virtual public ResultHolderBase<Args...> {
         friend class DLB_Handler;
 
     public:
-        explicit ResultHolderInt(DLB_Handler &dlb) : ResultHolderBase<Args...>(dlb) {}
+        explicit ResultHolderInt(DLB_Handler& dlb) :
+            ResultHolderBase<Args...>(dlb) {
+        }
 
-        ~ResultHolderInt() override= default;
+        ~ResultHolderInt() override = default;
     };
 }
 #endif

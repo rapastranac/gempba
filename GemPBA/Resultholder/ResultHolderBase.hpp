@@ -1,22 +1,10 @@
 #ifndef BASE_HPP
 #define BASE_HPP
 
-#include "ResultHolderParent.hpp"
-
-#include <mpi.h>
 #include <cstdio>
-
-#include <omp.h>
-
-#include <fmt/format.h>
-
-#include <chrono>
-#include <list>
 #include <functional>
-#include <future>
 #include <tuple>
-#include <type_traits>
-#include "utils/utils.hpp"
+#include <Resultholder/ResultHolderParent.hpp>
 
 /*
  * Created by Andres Pastrana on 2019
@@ -27,16 +15,16 @@
 namespace gempba {
     class DLB_Handler;
 
-    template<typename... Args>
+    template <typename... Args>
     class ResultHolderBase : public ResultHolderParent {
         friend class DLB_Handler;
 
     protected:
-        DLB_Handler &dlb;
+        DLB_Handler& dlb;
 
         std::tuple<Args...> tup;
         std::function<bool()> branch_checkIn;
-        bool isPushed = false;    // It was performed by another thread
+        bool isPushed = false; // It was performed by another thread
         bool isForwarded = false; // It was performed sequentially
         bool isRetrieved = false;
         bool isDiscarded = false;
@@ -49,25 +37,26 @@ namespace gempba {
         int depth = -1;
         bool isVirtual = false;
 
-#ifdef MULTIPROCESSING_ENABLED
+        #ifdef MULTIPROCESSING_ENABLED
         // MPI attributes in construction, specially for non-void functions ******
         bool isMPISent = false; // flag to check if was sent via MPI
         int dest_rank = -1;     // rank destination
 
         // **********************
-#endif
+        #endif
 
     public:
-        explicit ResultHolderBase(DLB_Handler &dlb) : dlb(dlb) {
+        explicit ResultHolderBase(DLB_Handler& dlb) :
+            dlb(dlb) {
         }
 
         ~ResultHolderBase() override = default;
 
-        void holdArgs(Args &...args) {
-            this->tup = std::make_tuple(std::forward<Args &&>(args)...);
+        void holdArgs(Args&... args) {
+            this->tup = std::make_tuple(std::forward<Args&&>(args)...);
         }
 
-        std::tuple<Args...> &getArgs() {
+        std::tuple<Args...>& getArgs() {
             return tup;
         }
 
@@ -84,12 +73,12 @@ namespace gempba {
         }
 
         bool isFetchable() {
-#ifdef MULTIPROCESSING_ENABLED
+            #ifdef MULTIPROCESSING_ENABLED
             // return (isPushed || isForwarded || isMPISent) && !isRetrieved;
             return false;
-#else
+            #else
             return (isPushed || isForwarded) && !isRetrieved;
-#endif
+            #endif
         }
 
         bool is_forwarded() {
@@ -101,11 +90,11 @@ namespace gempba {
         }
 
         bool isTreated() {
-#ifdef MULTIPROCESSING_ENABLED
+            #ifdef MULTIPROCESSING_ENABLED
             return isPushed || isForwarded || isDiscarded || isRetrieved || isMPISent;
-#else
+            #else
             return isPushed || isForwarded || isDiscarded || isRetrieved;
-#endif
+            #endif
         }
 
         bool is_discarded() {
@@ -126,8 +115,8 @@ namespace gempba {
             this->isDiscarded = val;
         }
 
-        template<typename F>
-        void bind_branch_checkIn(F &&branch_checkIn) {
+        template <typename F>
+        void bind_branch_checkIn(F&& branch_checkIn) {
             this->branch_checkIn = std::bind(std::forward<F>(branch_checkIn));
         }
 
@@ -157,7 +146,7 @@ namespace gempba {
             }
         }
 
-#ifdef MULTIPROCESSING_ENABLED
+        #ifdef MULTIPROCESSING_ENABLED
 
         bool is_MPI_Sent() {
             return this->isMPISent;
@@ -173,10 +162,10 @@ namespace gempba {
             this->dest_rank = dest_rank;
         }
 
-#endif
+        #endif
     };
 
-    template<typename Ret, typename Enable = void, typename... Args>
+    template <typename Ret, typename Enable = void, typename... Args>
     class ResultHolderInt;
 }
 
