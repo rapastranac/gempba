@@ -9,7 +9,7 @@
 #include "MPI_Modules/MPI_Scheduler.hpp"
 
 
-#ifdef MULTIPROCESSING_ENABLED
+#ifdef GEMPBA_MULTIPROCESSING
 
 #include <mpi.h>
 #include <cstdio>
@@ -257,7 +257,7 @@ namespace gempba {
             case MINIMISE: {
                 maximisation = false;
                 refValueLocal = INT_MAX;
-                #ifdef MULTIPROCESSING_ENABLED
+                #ifdef GEMPBA_MULTIPROCESSING
                     mpiScheduler->setRefValStrategyLookup(maximisation); // TODO redundant
                 #endif
             }
@@ -267,7 +267,7 @@ namespace gempba {
 
         // get number for this rank
         int rank_me() {
-            #ifdef MULTIPROCESSING_ENABLED
+            #ifdef GEMPBA_MULTIPROCESSING
             return mpiScheduler->rank_me();
             #else
             return -1; // no multiprocessing enabled
@@ -423,7 +423,7 @@ namespace gempba {
                 throw std::runtime_error("Attempt to push a treated holder\n");
             }
 
-            #ifdef MULTIPROCESSING_ENABLED
+            #ifdef GEMPBA_MULTIPROCESSING
             if (holder.is_pushed() || holder.is_MPI_Sent())
                 return;
             #else
@@ -454,7 +454,7 @@ namespace gempba {
         }
 
     public:
-        #ifdef MULTIPROCESSING_ENABLED
+        #ifdef GEMPBA_MULTIPROCESSING
     private:
         gempba::SchedulerParent *mpiScheduler = nullptr;
         std::mutex mtx_MPI;             // mutex to ensure MPI_THREAD_SERIALIZED

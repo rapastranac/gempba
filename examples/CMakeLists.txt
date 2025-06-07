@@ -27,8 +27,8 @@ foreach (EXAMPLE ${EXAMPLES})
 
     # Check if the example name starts with "mp_"
     if (EXAMPLE_NAME MATCHES "^mp_")
-        message(STATUS "Adding MULTIPROCESSING_ENABLED for ${EXAMPLE_NAME}")
-        target_compile_definitions(${EXAMPLE_NAME} PRIVATE MULTIPROCESSING_ENABLED)
+        message(STATUS "Adding GEMPBA_MULTIPROCESSING for ${EXAMPLE_NAME}")
+        target_compile_definitions(${EXAMPLE_NAME} PRIVATE GEMPBA_MULTIPROCESSING)
     endif ()
 
     # Executables output directory

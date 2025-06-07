@@ -6,14 +6,14 @@ set(CMAKE_CXX_STANDARD 23)
 # ⚙️ Flags to control the compilation of tests and examples
 option(GEMPBA_BUILD_TESTS "Build gempba unit tests" OFF)
 option(GEMPBA_BUILD_EXAMPLES "Build gempba examples" OFF)
-option(MULTIPROCESSING_ENABLED "Enable multiprocessing support in gempba" OFF)
+option(GEMPBA_MULTIPROCESSING "Enable multiprocessing support in gempba" OFF)
 option(GEMPBA_DEBUG_COMMENTS "Enable debug comments in gempba" OFF)
 
 # 🧠 If used as a root project, we default to building tests and examples, otherwise, we turn them off.
 if (CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
     message(STATUS "GemPBA detected as root project. Defaulting to build tests and examples.")
 
-    set(MULTRIPROCESSING_ENABLED ON)
+    set(GEMPBA_MULTIPROCESSING ON)
     set(GEMPBA_BUILD_TESTS ON)
     set(GEMPBA_BUILD_EXAMPLES ON)
 
@@ -67,14 +67,14 @@ add_library(gempba STATIC ${Sources})
 
 # 🔧️ Add macros for the library
 target_compile_definitions(gempba PUBLIC
-        $<$<BOOL:${MULTIPROCESSING_ENABLED}>:MULTIPROCESSING_ENABLED>
+        $<$<BOOL:${GEMPBA_MULTIPROCESSING}>:GEMPBA_MULTIPROCESSING>
         $<$<BOOL:${GEMPBA_DEBUG_COMMENTS}>:GEMPBA_DEBUG_COMMENTS>
         $<$<BOOL:${GEMPBA_BUILD_EXAMPLES}>:GEMPBA_BUILD_EXAMPLES>
         $<$<BOOL:${GEMPBA_BUILD_TESTS}>:GEMPBA_BUILD_TESTS>
 )
 
 # Print messages to confirm the flags
-message(STATUS "🔧 MULTIPROCESSING_ENABLED=${MULTIPROCESSING_ENABLED}")
+message(STATUS "🔧 GEMPBA_MULTIPROCESSING=${GEMPBA_MULTIPROCESSING}")
 message(STATUS "🔧 GEMPBA_DEBUG_COMMENTS=${GEMPBA_DEBUG_COMMENTS}")
 message(STATUS "🔧 GEMPBA_BUILD_EXAMPLES=${GEMPBA_BUILD_EXAMPLES}")
 message(STATUS "🔧 GEMPBA_BUILD_TESTS=${GEMPBA_BUILD_TESTS}")

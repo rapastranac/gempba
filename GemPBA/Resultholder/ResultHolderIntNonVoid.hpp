@@ -46,7 +46,7 @@ namespace gempba {
             return this->expected; // returns empty object of type _Ret,
         }
 
-        #ifdef MULTIPROCESSING_ENABLED
+        #ifdef GEMPBA_MULTIPROCESSING
 
         // in construction
         template<typename F_deser>
