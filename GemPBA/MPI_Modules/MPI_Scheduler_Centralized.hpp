@@ -428,12 +428,12 @@ namespace gempba {
         }
 
         /*	run the center node */
-        void runCenter(const char* SEED, const int SEED_SIZE) override {
+        void runCenter(const char* p_seed, const int p_seed_size) override {
             std::cout << "Starting centralized scheduler" << std::endl;
             MPI_Barrier(world_Comm);
             start_time = MPI_Wtime();
 
-            sendSeed(SEED, SEED_SIZE);
+            sendSeed(p_seed, p_seed_size);
 
             int nbloops = 0;
             while (true) {

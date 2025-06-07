@@ -401,7 +401,7 @@ namespace gempba {
 
     public:
         /*	run the center node */
-        void runCenter(const char* SEED, const int SEED_SIZE) override {
+        void runCenter(const char* p_seed, const int p_seed_size) override {
             MPI_Barrier(world_Comm);
             start_time = MPI_Wtime();
 
@@ -410,7 +410,7 @@ namespace gempba {
             }
             assignNodes();
 
-            sendSeed(SEED, SEED_SIZE);
+            sendSeed(p_seed, p_seed_size);
 
             int rcv_availability = 0;
 
