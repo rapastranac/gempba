@@ -5,7 +5,11 @@ CMakeCache.txt
 Makefile
 cmake_install.cmake
 .vscode
+.vs
+CMakeSettings.json
 build
+.build-debug
+.build-release
 build-with-coverage
 cmake-build-debug
 cmake-build-debug-wsl

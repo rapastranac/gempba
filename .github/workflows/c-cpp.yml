@@ -41,12 +41,6 @@ jobs:
           git clone https://github.com/rapastranac/gempba.git
           cd gempba
 
-      # Step to download and build external libraries
-      - name: Install External Libraries
-        run: |
-          cd external
-          git clone --branch "v2.9" --depth 1 https://github.com/p-ranav/argparse.git argparse
-
       - name: Install Gtests
         run: |
           cd ~

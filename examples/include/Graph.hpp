@@ -3,7 +3,7 @@
 
 using namespace std;
 
-#ifdef MULTIPROCESSING_ENABLED
+#ifdef GEMPBA_MULTIPROCESSING
 
 //#include <cereal/types/map.hpp>
 //#include <cereal/types/set.hpp>
@@ -35,7 +35,7 @@ using namespace std;
 
 class Graph {
 private:
-#ifdef MULTIPROCESSING_ENABLED
+#ifdef GEMPBA_MULTIPROCESSING
 
     //friend class cereal::access;
     friend class boost::serialization::access;
@@ -60,7 +60,7 @@ private:
             this->w = w;
         }
 
-#ifdef MULTIPROCESSING_ENABLED
+#ifdef GEMPBA_MULTIPROCESSING
         // cereal
         //template <class Archive>
         //void serialize(Archive &ar, const unsigned int version)
@@ -655,7 +655,7 @@ public:
         std::ifstream file(fileName);
 
         if (!file.is_open()) {
-            throw std::runtime_error("Input file not found\n");
+            throw std::runtime_error("Input file not found: " + fileName + "\n");
         }
 
         int u, v;
@@ -1067,7 +1067,7 @@ public:
     //Graph &operator=(const Graph &) = default;
     //Graph &operator=(Graph &&) = default;
     //virtual ~Graph() = default;
-#ifdef MULTIPROCESSING_ENABLED
+#ifdef GEMPBA_MULTIPROCESSING
     /*
     template <class Archive>
     void serialize(Archive &ar)

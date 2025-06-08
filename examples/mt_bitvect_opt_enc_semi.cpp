@@ -36,7 +36,7 @@ int run(int numThreads, int prob, std::string &filename) {
     gbitset allones = ~allzeros;
 
     branchHandler.setRefValue(gsize);
-    branchHandler.setLookupStrategy(gempba::MINIMISE);
+    branchHandler.set_lookup_strategy(gempba::MINIMISE);
 
     int zero = 0;
     int solsize = graph.size();
@@ -58,16 +58,16 @@ int run(int numThreads, int prob, std::string &filename) {
     size_t rqst = branchHandler.number_thread_requests();
 
     int solution = branchHandler.fetchSolution<int>();
-    spdlog::info("\n\n\nCover size : {} \n", solution);
+    spdlog::debug("\n\n\nCover size : {} \n", solution);
 
-    spdlog::info("Global pool idle time: {0:.6f} seconds\n\n\n", idl_tm);
-    spdlog::info("Elapsed time: {}\n", end - start);
+    spdlog::debug("Global pool idle time: {0:.6f} seconds\n\n\n", idl_tm);
+    spdlog::debug("Elapsed time: {}\n", end - start);
 
     // **************************************************************************
 
-    spdlog::info("thread requests: {} \n", rqst);
+    spdlog::debug("thread requests: {} \n", rqst);
 
-    spdlog::info("\n\n\n");
+    spdlog::debug("\n\n\n");
 
     // **************************************************************************
 

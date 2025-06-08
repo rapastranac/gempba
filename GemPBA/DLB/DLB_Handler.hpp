@@ -23,17 +23,17 @@
  */
 
 namespace gempba {
-    template<typename Ret, typename... Args>
+    template <typename Ret, typename... Args>
     class ResultHolder;
 
     // Dynamic Load Balancing
     class DLB_Handler {
-        template<typename Ret, typename... Args>
+        template <typename Ret, typename... Args>
         friend
         class ResultHolder;
 
     private:
-        std::map<int, void *> roots; // every thread will be solving a subtree, this point to their roots
+        std::map<int, void*> roots; // every thread will be solving a subtree, this point to their roots
         std::mutex mtx;
         std::atomic<long long> idleTime{0};
         int idCounter = 0;
@@ -41,8 +41,8 @@ namespace gempba {
         DLB_Handler() = default;
 
 
-        template<typename HolderType>
-        void lowerRoot(HolderType &holder) {
+        template <typename HolderType>
+        void lowerRoot(HolderType& holder) {
             this->assign_root(holder.threadId, &holder);
             holder.parent = nullptr;
         }
@@ -71,26 +71,27 @@ namespace gempba {
         then root should lower down where it finds a node with at least two children or
         the deepest node
          */
-        template<typename HolderType>
-        void rootCorrecting(HolderType *root) {
-            HolderType *_root = root;
+        template <typename HolderType>
+        void rootCorrecting(HolderType* root) {
+            HolderType* _root = root;
 
-            while (_root->children.size() == 1) { // lowering the root
+            while (_root->children.size() == 1) {
+                // lowering the root
                 _root = _root->children.front();
                 _root->parent->children.pop_front();
                 this->lowerRoot(*_root);
             }
         }
 
-        template<typename HolderType>
-        [[maybe_unused]] void linkVirtualRoot_helper(HolderType *parent, HolderType &child) {
+        template <typename HolderType>
+        [[maybe_unused]] void linkVirtualRoot_helper(HolderType* parent, HolderType& child) {
             child.parent = parent->itself;
             child.root = parent->root;
             parent->children.push_back(&child);
         }
 
-        template<typename HolderType, typename... Args>
-        void linkVirtualRoot_helper(HolderType *virtualRoot, HolderType &child, Args &...args) {
+        template <typename HolderType, typename... Args>
+        void linkVirtualRoot_helper(HolderType* virtualRoot, HolderType& child, Args&... args) {
             child.parent = virtualRoot->itself;
             child.root = virtualRoot->root;
             virtualRoot->children.push_back(&child);
@@ -98,7 +99,7 @@ namespace gempba {
         }
 
     public:
-        static DLB_Handler &getInstance() {
+        static DLB_Handler& getInstance() {
             static DLB_Handler instance;
             return instance;
         }
@@ -114,25 +115,27 @@ namespace gempba {
         }
 
         // thread safe: root creation or root switching
-        void assign_root(int threadId, void *root) {
+        void assign_root(int threadId, void* root) {
             std::scoped_lock<std::mutex> lck(mtx);
             roots[threadId] = root;
         }
 
-        void **getRoot(int threadId) {
+        void** getRoot(int threadId) {
             return &roots[threadId];
         }
 
-        template<typename HolderType>
-        HolderType *find_top_holder(HolderType *holder) {
-            HolderType *leftMost = nullptr; // this is the branch that led us to the root
-            HolderType *root = nullptr;     // local pointer to root, to avoid "*" use
+        template <typename HolderType>
+        HolderType* find_top_holder(HolderType* holder) {
+            HolderType* leftMost = nullptr; // this is the branch that led us to the root
+            HolderType* root = nullptr; // local pointer to root, to avoid "*" use
 
-            if (holder->parent) { // this confirms there might be a root
-                if (holder->parent != *holder->root) { // this confirms, the root isn't the parent
+            if (holder->parent) {
+                // this confirms there might be a root
+                if (holder->parent != *holder->root) {
+                    // this confirms, the root isn't the parent
                     /* this condition complies if a branch has already
                      been pushed, to ensure pushing leftMost first */
-                    root = static_cast<HolderType *>(*holder->root); // no need to iterate
+                    root = static_cast<HolderType*>(*holder->root); // no need to iterate
                     // int tmp = root->children.size(); // this probable fix the following
 
                     // the following is not true, it could be also the right branch
@@ -148,7 +151,7 @@ namespace gempba {
             }
 
             /*
-            #ifdef DEBUG_COMMENTS
+            #ifdef GEMPBA_DEBUG_COMMENTS
             fmt::print("rank {}, likely to get an upperHolder \n", -1);
             int N_children = root->children.size();
             fmt::print("rank {}, root->children.size() = {} \n", -1, N_children);
@@ -185,12 +188,12 @@ namespace gempba {
                 the goal is to push w1, which is the inmmediate right node */
 
                 auto second = std::next(root->children.begin(), 1); // this is to access the 2nd element
-                auto secondHolder = *second;                        // catches the pointer of the node	<-------------------------
-                root->children.erase(second);                       // removes second node from the root's children
+                auto secondHolder = *second; // catches the pointer of the node	<-------------------------
+                root->children.erase(second); // removes second node from the root's children
 
                 return secondHolder;
             } else if (root->children.size() == 2) {
-                //#ifdef DEBUG_COMMENTS
+                //#ifdef GEMPBA_DEBUG_COMMENTS
                 //                fmt::print("rank {}, about to choose an upperHolder \n", -1);
                 //#endif
                 /*	this scope is meant to push right branch which was put in waiting line
@@ -198,9 +201,9 @@ namespace gempba {
                     will be the new root since after this scope right branch will have been
                     already pushed*/
 
-                root->children.pop_front();             // deletes leftMost from root's children
-                HolderType *right = root->children.front(); // The one to be pushed
-                root->children.clear();                 // ..
+                root->children.pop_front(); // deletes leftMost from root's children
+                HolderType* right = root->children.front(); // The one to be pushed
+                root->children.clear(); // ..
 
                 // right->prune();                         // just in case, right branch is not being sent anyway, only its data
                 this->prune(right);
@@ -218,17 +221,17 @@ namespace gempba {
                 return right;
             } else {
                 spdlog::error("fw_count : {} \n ph_count : {}\n isVirtual :{} \n isDiscarded : {} \n",
-                           root->fw_count,
-                           root->ph_count,
-                           root->isVirtual,
-                           root->isDiscarded);
+                              root->fw_count,
+                              root->ph_count,
+                              root->isVirtual,
+                              root->isDiscarded);
                 throw std::runtime_error("4 Testing, it's not supposed to happen, find_top_holder()");
             }
         }
 
         // controls the root when sequential calls
-        template<typename HolderType>
-        void checkLeftSibling(HolderType *holder) {
+        template <typename HolderType>
+        void checkLeftSibling(HolderType* holder) {
 
             /* What does it do?. Having the following figure
                           root == parent
@@ -248,11 +251,14 @@ namespace gempba {
                 is avoided because find_top_holder() pushes the second element of the children
             */
 
-            if (holder->parent) { // this confirms the holder is not a root
-                if (holder->parent == *holder->root) { // this confirms that it's the first level of the root
-                    HolderType *leftMost = holder->parent->children.front();
+            if (holder->parent) {
+                // this confirms the holder is not a root
+                if (holder->parent == *holder->root) {
+                    // this confirms that it's the first level of the root
+                    HolderType* leftMost = holder->parent->children.front();
 
-                    if (leftMost != holder) { // This confirms pb has already been solved
+                    if (leftMost != holder) {
+                        // This confirms pb has already been solved
                         /*
                          root == parent
                           /  |  \   \  \
@@ -265,7 +271,7 @@ namespace gempba {
                         */
                         auto leftMost_cpy = leftMost;
                         while (leftMost != holder) {
-                            holder->parent->children.pop_front();        // removes pb from the parent's children
+                            holder->parent->children.pop_front(); // removes pb from the parent's children
                             leftMost = holder->parent->children.front(); // it gets the second element from the parent's children
                         }
                         // after this line,this should be true leftMost == holder
@@ -286,7 +292,8 @@ namespace gempba {
                         // holder->parent = nullptr;
                         // holder->prune(); //not even required, nullptr is sent
                     }
-                } else if (holder->parent != *holder->root) { // any other level,
+                } else if (holder->parent != *holder->root) {
+                    // any other level,
                     /*
                          root != parent
                            /|  \   \  \
@@ -309,8 +316,9 @@ namespace gempba {
                     because the node won't have information any more since it has already been passed
                     */
 
-                    HolderType *leftMost = holder->parent->children.front();
-                    if (leftMost != holder) { // This confirms pb has already been solved
+                    HolderType* leftMost = holder->parent->children.front();
+                    if (leftMost != holder) {
+                        // This confirms pb has already been solved
                         /*this scope only deletes the leftMost holder, which is already
                          * solved sequentially by here and leaves the parent with at
                          * least a child because the root still has at least a holder in
@@ -323,8 +331,8 @@ namespace gempba {
         }
 
         // controls the root when successful parallel calls (if not upperHolder available)
-        template<typename HolderType>
-        void pop_left_sibling(HolderType *holder) {
+        template <typename HolderType>
+        void pop_left_sibling(HolderType* holder) {
             /* this method is invoked when DLB_Handler is enabled and the method find_top_holder() was not able to find
         a top branch to push, because it means the next right sibling will become a root(for binary recursion)
         or just the leftMost will be unlisted from the parent's children. This method is invoked if and only if
@@ -352,7 +360,7 @@ namespace gempba {
                 sequential)
 
         */
-            auto *_parent = holder->parent;
+            auto* _parent = holder->parent;
             // it should always comply, virtual parent is being created
             if (_parent) {
                 // it also confirms that holder is not a parent (applies for DLB_Handler)
@@ -371,33 +379,33 @@ namespace gempba {
             }
         }
 
-        template<typename HolderType, typename... Args>
-        void linkVirtualRoot(int threadId, HolderType *virtualRoot, HolderType &child, Args &...args) {
+        template <typename HolderType, typename... Args>
+        void linkVirtualRoot(int threadId, HolderType* virtualRoot, HolderType& child, Args&... args) {
             virtualRoot->setDepth(child.depth);
             {
                 std::scoped_lock<std::mutex> lck(mtx);
-                child.parent = static_cast<HolderType *>(roots[threadId]);
+                child.parent = static_cast<HolderType*>(roots[threadId]);
                 child.root = &roots[threadId];
             }
             virtualRoot->children.push_back(&child);
             linkVirtualRoot_helper(virtualRoot, args...);
         }
 
-        template<typename HolderType>
-        void prune(HolderType *holder) {
+        template <typename HolderType>
+        void prune(HolderType* holder) {
             holder->root = nullptr;
             holder->parent = nullptr;
         }
 
         ~DLB_Handler() = default;
 
-        DLB_Handler(const DLB_Handler &) = delete;
+        DLB_Handler(const DLB_Handler&) = delete;
 
-        DLB_Handler(DLB_Handler &&) = delete;
+        DLB_Handler(DLB_Handler&&) = delete;
 
-        DLB_Handler &operator=(const DLB_Handler &) = delete;
+        DLB_Handler& operator=(const DLB_Handler&) = delete;
 
-        DLB_Handler &operator=(DLB_Handler &&) = delete;
+        DLB_Handler& operator=(DLB_Handler&&) = delete;
     };
 }
 #endif

@@ -2,11 +2,12 @@
 #define GEMPBA_GEMPBA_UTILS_H
 
 namespace gempba {
-    
-    enum LookupStrategy {
+
+    enum lookup_strategy {
         MAXIMISE, MINIMISE
     };
-    enum LoadBalancingStrategy {
+
+    enum load_balancing_strategy {
         QUASI_HORIZONTAL, // Our Novel Dynamic Load Balancer
         WORK_STEALING
     };

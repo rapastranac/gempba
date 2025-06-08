@@ -47,7 +47,7 @@ public:
 
         try {
             branchHandler.setRefValue(currentMVCSize);
-            branchHandler.setLookupStrategy(gempba::MINIMISE);
+            branchHandler.set_lookup_strategy(gempba::MINIMISE);
             //mvc(-1, 0, graph);
             //testing ****************************************
             HolderType initial(dlb, -1);
@@ -98,7 +98,7 @@ public:
         }
 
         if (graph.size() == 0) {
-#ifdef DEBUG_COMMENTS
+#ifdef GEMPBA_DEBUG_COMMENTS
             printf("Leaf reached, depth : %d \n", depth);
 #endif
             terminate_condition(graph, id, depth);
@@ -113,7 +113,7 @@ public:
         HolderType hol_r(dlb, id, parent);
         hol_l.setDepth(depth);
         hol_r.setDepth(depth);
-        if (branchHandler.getLoadBalancingStrategy() == gempba::QUASI_HORIZONTAL) {
+        if (branchHandler.get_load_balancing_strategy() == gempba::QUASI_HORIZONTAL) {
             dummyParent = new HolderType(dlb, id);
             dlb.linkVirtualRoot(id, dummyParent, hol_l, hol_r);
         }
@@ -126,7 +126,7 @@ public:
             int C = g.coverSize();
 
             if (C == 0) {
-                spdlog::info("rank {}, thread {}, cover is empty\n", branchHandler.rank_me(), id);
+                spdlog::debug("rank {}, thread {}, cover is empty\n", branchHandler.rank_me(), id);
                 throw;
             }
             if (C < branchHandler.refValue()) // user's condition to see if it's worth it to make branch call
@@ -141,7 +141,7 @@ public:
         hol_r.bind_branch_checkIn([&] {
             Graph g = graph;
             if (g.empty())
-                spdlog::info("rank {}, thread {}, Graph is empty\n", branchHandler.rank_me(), id);
+                spdlog::debug("rank {}, thread {}, Graph is empty\n", branchHandler.rank_me(), id);
 
             g.removeNv(v);
             g.clean_graph();

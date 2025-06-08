@@ -1,9 +1,9 @@
 #include "MPI_Scheduler_Centralized.hpp"
-#include "../GemPBA/BranchHandler/BranchHandler.hpp"
+#include "BranchHandler/BranchHandler.hpp"
 
 namespace gempba {
-    void gempba::MPI_SchedulerCentralized::taskFunneling(BranchHandler &branchHandler) {
-        std::string *message = nullptr;
+    void MPI_SchedulerCentralized::taskFunneling(BranchHandler& branchHandler) {
+        std::string* message = nullptr;
         bool isPop = q.pop(message);
 
         while (true) {
@@ -44,9 +44,9 @@ namespace gempba {
                     break;
             }
         }
-#ifdef DEBUG_COMMENTS
-        spdlog::info("rank {} sent {} tasks\n", world_rank, nTasksSent);
-#endif
+        #ifdef GEMPBA_DEBUG_COMMENTS
+        spdlog::debug("rank {} sent {} tasks\n", world_rank, nTasksSent);
+        #endif
 
         if (!q.empty())
             throw std::runtime_error("leaving process with a pending message\n");
@@ -56,8 +56,8 @@ namespace gempba {
         // nice(0);
     }
 
-    void MPI_SchedulerCentralized::updateRefValue(BranchHandler &branchHandler) {
-        int _refGlobal = refValueGlobal;          // constant within this scope
+    void MPI_SchedulerCentralized::updateRefValue(BranchHandler& branchHandler) {
+        int _refGlobal = refValueGlobal; // constant within this scope
         int _refLocal = branchHandler.refValue(); // constant within this scope
 
         // static size_t C = 0;

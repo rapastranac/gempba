@@ -19,22 +19,16 @@
 #ifndef OMP_THREADPOOL_H
 #define OMP_THREADPOOL_H
 
-#include "utils/Queue.hpp"
-
-#include <any>
 #include <atomic>
-#include <exception>
 #include <functional>
 #include <future>
+#include <map>
 #include <memory>
 #include <mutex>
-#include <queue>
-#include <thread>
-#include <vector>
-
-#include <map>
-#include <set>
 #include <omp.h>
+#include <set>
+#include <thread>
+#include <utils/Queue.hpp>
 
 /*
  * This pool has a fixed size during the whole execution, it's non-copyable, non-deletable, non-movable,
@@ -79,20 +73,20 @@ namespace ThreadPool {
 
             auto f = [this, size]() {
 
-#pragma omp parallel default(shared) num_threads(size)
+                #pragma omp parallel default(shared) num_threads(size)
                 {
-#pragma omp single // only one thread enters
+                    #pragma omp single // only one thread enters
                     {
                         printf("Number of threads spawned : %d \n", size);
                     }
                     int tid = omp_get_thread_num(); // get thread id
-                    this->run(tid);                 // run thread pool
-                }                                   // leave parallel region
+                    this->run(tid); // run thread pool
+                } // leave parallel region
             };
 
             thread = std::make_unique<std::thread>(f);
             while (nWaiting.load() !=
-                   SIZE); // main thread loops until one thread in thread pool has attained waiting mode
+                SIZE); // main thread loops until one thread in thread pool has attained waiting mode
         }
 
         /*	when pushing recursive functions that do not require waiting for merging
@@ -109,20 +103,20 @@ namespace ThreadPool {
         }
 
         [[maybe_unused]] void clear_queue() {
-            std::function<void(int)> *_f;
+            std::function<void(int)>* _f;
             while (this->q.pop(_f))
                 delete _f; // empty the queue
         }
 
         [[maybe_unused]] double idle_time() {
-            return ((double) idleTime.load() * 1.0e-9); // seconds
+            return ((double)idleTime.load() * 1.0e-9); // seconds
         }
 
-        template<typename F, typename... Args>
-        auto push(F &&f, Args &&...args) -> std::future<decltype(f(0, args...))> {
+        template <typename F, typename... Args>
+        auto push(F&& f, Args&&... args) -> std::future<decltype(f(0, args...))> {
             using namespace std::placeholders;
             auto pck = std::make_shared<std::packaged_task<decltype(f(0, args...))(int)>>(
-                    std::bind(std::forward<F>(f), _1, std::forward<Args>(args)...));
+                std::bind(std::forward<F>(f), _1, std::forward<Args>(args)...));
 
             auto _f = new std::function<void(int)>([pck](int id) { (*pck)(id); });
 
@@ -132,13 +126,13 @@ namespace ThreadPool {
             return pck->get_future();
         }
 
-        Pool(const Pool &) = delete;
+        Pool(const Pool&) = delete;
 
-        Pool(Pool &&) = delete;
+        Pool(Pool&&) = delete;
 
-        Pool &operator=(const Pool &) = delete;
+        Pool& operator=(const Pool&) = delete;
 
-        Pool &operator=(Pool &&) = delete;
+        Pool& operator=(Pool&&) = delete;
 
     protected:
         // it forces interrupt even if there is some task in the queue
@@ -165,12 +159,13 @@ namespace ThreadPool {
         }
 
         void run(int threadId) {
-            std::function<void(int)> *_f; // pointer to the function enqueued
+            std::function<void(int)>* _f; // pointer to the function enqueued
             bool isPop = this->q.pop(_f); // dequeuing a function
             std::chrono::steady_clock::time_point begin;
             std::chrono::steady_clock::time_point end;
             while (true) {
-                while (isPop) { // if there is anything in the queue
+                while (isPop) {
+                    // if there is anything in the queue
                     /* at return, delete the function even if an exception occurred, this
                             allows to free memory according to unique pointer rules*/
 
@@ -205,7 +200,7 @@ namespace ThreadPool {
         }
 
         void notify_no_tasks() {
-#pragma omp critical(only_one)
+            #pragma omp critical(only_one)
             {
                 // this condition is met only when all threads are sleeping (no tasks)
                 if (nWaiting.load() == this->size() && running) {
@@ -223,22 +218,22 @@ namespace ThreadPool {
             this->idleTime = 0;
         }
 
-        size_t SIZE;                         // number of threads in the thread pool
+        size_t SIZE; // number of threads in the thread pool
         std::unique_ptr<std::thread> thread; // primary thread invoking OMP
-        std::atomic<size_t> nWaiting;        // number of waiting threads
-        bool running = false;                // running signal
-        bool exitWait = false;               // wakeup signal for the thread invoking wait()
+        std::atomic<size_t> nWaiting; // number of waiting threads
+        bool running = false; // running signal
+        bool exitWait = false; // wakeup signal for the thread invoking wait()
 
-        std::atomic<bool> isDone;        // signalise that job is done
+        std::atomic<bool> isDone; // signalise that job is done
         std::atomic<bool> isInterrupted; // signalise thread pool interruption
         std::atomic<long long> idleTime; // total idle time that threads have been in sleeping mode (nanoseconds)
 
-        std::mutex mtx;                  // Control tasks creation and their execution atomically
-        std::mutex mtx_wait;             // synchronise with wait()
-        std::condition_variable cv;      // used with mtx
+        std::mutex mtx; // Control tasks creation and their execution atomically
+        std::mutex mtx_wait; // synchronise with wait()
+        std::condition_variable cv; // used with mtx
         std::condition_variable cv_wait; // used with mtx_wait
 
-        Queue<std::function<void(int)> *> q; // task queue
+        Queue<std::function<void(int)>*> q; // task queue
     };
 
 } // namespace ThreadPool
