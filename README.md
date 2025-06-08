@@ -1,16 +1,10 @@
 # Generic Massive Parallelisation of Branching Algorithms
 
-<p align="center">
-<a href="https://github.com/rapastranac/gempba/actions">
-    <img src="https://github.com/rapastranac/gempba/actions/workflows/c-cpp.yml/badge.svg" alt="CI Status"/>
-  </a>
-  <img alt="GitHub License" src="https://img.shields.io/github/license/rapastranac/gempba">
-  <img alt="GitHub Release" src="https://img.shields.io/github/v/release/rapastranac/gempba">
-</p>
+[![C/C++ CI](https://github.com/rapastranac/gempba/actions/workflows/c-cpp.yml/badge.svg)](https://github.com/rapastranac/gempba/actions/workflows/c-cpp.yml)
+![GitHub License](https://img.shields.io/github/license/rapastranac/gempba)
+![GitHub Release](https://img.shields.io/github/v/release/rapastranac/gempba) 
 
-<br /> 
-
- This tool will help you parallelise almost any branching algorithm that seemed initially impossible or super complex to do. Please refer to this [MSc. Thesis](http://hdl.handle.net/11143/18687) and [Paper](https://doi.org/10.1016/j.parco.2023.103024), for a performance report.
+This tool will help you parallelise almost any branching algorithm that seemed initially impossible or super complex to do. Please refer to this [MSc. Thesis](http://hdl.handle.net/11143/18687) and [Paper](https://doi.org/10.1016/j.parco.2023.103024), for a performance report.
 
  **GemPBA** will allow you to perform parallelism using a multithreading or multiprocessing environment. It also contains a robust ***Dynamic Load Balancing*** (DLB) that significantly decreases the CPU idle time, which also increases performance due to the reduction of parallel calls in branching algorithms.
 
