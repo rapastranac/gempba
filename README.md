@@ -757,3 +757,67 @@ To use this feature, simply include the ```MPI_Scheduler_Centralized.hpp``` head
 
 
 **Note:** The centralized scheduler is not part of the project's scope, but it is mentioned here for completeness. Depending on your project structure, you might need to add additional imports due to hidden dependencies within the *GemPBA* library.
+
+
+## How to include the GemPBA library in your project
+To include the *GemPBA* library in your project, you can either clone the repository or download it as a zip file. After that, you can include the necessary headers in your source files.
+
+However, it is recommended to use **CPM** to manage the **GemPBA** library in your project. This way, you can easily keep track of updates and dependencies. If you don't have an `${WORKSPACE}/external` folder in your project, you can create one and add the following `external/CMakeLists.txt` file to it:
+
+```cmake
+cmake_minimum_required(VERSION 3.28)
+include(FetchContent)
+
+project(external)
+
+## CPM
+set(CPM_DOWNLOAD_LOCATION "${CMAKE_BINARY_DIR}/cmake/CPM.cmake")
+if (NOT (EXISTS ${CPM_DOWNLOAD_LOCATION}))
+    message(STATUS "Downloading CPM.cmake")
+    file(DOWNLOAD https://github.com/cpm-cmake/CPM.cmake/releases/latest/download/CPM.cmake ${CPM_DOWNLOAD_LOCATION})
+endif ()
+include(${CPM_DOWNLOAD_LOCATION})
+
+CPMAddPackage(
+        NAME gempba
+        GITHUB_REPOSITORY rapastranac/gempba
+        GIT_TAG main
+)
+
+add_library(external INTERFACE)
+
+target_link_libraries(external INTERFACE gempba)
+```
+
+
+Then, in your main `CMakeLists.txt` file, you can include the `external` folder like this:
+
+```cmake
+cmake_minimum_required(VERSION 3.28)
+
+project(your-project VERSION 1.0 LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 23)
+
+
+# GemPBA flags and includes
+set(GEMPBA_MULTIPROCESSING ON CACHE BOOL "" FORCE) # (Needed if you want to enable multiprocessing)
+set(GEMPBA_DEBUG_COMMENTS ON CACHE BOOL "" FORCE)  # (Optional) Enable debug comments in the code
+set(GEMPBA_BUILD_EXAMPLES ON CACHE BOOL "" FORCE)  # (Optional) Enable building examples
+set(GEMPBA_BUILD_TESTS ON CACHE BOOL "" FORCE)     # (Optional) Enable building tests
+add_subdirectory(external)
+
+# Other configurations of your project
+# ...
+
+# Main executable
+target_compile_definitions(main PRIVATE)
+
+# link GemPBA with your main executable
+target_link_libraries(main PUBLIC
+        gempba::gempba
+)
+
+```
+
+
+For further testing and minimal reproducible examples, please refer to [GemPBA tester](https://github.com/rapastranac/gempba-tester) repository. 
