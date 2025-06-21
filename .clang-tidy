@@ -123,6 +123,8 @@ CheckOptions:
     value: lower_case
   - key: readability-identifier-naming.LocalVariablePrefix
     value: v_
+  - key: readability-identifier-naming.LocalVariableIgnoredRegexp
+    value: '^(i|j|k|idx|index|it|iter)$'
   - key: readability-identifier-naming.StaticLocalVariableCase
     value: lower_case
   - key: readability-identifier-naming.StaticLocalVariablePrefix
