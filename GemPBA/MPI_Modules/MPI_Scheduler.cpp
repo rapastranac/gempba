@@ -28,7 +28,7 @@ namespace gempba {
             {
                 /* this section protects MPI calls */
                 std::scoped_lock<std::mutex> lck(mtx);
-                probe_refValue();
+                maybe_receive_reference_value();
                 probe_nextProcess();
 
                 updateRefValue(branchHandler);

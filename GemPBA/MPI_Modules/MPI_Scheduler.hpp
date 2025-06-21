@@ -173,7 +173,7 @@ namespace gempba {
 
                 // this allows receiving refValue or nextProcess even if this process has turned into waiting mode
                 while (!flag) {
-                    if (probe_refValue()) // different communicator
+                    if (maybe_receive_reference_value()) // different communicator
                         continue; // center might update this value even if this process is idle
 
                     if (probe_nextProcess()) // different communicator
@@ -263,7 +263,7 @@ namespace gempba {
         }
 
         // checks for a ref value update from center
-        int probe_refValue() {
+        int maybe_receive_reference_value() {
             auto v_optional = probe_reference_value_comm();
             if (v_optional.has_value()) {
                 receive_reference_value(v_optional.value());
