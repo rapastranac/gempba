@@ -460,6 +460,37 @@ namespace gempba {
             }
         }
 
+        /**
+        * if center reaches this point, for sure workers have attained a better reference value,
+        * or they are not up-to-date, thus it is required to broadcast it whether this value changes or not
+        */
+        void maybe_broadcast_global_reference_value(int p_buffer, MPI_Status p_status) {
+
+            utils::print_mpi_debug_comments("center received refValue {} from rank {}\n", p_buffer, p_status.MPI_SOURCE);
+            bool v_signal = false;
+
+            if ((maximisation && p_buffer > refValueGlobal) || (!maximisation && p_buffer < refValueGlobal)) {
+                // refValueGlobal[0] = buffer;
+                refValueGlobal = p_buffer;
+                v_signal = true;
+                for (int rank = 1; rank < world_size; rank++) {
+                    MPI_Send(&refValueGlobal, 1, MPI_INT, rank, REFVAL_UPDATE_TAG, refValueGlobal_Comm);
+                }
+
+                // bcastPut(refValueGlobal, 1, MPI_INT, 0, win_refValueGlobal);
+            }
+
+            if (v_signal) {
+                static int success = 0;
+                success++;
+                spdlog::debug("refValueGlobal updated to : {} by rank {}\n", refValueGlobal, p_status.MPI_SOURCE);
+            } else {
+                static int failures = 0;
+                failures++;
+                spdlog::debug("FAILED updates : {}, refValueGlobal : {} by rank {}\n", failures, refValueGlobal, p_status.MPI_SOURCE);
+            }
+        }
+
     public:
         /*	run the center node */
         void runCenter(const char* p_seed, const int p_seed_size) override {
@@ -496,34 +527,9 @@ namespace gempba {
                     break;
                 }
                 case REFVAL_UPDATE_TAG: {
-                    /* if center reaches this point, for sure nodes have attained a better reference value
-                            or they are not up-to-date, thus it is required to broadcast it whether this value
-                            changes or not  */
-                    utils::print_mpi_debug_comments("center received refValue {} from rank {}\n", buffer, status.MPI_SOURCE);
-                    bool signal = false;
-
-                    if ((maximisation && buffer > refValueGlobal) || (!maximisation && buffer < refValueGlobal)) {
-                        // refValueGlobal[0] = buffer;
-                        refValueGlobal = buffer;
-                        signal = true;
-                        for (int rank = 1; rank < world_size; rank++) {
-                            MPI_Send(&refValueGlobal, 1, MPI_INT, rank, REFVAL_UPDATE_TAG, refValueGlobal_Comm);
-                        }
-
-                        // bcastPut(refValueGlobal, 1, MPI_INT, 0, win_refValueGlobal);
-                    }
-
-                    if (signal) {
-                        static int success = 0;
-                        success++;
-                        spdlog::debug("refValueGlobal updated to : {} by rank {}\n", refValueGlobal, status.MPI_SOURCE);
-                    } else {
-                        static int failures = 0;
-                        failures++;
-                        spdlog::debug("FAILED updates : {}, refValueGlobal : {} by rank {}\n", failures, refValueGlobal, status.MPI_SOURCE);
-                    }
+                    maybe_broadcast_global_reference_value(buffer, status);
+                    break;
                 }
-                break;
                 }
             }
 
