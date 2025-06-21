@@ -507,10 +507,11 @@ namespace gempba {
                 MPI_Status status;
                 MPI_Request request;
                 int ready;
-                double begin = MPI_Wtime();
+                const double v_wall_time0 = MPI_Wtime();
                 MPI_Irecv(&buffer, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, world_Comm, &request);
 
-                if (!awaitMessage(buffer, ready, begin, status, request))
+                const bool v_timeout = receive_or_timeout(buffer, ready, v_wall_time0, status, request);
+                if (v_timeout)
                     break;
 
                 switch (status.MPI_TAG) {
@@ -547,26 +548,26 @@ namespace gempba {
             all workers report (with a message) to center process when about to run a task or when becoming available
             if no message is received within a TIMEOUT window, then all processes will have finished
         */
-        bool awaitMessage(int buffer, int& ready, double begin, MPI_Status& status, MPI_Request& request) {
-            int cycles = 0;
+        bool receive_or_timeout(int p_buffer, int& p_ready, double p_wall_time0, MPI_Status& p_status, MPI_Request& p_request) {
+            int v_cycles = 0;
             while (true) {
-                MPI_Test(&request, &ready, &status);
+                MPI_Test(&p_request, &p_ready, &p_status);
                 // Check whether the underlying communication had already taken place
-                while (!ready && (difftime(begin, MPI_Wtime()) < TIMEOUT_TIME)) {
-                    MPI_Test(&request, &ready, &status);
-                    cycles++;
+                while (!p_ready && (TIMEOUT_TIME > difftime(p_wall_time0, MPI_Wtime()))) {
+                    MPI_Test(&p_request, &p_ready, &p_status);
+                    v_cycles++;
                 }
 
-                if (!ready) {
-                    if (nRunning == 0) {
-                        // Cancellation due to TIMEOUT
-                        MPI_Cancel(&request);
-                        MPI_Request_free(&request);
-                        printf("rank %d: receiving TIMEOUT, buffer : %d, cycles : %d\n", world_rank, buffer, cycles);
-                        return false;
-                    }
-                } else
+                if (p_ready) {
+                    return false;
+                }
+                if (nRunning == 0) {
+                    // Cancellation due to TIMEOUT
+                    MPI_Cancel(&p_request);
+                    MPI_Request_free(&p_request);
+                    spdlog::info("rank {}: receiving TIMEOUT, buffer : {}, cycles : {}\n", world_rank, p_buffer, v_cycles);
                     return true;
+                }
             }
         }
 
