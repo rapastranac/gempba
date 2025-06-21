@@ -203,6 +203,21 @@ namespace gempba {
             delete[] v_message;
         }
 
+        void process_termination(MPI_Status p_status) {
+            // message still needs to be received
+            int v_count; // count to be received
+            MPI_Get_count(&p_status, MPI_CHAR, &v_count); // receives total number of datatype elements of the message
+
+            utils::print_mpi_debug_comments("rank {}, received message from rank {}, count : {}\n", world_rank, p_status.MPI_SOURCE, v_count);
+            char* v_message = new char[v_count];
+            MPI_Recv(v_message, v_count, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, world_Comm, &p_status);
+
+            delete[] v_message;
+
+            spdlog::debug("rank {} exited\n", world_rank);
+            MPI_Barrier(world_Comm);
+        }
+
     public:
         void runNode(BranchHandler& branchHandler, std::function<std::shared_ptr<ResultHolderParent>(char*, int)>& bufferDecoder,
                      std::function<std::pair<int, std::string>()>& resultFetcher) override {
@@ -215,19 +230,8 @@ namespace gempba {
 
                 switch (status.MPI_TAG) {
                 case TERMINATION_TAG: {
-                    // message still needs to be received
-                    int count; // count to be received
-                    MPI_Get_count(&status, MPI_CHAR, &count); // receives total number of datatype elements of the message
-
-                    utils::print_mpi_debug_comments("rank {}, received message from rank {}, count : {}\n", world_rank, status.MPI_SOURCE, count);
-                    char* message = new char[count];
-                    MPI_Recv(message, count, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, world_Comm, &status);
-
-                    delete[] message;
-
-                    if (isTerminated(status.MPI_TAG)) {
-                        v_is_terminated = true; // temporary, it should always happen
-                    }
+                    process_termination(status);
+                    v_is_terminated = true; // temporary, it should always happen
                     break;
                 }
                 default: {
@@ -349,15 +353,6 @@ namespace gempba {
         // it separates receiving buffer from the local
         void updateNextProcess() {
             nxtProcess = next_process[0];
-        }
-
-        bool isTerminated(int TAG) {
-            if (TAG == TERMINATION_TAG) {
-                spdlog::debug("rank {} exited\n", world_rank);
-                MPI_Barrier(world_Comm);
-                return true;
-            }
-            return false;
         }
 
         void notifyAvailableState() {
