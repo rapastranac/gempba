@@ -162,11 +162,8 @@ namespace gempba {
 
     private:
         MPI_Status probe_communicators() {
-            MPI_Status status;
-            int flag = 0;
-
             // this allows receiving refValue or nextProcess even if this process has turned into waiting mode
-            while (!flag) {
+            while (true) {
                 if (auto v_optional = probe_reference_value_comm(); v_optional.has_value()){
                     return v_optional.value();
                 }
@@ -175,9 +172,8 @@ namespace gempba {
                     return v_optional.value();
                 }
 
-                MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, world_Comm, &flag, &status); // for regular messages
-                if (flag) {
-                    return status;
+                if (const auto v_optional = probe_world_comm(); v_optional.has_value()) {
+                    return v_optional.value();
                 }
             }
         }
@@ -310,6 +306,16 @@ namespace gempba {
             if (v_optional.has_value()) {
                 receive_reference_value(v_optional.value());
             }
+        }
+
+        std::optional<MPI_Status> probe_world_comm() {
+            int v_is_message_received = 0;
+            MPI_Status v_status;
+            MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, world_Comm, &v_is_message_received, &v_status); // for regular messages
+            if (v_is_message_received) {
+                return v_status;
+            }
+            return std::nullopt;
         }
 
         void receive_next_process(MPI_Status p_status) {
