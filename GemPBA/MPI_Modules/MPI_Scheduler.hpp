@@ -160,29 +160,35 @@ namespace gempba {
             }
         }
 
+    private:
+        MPI_Status probe_communicators() {
+            MPI_Status status;
+            int flag = 0;
 
+            // this allows receiving refValue or nextProcess even if this process has turned into waiting mode
+            while (!flag) {
+                if (maybe_receive_reference_value()) // different communicator
+                    continue; // center might update this value even if this process is idle
+
+                if (maybe_receive_next_process()) // different communicator
+                    continue; // center might update this value even if this process is idle
+
+                MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, world_Comm, &flag, &status); // for regular messages
+                if (flag) {
+                    return status;
+                }
+            }
+        }
+
+    public:
         void runNode(BranchHandler& branchHandler, std::function<std::shared_ptr<ResultHolderParent>(char*, int)>& bufferDecoder,
                      std::function<std::pair<int, std::string>()>& resultFetcher) override {
             MPI_Barrier(world_Comm);
             // nice(18);
 
             while (true) {
-                MPI_Status status;
+                MPI_Status status = probe_communicators();
                 int count; // count to be received
-                int flag = 0;
-
-                // this allows receiving refValue or nextProcess even if this process has turned into waiting mode
-                while (!flag) {
-                    if (maybe_receive_reference_value()) // different communicator
-                        continue; // center might update this value even if this process is idle
-
-                    if (maybe_receive_next_process()) // different communicator
-                        continue; // center might update this value even if this process is idle
-
-                    MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, world_Comm, &flag, &status); // for regular messages
-                    if (flag)
-                        break;
-                }
                 MPI_Get_count(&status, MPI_CHAR, &count); // receives total number of datatype elements of the message
 
                 utils::print_mpi_debug_comments("rank {}, received message from rank {}, count : {}\n", world_rank, status.MPI_SOURCE, count);
