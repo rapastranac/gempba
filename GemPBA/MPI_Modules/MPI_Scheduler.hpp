@@ -36,6 +36,7 @@
 #define TERMINATION_TAG 6
 #define REFVAL_UPDATE_TAG 9
 #define NEXT_PROCESS_TAG 10
+#define FUNCTION_ARGS_TAG 11
 
 #define HAS_RESULT_TAG 13
 #define NO_RESULT_TAG 14
@@ -184,7 +185,7 @@ namespace gempba {
 
             utils::print_mpi_debug_comments("rank {}, received message from rank {}, count : {}\n", world_rank, p_status.MPI_SOURCE, v_count);
             char* v_message = new char[v_count];
-            MPI_Recv(v_message, v_count, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, world_Comm, &p_status);
+            MPI_Recv(v_message, v_count, MPI_CHAR, p_status.MPI_SOURCE, FUNCTION_ARGS_TAG, world_Comm, &p_status);
 
             notifyRunningState();
             nTasksRecvd++;
@@ -235,7 +236,7 @@ namespace gempba {
                     receive_next_process(status);
                     break;
                 }
-                default: {
+                case FUNCTION_ARGS_TAG: {
                     process_message(status, branchHandler, bufferDecoder);
                     break;
                 }
@@ -385,7 +386,7 @@ namespace gempba {
                     throw std::runtime_error(msg);
                 }
                 utils::print_mpi_debug_comments("rank {} about to send buffer to rank {}\n", world_rank, dest_rank_tmp);
-                MPI_Send(message.data(), (int)messageLength, MPI_CHAR, dest_rank_tmp, 0, world_Comm);
+                MPI_Send(message.data(), (int)messageLength, MPI_CHAR, dest_rank_tmp, FUNCTION_ARGS_TAG, world_Comm);
                 utils::print_mpi_debug_comments("rank {} sent buffer to rank {}\n", world_rank, dest_rank_tmp);
                 dest_rank_tmp = -1;
             } else {
@@ -699,7 +700,7 @@ namespace gempba {
             processState[dest] = STATE_RUNNING;
             // *********************************************
 
-            int err = MPI_Ssend(buffer, COUNT, MPI_CHAR, dest, 0, world_Comm); // send buffer
+            int err = MPI_Ssend(buffer, COUNT, MPI_CHAR, dest, FUNCTION_ARGS_TAG, world_Comm); // send buffer
             if (err != MPI_SUCCESS)
                 spdlog::debug("buffer failed to send! \n");
 
