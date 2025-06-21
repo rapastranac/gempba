@@ -280,17 +280,26 @@ namespace gempba {
             utils::print_mpi_debug_comments("rank {}, received nextProcess from Center, count : {}\n", world_rank, v_count);
         }
 
+        std::optional<MPI_Status> probe_next_process_comm() {
+            int v_is_message_received = 0;
+
+            MPI_Status v_status;
+            MPI_Iprobe(CENTER, NEXT_PROCESS_TAG, nextProcess_Comm, &v_is_message_received, &v_status);
+            if (v_is_message_received) {
+                return v_status;
+
+            }
+            return std::nullopt;
+        }
+
         // checks for a new assigned process from center
         int probe_nextProcess() {
-            int flag = 0;
-            MPI_Status status;
-            MPI_Iprobe(CENTER, NEXT_PROCESS_TAG, nextProcess_Comm, &flag, &status);
-
-            if (flag) {
-                receive_next_process(status);
+            auto v_optional = probe_next_process_comm();
+            if (v_optional.has_value()) {
+                receive_next_process(v_optional.value());
+                return true;
             }
-
-            return flag;
+            return false;
         }
 
         // if ref value received, it attempts updating local value
