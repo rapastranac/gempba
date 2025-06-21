@@ -434,7 +434,6 @@ namespace gempba {
 
             send_seed(p_seed, p_seed_size);
 
-            int rcv_availability = 0;
 
             while (true) {
                 int buffer;
@@ -454,7 +453,6 @@ namespace gempba {
                     break;
                 }
                 case STATE_AVAILABLE: {
-                    ++rcv_availability;
                     processState[status.MPI_SOURCE] = STATE_AVAILABLE;
                     ++nAvailable;
                     --nRunning;
