@@ -180,6 +180,29 @@ namespace gempba {
             }
         }
 
+        void process_message(MPI_Status p_status, BranchHandler& p_branch_handler, std::function<std::shared_ptr<ResultHolderParent>(char*, int)>& p_buffer_decoder) {
+            int v_count; // count to be received
+            MPI_Get_count(&p_status, MPI_CHAR, &v_count); // receives total number of datatype elements of the message
+
+            utils::print_mpi_debug_comments("rank {}, received message from rank {}, count : {}\n", world_rank, p_status.MPI_SOURCE, v_count);
+            char* v_message = new char[v_count];
+            MPI_Recv(v_message, v_count, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, world_Comm, &p_status);
+
+            notifyRunningState();
+            nTasksRecvd++;
+
+
+            //  push to the thread pool *********************************************************************
+            std::shared_ptr<ResultHolderParent> v_holder = p_buffer_decoder(v_message, v_count); // holder might be useful for non-void functions
+            utils::print_mpi_debug_comments("rank {}, pushed buffer to thread pool \n", world_rank, p_status.MPI_SOURCE);
+            // **********************************************************************************************
+
+            taskFunneling(p_branch_handler);
+            notifyAvailableState();
+
+            delete[] v_message;
+        }
+
     public:
         void runNode(BranchHandler& branchHandler, std::function<std::shared_ptr<ResultHolderParent>(char*, int)>& bufferDecoder,
                      std::function<std::pair<int, std::string>()>& resultFetcher) override {
@@ -208,26 +231,7 @@ namespace gempba {
                     break;
                 }
                 default: {
-                    int count; // count to be received
-                    MPI_Get_count(&status, MPI_CHAR, &count); // receives total number of datatype elements of the message
-
-                    utils::print_mpi_debug_comments("rank {}, received message from rank {}, count : {}\n", world_rank, status.MPI_SOURCE, count);
-                    char* message = new char[count];
-                    MPI_Recv(message, count, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, world_Comm, &status);
-
-                    notifyRunningState();
-                    nTasksRecvd++;
-
-
-                    //  push to the thread pool *********************************************************************
-                    std::shared_ptr<ResultHolderParent> holder = bufferDecoder(message, count); // holder might be useful for non-void functions
-                    utils::print_mpi_debug_comments("rank {}, pushed buffer to thread pool \n", world_rank, status.MPI_SOURCE);
-                    // **********************************************************************************************
-
-                    taskFunneling(branchHandler);
-                    notifyAvailableState();
-
-                    delete[] message;
+                    process_message(status, branchHandler, bufferDecoder);
                     break;
                 }
                 }
