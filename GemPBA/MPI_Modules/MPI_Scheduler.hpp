@@ -399,6 +399,28 @@ namespace gempba {
             return end - start;
         }
 
+        void process_running(MPI_Status p_status) {
+            processState[p_status.MPI_SOURCE] = STATE_RUNNING; // node was assigned, now it's running
+            ++nRunning;
+            utils::print_mpi_debug_comments("rank {} reported running, nRunning :{}\n", p_status.MPI_SOURCE, nRunning);
+
+            if (processTree[p_status.MPI_SOURCE].is_assigned())
+                processTree[p_status.MPI_SOURCE].release();
+
+            if (!processTree[p_status.MPI_SOURCE].has_next()) // checks if notifying node has a child to push to
+            {
+                int nxt = getAvailable();
+                if (nxt > 0) {
+                    // put(&nxt, 1, status.MPI_SOURCE, MPI_INT, 0, win_nextProcess);
+                    MPI_Send(&nxt, 1, MPI_INT, p_status.MPI_SOURCE, NEXT_PROCESS_TAG, nextProcess_Comm);
+                    processTree[p_status.MPI_SOURCE].add_next(nxt);
+                    processState[nxt] = STATE_ASSIGNED;
+                    --nAvailable;
+                }
+            }
+            totalRequests++;
+        }
+
     public:
         /*	run the center node */
         void runCenter(const char* p_seed, const int p_seed_size) override {
@@ -426,29 +448,11 @@ namespace gempba {
                     break;
 
                 switch (status.MPI_TAG) {
-                case STATE_RUNNING: // received if and only if a worker receives from other but center
-                {
-                    processState[status.MPI_SOURCE] = STATE_RUNNING; // node was assigned, now it's running
-                    ++nRunning;
-                    utils::print_mpi_debug_comments("rank {} reported running, nRunning :{}\n", status.MPI_SOURCE, nRunning);
-
-                    if (processTree[status.MPI_SOURCE].is_assigned())
-                        processTree[status.MPI_SOURCE].release();
-
-                    if (!processTree[status.MPI_SOURCE].has_next()) // checks if notifying node has a child to push to
-                    {
-                        int nxt = getAvailable();
-                        if (nxt > 0) {
-                            // put(&nxt, 1, status.MPI_SOURCE, MPI_INT, 0, win_nextProcess);
-                            MPI_Send(&nxt, 1, MPI_INT, status.MPI_SOURCE, NEXT_PROCESS_TAG, nextProcess_Comm);
-                            processTree[status.MPI_SOURCE].add_next(nxt);
-                            processState[nxt] = STATE_ASSIGNED;
-                            --nAvailable;
-                        }
-                    }
-                    totalRequests++;
+                case STATE_RUNNING: {
+                    // received if and only if a worker receives from other but center
+                    process_running(status);
+                    break;
                 }
-                break;
                 case STATE_AVAILABLE: {
                     ++rcv_availability;
                     processState[status.MPI_SOURCE] = STATE_AVAILABLE;
