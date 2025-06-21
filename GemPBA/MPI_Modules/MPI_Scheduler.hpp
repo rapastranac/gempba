@@ -204,15 +204,10 @@ namespace gempba {
         }
 
         void process_termination(MPI_Status p_status) {
-            // message still needs to be received
-            int v_count; // count to be received
-            MPI_Get_count(&p_status, MPI_CHAR, &v_count); // receives total number of datatype elements of the message
-
-            utils::print_mpi_debug_comments("rank {}, received message from rank {}, count : {}\n", world_rank, p_status.MPI_SOURCE, v_count);
-            char* v_message = new char[v_count];
-            MPI_Recv(v_message, v_count, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, world_Comm, &p_status);
-
-            delete[] v_message;
+            constexpr int v_count = 1; // count to be received
+            int v_unused;
+            MPI_Recv(&v_unused, v_count, MPI_INT, p_status.MPI_SOURCE, TERMINATION_TAG, world_Comm, &p_status);
+            utils::print_mpi_debug_comments("rank {}, received message from rank {}", world_rank, p_status.MPI_SOURCE);
 
             spdlog::debug("rank {} exited\n", world_rank);
             MPI_Barrier(world_Comm);
@@ -628,9 +623,9 @@ namespace gempba {
 
         void notifyTermination() {
             for (int rank = 1; rank < world_size; rank++) {
-                char buffer[] = "exit signal";
-                int count = sizeof(buffer);
-                MPI_Send(&buffer, count, MPI_CHAR, rank, TERMINATION_TAG, world_Comm); // send positive signal
+                constexpr int v_buffer = 0;
+                constexpr int v_count = 1;
+                MPI_Send(&v_buffer, v_count, MPI_INT, rank, TERMINATION_TAG, world_Comm); // send positive signal
             }
             MPI_Barrier(world_Comm);
         }
