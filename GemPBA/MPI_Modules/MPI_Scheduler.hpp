@@ -18,6 +18,7 @@
 #include <fstream>
 #include <memory>
 #include <mpi.h>
+#include <optional>
 #include <queue>
 #include <random>
 #include <sstream>
@@ -249,17 +250,26 @@ namespace gempba {
             utils::print_mpi_debug_comments("rank {}, received refValue: {} from Center\n", world_rank, refValueGlobal);
         }
 
+        std::optional<MPI_Status> probe_reference_value_comm() {
+            int v_is_message_received = 0; // logical
+
+            MPI_Status v_status;
+            MPI_Iprobe(CENTER, REFVAL_UPDATE_TAG, refValueGlobal_Comm, &v_is_message_received, &v_status);
+            if (v_is_message_received) {
+                return v_status;
+
+            }
+            return std::nullopt;
+        }
+
         // checks for a ref value update from center
         int probe_refValue() {
-            int flag = 0;
-            MPI_Status status;
-            MPI_Iprobe(CENTER, REFVAL_UPDATE_TAG, refValueGlobal_Comm, &flag, &status);
-
-            if (flag) {
-                receive_reference_value(status);
+            auto v_optional = probe_reference_value_comm();
+            if (v_optional.has_value()) {
+                receive_reference_value(v_optional.value());
+                return true;
             }
-
-            return flag;
+            return false;
         }
 
         void receive_next_process(MPI_Status p_status) {
