@@ -430,33 +430,34 @@ namespace gempba {
                 processTree[p_status.MPI_SOURCE].release();
             }
             utils::print_mpi_debug_comments("rank {} reported available, nRunning :{}\n", p_status.MPI_SOURCE, nRunning);
-            std::random_device rd; // Will be used to obtain a seed for the random number engine
-            std::mt19937 gen(
-                rd()); // Standard mersenne_twister_engine seeded with rd()
-            std::uniform_int_distribution<> distrib(0,
-                                                    world_size); // uniform distribution [closed interval]
-            int random_offset = distrib(gen); // random value in range
+            std::random_device v_rd; // Will be used to obtain a seed for the random number engine
+            std::mt19937 v_gen(v_rd()); // Standard mersenne_twister_engine seeded with rd()
+            std::uniform_int_distribution<> v_distrib(0, world_size); // uniform distribution [closed interval]
+            const int v_random_offset = v_distrib(v_gen); // random value in range
 
-            for (int i_rank = 0; i_rank < world_size; i_rank++) {
-                int rank = (i_rank + random_offset) %
-                    world_size; // this ensures that rank is always in range 0 <= rank < world_size
-                if (rank > 0) {
-                    if (processState[rank] == STATE_RUNNING) // finds the first running node
-                    {
-                        if (!processTree[rank].has_next()) // checks if running node has a child to push to
-                        {
-                            MPI_Send(&p_status.MPI_SOURCE, 1, MPI_INT, rank, NEXT_PROCESS_TAG,
-                                     nextProcess_Comm);
-
-                            processTree[rank].add_next(
-                                p_status.MPI_SOURCE); // assigns returning node to the running node
-                            processState[p_status.MPI_SOURCE] = STATE_ASSIGNED; // it flags returning node as assigned
-                            --nAvailable; // assigned, not available any more
-                            utils::print_mpi_debug_comments("ASSIGNEMENT:\trank {} <-- [{}]\n", rank, p_status.MPI_SOURCE);
-                            break; // breaks for-loop
-                        }
-                    }
+            for (int i = 0; i < world_size; i++) {
+                int v_rank = (i + v_random_offset) % world_size; // this ensures that rank is always in range 0 <= rank < world_size
+                if (v_rank <= 0) {
+                    continue;
                 }
+
+                // finds the first running node
+                if (processState[v_rank] != STATE_RUNNING) {
+                    continue;
+                }
+
+                // checks if running node has a child to push to
+                if (processTree[v_rank].has_next()) {
+                    continue;
+                }
+
+                MPI_Send(&p_status.MPI_SOURCE, 1, MPI_INT, v_rank, NEXT_PROCESS_TAG, nextProcess_Comm);
+
+                processTree[v_rank].add_next(p_status.MPI_SOURCE); // assigns the returning node as a running node
+                processState[p_status.MPI_SOURCE] = STATE_ASSIGNED; // it flags the returning node as assigned
+                --nAvailable; // assigned, not available anymore
+                utils::print_mpi_debug_comments("ASSIGNMENT:\trank {} <-- [{}]\n", v_rank, p_status.MPI_SOURCE);
+                break; // IMPORTANT: breaks for-loop
             }
         }
 
