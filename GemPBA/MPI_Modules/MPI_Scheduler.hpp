@@ -186,32 +186,55 @@ namespace gempba {
             MPI_Barrier(world_Comm);
             // nice(18);
 
-            while (true) {
+            bool v_is_terminated = false;
+            while (true){
                 MPI_Status status = probe_communicators();
-                int count; // count to be received
-                MPI_Get_count(&status, MPI_CHAR, &count); // receives total number of datatype elements of the message
 
-                utils::print_mpi_debug_comments("rank {}, received message from rank {}, count : {}\n", world_rank, status.MPI_SOURCE, count);
-                char* message = new char[count];
-                MPI_Recv(message, count, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, world_Comm, &status);
+                switch (status.MPI_TAG) {
+                case TERMINATION_TAG: {
+                    // message still needs to be received
+                    int count; // count to be received
+                    MPI_Get_count(&status, MPI_CHAR, &count); // receives total number of datatype elements of the message
 
-                if (isTerminated(status.MPI_TAG)) {
+                    utils::print_mpi_debug_comments("rank {}, received message from rank {}, count : {}\n", world_rank, status.MPI_SOURCE, count);
+                    char* message = new char[count];
+                    MPI_Recv(message, count, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, world_Comm, &status);
+
+                    delete[] message;
+
+                    if (isTerminated(status.MPI_TAG)) {
+                        v_is_terminated = true; // temporary, it should always happen
+                    }
+                    break;
+                }
+                default: {
+                    int count; // count to be received
+                    MPI_Get_count(&status, MPI_CHAR, &count); // receives total number of datatype elements of the message
+
+                    utils::print_mpi_debug_comments("rank {}, received message from rank {}, count : {}\n", world_rank, status.MPI_SOURCE, count);
+                    char* message = new char[count];
+                    MPI_Recv(message, count, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, world_Comm, &status);
+
+                    notifyRunningState();
+                    nTasksRecvd++;
+
+
+                    //  push to the thread pool *********************************************************************
+                    std::shared_ptr<ResultHolderParent> holder = bufferDecoder(message, count); // holder might be useful for non-void functions
+                    utils::print_mpi_debug_comments("rank {}, pushed buffer to thread pool \n", world_rank, status.MPI_SOURCE);
+                    // **********************************************************************************************
+
+                    taskFunneling(branchHandler);
+                    notifyAvailableState();
+
                     delete[] message;
                     break;
                 }
+                }
 
-                notifyRunningState();
-                nTasksRecvd++;
-
-                //  push to the thread pool *********************************************************************
-                std::shared_ptr<ResultHolderParent> holder = bufferDecoder(message, count); // holder might be useful for non-void functions
-                utils::print_mpi_debug_comments("rank {}, pushed buffer to thread pool \n", world_rank, status.MPI_SOURCE);
-                // **********************************************************************************************
-
-                taskFunneling(branchHandler);
-                notifyAvailableState();
-
-                delete[] message;
+                if (v_is_terminated){
+                    break; // exit loop
+                }
             }
             /**
              * TODO.. send results back to the rank from which the task was sent.
