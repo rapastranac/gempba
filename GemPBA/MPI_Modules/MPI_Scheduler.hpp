@@ -176,7 +176,7 @@ namespace gempba {
                     if (maybe_receive_reference_value()) // different communicator
                         continue; // center might update this value even if this process is idle
 
-                    if (probe_nextProcess()) // different communicator
+                    if (maybe_receive_next_process()) // different communicator
                         continue; // center might update this value even if this process is idle
 
                     MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, world_Comm, &flag, &status); // for regular messages
@@ -293,7 +293,7 @@ namespace gempba {
         }
 
         // checks for a new assigned process from center
-        int probe_nextProcess() {
+        int maybe_receive_next_process() {
             auto v_optional = probe_next_process_comm();
             if (v_optional.has_value()) {
                 receive_next_process(v_optional.value());
