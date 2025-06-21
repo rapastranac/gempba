@@ -34,7 +34,8 @@
 #define STATE_AVAILABLE 3
 
 #define TERMINATION_TAG 6
-#define REFVAL_UPDATE_TAG 9
+#define REF_VAL_PROPOSAL 9
+#define REF_VAL_UPDATE 91
 #define NEXT_PROCESS_TAG 10
 #define FUNCTION_ARGS_TAG 11
 
@@ -228,7 +229,7 @@ namespace gempba {
                     v_is_terminated = true; // temporary, it should always happen
                     break;
                 }
-                case REFVAL_UPDATE_TAG: {
+                case REF_VAL_UPDATE: {
                     receive_reference_value(v_status);
                     break;
                 }
@@ -285,7 +286,7 @@ namespace gempba {
 
         void receive_reference_value(MPI_Status p_status) {
             utils::print_mpi_debug_comments("rank {}, about to receive refValue from Center\n", m_world_rank);
-            MPI_Recv(&m_global_reference_value, 1, MPI_INT, CENTER, REFVAL_UPDATE_TAG, m_global_reference_value_communicator, &p_status);
+            MPI_Recv(&m_global_reference_value, 1, MPI_INT, CENTER, REF_VAL_UPDATE, m_global_reference_value_communicator, &p_status);
             utils::print_mpi_debug_comments("rank {}, received refValue: {} from Center\n", m_world_rank, m_global_reference_value);
         }
 
@@ -293,7 +294,7 @@ namespace gempba {
             int v_is_message_received = 0; // logical
 
             MPI_Status v_status;
-            MPI_Iprobe(CENTER, REFVAL_UPDATE_TAG, m_global_reference_value_communicator, &v_is_message_received, &v_status);
+            MPI_Iprobe(CENTER, REF_VAL_UPDATE, m_global_reference_value_communicator, &v_is_message_received, &v_status);
             if (v_is_message_received) {
                 return v_status;
 
@@ -536,7 +537,7 @@ namespace gempba {
                 m_global_reference_value = p_new_global_reference_value;
                 v_reference_value_updated = true;
                 for (int v_rank = 1; v_rank < m_world_size; v_rank++) {
-                    MPI_Send(&m_global_reference_value, 1, MPI_INT, v_rank, REFVAL_UPDATE_TAG, m_global_reference_value_communicator);
+                    MPI_Send(&m_global_reference_value, 1, MPI_INT, v_rank, REF_VAL_UPDATE, m_global_reference_value_communicator);
                 }
             }
 
@@ -587,7 +588,7 @@ namespace gempba {
                     process_available(status);
                     break;
                 }
-                case REFVAL_UPDATE_TAG: {
+                case REF_VAL_PROPOSAL: {
                     maybe_broadcast_global_reference_value(buffer, status);
                     break;
                 }
