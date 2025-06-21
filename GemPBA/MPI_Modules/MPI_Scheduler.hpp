@@ -262,18 +262,22 @@ namespace gempba {
             return flag;
         }
 
+        void receive_next_process(MPI_Status p_status) {
+            int v_count;
+            MPI_Get_count(&p_status, MPI_INT, &v_count); // 0 < count < world_size   -- safe
+            utils::print_mpi_debug_comments("rank {}, about to receive nextProcess from Center, count : {}\n", world_rank, v_count);
+            MPI_Recv(next_process.data(), v_count, MPI_INT, CENTER, NEXT_PROCESS_TAG, nextProcess_Comm, &p_status);
+            utils::print_mpi_debug_comments("rank {}, received nextProcess from Center, count : {}\n", world_rank, v_count);
+        }
+
         // checks for a new assigned process from center
         int probe_nextProcess() {
             int flag = 0;
             MPI_Status status;
-            int count;
             MPI_Iprobe(CENTER, NEXT_PROCESS_TAG, nextProcess_Comm, &flag, &status);
 
             if (flag) {
-                MPI_Get_count(&status, MPI_INT, &count); // 0 < count < world_size   -- safe
-                utils::print_mpi_debug_comments("rank {}, about to receive nextProcess from Center, count : {}\n", world_rank, count);
-                MPI_Recv(next_process.data(), count, MPI_INT, CENTER, NEXT_PROCESS_TAG, nextProcess_Comm, &status);
-                utils::print_mpi_debug_comments("rank {}, received nextProcess from Center, count : {}\n", world_rank, count);
+                receive_next_process(status);
             }
 
             return flag;
