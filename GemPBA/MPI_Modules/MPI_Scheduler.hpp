@@ -243,6 +243,12 @@ namespace gempba {
     private:
         void taskFunneling(BranchHandler& branchHandler);
 
+        void receive_reference_value(MPI_Status p_status) {
+            utils::print_mpi_debug_comments("rank {}, about to receive refValue from Center\n", world_rank);
+            MPI_Recv(&refValueGlobal, 1, MPI_INT, CENTER, REFVAL_UPDATE_TAG, refValueGlobal_Comm, &p_status);
+            utils::print_mpi_debug_comments("rank {}, received refValue: {} from Center\n", world_rank, refValueGlobal);
+        }
+
         // checks for a ref value update from center
         int probe_refValue() {
             int flag = 0;
@@ -250,9 +256,7 @@ namespace gempba {
             MPI_Iprobe(CENTER, REFVAL_UPDATE_TAG, refValueGlobal_Comm, &flag, &status);
 
             if (flag) {
-                utils::print_mpi_debug_comments("rank {}, about to receive refValue from Center\n", world_rank);
-                MPI_Recv(&refValueGlobal, 1, MPI_INT, CENTER, REFVAL_UPDATE_TAG, refValueGlobal_Comm, &status);
-                utils::print_mpi_debug_comments("rank {}, received refValue: {} from Center\n", world_rank, refValueGlobal);
+                receive_reference_value(status);
             }
 
             return flag;
