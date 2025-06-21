@@ -465,26 +465,22 @@ namespace gempba {
         * if center reaches this point, for sure workers have attained a better reference value,
         * or they are not up-to-date, thus it is required to broadcast it whether this value changes or not
         */
-        void maybe_broadcast_global_reference_value(int p_buffer, MPI_Status p_status) {
+        void maybe_broadcast_global_reference_value(int p_new_global_reference_value, MPI_Status p_status) {
+            utils::print_mpi_debug_comments("center received refValue {} from rank {}\n", p_new_global_reference_value, p_status.MPI_SOURCE);
+            bool v_reference_value_updated = false;
 
-            utils::print_mpi_debug_comments("center received refValue {} from rank {}\n", p_buffer, p_status.MPI_SOURCE);
-            bool v_signal = false;
-
-            if ((maximisation && p_buffer > refValueGlobal) || (!maximisation && p_buffer < refValueGlobal)) {
-                // refValueGlobal[0] = buffer;
-                refValueGlobal = p_buffer;
-                v_signal = true;
-                for (int rank = 1; rank < world_size; rank++) {
-                    MPI_Send(&refValueGlobal, 1, MPI_INT, rank, REFVAL_UPDATE_TAG, refValueGlobal_Comm);
+            if ((maximisation && p_new_global_reference_value > refValueGlobal) || (!maximisation && p_new_global_reference_value < refValueGlobal)) {
+                refValueGlobal = p_new_global_reference_value;
+                v_reference_value_updated = true;
+                for (int v_rank = 1; v_rank < world_size; v_rank++) {
+                    MPI_Send(&refValueGlobal, 1, MPI_INT, v_rank, REFVAL_UPDATE_TAG, refValueGlobal_Comm);
                 }
-
-                // bcastPut(refValueGlobal, 1, MPI_INT, 0, win_refValueGlobal);
             }
 
-            if (v_signal) {
+            if (v_reference_value_updated) {
                 static int success = 0;
                 success++;
-                spdlog::debug("refValueGlobal updated to : {} by rank {}\n", refValueGlobal, p_status.MPI_SOURCE);
+                spdlog::info("SUCCESSFUL updates: {}, refValueGlobal updated to : {} by rank {}\n", success, refValueGlobal, p_status.MPI_SOURCE);
             } else {
                 static int failures = 0;
                 failures++;
