@@ -167,11 +167,13 @@ namespace gempba {
 
             // this allows receiving refValue or nextProcess even if this process has turned into waiting mode
             while (!flag) {
-                if (maybe_receive_reference_value()) // different communicator
-                    continue; // center might update this value even if this process is idle
+                if (auto v_optional = probe_reference_value_comm(); v_optional.has_value()){
+                    return v_optional.value();
+                }
 
-                if (maybe_receive_next_process()) // different communicator
-                    continue; // center might update this value even if this process is idle
+                if (auto v_optional = probe_next_process_comm(); v_optional.has_value()){
+                    return v_optional.value();
+                }
 
                 MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, world_Comm, &flag, &status); // for regular messages
                 if (flag) {
@@ -227,6 +229,14 @@ namespace gempba {
                 case TERMINATION_TAG: {
                     process_termination(status);
                     v_is_terminated = true; // temporary, it should always happen
+                    break;
+                }
+                case REFVAL_UPDATE_TAG: {
+                    receive_reference_value(status);
+                    break;
+                }
+                case NEXT_PROCESS_TAG: {
+                    receive_next_process(status);
                     break;
                 }
                 default: {
@@ -295,13 +305,11 @@ namespace gempba {
         }
 
         // checks for a ref value update from center
-        int maybe_receive_reference_value() {
+        void maybe_receive_reference_value() {
             auto v_optional = probe_reference_value_comm();
             if (v_optional.has_value()) {
                 receive_reference_value(v_optional.value());
-                return true;
             }
-            return false;
         }
 
         void receive_next_process(MPI_Status p_status) {
@@ -325,13 +333,11 @@ namespace gempba {
         }
 
         // checks for a new assigned process from center
-        int maybe_receive_next_process() {
+        void maybe_receive_next_process() {
             auto v_optional = probe_next_process_comm();
             if (v_optional.has_value()) {
                 receive_next_process(v_optional.value());
-                return true;
             }
-            return false;
         }
 
         // if ref value received, it attempts updating local value
