@@ -421,6 +421,45 @@ namespace gempba {
             totalRequests++;
         }
 
+        void process_available(MPI_Status p_status) {
+            processState[p_status.MPI_SOURCE] = STATE_AVAILABLE;
+            ++nAvailable;
+            --nRunning;
+
+            if (processTree[p_status.MPI_SOURCE].is_assigned()) {
+                processTree[p_status.MPI_SOURCE].release();
+            }
+            utils::print_mpi_debug_comments("rank {} reported available, nRunning :{}\n", p_status.MPI_SOURCE, nRunning);
+            std::random_device rd; // Will be used to obtain a seed for the random number engine
+            std::mt19937 gen(
+                rd()); // Standard mersenne_twister_engine seeded with rd()
+            std::uniform_int_distribution<> distrib(0,
+                                                    world_size); // uniform distribution [closed interval]
+            int random_offset = distrib(gen); // random value in range
+
+            for (int i_rank = 0; i_rank < world_size; i_rank++) {
+                int rank = (i_rank + random_offset) %
+                    world_size; // this ensures that rank is always in range 0 <= rank < world_size
+                if (rank > 0) {
+                    if (processState[rank] == STATE_RUNNING) // finds the first running node
+                    {
+                        if (!processTree[rank].has_next()) // checks if running node has a child to push to
+                        {
+                            MPI_Send(&p_status.MPI_SOURCE, 1, MPI_INT, rank, NEXT_PROCESS_TAG,
+                                     nextProcess_Comm);
+
+                            processTree[rank].add_next(
+                                p_status.MPI_SOURCE); // assigns returning node to the running node
+                            processState[p_status.MPI_SOURCE] = STATE_ASSIGNED; // it flags returning node as assigned
+                            --nAvailable; // assigned, not available any more
+                            utils::print_mpi_debug_comments("ASSIGNEMENT:\trank {} <-- [{}]\n", rank, p_status.MPI_SOURCE);
+                            break; // breaks for-loop
+                        }
+                    }
+                }
+            }
+        }
+
     public:
         /*	run the center node */
         void runCenter(const char* p_seed, const int p_seed_size) override {
@@ -453,44 +492,9 @@ namespace gempba {
                     break;
                 }
                 case STATE_AVAILABLE: {
-                    processState[status.MPI_SOURCE] = STATE_AVAILABLE;
-                    ++nAvailable;
-                    --nRunning;
-
-                    if (processTree[status.MPI_SOURCE].is_assigned()) {
-                        processTree[status.MPI_SOURCE].release();
-                    }
-                    utils::print_mpi_debug_comments("rank {} reported available, nRunning :{}\n", status.MPI_SOURCE, nRunning);
-                    std::random_device rd; // Will be used to obtain a seed for the random number engine
-                    std::mt19937 gen(
-                        rd()); // Standard mersenne_twister_engine seeded with rd()
-                    std::uniform_int_distribution<> distrib(0,
-                                                            world_size); // uniform distribution [closed interval]
-                    int random_offset = distrib(gen); // random value in range
-
-                    for (int i_rank = 0; i_rank < world_size; i_rank++) {
-                        int rank = (i_rank + random_offset) %
-                            world_size; // this ensures that rank is always in range 0 <= rank < world_size
-                        if (rank > 0) {
-                            if (processState[rank] == STATE_RUNNING) // finds the first running node
-                            {
-                                if (!processTree[rank].has_next()) // checks if running node has a child to push to
-                                {
-                                    MPI_Send(&status.MPI_SOURCE, 1, MPI_INT, rank, NEXT_PROCESS_TAG,
-                                             nextProcess_Comm);
-
-                                    processTree[rank].add_next(
-                                        status.MPI_SOURCE); // assigns returning node to the running node
-                                    processState[status.MPI_SOURCE] = STATE_ASSIGNED; // it flags returning node as assigned
-                                    --nAvailable; // assigned, not available any more
-                                    utils::print_mpi_debug_comments("ASSIGNEMENT:\trank {} <-- [{}]\n", rank, status.MPI_SOURCE);
-                                    break; // breaks for-loop
-                                }
-                            }
-                        }
-                    }
+                    process_available(status);
+                    break;
                 }
-                break;
                 case REFVAL_UPDATE_TAG: {
                     /* if center reaches this point, for sure nodes have attained a better reference value
                             or they are not up-to-date, thus it is required to broadcast it whether this value
