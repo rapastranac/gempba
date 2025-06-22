@@ -453,6 +453,12 @@ namespace gempba {
         }
 
         void process_running(MPI_Status p_status) {
+            {
+                // Consumes RUNNING_STATE
+                int v_dummy = 0;;
+                MPI_Recv(&v_dummy, 1, MPI_INT, p_status.MPI_SOURCE, p_status.MPI_TAG, m_world_communicator, &p_status);
+            }
+
             m_process_state[p_status.MPI_SOURCE] = RUNNING_STATE; // node was assigned, now it's running
             ++m_nodes_running;
             utils::print_mpi_debug_comments("rank {} reported running, nRunning :{}\n", p_status.MPI_SOURCE, m_nodes_running);
@@ -475,6 +481,12 @@ namespace gempba {
         }
 
         void process_available(MPI_Status p_status) {
+            {
+                // Consumes AVAILABLE_STATE
+                int v_dummy = 0;;
+                MPI_Recv(&v_dummy, 1, MPI_INT, p_status.MPI_SOURCE, p_status.MPI_TAG, m_world_communicator, &p_status);
+            }
+
             m_process_state[p_status.MPI_SOURCE] = AVAILABLE_STATE;
             ++m_nodes_available;
             --m_nodes_running;
@@ -541,6 +553,62 @@ namespace gempba {
             }
         }
 
+        std::optional<MPI_Status> probe_reference_value_comm_center() {
+            int v_is_message_received = 0; // logical
+            MPI_Status v_status;
+            MPI_Iprobe(MPI_ANY_SOURCE, REFERENCE_VAL_PROPOSAL, m_global_reference_value_communicator, &v_is_message_received, &v_status);
+            if (v_is_message_received) {
+                // spdlog::info("rank {}: probe_reference_value_comm_center received message from rank {}\n", world_rank, status.MPI_SOURCE);
+                return v_status;
+            }
+            return std::nullopt;
+        }
+
+        std::optional<MPI_Status> probe_world_comm_center() {
+            int v_is_message_received = 0;
+            MPI_Status v_status;
+            MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, m_world_communicator, &v_is_message_received, &v_status); // for regular messages
+            if (v_is_message_received) {
+                return v_status;
+            }
+            return std::nullopt;
+        }
+
+        /**
+         * Only returns when a message is received from any of the communicators.
+         * @return MPI_Status of the received message, or std::nullopt only when all processes have finished or a timeout occurs.
+         */
+        std::optional<MPI_Status> probe_communicators_center() {
+            long v_cycles = 0;
+            while (true) {
+                const double v_wall_time0 = MPI_Wtime();
+                while (true) {
+                    if (const auto v_optional = probe_world_comm_center(); v_optional.has_value()) {
+                        return v_optional;
+                    }
+                    if (auto v_optional = probe_reference_value_comm_center(); v_optional.has_value()) {
+                        return v_optional;
+                    }
+                    ++v_cycles;
+                    double v_elapsed = difftime(v_wall_time0, MPI_Wtime());
+                    if (v_elapsed > TIMEOUT_TIME) {
+                        spdlog::debug("rank {}: no messages received in {} seconds, cycles: {}", m_world_rank, v_elapsed, v_cycles);
+                        break;
+                    }
+                }
+
+                if (m_nodes_running < 0) {
+                    spdlog::throw_spdlog_ex("rank {}: m_nodes_running is negative, this should not happen", m_world_rank);
+                }
+
+                // Timeout or termination condition
+                if (m_nodes_running == 0) {
+                    spdlog::debug("rank {}: probe_communicators_center received TIMEOUT", m_world_rank);
+                    return std::nullopt;
+                }
+            }
+        }
+
     public:
         /*	run the center node */
         void runCenter(const char* p_seed, const int p_seed_size) override {
@@ -551,34 +619,31 @@ namespace gempba {
                 build_topology(1, 0, 2, m_world_size);
             }
             broadcast_nodes_topology();
-
             send_seed(p_seed, p_seed_size);
 
-
             while (true) {
-                int buffer;
-                MPI_Status status;
-                MPI_Request request;
-                int ready;
-                const double v_wall_time0 = MPI_Wtime();
-                MPI_Irecv(&buffer, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, m_world_communicator, &request);
-
-                const bool v_timeout = receive_or_timeout(buffer, ready, v_wall_time0, status, request);
-                if (v_timeout)
+                auto v_status_opt = probe_communicators_center();
+                if (!v_status_opt.has_value()) {
+                    spdlog::info("rank {}: probe_communicators_center received TIMEOUT, exiting center run", m_world_rank);
                     break;
+                }
+                MPI_Status v_status = v_status_opt.value();
 
-                switch (status.MPI_TAG) {
+                switch (v_status.MPI_TAG) {
                 case RUNNING_STATE: {
                     // received if and only if a worker receives from other but center
-                    process_running(status);
+                    process_running(v_status);
                     break;
                 }
                 case AVAILABLE_STATE: {
-                    process_available(status);
+                    process_available(v_status);
                     break;
                 }
                 case REFERENCE_VAL_PROPOSAL: {
-                    maybe_broadcast_global_reference_value(buffer, status);
+                    int v_candidate_global_reference_value;
+                    // Consumes REFERENCE_VAL_PROPOSAL
+                    MPI_Recv(&v_candidate_global_reference_value, 1, MPI_INT, v_status.MPI_SOURCE, v_status.MPI_TAG, m_global_reference_value_communicator, &v_status);
+                    maybe_broadcast_global_reference_value(v_candidate_global_reference_value, v_status);
                     break;
                 }
                 }
