@@ -4,7 +4,7 @@
 ![GitHub License](https://img.shields.io/github/license/rapastranac/gempba)
 ![GitHub Release](https://img.shields.io/github/v/release/rapastranac/gempba) 
 
-This tool will help you parallelise almost any branching algorithm that seemed initially impossible or super complex to do. Please refer to this [MSc. Thesis](http://hdl.handle.net/11143/18687) and [Paper](https://doi.org/10.1016/j.parco.2023.103024), for a performance report.
+This tool will help you parallelize almost any branching algorithm that seemed initially impossible or super complex to do. Please refer to this [MSc. Thesis](http://hdl.handle.net/11143/18687) and [Paper](https://doi.org/10.1016/j.parco.2023.103024), for a performance report.
 
  **GemPBA** will allow you to perform parallelism using a multithreading or multiprocessing environment. It also contains a robust ***Dynamic Load Balancing*** (DLB) that significantly decreases the CPU idle time, which also increases performance due to the reduction of parallel calls in branching algorithms.
 
@@ -815,3 +815,38 @@ target_link_libraries(main PUBLIC
 
 
 For further testing and minimal reproducible examples, please refer to [GemPBA tester](https://github.com/rapastranac/gempba-tester) repository. 
+
+### Starring the project
+
+If you find this project helpful, I’d greatly appreciate it if you could give it a star on GitHub! This helps me gauge how many people are benefiting from the code and encourages me to continue enhancing and maintaining it.
+
+
+### Copyright and citing
+
+Copyright © 2021-2025 [Andrés Pastrana](https://www.linkedin.com/in/andrepas/). Licensed under the [MIT license](https://github.com/rapastranac/gempba/blob/main/LICENSE).
+
+If you use this library in software of any kind, please provide a link to [the GitHub repository](https://github.com/rapastranac/gempba) in the source code and documentation.
+
+If you use this library in published research, please cite it as follows:
+
+* Andres Pastrana-Cruz, Manuel Lafond, *"A lightweight semi-centralized strategy for the massive parallelization of branching algorithms"*, [doi.org/10.1016/j.parco.2023.103024](https://doi.org/10.1016/j.parco.2023.103024), [Parallel Computing (2023) 103024](https://www.sciencedirect.com/science/article/abs/pii/S0167819123000303), [arXiv:2305.09117](https://arxiv.org/abs/2305.09117)
+
+For BibTeX users, please use `REFERENCES.bib` for citation.
+
+```bibtex
+@article{PASTRANACRUZ2023103024,
+    archiveprefix = {arXiv},
+    title = {A lightweight semi-centralized strategy for the massive parallelization of branching algorithms},
+    journal = {Parallel Computing},
+    volume = {116},
+    pages = {103024},
+    year = {2023},
+    issn = {0167-8191},
+    doi = {https://doi.org/10.1016/j.parco.2023.103024},
+    url = {https://www.sciencedirect.com/science/article/pii/S0167819123000303},
+    author = {Andres Pastrana-Cruz and Manuel Lafond},
+    keywords = {Load balancing, Vertex cover, Parallel algorithms, Scalable parallelism, Branching algorithms}
+}
+```
+
+The publications available on [Parallel Computing](https://doi.org/10.1016/j.parco.2023.103024) and [arXiv](https://arxiv.org/abs/2305.09117) do not reflect the most recent updates to the library. These papers are primarily aimed at helping researchers discover the library and providing a reference for citing it in academic work. For the latest documentation, please refer to the `README.md` file in the [GitHub repository](https://github.com/rapastranac/gempba).
