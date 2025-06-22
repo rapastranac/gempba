@@ -366,13 +366,13 @@ namespace gempba {
 
         void notifyAvailableState() {
             int buffer = 0;
-            MPI_Send(&buffer, 1, MPI_INT, 0, AVAILABLE_STATE, m_world_communicator);
+            MPI_Send(&buffer, 1, MPI_INT, CENTER_NODE, AVAILABLE_STATE, m_world_communicator);
             utils::print_mpi_debug_comments("rank {} entered notifyAvailableState()\n", m_world_rank);
         }
 
         void notifyRunningState() {
             int buffer = 0;
-            MPI_Send(&buffer, 1, MPI_INT, 0, RUNNING_STATE, m_world_communicator);
+            MPI_Send(&buffer, 1, MPI_INT, CENTER_NODE, RUNNING_STATE, m_world_communicator);
         }
 
         void sendTask(std::string& message) {
