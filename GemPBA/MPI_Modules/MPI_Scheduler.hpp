@@ -268,7 +268,7 @@ namespace gempba {
             m_transmitting = true;
             m_destination_rank = nextProcess();
             utils::print_mpi_debug_comments("rank {} entered MPI_Scheduler::push(..) for the node {}\n", m_world_rank, m_destination_rank);
-            shift_left(m_next_processes.data(), m_world_size);
+            utils::shift_left(m_next_processes);
 
             auto pck = std::make_shared<std::string>(std::forward<std::string&&>(message));
             auto _message = new std::string(*pck);
