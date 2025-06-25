@@ -452,13 +452,13 @@ namespace gempba {
             return end - start;
         }
 
-        void process_running(MPI_Status p_status) {
-            {
-                // Consumes RUNNING_STATE
-                int v_dummy = 0;;
-                MPI_Recv(&v_dummy, 1, MPI_INT, p_status.MPI_SOURCE, p_status.MPI_TAG, m_world_communicator, &p_status);
-            }
+        static int consume_flag(MPI_Status p_status, const MPI_Comm& p_communicator) {
+            int v_val = 0;;
+            MPI_Recv(&v_val, 1, MPI_INT, p_status.MPI_SOURCE, p_status.MPI_TAG, p_communicator, &p_status);
+            return v_val;
+        }
 
+        void process_running(MPI_Status p_status) {
             m_process_state[p_status.MPI_SOURCE] = RUNNING_STATE; // node was assigned, now it's running
             ++m_nodes_running;
             utils::print_mpi_debug_comments("rank {} reported running, nRunning :{}\n", p_status.MPI_SOURCE, m_nodes_running);
@@ -481,12 +481,6 @@ namespace gempba {
         }
 
         void process_available(MPI_Status p_status) {
-            {
-                // Consumes AVAILABLE_STATE
-                int v_dummy = 0;;
-                MPI_Recv(&v_dummy, 1, MPI_INT, p_status.MPI_SOURCE, p_status.MPI_TAG, m_world_communicator, &p_status);
-            }
-
             m_process_state[p_status.MPI_SOURCE] = AVAILABLE_STATE;
             ++m_nodes_available;
             --m_nodes_running;
@@ -632,17 +626,17 @@ namespace gempba {
                 switch (v_status.MPI_TAG) {
                 case RUNNING_STATE: {
                     // received if and only if a worker receives from other but center
+                    consume_flag(v_status, m_world_communicator);
                     process_running(v_status);
                     break;
                 }
                 case AVAILABLE_STATE: {
+                    consume_flag(v_status, m_world_communicator);
                     process_available(v_status);
                     break;
                 }
                 case REFERENCE_VAL_PROPOSAL: {
-                    int v_candidate_global_reference_value;
-                    // Consumes REFERENCE_VAL_PROPOSAL
-                    MPI_Recv(&v_candidate_global_reference_value, 1, MPI_INT, v_status.MPI_SOURCE, v_status.MPI_TAG, m_global_reference_value_communicator, &v_status);
+                    int v_candidate_global_reference_value = consume_flag(v_status, m_global_reference_value_communicator);
                     maybe_broadcast_global_reference_value(v_candidate_global_reference_value, v_status);
                     break;
                 }
