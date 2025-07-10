@@ -3,6 +3,10 @@ cmake_minimum_required(VERSION 3.28)
 project(gempba_examples LANGUAGES CXX)
 
 cmake_policy(SET CMP0167 NEW)
+
+# Static linking of Boost
+set(Boost_USE_STATIC_LIBS ON)
+
 find_package(Boost COMPONENTS system serialization fiber REQUIRED)
 
 # Include Boost y argparse
@@ -25,17 +29,17 @@ foreach (EXAMPLE ${EXAMPLES})
             Boost::fiber
     )
 
-    # Check if the example name starts with "mp_"
-    if (EXAMPLE_NAME MATCHES "^mp_")
-        message(STATUS "Adding GEMPBA_MULTIPROCESSING for ${EXAMPLE_NAME}")
-        target_compile_definitions(${EXAMPLE_NAME} PRIVATE GEMPBA_MULTIPROCESSING)
-    endif ()
-
     # Executables output directory
     set_target_properties(${EXAMPLE_NAME}
             PROPERTIES
             RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin
     )
+
+    # Check if the example name starts with "mp_"
+    if (EXAMPLE_NAME MATCHES "^mp_")
+        message(STATUS "Adding GEMPBA_MULTIPROCESSING for ${EXAMPLE_NAME}")
+        target_compile_definitions(${EXAMPLE_NAME} PRIVATE GEMPBA_MULTIPROCESSING)
+    endif ()
 
     # Compilation options by mode
     target_compile_options(${EXAMPLE_NAME} PRIVATE

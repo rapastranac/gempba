@@ -40,7 +40,6 @@ endif ()
 find_package(OpenMP REQUIRED)
 find_package(Threads REQUIRED)
 find_package(MPI REQUIRED)
-find_package(spdlog REQUIRED)
 
 # 📂 Includes
 include_directories(${MPI_INCLUDE_PATH})
@@ -94,7 +93,6 @@ target_link_libraries(gempba PUBLIC
         Threads::Threads
         MPI::MPI_CXX
         OpenMP::OpenMP_CXX
-        spdlog::spdlog
 )
 
 # 📁 Executables output directory
