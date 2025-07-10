@@ -24,7 +24,6 @@ jobs:
           sudo apt-get install -y git
           sudo apt-get install -y libboost-all-dev 
           sudo apt-get install -y libopenmpi-dev 
-          sudo apt-get install -y libspdlog-dev 
 
       - name: Echo Dependencies Version
         run: |
@@ -34,7 +33,6 @@ jobs:
           git --version
           dpkg -s libboost-dev | grep 'Version'
           dpkg -s libopenmpi-dev | grep 'Version'
-          dpkg -s libspdlog-dev | grep 'Version'
 
       - name: clone GemPBA
         run: |
