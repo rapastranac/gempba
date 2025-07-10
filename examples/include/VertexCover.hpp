@@ -8,7 +8,7 @@
 #include "BranchHandler/BranchHandler.hpp"
 #include "Resultholder/ResultHolder.hpp"
 #include "util.hpp"
-#include "fmt/core.h"
+#include <format>
 #include "DLB/DLB_Handler.hpp"
 
 #include <algorithm>
