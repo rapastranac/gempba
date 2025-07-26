@@ -76,7 +76,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
             main thread will take care of Inter-process communication (IPC), dedicated core
             numThreads could be the number of physical cores managed by this process - 1
         */
-        branchHandler.initThreadPool(threads_per_task - 1);
+        branchHandler.initThreadPool(threads_per_task);
 
         std::function<std::shared_ptr<gempba::ResultHolderParent>(char *, int)> bufferDecoder = branchHandler.constructBufferDecoder<void, int, gbitset, int>(function, deserializer);
         utils::print_mpi_debug_comments("Buffer decoded fetched successfully!\n");
