@@ -408,19 +408,6 @@ namespace gempba {
             }
         }
 
-        void build_topology(int pi, int base_d, int b, int p) {
-            for (int depth = base_d; depth < log2(p); depth++) {
-                for (int j = 1; j < b; j++) {
-                    int q = getNextProcess(j, pi, b, depth);
-                    if (q < p && q > 0) {
-                        m_process_tree[pi].add_next(q);
-                        spdlog::debug("process: {}, child: {}\n", pi, q);
-                        build_topology(q, depth + 1, b, p);
-                    }
-                }
-            }
-        }
-
     public:
     private:
         /*	each node has an array containing its children were it is going to send tasks,
@@ -634,7 +621,7 @@ namespace gempba {
             m_start_time = MPI_Wtime();
 
             if (!m_custom_initial_topology) {
-                build_topology(1, 0, 2, m_world_size);
+                utils::build_topology(m_process_tree, 1, 0, 2, m_world_size);
             }
             broadcast_nodes_topology();
             send_seed(p_seed, p_seed_size);
