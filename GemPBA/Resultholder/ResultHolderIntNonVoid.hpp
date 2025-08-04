@@ -11,7 +11,7 @@
 
 namespace gempba {
 
-    template <typename Ret, typename... Args>
+    template<typename Ret, typename... Args>
     class ResultHolderInt<Ret, typename std::enable_if<!std::is_void<Ret>::value>::type, Args...> : virtual public ResultHolderBase<Args...> {
         friend class DLB_Handler;
 
@@ -20,17 +20,17 @@ namespace gempba {
         Ret expected;
 
     public:
-        explicit ResultHolderInt(DLB_Handler& dlb) :
+        explicit ResultHolderInt(DLB_Handler &dlb) :
             ResultHolderBase<Args...>(dlb) {
         }
 
         ~ResultHolderInt() override = default;
 
-        void hold_future(std::future<Ret>&& expectedFut) {
+        void hold_future(std::future<Ret> &&expectedFut) {
             this->expectedFut = std::move(expectedFut);
         }
 
-        void hold_actual_result(Ret& expected) {
+        void hold_actual_result(Ret &expected) {
             this->expected = std::move(expected);
         }
 
@@ -71,7 +71,7 @@ namespace gempba {
                 int Bytes;
 
                 MPI_Probe(this->dest_rank, MPI_ANY_TAG, this->branchHandler.getCommunicator(), &status); // receives status before receiving the message
-                MPI_Get_count(&status, MPI_CHAR, &Bytes);                                                // receives total number of datatype elements of the message
+                MPI_Get_count(&status, MPI_CHAR, &Bytes); // receives total number of datatype elements of the message
 
                 char *in_buffer = new char[Bytes];
                 MPI_Recv(in_buffer, Bytes, MPI_CHAR, this->dest_rank, MPI_ANY_TAG,

@@ -50,8 +50,7 @@ public:
             branchHandler.set_lookup_strategy(gempba::MINIMISE);
             //mvc(-1, 0, graph);
             //testing ****************************************
-            HolderType initial(dlb, -1);
-            {
+            HolderType initial(dlb, -1); {
                 int depth = 0;
                 initial.holdArgs(depth, graph);
                 //branchHandler.try_push_MT<void>(_f, -1, initial);
@@ -64,8 +63,7 @@ public:
             graph_res = branchHandler.fetchSolution<Graph>();
             graph_res2 = graph_res;
             cover = graph_res.postProcessing();
-        }
-        catch (std::exception &e) {
+        } catch (std::exception &e) {
             this->output.open(outPath, std::ofstream::in | std::ofstream::out | std::ofstream::app);
             if (!output.is_open()) {
                 printf("Error, output file not found ! \n");

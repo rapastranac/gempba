@@ -22,8 +22,6 @@ inline bool caseInsCharCompareN(char a, char b) {
   **/
 class Util {
 public:
-
-
     /**
       Trims s on the right from any single character in delimiters
       **/

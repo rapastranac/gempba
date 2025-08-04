@@ -40,7 +40,6 @@ namespace boost {
         void save(Ar &ar, dynamic_bitset<Block, Alloc> const &bs, unsigned) {
 
 
-
             /*dynamic_bitset<Block, Alloc> dummy(bs);
             dummy.resize( bs.size() * 100 );
 
@@ -116,12 +115,12 @@ void helper_ser(auto &archive, auto &first) {
     archive << first;
 }
 
-void helper_ser(auto &archive, auto &first, auto &...args) {
+void helper_ser(auto &archive, auto &first, auto &... args) {
     archive << first;
     helper_ser(archive, args...);
 }
 
-auto serializer = [](auto &&...args) {
+auto serializer = [](auto &&... args) {
     /* here inside, user can implement its favourite serialization method given the
 	arguments pack and it must return a std::string */
     std::stringstream ss;
@@ -136,12 +135,12 @@ void helper_dser(auto &archive, auto &first) {
     archive >> first;
 }
 
-void helper_dser(auto &archive, auto &first, auto &...args) {
+void helper_dser(auto &archive, auto &first, auto &... args) {
     archive >> first;
     helper_dser(archive, args...);
 }
 
-auto deserializer = [](std::stringstream &ss, auto &...args) {
+auto deserializer = [](std::stringstream &ss, auto &... args) {
     /* here inside, the user can implement its favourite deserialization method given buffer
 	and the arguments pack*/
     //cereal::BinaryInputArchive archive(ss);
@@ -174,7 +173,8 @@ public:
         this->_f = std::bind(&VC_void_MPI_bitvec_enc2::mvcbitset, this, _1, _2, _3, _4, _5);
     }
 
-    ~VC_void_MPI_bitvec_enc2() {}
+    ~VC_void_MPI_bitvec_enc2() {
+    }
 
     void setGraph(Graph &graph) {
         is_skips = 0;
@@ -191,7 +191,7 @@ public:
         int gsize = graph.adj.size() + 1; //+1 cuz some files use node ids from 1 to n (instead of 0 to n - 1)
 
         cout << "Graph has " << graph.adj.size() << " vertices and " << graph.getNumEdges() << " edges" << endl;
-        vector<pair<int, int>> deg_v;
+        vector<pair<int, int> > deg_v;
         for (auto it = graph.adj.begin(); it != graph.adj.end(); ++it) {
             deg_v.push_back(make_pair(it->second.size(), it->first));
         }
@@ -202,7 +202,7 @@ public:
         for (int i = 0; i < deg_v.size(); i++) {
             remap[deg_v[i].second] = deg_v.size() - 1 - i;
         }
-        map<int, set<int>> adj2;
+        map<int, set<int> > adj2;
         for (auto it = graph.adj.begin(); it != graph.adj.end(); ++it) {
             int v = it->first;
             adj2[remap[v]] = set<int>();
@@ -499,7 +499,7 @@ private:
             std::time_t time = std::chrono::system_clock::to_time_t(clock); //it includes a "\n"
 
             spdlog::debug("rank {}, MVC solution so far: {} @ depth : {}, {}", branchHandler.rank_me(), solsize, depth,
-                         std::ctime(&time));
+                          std::ctime(&time));
             //spdlog::debug("dummy[0,...,3] = [{}, {}, {}, {}]\n", dummy[0], dummy[1], dummy[2], dummy[3]);
         }
 

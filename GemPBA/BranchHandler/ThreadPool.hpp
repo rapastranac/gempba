@@ -86,7 +86,7 @@ namespace ThreadPool {
 
             thread = std::make_unique<std::thread>(f);
             while (nWaiting.load() !=
-                SIZE); // main thread loops until one thread in thread pool has attained waiting mode
+                   SIZE); // main thread loops until one thread in thread pool has attained waiting mode
         }
 
         /*	when pushing recursive functions that do not require waiting for merging
@@ -103,20 +103,20 @@ namespace ThreadPool {
         }
 
         [[maybe_unused]] void clear_queue() {
-            std::function<void(int)>* _f;
+            std::function<void(int)> *_f;
             while (this->q.pop(_f))
                 delete _f; // empty the queue
         }
 
         [[maybe_unused]] double idle_time() {
-            return ((double)idleTime.load() * 1.0e-9); // seconds
+            return ((double) idleTime.load() * 1.0e-9); // seconds
         }
 
-        template <typename F, typename... Args>
-        auto push(F&& f, Args&&... args) -> std::future<decltype(f(0, args...))> {
+        template<typename F, typename... Args>
+        auto push(F &&f, Args &&... args) -> std::future<decltype(f(0, args...))> {
             using namespace std::placeholders;
-            auto pck = std::make_shared<std::packaged_task<decltype(f(0, args...))(int)>>(
-                std::bind(std::forward<F>(f), _1, std::forward<Args>(args)...));
+            auto pck = std::make_shared<std::packaged_task<decltype(f(0, args...))(int)> >(
+                    std::bind(std::forward<F>(f), _1, std::forward<Args>(args)...));
 
             auto _f = new std::function<void(int)>([pck](int id) { (*pck)(id); });
 
@@ -126,13 +126,13 @@ namespace ThreadPool {
             return pck->get_future();
         }
 
-        Pool(const Pool&) = delete;
+        Pool(const Pool &) = delete;
 
-        Pool(Pool&&) = delete;
+        Pool(Pool &&) = delete;
 
-        Pool& operator=(const Pool&) = delete;
+        Pool &operator=(const Pool &) = delete;
 
-        Pool& operator=(Pool&&) = delete;
+        Pool &operator=(Pool &&) = delete;
 
     protected:
         // it forces interrupt even if there is some task in the queue
@@ -159,7 +159,7 @@ namespace ThreadPool {
         }
 
         void run(int threadId) {
-            std::function<void(int)>* _f; // pointer to the function enqueued
+            std::function<void(int)> *_f; // pointer to the function enqueued
             bool isPop = this->q.pop(_f); // dequeuing a function
             std::chrono::steady_clock::time_point begin;
             std::chrono::steady_clock::time_point end;
@@ -172,7 +172,7 @@ namespace ThreadPool {
                     if (!running)
                         running = true; // this helps to block a main thread that launches the thread pool
 
-                    std::unique_ptr<std::function<void(int)>> func(_f); // acquire ownership of "_f"
+                    std::unique_ptr<std::function<void(int)> > func(_f); // acquire ownership of "_f"
                     (*_f)(threadId);
 
                     isPop = this->q.pop(_f);
@@ -233,7 +233,7 @@ namespace ThreadPool {
         std::condition_variable cv; // used with mtx
         std::condition_variable cv_wait; // used with mtx_wait
 
-        Queue<std::function<void(int)>*> q; // task queue
+        Queue<std::function<void(int)> *> q; // task queue
     };
 
 } // namespace ThreadPool

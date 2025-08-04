@@ -8,6 +8,7 @@
 
 - **C++20** compatible compiler
 - **CMake** ≥ 3.28
+- **OpenMPI** ≥ 4.0
 - **Boost** libraries (optional, only for examples and tests)
 - **GoogleTest** if you want to run the tests (Not fetched by default)
 

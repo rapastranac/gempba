@@ -15,12 +15,12 @@
 namespace gempba {
     class DLB_Handler;
 
-    template <typename... Args>
+    template<typename... Args>
     class ResultHolderBase : public ResultHolderParent {
         friend class DLB_Handler;
 
     protected:
-        DLB_Handler& dlb;
+        DLB_Handler &dlb;
 
         std::tuple<Args...> tup;
         std::function<bool()> branch_checkIn;
@@ -40,23 +40,23 @@ namespace gempba {
         #ifdef GEMPBA_MULTIPROCESSING
         // MPI attributes in construction, specially for non-void functions ******
         bool isMPISent = false; // flag to check if was sent via MPI
-        int dest_rank = -1;     // rank destination
+        int dest_rank = -1; // rank destination
 
         // **********************
         #endif
 
     public:
-        explicit ResultHolderBase(DLB_Handler& dlb) :
+        explicit ResultHolderBase(DLB_Handler &dlb) :
             dlb(dlb) {
         }
 
         ~ResultHolderBase() override = default;
 
-        void holdArgs(Args&... args) {
-            this->tup = std::make_tuple(std::forward<Args&&>(args)...);
+        void holdArgs(Args &... args) {
+            this->tup = std::make_tuple(std::forward<Args &&>(args)...);
         }
 
-        std::tuple<Args...>& getArgs() {
+        std::tuple<Args...> &getArgs() {
             return tup;
         }
 
@@ -115,8 +115,8 @@ namespace gempba {
             this->isDiscarded = val;
         }
 
-        template <typename F>
-        void bind_branch_checkIn(F&& branch_checkIn) {
+        template<typename F>
+        void bind_branch_checkIn(F &&branch_checkIn) {
             this->branch_checkIn = std::bind(std::forward<F>(branch_checkIn));
         }
 
@@ -165,7 +165,7 @@ namespace gempba {
         #endif
     };
 
-    template <typename Ret, typename Enable = void, typename... Args>
+    template<typename Ret, typename Enable = void, typename... Args>
     class ResultHolderInt;
 }
 

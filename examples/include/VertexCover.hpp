@@ -86,9 +86,9 @@ public:
         }
 
         output << std::internal
-               << col1
-               << std::setw(wide - col1.size())
-               << col2;
+                << col1
+                << std::setw(wide - col1.size())
+                << col2;
 
         output.close();
     }
@@ -100,9 +100,9 @@ public:
         }
 
         cout << "!" << fmt::format("{:-^{}}", "Minimum vertex cover", wide - 2) << "!"
-             << "\n";
+                << "\n";
         output << "!" << fmt::format("{:-^{}}", "Minimum vertex cover", wide - 2) << "!"
-               << "\n";
+                << "\n";
 
         /* create string of lenght wide*/
         auto it = cover.begin();
@@ -133,157 +133,157 @@ public:
         string col2 = input_file_name;
 
         cout << std::internal
-             << col1
-             << std::setfill(' ')
-             << std::setw(wide - col1.size()) << col2
-             << "\n";
+                << col1
+                << std::setfill(' ')
+                << std::setw(wide - col1.size()) << col2
+                << "\n";
         output << std::internal
-               << col1
-               << std::setw(wide - col1.size()) << col2
-               << "\n";
+                << col1
+                << std::setw(wide - col1.size()) << col2
+                << "\n";
 
         col1 = "Initial graph size after preprocessing: ";
         col2 = Util::ToString((int) preSize);
         cout << std::internal
-             << col1
-             << std::setfill(' ')
-             << std::setw(wide - col1.size()) << col2
-             << "\n";
+                << col1
+                << std::setfill(' ')
+                << std::setw(wide - col1.size()) << col2
+                << "\n";
         output << std::internal
-               << col1
-               << std::setw(wide - col1.size()) << col2
-               << "\n";
+                << col1
+                << std::setw(wide - col1.size()) << col2
+                << "\n";
 
         col1 = "Size:";
         col2 = Util::ToString((int) cover.size());
         cout << std::internal
-             << col1
-             << std::setw(wide - col1.size()) << col2
-             << "\n";
+                << col1
+                << std::setw(wide - col1.size()) << col2
+                << "\n";
         output << std::internal
-               << col1
-               << std::setw(wide - col1.size()) << col2
-               << "\n";
+                << col1
+                << std::setw(wide - col1.size()) << col2
+                << "\n";
 
         col1 = "Found at depth:";
         col2 = Util::ToString((int) foundAtDepth);
         cout << std::internal
-             << col1
-             << std::setw(wide - col1.size()) << col2
-             << "\n";
+                << col1
+                << std::setw(wide - col1.size()) << col2
+                << "\n";
         output << std::internal
-               << col1
-               << std::setw(wide - col1.size()) << col2
-               << "\n";
+                << col1
+                << std::setw(wide - col1.size()) << col2
+                << "\n";
 
         col1 = "Elapsed time:";
         col2 = Util::ToString((double) (elapsed_secs * 1.0e-9)) + " s";
         //auto tmp = std::setw(wide - col1.size() - col2.size());
         cout << std::internal
-             << col1
-             << std::setw(wide - col1.size()) << col2
-             << "\n";
+                << col1
+                << std::setw(wide - col1.size()) << col2
+                << "\n";
         output << std::internal
-               << col1
-               << std::setw(wide - col1.size()) << col2
-               << "\n";
+                << col1
+                << std::setw(wide - col1.size()) << col2
+                << "\n";
 
         col1 = "Number of leaves:";
         col2 = Util::ToString((int) leaves);
         cout << std::internal
-             << col1
-             << std::setw(wide - col1.size()) << col2
-             << "\n";
+                << col1
+                << std::setw(wide - col1.size()) << col2
+                << "\n";
         output << std::internal
-               << col1
-               << std::setw(wide - col1.size()) << col2
-               << "\n";
+                << col1
+                << std::setw(wide - col1.size()) << col2
+                << "\n";
 
         col1 = "Maximum depth reached:";
         col2 = Util::ToString((int) measured_Depth);
         cout << std::internal
-             << col1
-             << std::setw(wide - col1.size()) << col2
-             << "\n";
+                << col1
+                << std::setw(wide - col1.size()) << col2
+                << "\n";
         output << std::internal
-               << col1
-               << std::setw(wide - col1.size()) << col2
-               << "\n";
+                << col1
+                << std::setw(wide - col1.size()) << col2
+                << "\n";
 
         col1 = "Idle time:";
         col2 = std::to_string(branchHandler.idle_time());
         string col3 = std::to_string((branchHandler.idle_time() * 100.0 / (elapsed_secs * 1.0e-9))) + "%";
 
         cout << std::left << std::setw(wide * 0.3)
-             << col1
-             << std::right << std::setw(wide * 0.3)
-             << col2
-             << std::right << std::setw(wide * 0.4)
-             << col3
-             << "\n";
+                << col1
+                << std::right << std::setw(wide * 0.3)
+                << col2
+                << std::right << std::setw(wide * 0.4)
+                << col3
+                << "\n";
         output << std::left << std::setw(wide * 0.3)
-               << col1
-               << std::right << std::setw(wide * 0.3)
-               << col2
-               << std::right << std::setw(wide * 0.4)
-               << col3
-               << "\n";
+                << col1
+                << std::right << std::setw(wide * 0.3)
+                << col2
+                << std::right << std::setw(wide * 0.4)
+                << col3
+                << "\n";
 
         col1 = "Pool idle time:";
         col2 = Util::ToString((double) (branchHandler.getPoolIdleTime()));
         col3 = Util::ToString((double) (branchHandler.getPoolIdleTime() * 100.0 / (elapsed_secs * 1.0e-9))) + "%";
 
         cout << std::left << std::setw(wide * 0.3)
-             << col1
-             << std::right << std::setw(wide * 0.3)
-             << col2
-             << std::right << std::setw(wide * 0.4)
-             << col3
-             << "\n";
+                << col1
+                << std::right << std::setw(wide * 0.3)
+                << col2
+                << std::right << std::setw(wide * 0.4)
+                << col3
+                << "\n";
         output << std::left << std::setw(wide * 0.3)
-               << col1
-               << std::right << std::setw(wide * 0.3)
-               << col2
-               << std::right << std::setw(wide * 0.4)
-               << col3
-               << "\n";
+                << col1
+                << std::right << std::setw(wide * 0.3)
+                << col2
+                << std::right << std::setw(wide * 0.4)
+                << col3
+                << "\n";
 
         col1 = "Successful requests:";
         col2 = std::to_string(branchHandler.number_thread_requests());
         cout << std::internal
-             << col1
-             << std::setfill(' ')
-             << std::setw(wide - col1.size()) << col2
-             << "\n";
+                << col1
+                << std::setfill(' ')
+                << std::setw(wide - col1.size()) << col2
+                << "\n";
         output << std::internal
-               << col1
-               << std::setw(wide - col1.size()) << col2
-               << "\n";
+                << col1
+                << std::setw(wide - col1.size()) << col2
+                << "\n";
 
         std::cout << "!" << fmt::format("{:-^{}}", "", wide - 2) << "!"
-                  << "\n";
+                << "\n";
         output << "!" << fmt::format("{:-^{}}", "", wide - 2) << "!"
-               << "\n";
+                << "\n";
         std::cout << "\n"
-                  << "\n"
-                  << "\n";
+                << "\n"
+                << "\n";
         output << "\n"
-               << "\n"
-               << "\n";
+                << "\n"
+                << "\n";
 
         output.close();
 
         this->output_raw.open(outPath_raw, std::ofstream::in | std::ofstream::out | std::ofstream::app);
 
         output_raw << input_file_name << ","
-                   << Util::ToString((int) preSize) << ","
-                   << Util::ToString((int) cover.size()) << ","
-                   << Util::ToString((int) foundAtDepth) << ","
-                   << Util::ToString((double) (elapsed_secs * 1.0e-9)) << ","
-                   << Util::ToString((int) leaves) << ","
-                   << Util::ToString((int) measured_Depth) << ","
-                   << Util::ToString((double) (branchHandler.idle_time() * 1.0e-9)) << ","
-                   << Util::ToString((double) (branchHandler.getPoolIdleTime())) << "\n";
+                << Util::ToString((int) preSize) << ","
+                << Util::ToString((int) cover.size()) << ","
+                << Util::ToString((int) foundAtDepth) << ","
+                << Util::ToString((double) (elapsed_secs * 1.0e-9)) << ","
+                << Util::ToString((int) leaves) << ","
+                << Util::ToString((int) measured_Depth) << ","
+                << Util::ToString((double) (branchHandler.idle_time() * 1.0e-9)) << ","
+                << Util::ToString((double) (branchHandler.getPoolIdleTime())) << "\n";
         output_raw.close();
     }
 
@@ -297,10 +297,10 @@ public:
         string col1 = fmt::format("VC = {}", branchHandler.refValue());
         string col2 = fmt::format("process {}, thread {}, {}", branchHandler.rank_me(), id, std::ctime(&time));
         cout << std::internal
-             << std::setfill('.')
-             << col1
-             << std::setw(wide - col1.size())
-             << col2;
+                << std::setfill('.')
+                << col1
+                << std::setw(wide - col1.size())
+                << col2;
 
         outFile(col1, col2);
     }
@@ -318,8 +318,7 @@ public:
                 g.removeVertex(w);
                 g.removeZeroVertexDegree();
                 //				g.clean_graph(); //stupid thing
-            }
-            catch (const std::exception &e) {
+            } catch (const std::exception &e) {
                 std::cerr << e.what() << std::endl;
             }
         }

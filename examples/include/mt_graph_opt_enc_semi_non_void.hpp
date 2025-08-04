@@ -19,7 +19,8 @@ namespace gempba {
             this->_f = std::bind(&VC_non_void::mvc, this, _1, _2, _3, _4);
         }
 
-        ~VC_non_void() override {}
+        ~VC_non_void() override {
+        }
 
         bool findCover(int run) {
             string msg_center = fmt::format("run # {} ", run);
@@ -40,15 +41,13 @@ namespace gempba {
 
             try {
                 branchHandler.setRefValue(currentMVCSize);
-                HolderType *dummyParent = new HolderType(dlb, -1);
-                {
+                HolderType *dummyParent = new HolderType(dlb, -1); {
                     graph_res = mvc(-1, 0, graph, dummyParent);
                 }
 
                 graph_res2 = graph_res;
                 cover = graph_res.postProcessing();
-            }
-            catch (std::exception &e) {
+            } catch (std::exception &e) {
                 this->output.open(outPath, std::ofstream::in | std::ofstream::out | std::ofstream::app);
                 if (!output.is_open()) {
                     printf("Error, output file not found ! \n");
@@ -69,7 +68,7 @@ namespace gempba {
         Graph mvc(int id, int depth, Graph graph, void *parent) {
             size_t LB = graph.min_k();
             size_t degLB = 0; // graph.DegLB();
-//            size_t UB = graph.max_k();
+            //            size_t UB = graph.max_k();
             size_t acLB = 0; // graph.antiColoringLB();
             //size_t mm = maximum_matching(graph);
             //size_t k = relaxation(k1, k2);

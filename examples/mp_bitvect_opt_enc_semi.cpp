@@ -63,7 +63,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
 
     mpiScheduler.barrier();
 
-    int pid = getpid();                                       // for debugging purposes
+    int pid = getpid(); // for debugging purposes
     spdlog::debug("rank {} is process ID : {}\n", rank, pid); // for debugging purposes
 
     mpiScheduler.barrier();
@@ -76,7 +76,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
             main thread will take care of Inter-process communication (IPC), dedicated core
             numThreads could be the number of physical cores managed by this process - 1
         */
-        branchHandler.initThreadPool(threads_per_task - 1);
+        branchHandler.initThreadPool(threads_per_task);
 
         std::function<std::shared_ptr<gempba::ResultHolderParent>(char *, int)> bufferDecoder = branchHandler.constructBufferDecoder<void, int, gbitset, int>(function, deserializer);
         utils::print_mpi_debug_comments("Buffer decoded fetched successfully!\n");
@@ -97,7 +97,8 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
     int taskRecvd;
     int taskSent;
 
-    if (rank != 0) { // rank 0 does not run the main function
+    if (rank != 0) {
+        // rank 0 does not run the main function
         idl_tm = branchHandler.getPoolIdleTime();
         rqst = branchHandler.number_thread_requests();
 

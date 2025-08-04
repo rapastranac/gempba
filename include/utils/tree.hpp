@@ -29,7 +29,7 @@
 
 class tree {
     struct tree_node {
-        explicit tree_node(tree& p_tree, const int p_index) :
+        explicit tree_node(tree &p_tree, const int p_index) :
             m_tree(p_tree) {
             this->m_index = p_index;
             this->m_children_count = 0;
@@ -51,7 +51,7 @@ class tree {
             if (m_children_count == 0) {
                 m_next = &m_tree[p_index];
             } else {
-                tree_node* tail = m_next;
+                tree_node *tail = m_next;
                 while (tail->m_right_sibling) {
                     tail = tail->m_right_sibling;
                 }
@@ -134,19 +134,19 @@ class tree {
         [[nodiscard]] int size() const { return m_children_count; }
 
         class m_iterator {
-            tree_node* m_node;
+            tree_node *m_node;
 
             friend struct tree_node;
 
-            explicit m_iterator(tree_node* p_node) :
+            explicit m_iterator(tree_node *p_node) :
                 m_node(p_node) {
             }
 
         public:
-            int& operator*() const { return m_node->m_index; }
+            int &operator*() const { return m_node->m_index; }
 
             // overload pre-increment operator
-            m_iterator& operator++() {
+            m_iterator &operator++() {
                 m_node = m_node->m_right_sibling;
                 return *this;
             }
@@ -158,9 +158,9 @@ class tree {
                 return ret;
             }
 
-            bool operator==(const m_iterator& p_iter) const { return this->m_node == p_iter.m_node; }
+            bool operator==(const m_iterator &p_iter) const { return this->m_node == p_iter.m_node; }
 
-            bool operator!=(const m_iterator& p_iter) const { return this->m_node != p_iter.m_node; }
+            bool operator!=(const m_iterator &p_iter) const { return this->m_node != p_iter.m_node; }
         };
 
         using iterator = m_iterator;
@@ -170,13 +170,13 @@ class tree {
         [[nodiscard]] iterator end() const { return iterator(m_dummy); }
 
     private:
-        tree& m_tree;
-        tree_node* m_parent;
-        tree_node* m_left_sibling;
-        tree_node* m_right_sibling;
-        tree_node* m_next;
-        tree_node* m_last;
-        tree_node* m_dummy;
+        tree &m_tree;
+        tree_node *m_parent;
+        tree_node *m_left_sibling;
+        tree_node *m_right_sibling;
+        tree_node *m_next;
+        tree_node *m_last;
+        tree_node *m_dummy;
         int m_index = -1;
         int m_children_count;
     };
@@ -187,12 +187,14 @@ public:
     tree() = default;
 
     // non-copyable
-    tree(const tree&) = delete;
-    tree& operator=(const tree&) = delete;
+    tree(const tree &) = delete;
+
+    tree &operator=(const tree &) = delete;
 
     // movable
-    tree(tree&&) noexcept = default;
-    tree& operator=(tree&&) noexcept = default;
+    tree(tree &&) noexcept = default;
+
+    tree &operator=(tree &&) noexcept = default;
 
 
     explicit tree(const size_t p_size) {
@@ -209,7 +211,7 @@ public:
 
     [[nodiscard]] size_t size() const { return m_c.size(); }
 
-    tree_node& operator[](const int p_idx) { return m_c[p_idx]; }
+    tree_node &operator[](const int p_idx) { return m_c[p_idx]; }
 
     using iterator = std::vector<tree_node>::iterator;
 

@@ -11,19 +11,19 @@
  */
 namespace gempba {
 
-    template <typename Ret, typename... Args>
+    template<typename Ret, typename... Args>
     class ResultHolder : public ResultHolderInt<Ret, void, Args...> {
         friend class DLB_Handler;
 
     private:
-        void** root = nullptr; // raw pointer
-        ResultHolder* parent = nullptr; // raw pointer
-        ResultHolder* itself = nullptr; // this;	raw pointer
-        std::list<ResultHolder*> children; // raw pointers, it keeps the order in which they were appended
+        void **root = nullptr; // raw pointer
+        ResultHolder *parent = nullptr; // raw pointer
+        ResultHolder *itself = nullptr; // this;	raw pointer
+        std::list<ResultHolder *> children; // raw pointers, it keeps the order in which they were appended
 
     public:
         // default constructor, it has no parent, used for virtual roots
-        ResultHolder(DLB_Handler& dlb, int threadId) :
+        ResultHolder(DLB_Handler &dlb, int threadId) :
             ResultHolderInt<Ret, void, Args...>(dlb), ResultHolderBase<Args...>(dlb) {
             this->threadId = threadId;
             this->id = dlb.getUniqueId();
@@ -33,7 +33,7 @@ namespace gempba {
             this->isVirtual = true;
         }
 
-        ResultHolder(DLB_Handler& dlb, int threadId, void* parent) :
+        ResultHolder(DLB_Handler &dlb, int threadId, void *parent) :
             ResultHolderInt<Ret, void, Args...>(dlb), ResultHolderBase<Args...>(dlb) {
             this->threadId = threadId;
             this->id = this->dlb.getUniqueId();
@@ -41,7 +41,7 @@ namespace gempba {
 
             if (parent) {
                 this->root = &dlb.roots[threadId];
-                this->parent = static_cast<ResultHolder*>(parent);
+                this->parent = static_cast<ResultHolder *>(parent);
                 this->parent->children.push_back(this);
             } else {
                 // if there is no parent, it means the thread just took another subtree
@@ -54,9 +54,9 @@ namespace gempba {
 
         ~ResultHolder() = default;
 
-        ResultHolder(ResultHolder&& src) = delete;
+        ResultHolder(ResultHolder &&src) = delete;
 
-        ResultHolder(ResultHolder& src) = delete;
+        ResultHolder(ResultHolder &src) = delete;
     };
 }
 #endif
