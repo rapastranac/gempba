@@ -164,18 +164,30 @@ namespace gempba {
 
     private:
         MPI_Status probe_communicators() {
-            // this allows receiving refValue or nextProcess even if this process has turned into waiting mode
+            static int branch = 0;
+
             while (true) {
-                if (auto v_optional = probe_reference_value_comm(); v_optional.has_value()) {
-                    return v_optional.value();
+                switch (branch % 3) {
+                case 0:
+                    if (auto v = probe_reference_value_comm(); v.has_value()) {
+                        return v.value();
+                    }
+                    break;
+                case 1:
+                    if (auto v = probe_next_process_comm(); v.has_value()) {
+                        return v.value();
+                    }
+                    break;
+                case 2:
+                    if (auto v = probe_world_comm(); v.has_value()) {
+                        return v.value();
+                    }
+                    break;
                 }
 
-                if (auto v_optional = probe_next_process_comm(); v_optional.has_value()) {
-                    return v_optional.value();
-                }
-
-                if (const auto v_optional = probe_world_comm(); v_optional.has_value()) {
-                    return v_optional.value();
+                // Increment and reset before overflow
+                if (++branch > INT_MAX - 1000) {
+                    branch = 0;
                 }
             }
         }
@@ -574,14 +586,26 @@ namespace gempba {
          */
         std::optional<MPI_Status> probe_communicators_center() {
             long v_cycles = 0;
+            static int branch = 0;
             while (true) {
                 const double v_wall_time0 = MPI_Wtime();
                 while (true) {
-                    if (const auto v_optional = probe_world_comm_center(); v_optional.has_value()) {
-                        return v_optional;
+                    switch (branch % 2) {
+                        case 0: {
+                            if (const auto v_optional = probe_world_comm_center(); v_optional.has_value()) {
+                                return v_optional;
+                            }
+                            break;
+                        }
+                        case 1: {
+                            if (auto v_optional = probe_reference_value_comm_center(); v_optional.has_value()) {
+                                return v_optional;
+                            }
+                            break;
+                        }
                     }
-                    if (auto v_optional = probe_reference_value_comm_center(); v_optional.has_value()) {
-                        return v_optional;
+                    if (++branch > INT_MAX - 1000) {
+                        branch = 0;
                     }
                     ++v_cycles;
                     double v_elapsed = difftime(v_wall_time0, MPI_Wtime());
