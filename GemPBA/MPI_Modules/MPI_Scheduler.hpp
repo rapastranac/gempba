@@ -10,18 +10,13 @@
 #include <algorithm>
 #include <atomic>
 #include <climits>
-#include <condition_variable>
 #include <cstdio>
 #include <cstdlib> /* srand, rand */
-#include <cstring>
-#include <ctime>
 #include <fstream>
 #include <memory>
 #include <mpi.h>
 #include <optional>
-#include <queue>
 #include <random>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <thread>
