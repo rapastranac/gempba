@@ -78,8 +78,7 @@ Params parse(int argc, char *argv[]) {
             .action([](const std::string &value) { return value; });
     try {
         program.parse_args(argc, argv);
-    }
-    catch (const std::runtime_error &err) {
+    } catch (const std::runtime_error &err) {
         std::cout << err.what() << std::endl;
         std::cout << program;
         exit(0);

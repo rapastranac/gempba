@@ -30,11 +30,11 @@ struct my_struct {
 };
 
 TEST(queue_test, push_and_pop) {
-    Queue<my_struct*> q;
+    Queue<my_struct *> q;
 
-    auto* a = new my_struct{1};
-    auto* b = new my_struct{2};
-    auto* c = new my_struct{3};
+    auto *a = new my_struct{1};
+    auto *b = new my_struct{2};
+    auto *c = new my_struct{3};
 
     // Push some values into the queue
     ASSERT_TRUE(q.push(a));
@@ -42,7 +42,7 @@ TEST(queue_test, push_and_pop) {
     ASSERT_TRUE(q.push(c));
 
     // Pop the values and ensure they are retrieved in the correct order
-    my_struct* result;
+    my_struct *result;
     ASSERT_TRUE(q.pop(result));
     EXPECT_EQ(a, result);
 
@@ -57,7 +57,7 @@ TEST(queue_test, push_and_pop) {
 }
 
 TEST(queue_test, push_and_pop_with_shared_pointer) {
-    Queue<std::shared_ptr<my_struct>> q;
+    Queue<std::shared_ptr<my_struct> > q;
 
     const auto a = std::make_shared<my_struct>(1);
     const auto b = std::make_shared<my_struct>(2);
@@ -85,10 +85,10 @@ TEST(queue_test, push_and_pop_with_shared_pointer) {
 
 
 TEST(queue_test, empty) {
-    Queue<my_struct*> q;
+    Queue<my_struct *> q;
 
-    auto* a = new my_struct{1};
-    auto* b = new my_struct{2};
+    auto *a = new my_struct{1};
+    auto *b = new my_struct{2};
 
     // Queue should be empty initially
     EXPECT_TRUE(q.empty());
@@ -101,7 +101,7 @@ TEST(queue_test, empty) {
     EXPECT_FALSE(q.empty());
 
     // Pop all elements
-    my_struct* instance;
+    my_struct *instance;
     ASSERT_TRUE(q.pop(instance));
     ASSERT_TRUE(q.pop(instance));
 

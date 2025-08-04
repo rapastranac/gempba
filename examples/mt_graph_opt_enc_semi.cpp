@@ -31,4 +31,3 @@ int main(int argc, char *argv[]) {
 
     return run(job_id, thread_per_task, prob, filename);
 }
-

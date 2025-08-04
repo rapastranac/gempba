@@ -50,7 +50,7 @@ public:
         int gsize = graph.adj.size() + 1; //+1 cuz some files use node ids from 1 to n (instead of 0 to n - 1)
 
         cout << "Graph has " << graph.adj.size() << " vertices and " << graph.getNumEdges() << " edges" << endl;
-        vector<pair<int, int>> deg_v;
+        vector<pair<int, int> > deg_v;
         for (auto it = graph.adj.begin(); it != graph.adj.end(); ++it) {
             deg_v.push_back(make_pair(it->second.size(), it->first));
         }
@@ -61,7 +61,7 @@ public:
         for (int i = 0; i < deg_v.size(); i++) {
             remap[deg_v[i].second] = deg_v.size() - 1 - i;
         }
-        map<int, set<int>> adj2;
+        map<int, set<int> > adj2;
         for (auto it = graph.adj.begin(); it != graph.adj.end(); ++it) {
             int v = it->first;
             adj2[remap[v]] = set<int>();

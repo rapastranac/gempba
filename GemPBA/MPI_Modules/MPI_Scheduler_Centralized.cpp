@@ -2,8 +2,8 @@
 #include "BranchHandler/BranchHandler.hpp"
 
 namespace gempba {
-    void MPI_SchedulerCentralized::taskFunneling(BranchHandler& branchHandler) {
-        std::string* message = nullptr;
+    void MPI_SchedulerCentralized::taskFunneling(BranchHandler &branchHandler) {
+        std::string *message = nullptr;
         bool isPop = q.pop(message);
 
         while (true) {
@@ -23,8 +23,7 @@ namespace gempba {
                 else {
                     throw std::runtime_error("Task found in queue, this should not happen in taskFunneling()\n");
                 }
-            }
-            {
+            } {
                 /* this section protects MPI calls */
                 std::scoped_lock<std::mutex> lck(mtx);
                 probe_refValue();
@@ -56,7 +55,7 @@ namespace gempba {
         // nice(0);
     }
 
-    void MPI_SchedulerCentralized::updateRefValue(BranchHandler& branchHandler) {
+    void MPI_SchedulerCentralized::updateRefValue(BranchHandler &branchHandler) {
         int _refGlobal = refValueGlobal; // constant within this scope
         int _refLocal = branchHandler.refValue(); // constant within this scope
 

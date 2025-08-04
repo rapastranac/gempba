@@ -35,12 +35,12 @@ using namespace std;
 
 class Graph {
 private:
-#ifdef GEMPBA_MULTIPROCESSING
+    #ifdef GEMPBA_MULTIPROCESSING
 
     //friend class cereal::access;
     friend class boost::serialization::access;
 
-#endif
+    #endif
 
     struct FoldedVertices {
         int u{-1};
@@ -60,7 +60,7 @@ private:
             this->w = w;
         }
 
-#ifdef GEMPBA_MULTIPROCESSING
+        #ifdef GEMPBA_MULTIPROCESSING
         // cereal
         //template <class Archive>
         //void serialize(Archive &ar, const unsigned int version)
@@ -76,11 +76,11 @@ private:
             ar & w;
         }
 
-#endif
+        #endif
     };
 
     void _addRowToList(int vec0) {
-        this->adj.insert(pair<int, set<int>>(vec0, rows));
+        this->adj.insert(pair<int, set<int> >(vec0, rows));
         this->rows.clear();
     }
 
@@ -158,7 +158,7 @@ private:
         /*Here this will explore the list of higest degree vertices and
             it will choose any of them randomly*/
 
-        std::random_device rd;    // Will be used to obtain a seed for the random number engine
+        std::random_device rd; // Will be used to obtain a seed for the random number engine
         std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
         std::uniform_int_distribution<> distrib(0, target.size() - 1);
 
@@ -191,7 +191,7 @@ private:
     Thus, in G0, an isolated vertex can be eliminated, reducing n0 by one.
     This rule is applied repeatedly until all isolated
     vertices are eliminated.*/
-    bool _rule1(map<int, set<int>> &adj) {
+    bool _rule1(map<int, set<int> > &adj) {
         std::vector<int> degree_zero;
 
         // this loop finds vertices of degree zero
@@ -219,9 +219,9 @@ private:
     vertices for deletion under Rule 1. This reduces n0 by the number
     of deleted vertices and reduces k by one. This rule is applied repeatedly
     until all pendant vertices are eliminated.*/
-    bool _rule2(map<int, set<int>> &adj, int &added_to_cover) {
+    bool _rule2(map<int, set<int> > &adj, int &added_to_cover) {
         vector<int> pendant_neighbour;
-        vector<pair<int, int>> matching_ccs;
+        vector<pair<int, int> > matching_ccs;
 
         for (auto &[v, neighbours]: adj) {
             if (neighbours.size() == 1) {
@@ -262,7 +262,7 @@ private:
 
     /* this rule states that having a vertex u with two adjacent neighbours v and w,
         then v and w will be in the MVC*/
-    bool _rule3(map<int, set<int>> &adj, int &added_to_cover) {
+    bool _rule3(map<int, set<int> > &adj, int &added_to_cover) {
         /*		u ---- v ~~~
                  \	  /
                   \  /
@@ -303,7 +303,7 @@ private:
         return flag;
     }
 
-    bool _rule4(map<int, set<int>> &adj) {
+    bool _rule4(map<int, set<int> > &adj) {
         /*		u ---- v ~~~
                  \				==>  ~~~(u')~~~
                   \
@@ -311,7 +311,7 @@ private:
         */
 
         auto it = adj.begin();
-        map<int, set<int>> folded_vertices;
+        map<int, set<int> > folded_vertices;
         std::once_flag oo_flag;
 
         int id = -1;
@@ -357,7 +357,7 @@ private:
                     erase(adj, w);
 
                     //Insert (u') into graph
-                    adj.insert(pair<int, set<int>>(id, foldedNeigbours));
+                    adj.insert(pair<int, set<int> >(id, foldedNeigbours));
                     //link the neighbours of v and w to (u')
                     for (auto f_vertex: foldedNeigbours) {
                         adj[f_vertex].insert(id);
@@ -383,30 +383,29 @@ private:
         return flag;
     }
 
-    void erase(map<int, set<int>> &adj, int v) {
+    void erase(map<int, set<int> > &adj, int v) {
         try {
             // this loop removes vertex v from all its neighbours
             for (auto &vertex: adj[v]) {
                 adj[vertex].erase(v);
                 this->vertexDegree[vertex]--;
             }
-            numEdges -= adj[v].size();     // number of edges reduced by the number of neighbours that v had
-            adj.erase(v);                 // vertex v totally removed from adj list
+            numEdges -= adj[v].size(); // number of edges reduced by the number of neighbours that v had
+            adj.erase(v); // vertex v totally removed from adj list
             this->vertexDegree.erase(v); // removed from the vertexDegree list as well
-        }
-        catch (const std::exception &e) {
+        } catch (const std::exception &e) {
             std::stringstream ss;
             ss << "Exception while erasing vertex from adj"
-               << '\n'
-               << e.what() << '\n';
+                    << '\n'
+                    << e.what() << '\n';
 
             std::cerr << ss.str();
         }
     }
 
     void build(int n, double p) {
-//		int maxEdgesPossible = n * (n - 1) / 2;
-//		int maxEdgesPerNode = maxEdgesPossible / n;
+        //		int maxEdgesPossible = n * (n - 1) / 2;
+        //		int maxEdgesPerNode = maxEdgesPossible / n;
         this->max = 0;
         this->min = 0;
         this->numEdges = 0;
@@ -416,7 +415,7 @@ private:
 
         //srand(time(NULL)); //this commented to obtain always the same graph
         // Build the edges
-        std::random_device rd;    // Will be used to obtain a seed for the random number engine
+        std::random_device rd; // Will be used to obtain a seed for the random number engine
         std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
 
         for (int i = 0; i < n; i++) {
@@ -568,13 +567,12 @@ public:
             _updateVertexDegree();
 
             numVertices = adj.size();
-        }
-        catch (const std::exception &e) {
+        } catch (const std::exception &e) {
             std::stringstream ss;
             ss << "Exception while removing vertex : "
-               << v
-               << '\n'
-               << e.what() << '\n';
+                    << v
+                    << '\n'
+                    << e.what() << '\n';
             std::cerr << ss.str();
         }
         return 0;
@@ -671,12 +669,12 @@ public:
         numVertices = adj.size();
 
         /*4 testing*/
-//		double mean = (double)numEdges / (double)numVertices;
-//        double prob = mean * 100 / (double)numVertices;
-//
-//        double maxEdgesPossible = numVertices * (numVertices - 1) / 2;
-//		double maxEdgesPerNode = maxEdgesPossible / (double)numVertices;
-//        double density = mean / maxEdgesPerNode;
+        //		double mean = (double)numEdges / (double)numVertices;
+        //        double prob = mean * 100 / (double)numVertices;
+        //
+        //        double maxEdgesPossible = numVertices * (numVertices - 1) / 2;
+        //		double maxEdgesPerNode = maxEdgesPossible / (double)numVertices;
+        //        double density = mean / maxEdgesPerNode;
 
         _calculerVertexMaxDegree();
         _calculerVertexMinDegree();
@@ -724,7 +722,7 @@ public:
             return adj[v];
     }
 
-    typedef std::map<int, set<int>>::iterator iterator;
+    typedef std::map<int, set<int> >::iterator iterator;
 
     iterator begin() { return adj.begin(); }
 
@@ -734,8 +732,8 @@ public:
 
         clean_graph(INT_MAX);
         auto _adj = this->adj;
-//		bool flag = true;
-//		flag =
+        //		bool flag = true;
+        //		flag =
         _rule4(_adj);
         this->adj = _adj;
         clean_graph(INT_MAX);
@@ -1033,10 +1031,10 @@ public:
 
     /*		TEMPORARY		*/
 
-    std::vector<std::vector<int>> ADJ_MATRIX() {
+    std::vector<std::vector<int> > ADJ_MATRIX() {
 
         int N = adj.size();
-        std::vector<std::vector<int>> tmp(N, std::vector<int>(N, 0));
+        std::vector<std::vector<int> > tmp(N, std::vector<int>(N, 0));
 
         auto it = adj.begin();
         while (it != adj.end()) {
@@ -1067,7 +1065,7 @@ public:
     //Graph &operator=(const Graph &) = default;
     //Graph &operator=(Graph &&) = default;
     //virtual ~Graph() = default;
-#ifdef GEMPBA_MULTIPROCESSING
+    #ifdef GEMPBA_MULTIPROCESSING
     /*
     template <class Archive>
     void serialize(Archive &ar)
@@ -1102,24 +1100,24 @@ public:
         ar &numEdges;
         ar &numVertices;
     }*/
-#endif
+    #endif
 
-    std::map<int, std::set<int>> adj; /*Adjacency list*/
+    std::map<int, std::set<int> > adj; /*Adjacency list*/
 
 private:
-    int max;                                 /*Highest degree within graph*/
-    int min;                                 /*Lowest degree within graph*/
-    std::vector<int> idsMax;             /*Stores the positions of max degree vertices within the adjacency adj*/
-    std::vector<int> idsMin;             /*same as above but for min degree*/
-    std::set<int> rows;                     /*Temporary variable to store*/
+    int max; /*Highest degree within graph*/
+    int min; /*Lowest degree within graph*/
+    std::vector<int> idsMax; /*Stores the positions of max degree vertices within the adjacency adj*/
+    std::vector<int> idsMin; /*same as above but for min degree*/
+    std::set<int> rows; /*Temporary variable to store*/
     std::map<int, int> vertexDegree; /*list of vertices with their corresponding
 									number of edges*/
-    std::set<int> _zeroVertexDegree;     /*List of vertices with zero degree*/
+    std::set<int> _zeroVertexDegree; /*List of vertices with zero degree*/
 
     std::map<int, FoldedVertices> foldedVertices;
     std::set<int> _cover;
 
-    int numEdges;     //number of edges
+    int numEdges; //number of edges
     int numVertices; //number of vertices
 };
 

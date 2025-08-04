@@ -96,7 +96,7 @@ TEST(tree_test, iterator_test) {
 
     const std::vector expected = {1, 2};
     std::vector<int> result;
-    for (int& it : instance[0]) {
+    for (int &it: instance[0]) {
         result.push_back(it);
     }
     EXPECT_EQ(result, expected);

@@ -2,8 +2,8 @@
 #include "BranchHandler/BranchHandler.hpp"
 
 namespace gempba {
-    void MPI_Scheduler::taskFunneling(BranchHandler& branchHandler) {
-        std::string* message = nullptr;
+    void MPI_Scheduler::taskFunneling(BranchHandler &branchHandler) {
+        std::string *message = nullptr;
         bool isPop = m_tasks_queue.pop(message);
         // nice(18); // this method changes OS priority of current thread, it should be carefully used
 
@@ -24,8 +24,7 @@ namespace gempba {
                 } else {
                     throw std::runtime_error("Task found in queue, this should not happen in taskFunneling()\n");
                 }
-            }
-            {
+            } {
                 /* this section protects MPI calls */
                 std::scoped_lock<std::mutex> lck(m_mutex);
                 maybe_receive_reference_value();
@@ -58,7 +57,7 @@ namespace gempba {
         // nice(0);
     }
 
-    void MPI_Scheduler::updateRefValue(BranchHandler& branchHandler) {
+    void MPI_Scheduler::updateRefValue(BranchHandler &branchHandler) {
         int _refGlobal = m_global_reference_value; // constant within this scope
         int _refLocal = branchHandler.refValue(); // constant within this scope
 

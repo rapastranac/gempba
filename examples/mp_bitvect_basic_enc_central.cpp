@@ -65,7 +65,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
 
     mpiScheduler.barrier();
 
-    int pid = getpid();                                       // for debugging purposes
+    int pid = getpid(); // for debugging purposes
     spdlog::debug("rank {} is process ID : {}\n", rank, pid); // for debugging purposes
 
     mpiScheduler.barrier();
@@ -80,8 +80,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
         */
         branchHandler.initThreadPool(thread_per_task - 1);
 
-        std::function<std::shared_ptr<gempba::ResultHolderParent>(char *, int)> bufferDecoder = branchHandler.constructBufferDecoder<void, int, BitGraph, int>(function,
-                                                                                                                                                               deserializer);
+        std::function<std::shared_ptr<gempba::ResultHolderParent>(char *, int)> bufferDecoder = branchHandler.constructBufferDecoder<void, int, BitGraph, int>(function, deserializer);
         std::function<std::pair<int, std::string>()> resultFetcher = branchHandler.constructResultFetcher();
         mpiScheduler.runNode(branchHandler, bufferDecoder, resultFetcher);
     }
@@ -99,7 +98,8 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
     int taskRecvd;
     int taskSent;
 
-    if (rank != 0) { // rank 0 does not run the main function
+    if (rank != 0) {
+        // rank 0 does not run the main function
         idl_tm = branchHandler.getPoolIdleTime();
         rqst = branchHandler.number_thread_requests();
 

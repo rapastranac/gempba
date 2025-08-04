@@ -34,15 +34,15 @@
  * Created by Andrés Pastrana on 2024-04-08.
  */
 namespace utils {
-    template <typename... T>
-    void print_mpi_debug_comments(const fmt::format_string<T...>& p_format_string, T&&... p_args) {
+    template<typename... T>
+    void print_mpi_debug_comments(const fmt::format_string<T...> &p_format_string, T &&... p_args) {
         #ifdef GEMPBA_DEBUG_COMMENTS
         spdlog::debug(p_format_string, std::forward<T>(p_args)...);
         #endif
     }
 
-    template <typename T>
-    static std::future<std::any> convert_to_any_future(std::future<T>&& p_future) {
+    template<typename T>
+    static std::future<std::any> convert_to_any_future(std::future<T> &&p_future) {
         std::future<std::any> any_future = std::async(std::launch::async, [fut = std::move(p_future)]() mutable {
             fut.wait();
             T result = fut.get();
@@ -56,7 +56,7 @@ namespace utils {
         return p_child * static_cast<int>(pow(p_children_per_node, p_depth)) + p_parent;
     }
 
-    static void build_topology(tree& p_tree, int p_parent, const int p_depth_start, const int p_children_per_node, const int p_total) {
+    static void build_topology(tree &p_tree, int p_parent, const int p_depth_start, const int p_children_per_node, const int p_total) {
         for (int depth = p_depth_start; depth < log2(p_total); depth++) {
             for (int child = 1; child < p_children_per_node; child++) {
                 int next_child = get_next_child(child, p_parent, p_children_per_node, depth);
@@ -82,7 +82,7 @@ namespace utils {
      * @param vector_ The vector to be shifted. It should have been initialized with at least
      *            the required number of elements.
      */
-    static void shift_left(std::vector<int>& vector_) {
+    static void shift_left(std::vector<int> &vector_) {
         const int size = static_cast<int>(vector_.size());
         if (size == 0) {
             spdlog::throw_spdlog_ex("Attempted to shift an empty vector");
