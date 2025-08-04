@@ -396,17 +396,6 @@ namespace gempba {
             }
         }
 
-        /* shift a position to left of an array, leaving -1 as default value*/
-        static void shift_left(int v[], const int size) {
-            for (int i = 0; i < (size - 1); i++) {
-                if (v[i] != -1) {
-                    v[i] = v[i + 1]; // shift one cell to the left
-                } else {
-                    break; // no more data
-                }
-            }
-        }
-
         void build_topology(int pi, int base_d, int b, int p) {
             for (int depth = base_d; depth < log2(p); depth++) {
                 for (int j = 1; j < b; j++) {
