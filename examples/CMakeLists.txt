@@ -38,7 +38,9 @@ foreach (EXAMPLE ${EXAMPLES})
     # Check if the example name starts with "mp_"
     if (EXAMPLE_NAME MATCHES "^mp_")
         message(STATUS "Adding GEMPBA_MULTIPROCESSING for ${EXAMPLE_NAME}")
-        target_compile_definitions(${EXAMPLE_NAME} PRIVATE GEMPBA_MULTIPROCESSING)
+        target_compile_definitions(${EXAMPLE_NAME} PRIVATE GEMPBA_MULTIPROCESSING=1)
+    else ()
+        target_compile_definitions(${EXAMPLE_NAME} PRIVATE GEMPBA_MULTIPROCESSING=0)
     endif ()
 
     # Compilation options by mode
