@@ -3,7 +3,7 @@
 
 using namespace std;
 
-#ifdef GEMPBA_MULTIPROCESSING
+#if GEMPBA_MULTIPROCESSING
 
 //#include <cereal/types/map.hpp>
 //#include <cereal/types/set.hpp>
@@ -35,7 +35,7 @@ using namespace std;
 
 class Graph {
 private:
-    #ifdef GEMPBA_MULTIPROCESSING
+    #if GEMPBA_MULTIPROCESSING
 
     //friend class cereal::access;
     friend class boost::serialization::access;
@@ -60,7 +60,7 @@ private:
             this->w = w;
         }
 
-        #ifdef GEMPBA_MULTIPROCESSING
+        #if GEMPBA_MULTIPROCESSING
         // cereal
         //template <class Archive>
         //void serialize(Archive &ar, const unsigned int version)
@@ -1065,7 +1065,7 @@ public:
     //Graph &operator=(const Graph &) = default;
     //Graph &operator=(Graph &&) = default;
     //virtual ~Graph() = default;
-    #ifdef GEMPBA_MULTIPROCESSING
+    #if GEMPBA_MULTIPROCESSING
     /*
     template <class Archive>
     void serialize(Archive &ar)
