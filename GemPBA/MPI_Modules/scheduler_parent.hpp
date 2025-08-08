@@ -4,12 +4,9 @@
 #include <functional>
 #include <memory>
 #include <mpi.h>
-#include <string>
-#include <utility>
-#include <utils/tree.hpp>
-
 #include <utils/ipc/result.hpp>
 #include <utils/ipc/task_packet.hpp>
+#include <utils/tree.hpp>
 
 namespace gempba {
 
@@ -28,7 +25,7 @@ namespace gempba {
 
         virtual task_packet fetchSolution() = 0;
 
-        virtual std::vector<std::pair<int, std::string> > fetchResVec() = 0;
+        virtual std::vector<result> fetchResVec() = 0;
 
         virtual void printStats() = 0;
 

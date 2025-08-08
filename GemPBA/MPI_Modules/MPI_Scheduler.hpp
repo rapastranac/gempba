@@ -82,13 +82,8 @@ namespace gempba {
             return task_packet::EMPTY;
         }
 
-        std::vector<std::pair<int, std::string> > fetchResVec() override {
-            std::vector<std::pair<int, std::string> > v_temp;
-            for (int v_rank = 1; v_rank < m_world_size; v_rank++) {
-                task_packet v_task_packet = m_best_results[v_rank].get_task_packet();
-                v_temp.emplace_back(m_best_results[v_rank].get_reference_value(), std::string{reinterpret_cast<char *>(v_task_packet.data()), v_task_packet.size()});
-            }
-            return v_temp;
+        std::vector<result> fetchResVec() override {
+            return m_best_results;
         }
 
         void printStats() override {

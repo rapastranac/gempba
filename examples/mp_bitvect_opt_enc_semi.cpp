@@ -118,7 +118,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
     // *****************************************************************************************
 
     if (rank == 0) {
-        auto solutions = mpiScheduler.fetchResVec();
+        std::vector<gempba::result> solutions = mpiScheduler.fetchResVec();
 
         mpiScheduler.printStats();
 
