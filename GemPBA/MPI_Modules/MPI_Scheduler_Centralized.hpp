@@ -358,16 +358,14 @@ namespace gempba {
     private:
         /*	send solution attained from node to the center node */
         void sendSolution(const std::function<result()> &p_result_fetcher) {
-            result v_result = p_result_fetcher();
+            const result v_result = p_result_fetcher();
             const int v_ref_val = v_result.get_reference_value();
             task_packet v_task_packet = v_result.get_task_packet();
 
-            std::string v_buffer = std::string{reinterpret_cast<char *>(v_task_packet.data()), v_task_packet.size()};
-
-            if (v_buffer.starts_with("Empty")) {
-                MPI_Send(v_task_packet.data(), static_cast<int>(v_task_packet.size()), MPI_BYTE, 0, NO_RESULT_TAG, world_Comm);
+            if (v_result == result::EMPTY) {
+                MPI_Send(nullptr, 0, MPI_BYTE, CENTER, NO_RESULT_TAG, world_Comm);
             } else {
-                MPI_Send(v_task_packet.data(), static_cast<int>(v_task_packet.size()), MPI_BYTE, 0, HAS_RESULT_TAG, world_Comm);
+                MPI_Send(v_task_packet.data(), static_cast<int>(v_task_packet.size()), MPI_BYTE, CENTER, HAS_RESULT_TAG, world_Comm);
                 MPI_Send(&v_ref_val, 1, MPI_INT, 0, HAS_RESULT_TAG, world_Comm);
             }
         }

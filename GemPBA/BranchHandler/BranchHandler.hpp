@@ -50,7 +50,6 @@ namespace gempba {
         class ResultHolder;
 
     private:
-        const result EMPTY_RESULT{0, task_packet{static_cast<std::string>("Empty buffer, no result")}};
         std::atomic<size_t> numThreadRequests;
         /*This section refers to the strategy wrapping a function
             then pruning data to be used by the wrapped function<<---*/
@@ -85,7 +84,7 @@ namespace gempba {
         /**
       * this method should not possibly be accessed if priority (Thread Pool) is not acquired
       */
-        template<typename Ret, typename F, typename HolderType, std::enable_if_t<std::is_void_v<Ret>, int>  = 0>
+        template<typename Ret, typename F, typename HolderType, std::enable_if_t<std::is_void_v<Ret>, int> = 0>
         bool try_top_holder(F &f, HolderType &holder) {
             if (_loadBalancingStrategy == QUASI_HORIZONTAL) {
                 HolderType *upperHolder = dlb.find_top_holder(&holder);
@@ -109,7 +108,7 @@ namespace gempba {
             return false; // top holder isn't found or just DLB is disabled
         }
 
-        template<typename Ret, typename F, typename HolderType, std::enable_if_t<std::is_void_v<Ret>, int>  = 0>
+        template<typename Ret, typename F, typename HolderType, std::enable_if_t<std::is_void_v<Ret>, int> = 0>
         bool push_multithreading(F &&f, int id, HolderType &holder) {
             /* the underlying loop breaks under one of the following scenarios:
                 - mutex cannot be acquired
@@ -147,7 +146,7 @@ namespace gempba {
             return false;
         }
 
-        template<typename Ret, typename F, typename HolderType, std::enable_if_t<!std::is_void_v<Ret>, int>  = 0>
+        template<typename Ret, typename F, typename HolderType, std::enable_if_t<!std::is_void_v<Ret>, int> = 0>
         bool push_multithreading(F &f, int id, HolderType &holder) {
             /*This lock must be acquired before checking the condition,
             even though numThread is atomic*/
@@ -371,7 +370,7 @@ namespace gempba {
          * @param f function to be execute
          * @param holder ResultHolder instance that wraps the function arguments and potential result
          */
-        template<typename Ret, typename F, typename HolderType, std::enable_if_t<std::is_void_v<Ret>, int>  = 0>
+        template<typename Ret, typename F, typename HolderType, std::enable_if_t<std::is_void_v<Ret>, int> = 0>
         void force_push(F &f, int id, HolderType &holder) {
             holder.setPushStatus();
             dlb.prune(&holder);
@@ -388,7 +387,7 @@ namespace gempba {
          * @param f function to be execute
          * @param holder ResultHolder instance that wraps the function arguments and potential result
          */
-        template<typename Ret, typename F, typename HolderType, std::enable_if_t<!std::is_void_v<Ret>, int>  = 0>
+        template<typename Ret, typename F, typename HolderType, std::enable_if_t<!std::is_void_v<Ret>, int> = 0>
         void force_push(F &f, int id, HolderType &holder) {
             holder.setPushStatus();
             dlb.prune(&holder);
@@ -412,7 +411,7 @@ namespace gempba {
     public:
         // no DLB_Handler begin **********************************************************************
 
-        template<typename Ret, typename F, typename HolderType, std::enable_if_t<!std::is_void_v<Ret>, int>  = 0>
+        template<typename Ret, typename F, typename HolderType, std::enable_if_t<!std::is_void_v<Ret>, int> = 0>
         Ret forward(F &f, int threadId, HolderType &holder) {
             // TODO this is related to non-void function on multithreading mode
             // DLB not supported
@@ -422,7 +421,7 @@ namespace gempba {
 
         // no DLB_Handler ************************************************************************* end
 
-        template<typename Ret, typename F, typename HolderType, std::enable_if_t<std::is_void_v<Ret>, int>  = 0>
+        template<typename Ret, typename F, typename HolderType, std::enable_if_t<std::is_void_v<Ret>, int> = 0>
         Ret forward(F &f, int threadId, HolderType &holder) {
             if (holder.isTreated()) {
                 throw std::runtime_error("Attempt to push a treated holder\n");
@@ -443,7 +442,7 @@ namespace gempba {
             gempba::args_handler::unpack_and_forward_void(f, threadId, holder.getArgs(), &holder);
         }
 
-        template<typename Ret, typename F, typename HolderType, std::enable_if_t<!std::is_void_v<Ret>, int>  = 0>
+        template<typename Ret, typename F, typename HolderType, std::enable_if_t<!std::is_void_v<Ret>, int> = 0>
         Ret forward(F &f, int threadId, HolderType &holder, bool) {
             // TODO this is related to non-void function on multithreading mode
             // in construction, DLB may be supported
@@ -522,7 +521,7 @@ namespace gempba {
             return isSuccess;
         }
 
-        template<typename Ret, typename F, typename HolderType, typename F_SERIAL, std::enable_if_t<!std::is_void_v<Ret>, int>  = 0>
+        template<typename Ret, typename F, typename HolderType, typename F_SERIAL, std::enable_if_t<!std::is_void_v<Ret>, int> = 0>
         bool push_multiprocess(F &f, int id, HolderType &holder, F_SERIAL &f_serial) {
             int r = try_another_process(holder, f_serial); // TODO .. this method does not exist, maybe remove!
             if (r == 0) {
@@ -552,7 +551,7 @@ namespace gempba {
 
 
         //<editor-fold desc="In construction... non-void  functions">
-        template<typename Ret, typename HolderType, typename Serialize, std::enable_if_t<!std::is_void_v<Ret>, int>  = 0>
+        template<typename Ret, typename HolderType, typename Serialize, std::enable_if_t<!std::is_void_v<Ret>, int> = 0>
         void reply(Serialize &&serialize, HolderType &holder, int src) {
             utils::print_mpi_debug_comments("rank {} entered reply! \n", world_rank);
             // default construction of a return type "Ret"
@@ -634,7 +633,7 @@ namespace gempba {
             return isSuccess ? isSuccess : try_push_MT<Ret>(f, id, holder);
         }
 
-        template<typename Ret, typename F, typename HolderType, typename Deserializer, std::enable_if_t<!std::is_void_v<Ret>, int>  = 0>
+        template<typename Ret, typename F, typename HolderType, typename Deserializer, std::enable_if_t<!std::is_void_v<Ret>, int> = 0>
         Ret forward(F &f, int threadId, HolderType &holder, Deserializer &deserializer, bool) {
             // TODO this is related to non-void function on multiprocessing mode
             // in construction
@@ -696,7 +695,7 @@ namespace gempba {
         [[nodiscard]] std::function<result()> constructResultFetcher() {
             return [this]() {
                 if (bestSolution_serialized.get_reference_value() == -1) {
-                    return EMPTY_RESULT;
+                    return result::EMPTY;
                 } else {
                     return bestSolution_serialized;
                 }
