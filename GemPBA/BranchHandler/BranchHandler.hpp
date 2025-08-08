@@ -242,8 +242,7 @@ namespace gempba {
         void holdSolution(int refValueLocal, auto &solution, auto &serializer) {
             std::unique_lock<std::mutex> lck(mtx);
 
-            const std::string v_buffer = static_cast<std::string>(serializer(solution));
-            task_packet v_packet(v_buffer);
+            const auto v_packet = static_cast<task_packet>(serializer(solution));
 
             this->bestSolution_serialized = {refValueLocal, v_packet};
         }
@@ -496,8 +495,8 @@ namespace gempba {
                                 throw std::runtime_error("Attempt to push a treated holder\n");
                             }
 
-                            std::string v_buffer = getBuffer(holder.getArgs());
-                            mpiScheduler->push(task_packet(v_buffer)); // this closes the sending channel internally
+                            task_packet v_buffer = getBuffer(holder.getArgs());
+                            mpiScheduler->push(std::move(v_buffer)); // this closes the sending channel internally
                             holder.setMPISent();
                             dlb.prune(&holder);
                             return true;
@@ -608,8 +607,8 @@ namespace gempba {
 
                     if (upperHolder->evaluate_branch_checkIn()) {
                         upperHolder->setMPISent(true, mpiScheduler->nextProcess());
-                        std::string v_buffer = getBuffer(upperHolder->getArgs());
-                        mpiScheduler->push(task_packet(v_buffer));
+                        task_packet v_buffer = getBuffer(upperHolder->getArgs());
+                        mpiScheduler->push(std::move(v_buffer));
                     } else {
                         upperHolder->setDiscard();
                         // WARNING, ATTENTION, CUIDADO! holder discarded, flagged as sent but not really sent, then sendingChannel should be released!!!!

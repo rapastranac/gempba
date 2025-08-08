@@ -128,7 +128,7 @@ auto serializer = [](auto &&... args) {
     //archive(args...);
     boost::archive::text_oarchive archive(ss);
     helper_ser(archive, args...);
-    return ss.str();
+    return gempba::task_packet(ss.str());
 };
 
 void helper_dser(auto &archive, auto &first) {

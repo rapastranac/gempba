@@ -56,7 +56,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
     std::cout << "solsize=" << solsize << std::endl;
     mpiScheduler.barrier();
 
-    std::string buffer = serializer(zero, allones, zero);
+    gempba::task_packet v_buffer = serializer(zero, allones, zero);
 
 
     std::cout << "Starting MPI node " << branchHandler.rank_me() << std::endl;
@@ -70,7 +70,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
 
     if (rank == 0) {
         // center process
-        gempba::task_packet v_seed(buffer);
+        gempba::task_packet v_seed(v_buffer);
         mpiScheduler.runCenter(v_seed);
     } else {
         /*	worker process

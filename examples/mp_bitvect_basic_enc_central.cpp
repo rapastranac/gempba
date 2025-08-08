@@ -59,7 +59,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
 
     BitGraph bg;
     bg.bits_in_graph = allones;
-    std::string buffer = serializer(zero, bg, zero);
+    gempba::task_packet v_buffer = serializer(zero, bg, zero);
 
     std::cout << "Starting MPI node " << branchHandler.rank_me() << std::endl;
 
@@ -72,7 +72,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
 
     if (rank == 0) {
         // center process
-        gempba::task_packet v_seed{buffer};
+        gempba::task_packet v_seed{v_buffer};
         mpiScheduler.runCenter(v_seed);
     } else {
         /*	worker process
