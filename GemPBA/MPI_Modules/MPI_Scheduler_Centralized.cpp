@@ -3,7 +3,7 @@
 
 namespace gempba {
     void MPI_SchedulerCentralized::taskFunneling(BranchHandler &branchHandler) {
-        std::string *message = nullptr;
+        task_packet *message = nullptr;
         bool isPop = q.pop(message);
 
         while (true) {
@@ -11,7 +11,7 @@ namespace gempba {
             {
                 std::scoped_lock<std::mutex> lck(mtx);
 
-                std::unique_ptr<std::string> ptr(message);
+                std::unique_ptr<task_packet> ptr(message);
                 nTasksSent++;
 
                 sendTaskToCenter(*message);

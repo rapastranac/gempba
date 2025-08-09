@@ -570,15 +570,16 @@ namespace gempba {
                 std::stringstream ss;
                 serialize(ss, res);
                 int count = ss.str().size();
+                task_packet v_task_packet(ss.str());
 
-                int err = MPI_Ssend(ss.str().data(), count, MPI_CHAR, src, 0, *world_Comm);
+                int err = MPI_Ssend(v_task_packet.data(), count, MPI_BYTE, src, 0, *world_Comm); // this might be wrong anyway due to the tag
                 if (err != MPI_SUCCESS) {
                     spdlog::error("result could not be sent from rank {} to rank {}! \n", world_rank, src);
                 }
             }
         }
 
-        template<typename Ret, typename HolderType, typename Serialize, std::enable_if_t<std::is_void_v<Ret>, int>  = 0>
+        template<typename Ret, typename HolderType, typename Serialize, std::enable_if_t<std::is_void_v<Ret>, int> = 0>
         void reply(Serialize &&, HolderType &, int) {
             thread_pool->wait();
         }

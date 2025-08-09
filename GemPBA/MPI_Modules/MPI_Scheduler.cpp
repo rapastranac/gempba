@@ -1,10 +1,10 @@
-#include "MPI_Scheduler.hpp"
-#include "BranchHandler/BranchHandler.hpp"
+#include <MPI_Modules/MPI_Scheduler.hpp>
+#include <BranchHandler/BranchHandler.hpp>
 
 namespace gempba {
     void MPI_Scheduler::taskFunneling(BranchHandler &branchHandler) {
-        std::string *message = nullptr;
-        bool isPop = m_tasks_queue.pop(message);
+        task_packet *v_packet = nullptr;
+        bool isPop = m_tasks_queue.pop(v_packet);
         // nice(18); // this method changes OS priority of current thread, it should be carefully used
 
         while (true) {
@@ -12,16 +12,17 @@ namespace gempba {
                 // as long as there is a message
 
                 std::scoped_lock<std::mutex> lck(m_mutex);
-                std::unique_ptr<std::string> ptr(message);
+                std::unique_ptr<task_packet> ptr(v_packet);
                 m_sent_tasks++;
 
-                sendTask(*message);
+                sendTask(*v_packet);
 
-                isPop = m_tasks_queue.pop(message);
+                isPop = m_tasks_queue.pop(v_packet);
 
                 if (!isPop) {
                     m_transmitting = false;
                 } else {
+                    delete v_packet;
                     throw std::runtime_error("Task found in queue, this should not happen in taskFunneling()\n");
                 }
             } {
@@ -34,12 +35,12 @@ namespace gempba {
                 updateNextProcess();
             }
 
-            isPop = m_tasks_queue.pop(message);
+            isPop = m_tasks_queue.pop(v_packet);
 
             if (!isPop && branchHandler.isDone()) {
                 /* by the time this thread realises that the thread pool has no more tasks,
                     another buffer might have been pushed, which should be verified in the next line*/
-                isPop = m_tasks_queue.pop(message);
+                isPop = m_tasks_queue.pop(v_packet);
 
                 if (!isPop) {
                     break;
