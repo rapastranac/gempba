@@ -25,7 +25,7 @@ namespace gempba {
 
         virtual task_packet fetch_solution() = 0;
 
-        virtual std::vector<result> fetchResVec() = 0;
+        virtual std::vector<result> fetch_result_vector() = 0;
 
         virtual void printStats() = 0;
 

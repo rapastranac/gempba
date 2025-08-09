@@ -82,7 +82,7 @@ namespace gempba {
             return task_packet::EMPTY;
         }
 
-        std::vector<result> fetchResVec() override {
+        std::vector<result> fetch_result_vector() override {
             return m_best_results;
         }
 
