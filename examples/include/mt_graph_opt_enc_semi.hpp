@@ -47,7 +47,7 @@ public:
 
         try {
             branchHandler.setRefValue(currentMVCSize);
-            branchHandler.set_lookup_strategy(gempba::MINIMISE);
+            branchHandler.set_goal(gempba::MINIMISE);
             //mvc(-1, 0, graph);
             //testing ****************************************
             HolderType initial(dlb, -1); {

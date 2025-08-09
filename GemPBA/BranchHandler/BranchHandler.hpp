@@ -60,7 +60,7 @@ namespace gempba {
         load_balancing_strategy _loadBalancingStrategy = QUASI_HORIZONTAL;
 
         int refValueLocal = INT_MIN;
-        bool maximisation = true;
+        goal m_goal = MAXIMISE;
 
         /*------------------------------------------------------>>end*/
         /* "processor_count" would allow setting by default the maximum number of threads
@@ -252,16 +252,16 @@ namespace gempba {
             return numThreadRequests.load();
         }
 
-        void set_lookup_strategy(lookup_strategy strategy) {
-            switch (strategy) {
+        void set_goal(const goal p_goal) {
+            m_goal = p_goal;
+            switch (p_goal) {
                 case MAXIMISE: {
                     return; // maximise by default
                 }
                 case MINIMISE: {
-                    maximisation = false;
                     refValueLocal = INT_MAX;
                     #if GEMPBA_MULTIPROCESSING
-                    mpiScheduler->set_ref_val_strategy_lookup(maximisation); // TODO redundant
+                    mpiScheduler->set_ref_val_strategy_lookup(false); // TODO redundant
                     #endif
                 }
             };
@@ -345,9 +345,9 @@ namespace gempba {
         bool updateRefValue(int new_refValue, int *mostUpToDate = nullptr) {
             std::scoped_lock<std::mutex> lck(mtx);
 
-            bool isRefValueIncreasing = maximisation && new_refValue > refValueLocal;
-            bool isRefValueDecreasing = !maximisation && new_refValue < refValueLocal;
-            if (isRefValueIncreasing || isRefValueDecreasing) {
+            const bool v_is_reference_value_increasing = m_goal == MAXIMISE && new_refValue > refValueLocal;
+            const bool v_is_reference_value_decreasing = m_goal == MINIMISE && new_refValue < refValueLocal;
+            if (v_is_reference_value_increasing || v_is_reference_value_decreasing) {
                 refValueLocal = new_refValue;
                 return true;
             }
