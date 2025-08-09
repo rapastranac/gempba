@@ -41,7 +41,7 @@ namespace gempba {
     template<typename Ret, typename... Args>
     class ResultHolder;
 
-    class SchedulerParent;
+    class scheduler_parent;
 
     class BranchHandler {
 
@@ -460,7 +460,7 @@ namespace gempba {
         #if GEMPBA_MULTIPROCESSING
 
     private:
-        gempba::SchedulerParent *mpiScheduler = nullptr;
+        gempba::scheduler_parent *mpiScheduler = nullptr;
         std::mutex mtx_MPI; // mutex to ensure MPI_THREAD_SERIALIZED
         int world_rank = -1; // get the rank of the process
         int world_size = -1; // get the number of processes/nodes
@@ -539,7 +539,7 @@ namespace gempba {
         }
 
         // if multiprocessing, BranchHandler should have access to the mpi scheduler
-        void passMPIScheduler(SchedulerParent *mpiScheduler) {
+        void passMPIScheduler(scheduler_parent *mpiScheduler) {
             this->mpiScheduler = mpiScheduler;
             this->world_rank = this->mpiScheduler->rank_me();
         }

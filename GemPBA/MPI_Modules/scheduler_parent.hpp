@@ -15,11 +15,11 @@ namespace gempba {
     class BranchHandler;
 
 
-    class SchedulerParent {
+    class scheduler_parent {
     public:
-        SchedulerParent() = default;
+        scheduler_parent() = default;
 
-        virtual ~SchedulerParent() = default;
+        virtual ~scheduler_parent() = default;
 
         virtual int rank_me() const = 0;
 
@@ -55,7 +55,7 @@ namespace gempba {
 
         virtual void runNode(BranchHandler &handler, std::function<std::shared_ptr<ResultHolderParent>(task_packet)> &bufferDecoder, std::function<result()> &resultFetcher) = 0;
 
-        virtual void runCenter(task_packet& p_seed) = 0;
+        virtual void runCenter(task_packet &p_seed) = 0;
 
         virtual size_t getTotalRequests() const = 0;
 

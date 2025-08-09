@@ -62,7 +62,7 @@ namespace gempba {
     class BranchHandler;
 
     // inter process communication handler
-    class MPI_SchedulerCentralized final : public SchedulerParent {
+    class MPI_SchedulerCentralized final : public scheduler_parent {
 
         std::priority_queue<task_packet, std::vector<task_packet>, TaskComparator> center_queue; //message, size
         //std::vector<task_packet> center_queue;

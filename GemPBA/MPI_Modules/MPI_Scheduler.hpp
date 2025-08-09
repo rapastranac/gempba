@@ -48,7 +48,7 @@ namespace gempba {
     class ResultHolderParent;
 
     // inter process communication handler
-    class MPI_Scheduler final : public SchedulerParent {
+    class MPI_Scheduler final : public scheduler_parent {
 
     public:
         ~MPI_Scheduler() override {
