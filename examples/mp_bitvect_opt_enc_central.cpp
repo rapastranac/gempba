@@ -1,5 +1,5 @@
 #include "include/mp_bitvec_opt_enc.hpp"
-#include "MPI_Modules/MPI_Scheduler_Centralized.hpp"
+#include "MPI_Modules/mpi_centralized_scheduler.hpp"
 #include "include/main.hpp"
 
 #include <filesystem>
