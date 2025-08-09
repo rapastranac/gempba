@@ -48,7 +48,7 @@ namespace gempba {
 
         [[nodiscard]] virtual int next_process() const = 0;
 
-        virtual void set_ref_val_strategy_lookup(bool p_maximisation) = 0;
+        virtual void set_goal(bool p_maximisation) = 0;
 
         virtual void push(task_packet &&p_task_packet) = 0;
 

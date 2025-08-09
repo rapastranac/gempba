@@ -151,7 +151,7 @@ namespace gempba {
             return this->m_next_process;
         }
 
-        void set_ref_val_strategy_lookup(bool p_maximisation) override {
+        void set_goal(bool p_maximisation) override {
             this->m_maximisation = p_maximisation;
 
             if (!p_maximisation) {
