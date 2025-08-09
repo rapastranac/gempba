@@ -48,15 +48,15 @@ namespace gempba {
     class ResultHolderParent;
 
     // inter process communication handler
-    class MPI_Scheduler final : public scheduler_parent {
+    class mpi_scheduler final : public scheduler_parent {
 
     public:
-        ~MPI_Scheduler() override {
+        ~mpi_scheduler() override {
             finalize();
         }
 
-        static MPI_Scheduler &getInstance() {
-            static MPI_Scheduler instance;
+        static mpi_scheduler &getInstance() {
+            static mpi_scheduler instance;
             return instance;
         }
 
@@ -612,7 +612,7 @@ namespace gempba {
 
     public:
         /*	run the center node */
-        void run_center(task_packet& p_seed) override {
+        void run_center(task_packet &p_seed) override {
             task_packet v_task_packet = p_seed;
             MPI_Barrier(m_world_communicator);
             m_start_time = MPI_Wtime();
@@ -837,7 +837,7 @@ namespace gempba {
         double m_end_time = 0;
 
         /* singleton*/
-        MPI_Scheduler() {
+        mpi_scheduler() {
             init(NULL, NULL);
         }
 

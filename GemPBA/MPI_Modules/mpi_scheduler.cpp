@@ -1,8 +1,8 @@
-#include <MPI_Modules/MPI_Scheduler.hpp>
+#include <MPI_Modules/mpi_scheduler.hpp>
 #include <BranchHandler/BranchHandler.hpp>
 
 namespace gempba {
-    void MPI_Scheduler::taskFunneling(BranchHandler &branchHandler) {
+    void mpi_scheduler::taskFunneling(BranchHandler &branchHandler) {
         task_packet *v_packet = nullptr;
         bool isPop = m_tasks_queue.pop(v_packet);
         // nice(18); // this method changes OS priority of current thread, it should be carefully used
@@ -58,7 +58,7 @@ namespace gempba {
         // nice(0);
     }
 
-    void MPI_Scheduler::updateRefValue(BranchHandler &branchHandler) {
+    void mpi_scheduler::updateRefValue(BranchHandler &branchHandler) {
         int _refGlobal = m_global_reference_value; // constant within this scope
         int _refLocal = branchHandler.refValue(); // constant within this scope
 
