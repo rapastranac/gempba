@@ -261,7 +261,7 @@ namespace gempba {
                     maximisation = false;
                     refValueLocal = INT_MAX;
                     #if GEMPBA_MULTIPROCESSING
-                    mpiScheduler->setRefValStrategyLookup(maximisation); // TODO redundant
+                    mpiScheduler->set_ref_val_strategy_lookup(maximisation); // TODO redundant
                     #endif
                 }
             };
@@ -481,7 +481,7 @@ namespace gempba {
                 std::unique_lock<std::mutex> lck(mtx_MPI, std::defer_lock);
                 if (lck.try_lock()) {
                     // if mutex acquired, other threads will jump this section
-                    if (mpiScheduler->openSendingChannel()) {
+                    if (mpiScheduler->open_sending_channel()) {
                         auto getBuffer = [&serializer](auto &tuple) {
                             return std::apply(serializer, tuple);
                         };
@@ -606,13 +606,13 @@ namespace gempba {
                         throw std::runtime_error("Attempt to push a treated holder\n");
 
                     if (upperHolder->evaluate_branch_checkIn()) {
-                        upperHolder->setMPISent(true, mpiScheduler->nextProcess());
+                        upperHolder->setMPISent(true, mpiScheduler->next_process());
                         task_packet v_buffer = getBuffer(upperHolder->getArgs());
                         mpiScheduler->push(std::move(v_buffer));
                     } else {
                         upperHolder->setDiscard();
                         // WARNING, ATTENTION, CUIDADO! holder discarded, flagged as sent but not really sent, then sendingChannel should be released!!!!
-                        mpiScheduler->closeSendingChannel();
+                        mpiScheduler->close_sending_channel();
                     }
                     return true; // top holder found whether discarded or pushed
                 }

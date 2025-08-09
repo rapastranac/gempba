@@ -131,9 +131,9 @@ void printToSummaryFile(int job_id, int nodes, int ntasks_per_node, int ntasks_p
     myfile << "cpus-per-task:\t" << cpus_per_task << std::endl;
     myfile << "graph size:\t\t" << gsize << std::endl;
     myfile << "cover size:\t\t" << solSize << std::endl;
-    myfile << "process requests:\t\t" << mpiScheduler.getTotalRequests() << std::endl;
+    myfile << "process requests:\t\t" << mpiScheduler.get_total_requests() << std::endl;
     myfile << "thread requests:\t\t" << totalThreadRequests << std::endl;
-    myfile << "elapsed time:\t\t" << mpiScheduler.elapsedTime() << std::endl;
+    myfile << "elapsed time:\t\t" << mpiScheduler.elapsed_time() << std::endl;
     myfile << "cpu idle time (global):\t" << global_cpu_idle_time << std::endl;
     myfile << "wall idle time (global):\t" << global_cpu_idle_time / (world_size - 1) << std::endl;
 

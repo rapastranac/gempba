@@ -64,7 +64,7 @@ namespace gempba {
             return m_world_rank;
         }
 
-        size_t getTotalRequests() const override {
+        size_t get_total_requests() const override {
             return m_total_requests_number;
         }
 
@@ -86,16 +86,16 @@ namespace gempba {
             return m_best_results;
         }
 
-        void printStats() override {
+        void print_stats() override {
             spdlog::debug("\n \n \n");
             spdlog::debug("*****************************************************\n");
-            spdlog::debug("Elapsed time : {:4.3f} \n", elapsedTime());
+            spdlog::debug("Elapsed time : {:4.3f} \n", elapsed_time());
             spdlog::debug("Total number of requests : {} \n", m_total_requests_number);
             spdlog::debug("*****************************************************\n");
             spdlog::debug("\n \n \n");
         }
 
-        double elapsedTime() const override {
+        double elapsed_time() const override {
             return (m_end_time - m_start_time) - static_cast<double>(TIMEOUT_TIME);
         }
 
@@ -108,15 +108,15 @@ namespace gempba {
             MPI_Gather(sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, root, m_world_communicator);
         }
 
-        int getWorldSize() const override {
+        int get_world_size() const override {
             return m_world_size;
         }
 
-        int tasksRecvd() const override {
+        int tasks_recvd() const override {
             return m_received_tasks;
         }
 
-        int tasksSent() const override {
+        int tasks_sent() const override {
             return m_sent_tasks;
         }
 
@@ -125,12 +125,12 @@ namespace gempba {
                 MPI_Barrier(m_world_communicator);
         }
 
-        bool openSendingChannel() override {
+        bool open_sending_channel() override {
             if (m_mutex.try_lock()) // acquires mutex
             {
                 if (!m_transmitting.load()) // check if transmission in progress
                 {
-                    int nxt = nextProcess();
+                    int nxt = next_process();
                     if (nxt > 0) // check if there is another process in the list
                     {
                         return true; // priority acquired "mutex is meant to be released in releasePriority() "
@@ -142,16 +142,16 @@ namespace gempba {
         }
 
         /* this should be invoked only if priority is acquired*/
-        void closeSendingChannel() override {
+        void close_sending_channel() override {
             m_mutex.unlock();
         }
 
         // returns the process rank assigned to receive a task from this process
-        int nextProcess() const override {
+        int next_process() const override {
             return this->m_next_process;
         }
 
-        void setRefValStrategyLookup(bool maximisation) override {
+        void set_ref_val_strategy_lookup(bool maximisation) override {
             this->m_maximisation = maximisation;
 
             if (!maximisation) {
@@ -221,7 +221,7 @@ namespace gempba {
         }
 
     public:
-        void runNode(BranchHandler &branchHandler, std::function<std::shared_ptr<ResultHolderParent>(task_packet)> &bufferDecoder, std::function<result()> &resultFetcher) override {
+        void run_node(BranchHandler &branchHandler, std::function<std::shared_ptr<ResultHolderParent>(task_packet)> &bufferDecoder, std::function<result()> &resultFetcher) override {
             MPI_Barrier(m_world_communicator);
 
             bool v_is_terminated = false;
@@ -271,7 +271,7 @@ namespace gempba {
             }
 
             m_transmitting = true;
-            m_destination_rank = nextProcess();
+            m_destination_rank = next_process();
             utils::print_mpi_debug_comments("rank {} entered MPI_Scheduler::push(..) for the node {}\n", m_world_rank, m_destination_rank);
             utils::shift_left(m_next_processes);
 
@@ -283,7 +283,7 @@ namespace gempba {
             }
 
             m_tasks_queue.push(v_message);
-            closeSendingChannel();
+            close_sending_channel();
         }
 
     private:
@@ -612,7 +612,7 @@ namespace gempba {
 
     public:
         /*	run the center node */
-        void runCenter(task_packet& p_seed) override {
+        void run_center(task_packet& p_seed) override {
             task_packet v_task_packet = p_seed;
             MPI_Barrier(m_world_communicator);
             m_start_time = MPI_Wtime();

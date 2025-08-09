@@ -73,7 +73,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
     if (rank == 0) {
         // center process
         gempba::task_packet v_seed{v_buffer};
-        mpiScheduler.runCenter(v_seed);
+        mpiScheduler.run_center(v_seed);
     } else {
         /*	worker process
             main thread will take care of Inter-process communication (IPC), dedicated core
@@ -83,12 +83,12 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
 
         std::function<std::shared_ptr<gempba::ResultHolderParent>(gempba::task_packet)> bufferDecoder = branchHandler.constructBufferDecoder<void, int, BitGraph, int>(function, deserializer);
         std::function<gempba::result()> resultFetcher = branchHandler.constructResultFetcher();
-        mpiScheduler.runNode(branchHandler, bufferDecoder, resultFetcher);
+        mpiScheduler.run_node(branchHandler, bufferDecoder, resultFetcher);
     }
     mpiScheduler.barrier();
     // *****************************************************************************************
     // this is a generic way of getting information from all the other processes after execution retuns
-    auto world_size = mpiScheduler.getWorldSize();
+    auto world_size = mpiScheduler.get_world_size();
     std::vector<double> idleTime(world_size);
     std::vector<size_t> threadRequests(world_size);
     std::vector<int> nTasksRecvd(world_size);
@@ -104,8 +104,8 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
         idl_tm = branchHandler.getPoolIdleTime();
         rqst = branchHandler.number_thread_requests();
 
-        taskRecvd = mpiScheduler.tasksRecvd();
-        taskSent = mpiScheduler.tasksSent();
+        taskRecvd = mpiScheduler.tasks_recvd();
+        taskSent = mpiScheduler.tasks_sent();
     }
 
     // here below, idl_tm is the idle time of the other ranks, which is gathered by .allgather() and stored in
@@ -121,7 +121,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
     if (rank == 0) {
         std::vector<gempba::result> solutions = mpiScheduler.fetch_result_vector();
 
-        mpiScheduler.printStats();
+        mpiScheduler.print_stats();
 
         // print sumation of refValGlobal
         int solsize;

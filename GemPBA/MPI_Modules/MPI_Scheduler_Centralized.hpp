@@ -104,16 +104,16 @@ namespace gempba {
         }
 
 
-        void printStats() override {
+        void print_stats() override {
             spdlog::debug("\n \n \n");
             spdlog::debug("*****************************************************\n");
-            spdlog::debug("Elapsed time : {:4.3f} \n", elapsedTime());
+            spdlog::debug("Elapsed time : {:4.3f} \n", elapsed_time());
             spdlog::debug("Total number of requests : {} \n", totalRequests);
             spdlog::debug("*****************************************************\n");
             spdlog::debug("\n \n \n");
         }
 
-        size_t getTotalRequests() const override {
+        size_t get_total_requests() const override {
             return totalRequests;
         }
 
@@ -122,11 +122,11 @@ namespace gempba {
             m_custom_initial_topology = true;
         }
 
-        double elapsedTime() const override {
+        double elapsed_time() const override {
             return (end_time - start_time) - static_cast<double>(TIMEOUT_TIME);
         }
 
-        int nextProcess() const override {
+        int next_process() const override {
             return 0;
         }
 
@@ -140,15 +140,15 @@ namespace gempba {
             MPI_Gather(sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, root, world_Comm);
         }
 
-        int getWorldSize() const override {
+        int get_world_size() const override {
             return world_size;
         }
 
-        int tasksRecvd() const override {
+        int tasks_recvd() const override {
             return nTasksRecvd;
         }
 
-        int tasksSent() const override {
+        int tasks_sent() const override {
             return nTasksSent;
         }
 
@@ -157,7 +157,7 @@ namespace gempba {
                 MPI_Barrier(world_Comm);
         }
 
-        bool openSendingChannel() override {
+        bool open_sending_channel() override {
             if (mtx.try_lock()) // acquires mutex
             {
                 if (!transmitting.load()) // check if transmission in progress
@@ -173,11 +173,11 @@ namespace gempba {
         }
 
         /* this should be invoked only if channel is open*/
-        void closeSendingChannel() override {
+        void close_sending_channel() override {
             mtx.unlock();
         }
 
-        void setRefValStrategyLookup(bool maximisation) override {
+        void set_ref_val_strategy_lookup(bool maximisation) override {
             this->maximisation = maximisation;
 
             if (!maximisation) // minimisation
@@ -185,7 +185,7 @@ namespace gempba {
         }
 
 
-        void runNode(BranchHandler &branchHandler, std::function<std::shared_ptr<ResultHolderParent>(task_packet)> &bufferDecoder, std::function<result()> &resultFetcher) override {
+        void run_node(BranchHandler &branchHandler, std::function<std::shared_ptr<ResultHolderParent>(task_packet)> &bufferDecoder, std::function<result()> &resultFetcher) override {
             MPI_Barrier(world_Comm);
 
             while (true) {
@@ -265,7 +265,7 @@ namespace gempba {
 
             q.push(_message);
 
-            closeSendingChannel();
+            close_sending_channel();
         }
 
     private:
@@ -429,7 +429,7 @@ namespace gempba {
         }
 
         /*	run the center node */
-        void runCenter(task_packet& p_seed) override {
+        void run_center(task_packet& p_seed) override {
             task_packet v_task_packet = p_seed;
             std::cout << "Starting centralized scheduler" << std::endl;
             MPI_Barrier(world_Comm);
