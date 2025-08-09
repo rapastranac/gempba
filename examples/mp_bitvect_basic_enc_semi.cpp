@@ -126,9 +126,9 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
         // print sumation of refValGlobal
         int solsize;
         std::stringstream ss;
-        std::string buffer = mpiScheduler.fetchSolution(); // returns a std::stringstream
+        gempba::task_packet packet = mpiScheduler.fetchSolution(); // returns a std::stringstream
 
-        ss << buffer;
+        ss.write(reinterpret_cast<const char *>(packet.data()), static_cast<int>(packet.size()));
 
         deserializer(ss, solsize);
         spdlog::debug("Cover size : {} \n", solsize);

@@ -90,14 +90,13 @@ namespace gempba {
             return world_rank;
         }
 
-        std::string fetchSolution() override {
+        task_packet fetchSolution() override {
             for (int rank = 1; rank < world_size; rank++) {
                 if (bestResults[rank].get_reference_value() == refValueGlobal) {
-                    task_packet v_packet = bestResults[rank].get_task_packet();
-                    return std::string{reinterpret_cast<char *>(v_packet.data()), v_packet.size()};
+                    return bestResults[rank].get_task_packet();
                 }
             }
-            return {}; // no solution found
+            return task_packet::EMPTY; // no solution found
         }
 
         std::vector<std::pair<int, std::string> > fetchResVec() override {

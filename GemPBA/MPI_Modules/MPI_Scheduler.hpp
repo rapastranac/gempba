@@ -73,15 +73,13 @@ namespace gempba {
             m_custom_initial_topology = true;
         }
 
-        std::string fetchSolution() override {
+        task_packet fetchSolution() override {
             for (int v_rank = 1; v_rank < m_world_size; v_rank++) {
                 if (m_best_results[v_rank].get_reference_value() == m_global_reference_value) {
-
-                    task_packet v_task_packet = m_best_results[v_rank].get_task_packet();
-                    return std::string{reinterpret_cast<char *>(v_task_packet.data()), v_task_packet.size()};
+                    return m_best_results[v_rank].get_task_packet();
                 }
             }
-            return {}; // no solution found
+            return task_packet::EMPTY;
         }
 
         std::vector<std::pair<int, std::string> > fetchResVec() override {

@@ -496,7 +496,7 @@ These functions are synchronised such that no process ends until all of them hav
 After doing this, if the user wants to fetch the solution. It should invoke from the center process:
 
 ```cpp
-std::string buffer = mpiScheduler.fetchSolution();
+gempba::task_packet buffer = mpiScheduler.fetchSolution();
 ```
 
 Which is the best solution according to the user's criteria, stored in a serial fashion. This buffer must be deserialised in order to have the actual solution.
@@ -644,13 +644,13 @@ int main(){
 
     if (rank == 0) { 
 		mpiScheduler.printStats();
-		std::string buffer = mpiScheduler.fetchSolution(); // returns a stringstream
+		gempba::task_packet buffer = mpiScheduler.fetchSolution(); // returns a stringstream
 
         /* Solution data type must coincide with the data type passed through
         the method BranchHandler::holdSolution(...) */
         SolType solution;
         std::stringstream ss;
-        ss << buffer;   // buffer passed to a stringstream
+        ss.write(reinterpret_cast<const char *>(packet.data()), static_cast<int>(packet.size())); // buffer passed to a stringstream   
 		deserializer(ss, solution);
 
         // do something else with the solution
@@ -728,10 +728,10 @@ int main(){
     mpiScheduler.barrier();
 
     if (rank == 0) { 
-        std::string buffer = mpiScheduler.fetchSolution(); 
+        gempba::task_packet buffer = mpiScheduler.fetchSolution(); 
         SolType solution;
         std::stringstream ss;
-        ss << buffer;
+        ss.write(reinterpret_cast<const char *>(packet.data()), static_cast<int>(packet.size()));
         deserializer(ss, solution);
 
         // do something with "solution"
