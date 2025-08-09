@@ -62,7 +62,7 @@ namespace gempba {
     class BranchHandler;
 
     // inter process communication handler
-    class MPI_SchedulerCentralized final : public scheduler_parent {
+    class mpi_centralized_scheduler final : public scheduler_parent {
 
         std::priority_queue<task_packet, std::vector<task_packet>, TaskComparator> center_queue; //message, size
         //std::vector<task_packet> center_queue;
@@ -77,12 +77,12 @@ namespace gempba {
         std::vector<task_packet> local_inqueue;
 
     public:
-        ~MPI_SchedulerCentralized() override {
+        ~mpi_centralized_scheduler() override {
             finalize();
         }
 
-        static MPI_SchedulerCentralized &getInstance() {
-            static MPI_SchedulerCentralized instance;
+        static mpi_centralized_scheduler &getInstance() {
+            static mpi_centralized_scheduler instance;
             return instance;
         }
 
@@ -795,7 +795,7 @@ namespace gempba {
         double end_time = 0;
 
         /* singleton*/
-        MPI_SchedulerCentralized() {
+        mpi_centralized_scheduler() {
             init(NULL, NULL);
         }
 
