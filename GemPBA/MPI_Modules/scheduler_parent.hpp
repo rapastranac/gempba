@@ -54,7 +54,7 @@ namespace gempba {
 
         virtual void setRefValStrategyLookup(bool maximisation) = 0;
 
-        virtual void push(std::string &&message) = 0;
+        virtual void push(task_packet &&p_task_packet) = 0;
 
         virtual void runNode(BranchHandler &handler, std::function<std::shared_ptr<ResultHolderParent>(task_packet)> &bufferDecoder, std::function<result()> &resultFetcher) = 0;
 

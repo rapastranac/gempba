@@ -271,9 +271,8 @@ namespace gempba {
             message pushing is only possible when the preceding message has been successfully pushed
             to another process, to avoid enqueuing.
         */
-        void push(std::string &&message) override {
-            task_packet v_task_packet(message);
-            if (v_task_packet.empty()) {
+        void push(task_packet &&p_task_packet) override {
+            if (p_task_packet.empty()) {
                 auto str = fmt::format("rank {}, attempted to send empty buffer \n", m_world_rank);
                 throw std::runtime_error(str);
             }
@@ -283,7 +282,7 @@ namespace gempba {
             utils::print_mpi_debug_comments("rank {} entered MPI_Scheduler::push(..) for the node {}\n", m_world_rank, m_destination_rank);
             utils::shift_left(m_next_processes);
 
-            const auto v_pck = std::make_shared<task_packet>(std::forward<task_packet &&>(v_task_packet));
+            const auto v_pck = std::make_shared<task_packet>(std::forward<task_packet &&>(p_task_packet));
             const auto v_message = new task_packet(*v_pck);
 
             if (!m_tasks_queue.empty()) {

@@ -254,16 +254,15 @@ namespace gempba {
 
         /* enqueue a message which will be sent to the center
          */
-        void push(std::string &&message) override {
-            task_packet v_task_packet(message);
-            if (v_task_packet.empty()) {
+        void push(task_packet &&p_task_packet) override {
+            if (p_task_packet.empty()) {
                 auto str = fmt::format("rank {}, attempted to send empty buffer \n", world_rank);
                 throw std::runtime_error(str);
             }
 
             transmitting = true;
 
-            auto pck = std::make_shared<task_packet>(std::forward<task_packet &&>(v_task_packet));
+            auto pck = std::make_shared<task_packet>(std::forward<task_packet &&>(p_task_packet));
             auto _message = new task_packet(*pck);
 
             if (!q.empty()) {

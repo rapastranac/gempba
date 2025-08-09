@@ -497,7 +497,8 @@ namespace gempba {
                                 throw std::runtime_error("Attempt to push a treated holder\n");
                             }
 
-                            mpiScheduler->push(getBuffer(holder.getArgs())); // this closes the sending channel internally
+                            std::string v_buffer = getBuffer(holder.getArgs());
+                            mpiScheduler->push(task_packet(v_buffer)); // this closes the sending channel internally
                             holder.setMPISent();
                             dlb.prune(&holder);
                             return true;
@@ -608,7 +609,8 @@ namespace gempba {
 
                     if (upperHolder->evaluate_branch_checkIn()) {
                         upperHolder->setMPISent(true, mpiScheduler->nextProcess());
-                        mpiScheduler->push(getBuffer(upperHolder->getArgs()));
+                        std::string v_buffer = getBuffer(upperHolder->getArgs());
+                        mpiScheduler->push(task_packet(v_buffer));
                     } else {
                         upperHolder->setDiscard();
                         // WARNING, ATTENTION, CUIDADO! holder discarded, flagged as sent but not really sent, then sendingChannel should be released!!!!
