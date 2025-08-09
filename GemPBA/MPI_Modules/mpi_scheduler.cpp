@@ -2,24 +2,24 @@
 #include <BranchHandler/BranchHandler.hpp>
 
 namespace gempba {
-    void mpi_scheduler::taskFunneling(BranchHandler &branchHandler) {
+    void mpi_scheduler::task_funneling(BranchHandler &p_branch_handler) {
         task_packet *v_packet = nullptr;
-        bool isPop = m_tasks_queue.pop(v_packet);
+        bool v_is_pop = m_tasks_queue.pop(v_packet);
         // nice(18); // this method changes OS priority of current thread, it should be carefully used
 
         while (true) {
-            while (isPop) {
+            while (v_is_pop) {
                 // as long as there is a message
 
-                std::scoped_lock<std::mutex> lck(m_mutex);
-                std::unique_ptr<task_packet> ptr(v_packet);
+                std::scoped_lock<std::mutex> v_lock(m_mutex);
+                std::unique_ptr<task_packet> v_unique_pointer(v_packet);
                 m_sent_tasks++;
 
-                sendTask(*v_packet);
+                send_task(*v_packet);
 
-                isPop = m_tasks_queue.pop(v_packet);
+                v_is_pop = m_tasks_queue.pop(v_packet);
 
-                if (!isPop) {
+                if (!v_is_pop) {
                     m_transmitting = false;
                 } else {
                     delete v_packet;
@@ -27,22 +27,22 @@ namespace gempba {
                 }
             } {
                 /* this section protects MPI calls */
-                std::scoped_lock<std::mutex> lck(m_mutex);
+                std::scoped_lock<std::mutex> v_lock(m_mutex);
                 maybe_receive_reference_value();
                 maybe_receive_next_process();
 
-                updateRefValue(branchHandler);
-                updateNextProcess();
+                update_ref_value(p_branch_handler);
+                update_next_process();
             }
 
-            isPop = m_tasks_queue.pop(v_packet);
+            v_is_pop = m_tasks_queue.pop(v_packet);
 
-            if (!isPop && branchHandler.isDone()) {
+            if (!v_is_pop && p_branch_handler.isDone()) {
                 /* by the time this thread realises that the thread pool has no more tasks,
                     another buffer might have been pushed, which should be verified in the next line*/
-                isPop = m_tasks_queue.pop(v_packet);
+                v_is_pop = m_tasks_queue.pop(v_packet);
 
-                if (!isPop) {
+                if (!v_is_pop) {
                     break;
                 }
             }
@@ -58,16 +58,16 @@ namespace gempba {
         // nice(0);
     }
 
-    void mpi_scheduler::updateRefValue(BranchHandler &branchHandler) {
-        int _refGlobal = m_global_reference_value; // constant within this scope
-        int _refLocal = branchHandler.refValue(); // constant within this scope
+    void mpi_scheduler::update_ref_value(BranchHandler &p_branch_handler) {
+        const int v_reference_global = m_global_reference_value; // constant within this scope
+        const int v_refereence_local = p_branch_handler.refValue(); // constant within this scope
 
         // static size_t C = 0;
 
-        if ((m_maximisation && _refGlobal > _refLocal) || (!m_maximisation && _refGlobal < _refLocal)) {
-            branchHandler.updateRefValue(_refGlobal);
-        } else if ((m_maximisation && _refLocal > _refGlobal) || (!m_maximisation && _refLocal < _refGlobal)) {
-            MPI_Ssend(&_refLocal, 1, MPI_INT, CENTER_NODE, REFERENCE_VAL_PROPOSAL, m_global_reference_value_communicator);
+        if ((m_maximisation && v_reference_global > v_refereence_local) || (!m_maximisation && v_reference_global < v_refereence_local)) {
+            p_branch_handler.updateRefValue(v_reference_global);
+        } else if ((m_maximisation && v_refereence_local > v_reference_global) || (!m_maximisation && v_refereence_local < v_reference_global)) {
+            MPI_Ssend(&v_refereence_local, 1, MPI_INT, CENTER_NODE, REFERENCE_VAL_PROPOSAL, m_global_reference_value_communicator);
         }
     }
 }

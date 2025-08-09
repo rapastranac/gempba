@@ -22,7 +22,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
     gempba::BranchHandler &branchHandler = gempba::BranchHandler::getInstance(); // parallel library
 
     // NOTE: instantiated object depends on SCHEDULER_CENTRALIZED macro
-    auto &mpiScheduler = gempba::mpi_scheduler::getInstance();
+    auto &mpiScheduler = gempba::mpi_scheduler::get_instance();
 
     int rank = mpiScheduler.rank_me();
     branchHandler.passMPIScheduler(&mpiScheduler);
