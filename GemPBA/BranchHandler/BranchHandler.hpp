@@ -50,12 +50,12 @@ namespace gempba {
         class ResultHolder;
 
     private:
-        const std::pair<int, std::string> EMPTY_RESULT = std::make_pair(0, static_cast<std::string>("Empty buffer, no result"));
+        const result EMPTY_RESULT{0, task_packet{static_cast<std::string>("Empty buffer, no result")}};
         std::atomic<size_t> numThreadRequests;
         /*This section refers to the strategy wrapping a function
             then pruning data to be used by the wrapped function<<---*/
         std::any bestSolution;
-        std::pair<int, std::string> bestSolution_serialized;
+        result bestSolution_serialized;
 
         DLB_Handler &dlb = gempba::DLB_Handler::getInstance();
         load_balancing_strategy _loadBalancingStrategy = QUASI_HORIZONTAL;
@@ -73,11 +73,12 @@ namespace gempba {
         std::condition_variable cv;
         std::unique_ptr<ThreadPool::Pool> thread_pool;
 
-        BranchHandler() {
+        BranchHandler() :
+            bestSolution_serialized(result::EMPTY) {
+
             processor_count = std::thread::hardware_concurrency();
             idleTime = 0;
             numThreadRequests = 0;
-            bestSolution_serialized.first = -1; // this allows avoiding sending empty buffers
         }
 
 
@@ -241,8 +242,11 @@ namespace gempba {
 
         void holdSolution(int refValueLocal, auto &solution, auto &serializer) {
             std::unique_lock<std::mutex> lck(mtx);
-            this->bestSolution_serialized.first = refValueLocal;
-            this->bestSolution_serialized.second = serializer(solution);
+
+            const std::string v_buffer = static_cast<std::string>(serializer(solution));
+            task_packet v_packet(v_buffer);
+
+            this->bestSolution_serialized = {refValueLocal, v_packet};
         }
 
         // get number of successful thread requests
@@ -558,9 +562,13 @@ namespace gempba {
             if (src == 0) {
                 utils::print_mpi_debug_comments("cover size() : {}, sending to center \n", res.coverSize());
 
-                bestSolution_serialized.first = refValue();
-                auto &ss = bestSolution_serialized.second; // it should be empty
-                serialize(ss, res);
+                std::string v_buffer;
+                serialize(v_buffer, res);
+
+                int v_ref_value_local = refValue();
+                task_packet v_candidate{v_buffer};
+                bestSolution_serialized = {v_ref_value_local, v_candidate};
+
             } else {
                 // some other node requested help, and it is surely waiting for the return value
 
@@ -657,17 +665,16 @@ namespace gempba {
             Lambda object will push to the thread pool, and it will return a pointer to the holder
             */
         template<typename Ret, typename... Args>
-        [[nodiscard]] std::function<std::shared_ptr<ResultHolderParent>(char *, int)> constructBufferDecoder(auto &callable, auto &deserializer) {
+        [[nodiscard]] std::function<std::shared_ptr<ResultHolderParent>(task_packet)> constructBufferDecoder(auto &callable, auto &deserializer) {
             using HolderType = gempba::ResultHolder<Ret, Args...>;
 
             utils::print_mpi_debug_comments("About to build Decoder");
-            std::function<std::shared_ptr<ResultHolderParent>(char *, int)> decoder = [this, &callable, &deserializer](
-                    const char *buffer, const int count) {
+            std::function<std::shared_ptr<ResultHolderParent>(task_packet)> decoder = [this, &callable, &deserializer](task_packet p_packet) {
                 std::shared_ptr<ResultHolderParent> smart_ptr = std::make_shared<HolderType>(dlb, -1);
                 auto *holder = dynamic_cast<HolderType *>(smart_ptr.get());
 
                 std::stringstream ss;
-                ss.write(buffer, count);
+                ss.write(reinterpret_cast<const char *>(p_packet.data()), static_cast<int>(p_packet.size()));
 
                 auto _deserializer = std::bind_front(deserializer, std::ref(ss));
                 std::apply(_deserializer, holder->getArgs());
@@ -684,9 +691,9 @@ namespace gempba {
 
 
         // this returns a lambda function which returns the best results as raw data
-        [[nodiscard]] std::function<std::pair<int, std::string>()> constructResultFetcher() {
+        [[nodiscard]] std::function<result()> constructResultFetcher() {
             return [this]() {
-                if (bestSolution_serialized.first == -1) {
+                if (bestSolution_serialized.get_reference_value() == -1) {
                     return EMPTY_RESULT;
                 } else {
                     return bestSolution_serialized;

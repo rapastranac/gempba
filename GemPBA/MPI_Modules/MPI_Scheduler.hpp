@@ -228,21 +228,8 @@ namespace gempba {
         }
 
     public:
-        void runNode(BranchHandler &branchHandler, std::function<std::shared_ptr<ResultHolderParent>(char *, int)> &bufferDecoder,
-                     std::function<std::pair<int, std::string>()> &resultFetcher) override {
+        void runNode(BranchHandler &branchHandler, std::function<std::shared_ptr<ResultHolderParent>(task_packet)> &bufferDecoder, std::function<result()> &resultFetcher) override {
             MPI_Barrier(m_world_communicator);
-
-            // Temporary,to self-contain refactor
-            const std::function<std::shared_ptr<ResultHolderParent>(task_packet)> v_buffer_decoder = [bufferDecoder](task_packet p_packet) {
-                const auto v_char_ptr = reinterpret_cast<char *>(p_packet.data());
-                return bufferDecoder(v_char_ptr, static_cast<int>(p_packet.size()));
-
-            };
-
-            const std::function<result()> v_result_fetcher = [resultFetcher]() {
-                auto [refVal, buffer] = resultFetcher();
-                return result(refVal, task_packet{buffer});
-            };
 
             bool v_is_terminated = false;
             while (true) {
@@ -263,7 +250,7 @@ namespace gempba {
                         break;
                     }
                     case FUNCTION_ARGS: {
-                        process_message(v_status, branchHandler, v_buffer_decoder);
+                        process_message(v_status, branchHandler, bufferDecoder);
                         break;
                     }
                 }
@@ -277,7 +264,7 @@ namespace gempba {
              * this applies only when parallelising non-void functions
              */
 
-            sendSolution(v_result_fetcher);
+            sendSolution(resultFetcher);
         }
 
         /* enqueue a message which will be sent to the next assigned process
@@ -635,8 +622,8 @@ namespace gempba {
 
     public:
         /*	run the center node */
-        void runCenter(const char *p_seed, const int p_seed_size) override {
-            task_packet v_task_packet(p_seed, p_seed_size);
+        void runCenter(task_packet& p_seed) override {
+            task_packet v_task_packet = p_seed;
             MPI_Barrier(m_world_communicator);
             m_start_time = MPI_Wtime();
 

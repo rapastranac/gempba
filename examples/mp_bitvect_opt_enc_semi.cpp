@@ -70,7 +70,8 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
 
     if (rank == 0) {
         // center process
-        mpiScheduler.runCenter(buffer.data(), buffer.size());
+        gempba::task_packet v_seed(buffer);
+        mpiScheduler.runCenter(v_seed);
     } else {
         /*	worker process
             main thread will take care of Inter-process communication (IPC), dedicated core
@@ -78,9 +79,9 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
         */
         branchHandler.initThreadPool(threads_per_task);
 
-        std::function<std::shared_ptr<gempba::ResultHolderParent>(char *, int)> bufferDecoder = branchHandler.constructBufferDecoder<void, int, gbitset, int>(function, deserializer);
+        std::function<std::shared_ptr<gempba::ResultHolderParent>(gempba::task_packet)> bufferDecoder = branchHandler.constructBufferDecoder<void, int, gbitset, int>(function, deserializer);
         utils::print_mpi_debug_comments("Buffer decoded fetched successfully!\n");
-        std::function<std::pair<int, std::string>()> resultFetcher = branchHandler.constructResultFetcher();
+        std::function<gempba::result()> resultFetcher = branchHandler.constructResultFetcher();
         mpiScheduler.runNode(branchHandler, bufferDecoder, resultFetcher);
     }
     mpiScheduler.barrier();

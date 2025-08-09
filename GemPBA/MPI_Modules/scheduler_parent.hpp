@@ -8,6 +8,9 @@
 #include <utility>
 #include <utils/tree.hpp>
 
+#include <utils/ipc/result.hpp>
+#include <utils/ipc/task_packet.hpp>
+
 namespace gempba {
 
     class ResultHolderParent;
@@ -53,10 +56,9 @@ namespace gempba {
 
         virtual void push(std::string &&message) = 0;
 
-        virtual void runNode(BranchHandler &handler, std::function<std::shared_ptr<ResultHolderParent>(char *, int)> &bufferDecoder,
-                             std::function<std::pair<int, std::string>()> &resultFetcher) = 0;
+        virtual void runNode(BranchHandler &handler, std::function<std::shared_ptr<ResultHolderParent>(task_packet)> &bufferDecoder, std::function<result()> &resultFetcher) = 0;
 
-        virtual void runCenter(const char *SEED, const int SEED_SIZE) = 0;
+        virtual void runCenter(task_packet& p_seed) = 0;
 
         virtual size_t getTotalRequests() const = 0;
 

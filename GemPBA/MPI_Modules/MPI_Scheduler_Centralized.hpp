@@ -191,21 +191,8 @@ namespace gempba {
         }
 
 
-        void runNode(BranchHandler &branchHandler, std::function<std::shared_ptr<ResultHolderParent>(char *, int)> &bufferDecoder,
-                     std::function<std::pair<int, std::string>()> &resultFetcher) override {
+        void runNode(BranchHandler &branchHandler, std::function<std::shared_ptr<ResultHolderParent>(task_packet)> &bufferDecoder, std::function<result()> &resultFetcher) override {
             MPI_Barrier(world_Comm);
-
-            // Temporary,to self-contain refactor
-            const std::function<std::shared_ptr<ResultHolderParent>(task_packet)> v_buffer_decoder = [bufferDecoder](task_packet p_packet) {
-                const auto v_char_ptr = reinterpret_cast<char *>(p_packet.data());
-                return bufferDecoder(v_char_ptr, static_cast<int>(p_packet.size()));
-
-            };
-
-            std::function<result()> v_result_fetcher = [resultFetcher]() {
-                auto [refVal, buffer] = resultFetcher();
-                return result(refVal, task_packet{buffer});
-            };
 
             while (true) {
                 MPI_Status status;
@@ -245,7 +232,7 @@ namespace gempba {
                     spdlog::debug("rank {}, pushing buffer to thread pool", world_rank, status.MPI_SOURCE);
                     #endif
                     //  push to the thread pool *********************************************************************
-                    std::shared_ptr<ResultHolderParent> holder = v_buffer_decoder(v_task_packet); // holder might be useful for non-void functions
+                    std::shared_ptr<ResultHolderParent> holder = bufferDecoder(v_task_packet); // holder might be useful for non-void functions
                     #ifdef GEMPBA_DEBUG_COMMENTS
                     spdlog::debug("... DONE\n", world_rank, status.MPI_SOURCE);
                     #endif
@@ -262,7 +249,7 @@ namespace gempba {
              * this applies only when parallelising non-void functions
              */
 
-            sendSolution(v_result_fetcher);
+            sendSolution(resultFetcher);
         }
 
         /* enqueue a message which will be sent to the center
@@ -451,8 +438,8 @@ namespace gempba {
         }
 
         /*	run the center node */
-        void runCenter(const char *p_seed, const int p_seed_size) override {
-            task_packet v_task_packet(p_seed, p_seed_size);
+        void runCenter(task_packet& p_seed) override {
+            task_packet v_task_packet = p_seed;
             std::cout << "Starting centralized scheduler" << std::endl;
             MPI_Barrier(world_Comm);
             start_time = MPI_Wtime();
