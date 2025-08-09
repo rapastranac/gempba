@@ -23,7 +23,7 @@ namespace gempba {
 
         virtual int rank_me() const = 0;
 
-        virtual task_packet fetchSolution() = 0;
+        virtual task_packet fetch_solution() = 0;
 
         virtual std::vector<result> fetchResVec() = 0;
 

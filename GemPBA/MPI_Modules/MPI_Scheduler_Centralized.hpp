@@ -90,7 +90,7 @@ namespace gempba {
             return world_rank;
         }
 
-        task_packet fetchSolution() override {
+        task_packet fetch_solution() override {
             for (int rank = 1; rank < world_size; rank++) {
                 if (bestResults[rank].get_reference_value() == refValueGlobal) {
                     return bestResults[rank].get_task_packet();

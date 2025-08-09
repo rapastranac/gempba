@@ -73,7 +73,7 @@ namespace gempba {
             m_custom_initial_topology = true;
         }
 
-        task_packet fetchSolution() override {
+        task_packet fetch_solution() override {
             for (int v_rank = 1; v_rank < m_world_size; v_rank++) {
                 if (m_best_results[v_rank].get_reference_value() == m_global_reference_value) {
                     return m_best_results[v_rank].get_task_packet();
