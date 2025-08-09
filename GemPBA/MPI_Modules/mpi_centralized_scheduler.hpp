@@ -27,6 +27,7 @@
 #include <unistd.h>
 #include <spdlog/spdlog.h>
 
+#include "utils/gempba_utils.hpp"
 #include "utils/ipc/result.hpp"
 #include "utils/ipc/task_packet.hpp"
 
@@ -176,10 +177,10 @@ namespace gempba {
             m_mutex.unlock();
         }
 
-        void set_goal(bool p_maximisation) override {
-            this->m_maximisation = p_maximisation;
+        void set_goal(goal p_goal) override {
+            this->m_goal = p_goal;
 
-            if (!p_maximisation) // minimisation
+            if (p_goal == MINIMISE) // minimisation
                 m_ref_value_global = INT_MAX;
         }
 
@@ -527,7 +528,7 @@ namespace gempba {
                         #endif
                         bool signal = false;
 
-                        if ((m_maximisation && v_buffer > m_ref_value_global) || (!m_maximisation && v_buffer < m_ref_value_global)) {
+                        if ((m_goal == MAXIMISE && v_buffer > m_ref_value_global) || (m_goal == MINIMISE && v_buffer < m_ref_value_global)) {
                             // refValueGlobal[0] = buffer;
                             m_ref_value_global = v_buffer;
                             signal = true;
@@ -780,7 +781,7 @@ namespace gempba {
 
         bool m_is_center_full = false;
 
-        bool m_maximisation = true; // true if maximising, false if minimising
+        goal m_goal = MAXIMISE;
 
         std::vector<result> m_best_results;
 

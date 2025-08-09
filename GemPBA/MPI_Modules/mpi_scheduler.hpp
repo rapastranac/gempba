@@ -25,6 +25,8 @@
 #include <utils/ipc/result.hpp>
 #include <utils/ipc/task_packet.hpp>
 
+#include "utils/gempba_utils.hpp"
+
 #define TIMEOUT_TIME 3
 
 // sanity assignment
@@ -151,10 +153,10 @@ namespace gempba {
             return this->m_next_process;
         }
 
-        void set_goal(bool p_maximisation) override {
-            this->m_maximisation = p_maximisation;
+        void set_goal(goal p_goal) override {
+            this->m_goal = p_goal;
 
-            if (!p_maximisation) {
+            if (p_goal == MINIMISE) {
                 // minimisation
                 m_global_reference_value = INT_MAX;
             }
@@ -521,7 +523,7 @@ namespace gempba {
             utils::print_mpi_debug_comments("center received refValue {} from rank {}\n", p_new_global_reference_value, p_status.MPI_SOURCE);
             bool v_reference_value_updated = false;
 
-            if ((m_maximisation && p_new_global_reference_value > m_global_reference_value) || (!m_maximisation && p_new_global_reference_value < m_global_reference_value)) {
+            if ((m_goal == MAXIMISE && p_new_global_reference_value > m_global_reference_value) || (m_goal == MINIMISE && p_new_global_reference_value < m_global_reference_value)) {
                 m_global_reference_value = p_new_global_reference_value;
                 v_reference_value_updated = true;
                 for (int v_rank = 1; v_rank < m_world_size; v_rank++) {
@@ -823,7 +825,7 @@ namespace gempba {
 
         int m_next_process = -1;
 
-        bool m_maximisation = true; // true if maximising, false if minimising
+        goal m_goal = MAXIMISE;
 
         std::vector<result> m_best_results;
 

@@ -261,7 +261,7 @@ namespace gempba {
                 case MINIMISE: {
                     refValueLocal = INT_MAX;
                     #if GEMPBA_MULTIPROCESSING
-                    mpiScheduler->set_goal(false); // TODO redundant
+                    mpiScheduler->set_goal(MINIMISE); // TODO redundant
                     #endif
                 }
             };

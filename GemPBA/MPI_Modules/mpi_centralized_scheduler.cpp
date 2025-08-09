@@ -61,9 +61,9 @@ namespace gempba {
 
         // static size_t C = 0;
 
-        if ((m_maximisation && v_reference_global > v_reference_local) || (!m_maximisation && v_reference_global < v_reference_local)) {
+        if ((m_goal == MAXIMISE && v_reference_global > v_reference_local) || (m_goal == MINIMISE && v_reference_global < v_reference_local)) {
             p_branch_handler.updateRefValue(v_reference_global);
-        } else if ((m_maximisation && v_reference_local > v_reference_global) || (!m_maximisation && v_reference_local < v_reference_global)) {
+        } else if ((m_goal == MAXIMISE && v_reference_local > v_reference_global) || (m_goal == MINIMISE && v_reference_local < v_reference_global)) {
             MPI_Ssend(&v_reference_local, 1, MPI_INT, 0, REFVAL_UPDATE_TAG, m_world_comm);
         }
     }
