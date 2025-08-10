@@ -279,7 +279,9 @@ namespace gempba {
         }
 
         /**
-        * This method is thread safe: Updates the reference value
+        * Warning: This is not meant to be used directly by the user. This is called only by the scheduler.
+        *
+        * This method is thread safe: Updates the most up-to-date reference value if the new reference value is better than the current one, and clears any previous result.
         *
         * @param p_new_ref_value the most promising new reference value for the solution in the scope calling this method
         * @return True if the reference value was successfully updated, false otherwise.
@@ -289,6 +291,7 @@ namespace gempba {
 
             if (should_update_result(p_new_ref_value)) {
                 m_reference_value = p_new_ref_value;
+                clear_result();
                 return true;
             }
 
@@ -356,6 +359,7 @@ namespace gempba {
 
         void clear_result() {
             m_best_solution.reset();
+            m_best_solution_serialized = result::EMPTY;
         }
 
 
