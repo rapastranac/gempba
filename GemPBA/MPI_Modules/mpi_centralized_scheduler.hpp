@@ -501,12 +501,10 @@ namespace gempba {
 
                         // receives task from worker
                         MPI_Get_count(&status, MPI_BYTE, &v_buffer_char_count);
-                        task_packet *v_buffer_packet = new task_packet(v_buffer_char_count);
-                        MPI_Recv(v_buffer_packet->data(), v_buffer_char_count, MPI_BYTE, status.MPI_SOURCE, status.MPI_TAG, m_world_comm, &status);
+                        task_packet v_task(v_buffer_char_count);
+                        MPI_Recv(v_task.data(), v_buffer_char_count, MPI_BYTE, status.MPI_SOURCE, status.MPI_TAG, m_world_comm, &status);
 
-                        task_packet msg{*v_buffer_packet}; //copy
-                        m_center_queue.push(msg);
-                        delete v_buffer_packet; // free memory
+                        m_center_queue.push(v_task);
 
                         if (m_center_queue.size() > m_max_queue_size) {
                             if (m_center_queue.size() % 10000 == 0)
