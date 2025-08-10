@@ -392,36 +392,6 @@ namespace gempba {
             }
         }
 
-        void handle_full_messaging() {
-            const size_t v_current_memory = getCurrentRSS() / (1024 * 1024); // ram usage in megabytes
-
-
-            if (!m_center_last_full_status) {
-                // last iter, center wasn't full but now it is => warn nodes to stop sending
-                if (v_current_memory > MAX_MEMORY_MB || m_center_queue.size() > CENTER_NBSTORED_TASKS_PER_PROCESS * m_world_size) {
-                    for (int rank = 1; rank < m_world_size; rank++) {
-                        std::byte v_tmp{0};
-                        MPI_Send(&v_tmp, 1, MPI_BYTE, rank, CENTER_IS_FULL_TAG, m_center_fullness_communicator);
-                    }
-                    m_center_last_full_status = true;
-                    m_time_centerfull_sent = MPI_Wtime();
-
-                    //cout << "CENTER IS FULL" << endl;
-                }
-            } else {
-                // last iter, center was full but now it has space => warn others it's ok
-                if (v_current_memory <= 0.9 * MAX_MEMORY_MB && m_center_queue.size() < CENTER_NBSTORED_TASKS_PER_PROCESS * m_world_size * 0.8) {
-                    for (int rank = 1; rank < m_world_size; rank++) {
-                        std::byte v_tmp{0};
-                        MPI_Send(&v_tmp, 1, MPI_BYTE, rank, CENTER_IS_FREE_TAG, m_center_fullness_communicator);
-                    }
-                    m_center_last_full_status = false;
-
-                    //cout << "CENTER IS NOT FULL ANYMORE" << endl;
-                }
-            }
-        }
-
         int consume_int_message(MPI_Status status, const MPI_Comm &p_communicator) {
             int v_buffer;
             MPI_Recv(&v_buffer, 1, MPI_INT, status.MPI_SOURCE, status.MPI_TAG, p_communicator, &status);
@@ -454,7 +424,7 @@ namespace gempba {
 
                         if (!flag) {
                             clear_buffer();
-                            handle_full_messaging();
+                            monitor_and_notify_center_status();
                         }
                     }
 
@@ -467,7 +437,7 @@ namespace gempba {
 
                 if (!flag) {
                     clear_buffer();
-                    handle_full_messaging();
+                    monitor_and_notify_center_status();
                     continue;
                 }
 
@@ -566,7 +536,7 @@ namespace gempba {
                 }
 
                 clear_buffer();
-                handle_full_messaging();
+                monitor_and_notify_center_status();
             }
 
             std::cout << "CENTER HAS TERMINATED" << std::endl;
@@ -586,6 +556,43 @@ namespace gempba {
         }
 
     private:
+        void monitor_and_notify_center_status() {
+            const size_t v_current_memory = getCurrentRSS() / (1024 * 1024); // ram usage in megabytes
+
+            if (m_center_last_full_status) {
+                notify_center_free(v_current_memory);
+            } else {
+                notify_center_full(v_current_memory);
+            }
+        }
+
+        void notify_center_full(const size_t v_current_memory) {
+            // last iter, center wasn't full but now it is => warn nodes to stop sending
+            if (v_current_memory > MAX_MEMORY_MB || m_center_queue.size() > CENTER_NBSTORED_TASKS_PER_PROCESS * m_world_size) {
+                for (int rank = 1; rank < m_world_size; rank++) {
+                    std::byte v_tmp{0};
+                    MPI_Send(&v_tmp, 1, MPI_BYTE, rank, CENTER_IS_FULL_TAG, m_center_fullness_communicator);
+                }
+                m_center_last_full_status = true;
+                m_time_centerfull_sent = MPI_Wtime();
+
+                //cout << "CENTER IS FULL" << endl;
+            }
+        }
+
+        void notify_center_free(const size_t v_current_memory) {
+            // last iter, center was full but now it has space => warn others it's ok
+            if (v_current_memory <= 0.9 * MAX_MEMORY_MB && m_center_queue.size() < CENTER_NBSTORED_TASKS_PER_PROCESS * m_world_size * 0.8) {
+                for (int rank = 1; rank < m_world_size; rank++) {
+                    std::byte v_tmp{0};
+                    MPI_Send(&v_tmp, 1, MPI_BYTE, rank, CENTER_IS_FREE_TAG, m_center_fullness_communicator);
+                }
+                m_center_last_full_status = false;
+
+                //cout << "CENTER IS NOT FULL ANYMORE" << endl;
+            }
+        }
+
         /* return false if message not received, which is signal of termination
             all workers report (with a message) to center process when about to run a task or when becoming available
             if no message is received within a TIMEOUT window, then all processes will have finished
