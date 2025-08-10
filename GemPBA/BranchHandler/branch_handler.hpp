@@ -246,6 +246,28 @@ namespace gempba {
             this->m_best_solution_serialized = {p_ref_value_local, v_packet};
         }
 
+        /**
+        * This method is thread safe: Updates the reference value and optionally retrieves the most up-to-date value.
+        *
+        * @param p_new_ref_value the most promising new reference value for the solution in the scope calling this method
+        * @param p_most_up_to_date A pointer to an integer where the most up-to-date value will be stored.
+        * If nullptr, the most up-to-date value is not retrieved.
+        * @return True if the reference value was successfully updated, false otherwise.
+        */
+        bool try_update_reference_value(const int p_new_ref_value, int *p_most_up_to_date = nullptr) {
+            std::scoped_lock<std::mutex> lck(m_mutex);
+
+            if (should_update_result(p_new_ref_value)) {
+                m_reference_value = p_new_ref_value;
+                return true;
+            }
+
+            if (p_most_up_to_date) {
+                *p_most_up_to_date = m_reference_value;
+            }
+            return false;
+        }
+
         // get number of successful thread requests
         size_t number_thread_requests() const {
             return m_thread_requests.load();
@@ -331,28 +353,6 @@ namespace gempba {
          */
         void set_reference_value(const int p_reference_value) {
             this->m_reference_value = p_reference_value;
-        }
-
-        /**
-        * This method is thread safe: Updates the reference value and optionally retrieves the most up-to-date value.
-        *
-        * @param p_new_ref_value the most promising new reference value for the solution in the scope calling this method
-        * @param p_most_up_to_date A pointer to an integer where the most up-to-date value will be stored.
-        * If nullptr, the most up-to-date value is not retrieved.
-        * @return True if the reference value was successfully updated, false otherwise.
-        */
-        bool try_update_reference_value(const int p_new_ref_value, int *p_most_up_to_date = nullptr) {
-            std::scoped_lock<std::mutex> lck(m_mutex);
-
-            if (should_update_result(p_new_ref_value)) {
-                m_reference_value = p_new_ref_value;
-                return true;
-            }
-
-            if (p_most_up_to_date) {
-                *p_most_up_to_date = m_reference_value;
-            }
-            return false;
         }
 
 
