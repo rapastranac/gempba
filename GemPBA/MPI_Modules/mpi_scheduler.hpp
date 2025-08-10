@@ -442,11 +442,6 @@ namespace gempba {
             }
         }
 
-        /* it returns the substraction between end and start*/
-        static double difftime(const double p_start, const double p_end) {
-            return p_end - p_start;
-        }
-
         static int consume_flag(MPI_Status p_status, const MPI_Comm &p_communicator) {
             int v_val = 0;;
             MPI_Recv(&v_val, 1, MPI_INT, p_status.MPI_SOURCE, p_status.MPI_TAG, p_communicator, &p_status);
@@ -589,7 +584,7 @@ namespace gempba {
                         branch = 0;
                     }
                     ++v_cycles;
-                    double v_elapsed = difftime(v_wall_time0, MPI_Wtime());
+                    double v_elapsed = utils::diff_time(v_wall_time0, MPI_Wtime());
                     if (v_elapsed > TIMEOUT_TIME) {
                         spdlog::debug("rank {}: no messages received in {} seconds, cycles: {}", m_world_rank, v_elapsed, v_cycles);
                         break;
@@ -671,7 +666,7 @@ namespace gempba {
             while (true) {
                 MPI_Test(&p_request, &p_ready, &p_status);
                 // Check whether the underlying communication had already taken place
-                while (!p_ready && (TIMEOUT_TIME > difftime(p_wall_time0, MPI_Wtime()))) {
+                while (!p_ready && (TIMEOUT_TIME > utils::diff_time(p_wall_time0, MPI_Wtime()))) {
                     MPI_Test(&p_request, &p_ready, &p_status);
                     v_cycles++;
                 }

@@ -28,6 +28,7 @@
 #include <spdlog/spdlog.h>
 
 #include "utils/gempba_utils.hpp"
+#include "utils/utils.hpp"
 #include "utils/ipc/result.hpp"
 #include "utils/ipc/task_packet.hpp"
 
@@ -370,11 +371,6 @@ namespace gempba {
             }
         }
 
-        /* it returns the substraction between end and start*/
-        static double difftime(const double p_start, const double p_end) {
-            return p_end - p_start;
-        }
-
     public:
         void clear_buffer() {
             if (m_center_queue.empty())
@@ -468,7 +464,7 @@ namespace gempba {
                 if (!flag) {
                     const double v_begin = MPI_Wtime();
 
-                    while (!flag && (difftime(v_begin, MPI_Wtime()) < TIMEOUT_TIME)) {
+                    while (!flag && (utils::diff_time(v_begin, MPI_Wtime()) < TIMEOUT_TIME)) {
                         MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, m_world_comm, &flag, &status);
 
                         if (!flag) {
@@ -574,7 +570,7 @@ namespace gempba {
 
 
                         if (m_center_queue.size() > 2 * CENTER_NBSTORED_TASKS_PER_PROCESS * m_world_size) {
-                            if (difftime(m_time_centerfull_sent, MPI_Wtime() > 1)) {
+                            if (utils::diff_time(m_time_centerfull_sent, MPI_Wtime() > 1)) {
                                 spdlog::debug(
                                         "Center queue size is twice the limit.  Contacting workers to let them know.\n");
                                 m_center_last_full_status = false; //handleFullMessaging will see this and reontact workers
@@ -618,7 +614,7 @@ namespace gempba {
             while (true) {
                 MPI_Test(&p_request, &p_ready, &p_status);
                 // Check whether the underlying communication had already taken place
-                while (!p_ready && (difftime(p_begin, MPI_Wtime()) < TIMEOUT_TIME)) {
+                while (!p_ready && (utils::diff_time(p_begin, MPI_Wtime()) < TIMEOUT_TIME)) {
                     MPI_Test(&p_request, &p_ready, &p_status);
                     cycles++;
                 }
