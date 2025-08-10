@@ -147,7 +147,7 @@ namespace gempba {
         }
 
         Graph termination(Graph &graph) {
-            bool updated = branchHandler.try_update_reference_value(graph.size());
+            bool updated = branchHandler.try_update_result(graph, graph.size());
 
             if (updated) {
                 return graph;
