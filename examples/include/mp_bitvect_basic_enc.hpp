@@ -1,4 +1,4 @@
-#ifndef MP_BITVECT_BASIC_ENC_CENTRAL_HPP
+ #ifndef MP_BITVECT_BASIC_ENC_CENTRAL_HPP
 #define MP_BITVECT_BASIC_ENC_CENTRAL_HPP
 
 
@@ -15,6 +15,9 @@
 #include <boost/unordered_map.hpp>
 #include <boost/container/flat_map.hpp>
 #include <format>
+#include <functional>
+#include <utils/ipc/task_packet.hpp>
+
 
 #include <memory_resource>
 
@@ -130,6 +133,14 @@ auto serializer = [](auto &&... args) {
     helper_ser(archive, args...);
     return gempba::task_packet(ss.str());
 };
+
+template<typename T>
+std::function<gempba::task_packet(T&)> make_single_serializer() {
+     return [&](T &p_arg) {
+         gempba::task_packet v_ser = serializer(p_arg);
+         return v_ser;
+     };
+ }
 
 void helper_dser(auto &archive, auto &first) {
     archive >> first;
@@ -492,7 +503,8 @@ private:
 
         if (solsize < branchHandler.reference_value()) {
             //branchHandler.setBestVal(solsize);
-            branchHandler.try_update_result(solsize, solsize, serializer);
+            std::function<gempba::task_packet(int &)> v_serializer = make_single_serializer<int>();
+            branchHandler.try_update_result(solsize, solsize, v_serializer);
             branchHandler.try_update_reference_value(solsize);
 
             auto clock = std::chrono::system_clock::now();

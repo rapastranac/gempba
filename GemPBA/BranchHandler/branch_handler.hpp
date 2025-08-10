@@ -233,17 +233,19 @@ namespace gempba {
             return v_nanoseconds * 1.0e-9; // convert to seconds
         }
 
-        void try_update_result(auto &p_best_local_solution) {
-            std::unique_lock<std::mutex> lck(m_mutex);
-            this->m_best_solution = std::make_any<decltype(p_best_local_solution)>(p_best_local_solution);
+        template<typename T>
+        void try_update_result(T &p_new_result) {
+            std::unique_lock v_lock(m_mutex);
+            this->m_best_solution = std::make_any<decltype(p_new_result)>(p_new_result);
         }
 
-        void try_update_result(int p_ref_value_local, auto &p_solution, auto &p_serializer) {
-            std::unique_lock<std::mutex> lck(m_mutex);
+        template<typename T>
+        void try_update_result(int p_new_reference_value, T &p_new_result, std::function<task_packet(T&)> &p_serializer) {
+            std::unique_lock v_lock(m_mutex);
 
-            const auto v_packet = static_cast<task_packet>(p_serializer(p_solution));
+            const auto v_packet = static_cast<task_packet>(p_serializer(p_new_result));
 
-            this->m_best_solution_serialized = {p_ref_value_local, v_packet};
+            this->m_best_solution_serialized = {p_new_reference_value, v_packet};
         }
 
         /**
@@ -255,7 +257,7 @@ namespace gempba {
         * @return True if the reference value was successfully updated, false otherwise.
         */
         bool try_update_reference_value(const int p_new_ref_value, int *p_most_up_to_date = nullptr) {
-            std::scoped_lock<std::mutex> lck(m_mutex);
+            std::scoped_lock<std::mutex> v_lock(m_mutex);
 
             if (should_update_result(p_new_ref_value)) {
                 m_reference_value = p_new_ref_value;
