@@ -828,6 +828,22 @@ namespace gempba {
             spdlog::debug("rank {}, after MPI_Finalize() \n", m_world_rank);
             #endif
         }
+
+        /* ---------------------------------------------------------------------------------
+         * utility functions to determine whether to update global or local reference values
+         * ---------------------------------------------------------------------------------*/
+
+        static bool should_update_global(const goal p_goal, const int p_global_reference_value, const int p_local_reference_value) {
+            const bool local_max_is_better = p_goal == MAXIMISE && p_local_reference_value > p_global_reference_value;
+            const bool local_min_is_better = p_goal == MINIMISE && p_local_reference_value < p_global_reference_value;
+            return local_max_is_better || local_min_is_better;
+        }
+
+        static bool should_update_local(const goal p_goal, const int p_global_reference_value, const int p_local_reference_value) {
+            const bool global_max_is_better = p_goal == MAXIMISE && p_global_reference_value > p_local_reference_value;
+            const bool global_min_is_better = p_goal == MINIMISE && p_global_reference_value < p_local_reference_value;
+            return global_max_is_better || global_min_is_better;
+        }
     };
 
 }
