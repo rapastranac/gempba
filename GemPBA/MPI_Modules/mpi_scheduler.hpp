@@ -521,17 +521,16 @@ namespace gempba {
         */
         void maybe_broadcast_global_reference_value(int p_new_global_reference_value, MPI_Status p_status) {
             utils::print_mpi_debug_comments("center received refValue {} from rank {}\n", p_new_global_reference_value, p_status.MPI_SOURCE);
-            bool v_reference_value_updated = false;
 
-            if ((m_goal == MAXIMISE && p_new_global_reference_value > m_global_reference_value) || (m_goal == MINIMISE && p_new_global_reference_value < m_global_reference_value)) {
+            const bool v_should_broadcast = should_broadcast_global(m_goal, m_global_reference_value, p_new_global_reference_value);
+            if (v_should_broadcast) {
                 m_global_reference_value = p_new_global_reference_value;
-                v_reference_value_updated = true;
                 for (int v_rank = 1; v_rank < m_world_size; v_rank++) {
                     MPI_Send(&m_global_reference_value, 1, MPI_INT, v_rank, REFERENCE_VAL_UPDATE, m_global_reference_value_communicator);
                 }
             }
 
-            if (v_reference_value_updated) {
+            if (v_should_broadcast) {
                 static int success = 0;
                 success++;
                 spdlog::info("SUCCESSFUL updates: {}, refValueGlobal updated to : {} by rank {}\n", success, m_global_reference_value, p_status.MPI_SOURCE);
@@ -881,6 +880,12 @@ namespace gempba {
             const bool global_max_is_better = p_goal == MAXIMISE && p_global_reference_value > p_local_reference_value;
             const bool global_min_is_better = p_goal == MINIMISE && p_global_reference_value < p_local_reference_value;
             return global_max_is_better || global_min_is_better;
+        }
+
+        static bool should_broadcast_global(const goal p_goal, const int p_old_global, const int p_new_global) {
+            const bool new_max_is_better = p_goal == MAXIMISE && p_new_global > p_old_global;
+            const bool new_min_is_better = p_goal == MINIMISE && p_new_global < p_old_global;
+            return new_max_is_better || new_min_is_better;
         }
     };
 
