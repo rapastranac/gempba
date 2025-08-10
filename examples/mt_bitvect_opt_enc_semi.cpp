@@ -15,7 +15,7 @@
 int run(int numThreads, int prob, std::string &filename) {
     using HolderType = gempba::ResultHolder<void, int, gbitset, int>;
 
-    auto &branchHandler = gempba::branch_handler::getInstance(); // parallel library
+    auto &branchHandler = gempba::branch_handler::get_instance(); // parallel library
     auto &dlb = gempba::DLB_Handler::getInstance();
 
     cout << "NUMTHREADS= " << numThreads << endl;
@@ -35,7 +35,7 @@ int run(int numThreads, int prob, std::string &filename) {
     gbitset allzeros(gsize);
     gbitset allones = ~allzeros;
 
-    branchHandler.setRefValue(gsize);
+    branchHandler.set_reference_value(gsize);
     branchHandler.set_goal(gempba::MINIMISE);
 
     int zero = 0;
@@ -49,15 +49,15 @@ int run(int numThreads, int prob, std::string &filename) {
     holder.holdArgs(zero, allones, zero);
 
     double start = branchHandler.WTime();
-    branchHandler.initThreadPool(numThreads);
+    branchHandler.init_thread_pool(numThreads);
     branchHandler.force_push<void>(function, -1, holder);
     branchHandler.wait();
     double end = branchHandler.WTime();
 
-    double idl_tm = branchHandler.getPoolIdleTime();
+    double idl_tm = branchHandler.get_pool_idle_time();
     size_t rqst = branchHandler.number_thread_requests();
 
-    int solution = branchHandler.fetchSolution<int>();
+    int solution = branchHandler.fetch_solution<int>();
     spdlog::debug("\n\n\nCover size : {} \n", solution);
 
     spdlog::debug("Global pool idle time: {0:.6f} seconds\n\n\n", idl_tm);

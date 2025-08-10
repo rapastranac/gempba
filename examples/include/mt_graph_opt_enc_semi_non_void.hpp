@@ -28,7 +28,7 @@ namespace gempba {
             cout << msg_center;
             outFile(msg_center, "");
 
-            this->branchHandler.initThreadPool(numThreads);
+            this->branchHandler.init_thread_pool(numThreads);
             preSize = graph.preprocessing();
 
             size_t k_mm = maximum_matching(graph);
@@ -40,7 +40,7 @@ namespace gempba {
             begin = std::chrono::steady_clock::now();
 
             try {
-                branchHandler.setRefValue(currentMVCSize);
+                branchHandler.set_reference_value(currentMVCSize);
                 HolderType *dummyParent = new HolderType(dlb, -1); {
                     graph_res = mvc(-1, 0, graph, dummyParent);
                 }
@@ -61,7 +61,7 @@ namespace gempba {
             end = std::chrono::steady_clock::now();
             elapsed_secs = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
 
-            printf("refGlobal : %d \n", branchHandler.refValue());
+            printf("refGlobal : %d \n", branchHandler.reference_value());
             return true;
         }
 
@@ -73,7 +73,7 @@ namespace gempba {
             //size_t mm = maximum_matching(graph);
             //size_t k = relaxation(k1, k2);
 
-            if (graph.coverSize() + std::max({LB, degLB, acLB}) >= (size_t) branchHandler.refValue()) {
+            if (graph.coverSize() + std::max({LB, degLB, acLB}) >= (size_t) branchHandler.reference_value()) {
                 //size_t addition = k + graph.coverSize();
                 //return;
                 return {};
@@ -93,7 +93,7 @@ namespace gempba {
             holderLeft.setDepth(depth);
             holderRight.setDepth(depth);
 
-            int referenceValue = branchHandler.refValue();
+            int referenceValue = branchHandler.reference_value();
 
             holderLeft.bind_branch_checkIn([&graph, &v, referenceValue, &depth, &holderLeft] {
                 Graph g = graph;
@@ -132,7 +132,7 @@ namespace gempba {
             Graph rightGraph;
 
             if (holderLeft.evaluate_branch_checkIn()) {
-                branchHandler.try_push_MT<Graph>(_f, id, holderLeft);
+                branchHandler.try_push_mt<Graph>(_f, id, holderLeft);
             }
 
             if (holderRight.evaluate_branch_checkIn()) {
@@ -147,7 +147,7 @@ namespace gempba {
         }
 
         Graph termination(Graph &graph) {
-            bool updated = branchHandler.updateRefValue(graph.size());
+            bool updated = branchHandler.update_reference_value(graph.size());
 
             if (updated) {
                 return graph;

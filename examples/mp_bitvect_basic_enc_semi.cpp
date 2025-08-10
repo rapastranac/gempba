@@ -19,13 +19,13 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
     std::cout << "USING SEMI-CENTRALIZED STRATEGY" << std::endl;
 
 
-    auto &branchHandler = gempba::branch_handler::getInstance(); // parallel library
+    auto &branchHandler = gempba::branch_handler::get_instance(); // parallel library
 
     // NOTE: instantiated object depends on SCHEDULER_CENTRALIZED macro
     auto &mpiScheduler = gempba::mpi_scheduler::get_instance();
 
     int rank = mpiScheduler.rank_me();
-    branchHandler.passMPIScheduler(&mpiScheduler);
+    branchHandler.pass_mpi_scheduler(&mpiScheduler);
 
     std::cout << "NUMTHREADS= " << threads_per_task << std::endl;
 
@@ -49,7 +49,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
     gbitset allzeros(gsize);
     gbitset allones = ~allzeros;
 
-    branchHandler.setRefValue(gsize); // thus, all processes know the best value so far
+    branchHandler.set_reference_value(gsize); // thus, all processes know the best value so far
     branchHandler.set_goal(gempba::MINIMISE);
 
     int zero = 0;
@@ -79,10 +79,10 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
             main thread will take care of Inter-process communication (IPC), dedicated core
             numThreads could be the number of physical cores managed by this process - 1
         */
-        branchHandler.initThreadPool(threads_per_task);
+        branchHandler.init_thread_pool(threads_per_task);
 
-        std::function<std::shared_ptr<gempba::ResultHolderParent>(gempba::task_packet)> bufferDecoder = branchHandler.constructBufferDecoder<void, int, BitGraph, int>(function, deserializer);
-        std::function<gempba::result()> resultFetcher = branchHandler.constructResultFetcher();
+        std::function<std::shared_ptr<gempba::ResultHolderParent>(gempba::task_packet)> bufferDecoder = branchHandler.construct_buffer_decoder<void, int, BitGraph, int>(function, deserializer);
+        std::function<gempba::result()> resultFetcher = branchHandler.construct_result_fetcher();
         mpiScheduler.run_node(branchHandler, bufferDecoder, resultFetcher);
     }
     mpiScheduler.barrier();
@@ -101,7 +101,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
 
     if (rank != 0) {
         // rank 0 does not run the main function
-        idl_tm = branchHandler.getPoolIdleTime();
+        idl_tm = branchHandler.get_pool_idle_time();
         rqst = branchHandler.number_thread_requests();
 
         taskRecvd = mpiScheduler.tasks_recvd();

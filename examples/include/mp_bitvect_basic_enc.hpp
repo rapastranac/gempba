@@ -266,7 +266,7 @@ public:
             auto str = std::format(
                     "WR= {} ID= {} passes={} gsize={} refvalue={} solsize={} isskips={} deglbskips={} {}",
                     branchHandler.rank_me(), id, passes.load(), bits_in_graph.count(),
-                    branchHandler.refValue(), cursol_size, is_skips, deglb_skips,
+                    branchHandler.reference_value(), cursol_size, is_skips, deglb_skips,
                     ctime);
 
             cout << str;
@@ -284,7 +284,7 @@ public:
             return;
         }
 
-        if (cursol_size >= branchHandler.refValue()) {
+        if (cursol_size >= branchHandler.reference_value()) {
             return;
         }
 
@@ -388,7 +388,7 @@ public:
         int indsetub = (int) (0.5f * (1.0f + sqrt(tmp)));
         int vclb = nbVertices - indsetub;
 
-        if (vclb + cursol_size >= branchHandler.refValue()) {
+        if (vclb + cursol_size >= branchHandler.reference_value()) {
             is_skips++;
             return;
         }
@@ -396,7 +396,7 @@ public:
         int degLB = 0; //getDegLB(bits_in_graph, nbEdgesDoubleCounted/2);
         degLB = (nbEdgesDoubleCounted / 2) / maxdeg;
         //cout<<"deglb="<<degLB<<" n="<<bits_in_graph.count()<<" refval="<<branchHandler.getRefValue()<<endl;
-        if (degLB + cursol_size >= branchHandler.refValue()) {
+        if (degLB + cursol_size >= branchHandler.reference_value()) {
             deglb_skips++;
             return;
         }
@@ -415,7 +415,7 @@ public:
         }
 
         hol_l.bind_branch_checkIn([&] {
-            int bestVal = branchHandler.refValue();
+            int bestVal = branchHandler.reference_value();
             gbitset ingraph1 = bits_in_graph;
 
             if (!ingraph1[maxdeg_v]) {
@@ -438,7 +438,7 @@ public:
         });
 
         hol_r.bind_branch_checkIn([&] {
-            int bestVal = branchHandler.refValue();
+            int bestVal = branchHandler.reference_value();
             //right branch = take out v nbrs
             gbitset ingraph2 = bits_in_graph;
 
@@ -464,7 +464,7 @@ public:
             // else
             {
 
-                branchHandler.try_push_MP<void>(_f, id, hol_l, serializer);
+                branchHandler.try_push_mp<void>(_f, id, hol_l, serializer);
             }
         } else {
         }
@@ -490,10 +490,10 @@ private:
         if (solsize == 0)
             return;
 
-        if (solsize < branchHandler.refValue()) {
+        if (solsize < branchHandler.reference_value()) {
             //branchHandler.setBestVal(solsize);
-            branchHandler.holdSolution(solsize, solsize, serializer);
-            branchHandler.updateRefValue(solsize);
+            branchHandler.hold_solution(solsize, solsize, serializer);
+            branchHandler.update_reference_value(solsize);
 
             auto clock = std::chrono::system_clock::now();
             std::time_t time = std::chrono::system_clock::to_time_t(clock); //it includes a "\n"
