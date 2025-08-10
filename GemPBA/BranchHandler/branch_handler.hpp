@@ -69,7 +69,6 @@ namespace gempba {
         unsigned int m_processor_count;
         std::atomic<long long> m_idle_time;
         std::mutex m_mutex; // local mutex
-        std::condition_variable cv;
         std::unique_ptr<ThreadPool::Pool> m_thread_pool;
 
         branch_handler() :
