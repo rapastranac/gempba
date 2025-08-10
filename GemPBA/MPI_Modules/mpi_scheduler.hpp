@@ -523,22 +523,21 @@ namespace gempba {
             utils::print_mpi_debug_comments("center received refValue {} from rank {}\n", p_new_global_reference_value, p_status.MPI_SOURCE);
 
             const bool v_should_broadcast = should_broadcast_global(m_goal, m_global_reference_value, p_new_global_reference_value);
-            if (v_should_broadcast) {
-                m_global_reference_value = p_new_global_reference_value;
-                for (int v_rank = 1; v_rank < m_world_size; v_rank++) {
-                    MPI_Send(&m_global_reference_value, 1, MPI_INT, v_rank, REFERENCE_VAL_UPDATE, m_global_reference_value_communicator);
-                }
-            }
-
-            if (v_should_broadcast) {
-                static int success = 0;
-                success++;
-                spdlog::info("SUCCESSFUL updates: {}, refValueGlobal updated to : {} by rank {}\n", success, m_global_reference_value, p_status.MPI_SOURCE);
-            } else {
+            if (!v_should_broadcast) {
                 static int failures = 0;
                 failures++;
                 spdlog::debug("FAILED updates : {}, refValueGlobal : {} by rank {}\n", failures, m_global_reference_value, p_status.MPI_SOURCE);
+                return;
             }
+
+            m_global_reference_value = p_new_global_reference_value;
+            for (int v_rank = 1; v_rank < m_world_size; v_rank++) {
+                MPI_Send(&m_global_reference_value, 1, MPI_INT, v_rank, REFERENCE_VAL_UPDATE, m_global_reference_value_communicator);
+            }
+
+            static int success = 0;
+            success++;
+            spdlog::info("SUCCESSFUL updates: {}, refValueGlobal updated to : {} by rank {}\n", success, m_global_reference_value, p_status.MPI_SOURCE);
         }
 
         std::optional<MPI_Status> probe_reference_value_comm_center() {
@@ -871,20 +870,20 @@ namespace gempba {
          * ---------------------------------------------------------------------------------*/
 
         static bool should_update_global(const goal p_goal, const int p_global_reference_value, const int p_local_reference_value) {
-            const bool local_max_is_better = p_goal == MAXIMISE && p_local_reference_value > p_global_reference_value;
-            const bool local_min_is_better = p_goal == MINIMISE && p_local_reference_value < p_global_reference_value;
-            return local_max_is_better || local_min_is_better;
+            return should_update(p_goal, p_global_reference_value, p_local_reference_value);
         }
 
         static bool should_update_local(const goal p_goal, const int p_global_reference_value, const int p_local_reference_value) {
-            const bool global_max_is_better = p_goal == MAXIMISE && p_global_reference_value > p_local_reference_value;
-            const bool global_min_is_better = p_goal == MINIMISE && p_global_reference_value < p_local_reference_value;
-            return global_max_is_better || global_min_is_better;
+            return should_update(p_goal, p_local_reference_value, p_global_reference_value);
         }
 
         static bool should_broadcast_global(const goal p_goal, const int p_old_global, const int p_new_global) {
-            const bool new_max_is_better = p_goal == MAXIMISE && p_new_global > p_old_global;
-            const bool new_min_is_better = p_goal == MINIMISE && p_new_global < p_old_global;
+            return should_update(p_goal, p_old_global, p_new_global);
+        }
+
+        static bool should_update(const goal p_goal, const int p_old_value, const int p_new_value) {
+            const bool new_max_is_better = p_goal == MAXIMISE && p_new_value > p_old_value;
+            const bool new_min_is_better = p_goal == MINIMISE && p_new_value < p_old_value;
             return new_max_is_better || new_min_is_better;
         }
     };
