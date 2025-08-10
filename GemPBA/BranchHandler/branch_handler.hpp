@@ -233,12 +233,12 @@ namespace gempba {
             return v_nanoseconds * 1.0e-9; // convert to seconds
         }
 
-        void hold_solution(auto &p_best_local_solution) {
+        void try_update_result(auto &p_best_local_solution) {
             std::unique_lock<std::mutex> lck(m_mutex);
             this->m_best_solution = std::make_any<decltype(p_best_local_solution)>(p_best_local_solution);
         }
 
-        void hold_solution(int p_ref_value_local, auto &p_solution, auto &p_serializer) {
+        void try_update_result(int p_ref_value_local, auto &p_solution, auto &p_serializer) {
             std::unique_lock<std::mutex> lck(m_mutex);
 
             const auto v_packet = static_cast<task_packet>(p_serializer(p_solution));

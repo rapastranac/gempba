@@ -432,7 +432,7 @@ private:
 
         if (solsize < branchHandler.reference_value()) {
             //branchHandler.setBestVal(solsize);
-            branchHandler.hold_solution(solsize, solsize, serializer);
+            branchHandler.try_update_result(solsize, solsize, serializer);
             branchHandler.try_update_reference_value(solsize);
 
             auto clock = std::chrono::system_clock::now();

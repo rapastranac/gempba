@@ -329,7 +329,7 @@ private:
             return;
 
         if (solsize < branchHandler.reference_value()) {
-            branchHandler.hold_solution(solsize);
+            branchHandler.try_update_result(solsize);
             branchHandler.try_update_reference_value(solsize);
 
             auto clock = std::chrono::system_clock::now();
