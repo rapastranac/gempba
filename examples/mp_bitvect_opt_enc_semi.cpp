@@ -19,7 +19,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
     std::cout << "USING SEMI-CENTRALIZED STRATEGY" << std::endl;
 
 
-    gempba::BranchHandler &branchHandler = gempba::BranchHandler::getInstance(); // parallel library
+    gempba::branch_handler &branchHandler = gempba::branch_handler::getInstance(); // parallel library
 
     // NOTE: instantiated object depends on SCHEDULER_CENTRALIZED macro
     auto &mpiScheduler = gempba::mpi_scheduler::get_instance();

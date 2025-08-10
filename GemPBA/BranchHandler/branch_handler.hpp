@@ -43,7 +43,7 @@ namespace gempba {
 
     class scheduler_parent;
 
-    class BranchHandler {
+    class branch_handler {
 
         template<typename Ret, typename... Args>
         friend
@@ -72,7 +72,7 @@ namespace gempba {
         std::condition_variable cv;
         std::unique_ptr<ThreadPool::Pool> thread_pool;
 
-        BranchHandler() :
+        branch_handler() :
             bestSolution_serialized(result::EMPTY) {
 
             processor_count = std::thread::hardware_concurrency();
@@ -182,20 +182,20 @@ namespace gempba {
 
     public:
         //<editor-fold desc="Construction/Destruction">
-        static BranchHandler &getInstance() {
-            static BranchHandler instance;
+        static branch_handler &getInstance() {
+            static branch_handler instance;
             return instance;
         }
 
-        ~BranchHandler() = default;
+        ~branch_handler() = default;
 
-        BranchHandler(const BranchHandler &) = delete;
+        branch_handler(const branch_handler &) = delete;
 
-        BranchHandler(BranchHandler &&) = delete;
+        branch_handler(branch_handler &&) = delete;
 
-        BranchHandler &operator=(const BranchHandler &) = delete;
+        branch_handler &operator=(const branch_handler &) = delete;
 
-        BranchHandler &operator=(BranchHandler &&) = delete;
+        branch_handler &operator=(branch_handler &&) = delete;
 
         //</editor-fold>
 

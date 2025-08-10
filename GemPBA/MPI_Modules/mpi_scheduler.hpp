@@ -45,7 +45,7 @@ enum tags {
 };
 
 namespace gempba {
-    class BranchHandler;
+    class branch_handler;
 
     class ResultHolderParent;
 
@@ -192,7 +192,7 @@ namespace gempba {
             }
         }
 
-        void process_message(MPI_Status p_status, BranchHandler &p_branch_handler, const std::function<std::shared_ptr<ResultHolderParent>(task_packet)> &p_buffer_decoder) {
+        void process_message(MPI_Status p_status, branch_handler &p_branch_handler, const std::function<std::shared_ptr<ResultHolderParent>(task_packet)> &p_buffer_decoder) {
             int v_count; // count to be received
             MPI_Get_count(&p_status, MPI_BYTE, &v_count); // receives total number of datatype elements of the message
 
@@ -223,7 +223,7 @@ namespace gempba {
         }
 
     public:
-        void run_node(BranchHandler &p_branch_handler, std::function<std::shared_ptr<ResultHolderParent>(task_packet)> &p_buffer_decoder,
+        void run_node(branch_handler &p_branch_handler, std::function<std::shared_ptr<ResultHolderParent>(task_packet)> &p_buffer_decoder,
                       std::function<result()> &p_result_fetcher) override {
             MPI_Barrier(m_world_communicator);
 
@@ -289,7 +289,7 @@ namespace gempba {
         }
 
     private:
-        void task_funneling(BranchHandler &p_branch_handler);
+        void task_funneling(branch_handler &p_branch_handler);
 
         void receive_reference_value(MPI_Status p_status) {
             utils::print_mpi_debug_comments("rank {}, about to receive refValue from Center\n", m_world_rank);
@@ -357,7 +357,7 @@ namespace gempba {
 
         // if ref value received, it attempts updating local value
         // if local value is better than the one in center, then the local best value is sent to center
-        void update_ref_value(BranchHandler &p_branch_handler);
+        void update_ref_value(branch_handler &p_branch_handler);
 
         /*	- return true is priority is acquired, false otherwise
             - priority released automatically if a message is pushed, otherwise it should be released manually

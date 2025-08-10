@@ -5,7 +5,7 @@
 #include <boost/archive/text_iarchive.hpp>
 
 #include "Graph.hpp"
-#include "BranchHandler/BranchHandler.hpp"
+#include "BranchHandler/branch_handler.hpp"
 #include "Resultholder/ResultHolder.hpp"
 #include "util.hpp"
 #include <format>
@@ -336,7 +336,7 @@ protected:
 
 protected:
     gempba::DLB_Handler &dlb = gempba::DLB_Handler::getInstance();
-    gempba::BranchHandler &branchHandler = gempba::BranchHandler::getInstance();
+    gempba::branch_handler &branchHandler = gempba::branch_handler::getInstance();
 
     Graph graph;
     Graph graph_res;

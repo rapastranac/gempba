@@ -60,7 +60,7 @@
 
 namespace gempba {
 
-    class BranchHandler;
+    class branch_handler;
 
     // inter process communication handler
     class mpi_centralized_scheduler final : public scheduler_parent {
@@ -185,7 +185,7 @@ namespace gempba {
         }
 
 
-        void run_node(BranchHandler &p_branch_handler, std::function<std::shared_ptr<ResultHolderParent>(task_packet)> &p_buffer_decoder,
+        void run_node(branch_handler &p_branch_handler, std::function<std::shared_ptr<ResultHolderParent>(task_packet)> &p_buffer_decoder,
                       std::function<result()> &p_result_fetcher) override {
             MPI_Barrier(m_world_comm);
 
@@ -270,7 +270,7 @@ namespace gempba {
 
     private:
         // when a node is working, it loops through here
-        void task_funneling(BranchHandler &p_branch_handler);
+        void task_funneling(branch_handler &p_branch_handler);
 
         // checks for a ref value update from center
         int probe_reference_value() {
@@ -325,7 +325,7 @@ namespace gempba {
 
         // if ref value received, it attempts updating local value
         // if local value is better than the one in center, then local best value is sent to center
-        void update_ref_value(BranchHandler &p_branch_handler);
+        void update_ref_value(branch_handler &p_branch_handler);
 
         bool is_terminated(int TAG) {
             if (TAG == TERMINATION_TAG) {

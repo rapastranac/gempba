@@ -1,8 +1,8 @@
 #include "mpi_centralized_scheduler.hpp"
-#include "BranchHandler/BranchHandler.hpp"
+#include "BranchHandler/branch_handler.hpp"
 
 namespace gempba {
-    void mpi_centralized_scheduler::task_funneling(BranchHandler &p_branch_handler) {
+    void mpi_centralized_scheduler::task_funneling(branch_handler &p_branch_handler) {
         task_packet *v_message = nullptr;
         bool v_is_pop = m_task_queue.pop(v_message);
 
@@ -55,7 +55,7 @@ namespace gempba {
         // nice(0);
     }
 
-    void mpi_centralized_scheduler::update_ref_value(BranchHandler &p_branch_handler) {
+    void mpi_centralized_scheduler::update_ref_value(branch_handler &p_branch_handler) {
         const int v_reference_global = m_ref_value_global; // constant within this scope
         const int v_reference_local = p_branch_handler.refValue(); // constant within this scope
 

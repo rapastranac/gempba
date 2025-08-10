@@ -13,7 +13,7 @@ namespace gempba {
 
     class ResultHolderParent;
 
-    class BranchHandler;
+    class branch_handler;
 
     class scheduler_parent {
     public:
@@ -53,7 +53,7 @@ namespace gempba {
 
         virtual void push(task_packet &&p_task_packet) = 0;
 
-        virtual void run_node(BranchHandler &p_branch_handler, std::function<std::shared_ptr<ResultHolderParent>(task_packet)> &p_buffer_decoder,
+        virtual void run_node(branch_handler &p_branch_handler, std::function<std::shared_ptr<ResultHolderParent>(task_packet)> &p_buffer_decoder,
                               std::function<result()> &p_result_fetcher) = 0;
 
         virtual void run_center(task_packet &p_seed) = 0;

@@ -2,7 +2,7 @@
 #include "include/mt_bitvect_opt_enc.hpp"
 
 #include <Resultholder/ResultHolder.hpp>
-#include <BranchHandler/BranchHandler.hpp>
+#include <BranchHandler/branch_handler.hpp>
 #include <DLB/DLB_Handler.hpp>
 
 #include <iostream>
@@ -15,7 +15,7 @@
 int run(int numThreads, int prob, std::string &filename) {
     using HolderType = gempba::ResultHolder<void, int, gbitset, int>;
 
-    auto &branchHandler = gempba::BranchHandler::getInstance(); // parallel library
+    auto &branchHandler = gempba::branch_handler::getInstance(); // parallel library
     auto &dlb = gempba::DLB_Handler::getInstance();
 
     cout << "NUMTHREADS= " << numThreads << endl;
