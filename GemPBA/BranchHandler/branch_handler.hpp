@@ -344,9 +344,7 @@ namespace gempba {
         bool update_reference_value(const int p_new_ref_value, int *p_most_up_to_date = nullptr) {
             std::scoped_lock<std::mutex> lck(m_mutex);
 
-            const bool v_is_reference_value_increasing = m_goal == MAXIMISE && p_new_ref_value > m_reference_value;
-            const bool v_is_reference_value_decreasing = m_goal == MINIMISE && p_new_ref_value < m_reference_value;
-            if (v_is_reference_value_increasing || v_is_reference_value_decreasing) {
+            if (should_update_result(p_new_ref_value)) {
                 m_reference_value = p_new_ref_value;
                 return true;
             }
@@ -709,6 +707,13 @@ namespace gempba {
 
 
         #endif
+
+    private:
+        [[nodiscard]] bool should_update_result(const int p_new_reference_value) const {
+            const bool v_new_max_is_better = m_goal == MAXIMISE && p_new_reference_value > m_reference_value;
+            const bool v_new_min_is_better = m_goal == MINIMISE && p_new_reference_value < m_reference_value;
+            return v_new_max_is_better || v_new_min_is_better;
+        }
     };
 }
 
