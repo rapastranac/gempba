@@ -431,35 +431,14 @@ namespace gempba {
 
             send_seed(v_task_packet);
 
-            int v_number_loops = 0;
             while (true) {
-                v_number_loops++;
                 int v_buffer;
                 int v_buffer_char_count = 0;
                 task_packet *v_buffer_packet = nullptr;
                 MPI_Status status;
-                MPI_Request request;
-                int ready;
 
                 int flag;
                 MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, m_world_comm, &flag, &status);
-
-                /*if (nbloops % 100 == 0)
-                {
-                    cout<<"CENTER nb loops = "<<nbloops<<" nrunning="<<nRunning<<endl;
-                    cout<<"STATES=";
-                    for (int i = 1; i < world_size;++i)
-                    {
-                        cout<<processState[i]<<"  ";
-                    }
-                    cout<<endl;
-                    cout<<"WARNED=";
-                    for (int i = 1; i < world_size;++i)
-                    {
-                        cout<<processes_center_asked[i]<<"  ";
-                    }
-                    cout<<endl;
-                }*/
 
                 if (!flag) {
                     const double v_begin = MPI_Wtime();
@@ -500,9 +479,8 @@ namespace gempba {
                     case STATE_RUNNING: // received if and only if a worker receives from other but center
                     {
                         m_process_state[status.MPI_SOURCE] = STATE_RUNNING; // node was assigned, now it's running
-                        ++m_nodes_running;
-
-                        ++m_total_requests;
+                        m_nodes_running++;
+                        m_total_requests++;
                     }
                     break;
                     case STATE_AVAILABLE: {
@@ -510,9 +488,9 @@ namespace gempba {
                         spdlog::debug("center received state_available from rank {}\n", status.MPI_SOURCE);
                         #endif
                         m_process_state[status.MPI_SOURCE] = STATE_AVAILABLE;
-                        ++m_nodes_available;
-                        --m_nodes_running;
-                        ++m_total_requests;
+                        m_nodes_available++;
+                        m_nodes_running--;
+                        m_total_requests++;
                     }
                     break;
                     case REFVAL_UPDATE_TAG: {
@@ -525,26 +503,21 @@ namespace gempba {
                         bool signal = false;
 
                         if ((m_goal == MAXIMISE && v_buffer > m_ref_value_global) || (m_goal == MINIMISE && v_buffer < m_ref_value_global)) {
-                            // refValueGlobal[0] = buffer;
                             m_ref_value_global = v_buffer;
                             signal = true;
                             for (int rank = 1; rank < m_world_size; rank++) {
                                 MPI_Send(&m_ref_value_global, 1, MPI_INT, rank, REFVAL_UPDATE_TAG, m_ref_value_global_communicator);
                             }
-
-                            // bcastPut(refValueGlobal, 1, MPI_INT, 0, win_refValueGlobal);
                         }
 
                         if (signal) {
                             static int success = 0;
                             success++;
-                            spdlog::debug("refValueGlobal updated to : {} by rank {}\n", m_ref_value_global,
-                                          status.MPI_SOURCE);
+                            spdlog::debug("refValueGlobal updated to : {} by rank {}\n", m_ref_value_global, status.MPI_SOURCE);
                         } else {
                             static int failures = 0;
                             failures++;
-                            spdlog::debug("FAILED updates : {}, refValueGlobal : {} by rank {}\n", failures,
-                                          m_ref_value_global, status.MPI_SOURCE);
+                            spdlog::debug("FAILED updates : {}, refValueGlobal : {} by rank {}\n", failures, m_ref_value_global, status.MPI_SOURCE);
                         }
                         ++m_total_requests;
                     }
@@ -556,7 +529,6 @@ namespace gempba {
                         }
 
                         task_packet msg{*v_buffer_packet}; //copy
-                        //center_queue.push_back(msg);
                         m_center_queue.push(msg);
                         delete v_buffer_packet; // free memory
 
@@ -566,14 +538,13 @@ namespace gempba {
                             m_max_queue_size = m_center_queue.size();
                         }
 
-                        ++m_total_requests;
+                        m_total_requests++;
 
 
                         if (m_center_queue.size() > 2 * CENTER_NBSTORED_TASKS_PER_PROCESS * m_world_size) {
                             if (utils::diff_time(m_time_centerfull_sent, MPI_Wtime() > 1)) {
-                                spdlog::debug(
-                                        "Center queue size is twice the limit.  Contacting workers to let them know.\n");
-                                m_center_last_full_status = false; //handleFullMessaging will see this and reontact workers
+                                spdlog::debug("Center queue size is twice the limit.  Contacting workers to let them know.\n");
+                                m_center_last_full_status = false; //handleFullMessaging will see this and recontact workers
                             }
                         }
 
@@ -691,7 +662,7 @@ namespace gempba {
         void send_seed(task_packet &p_packet) {
             constexpr int v_dest = 1;
             // global synchronisation **********************
-            --m_nodes_available;
+            m_nodes_available--;
             m_process_state[v_dest] = STATE_RUNNING;
             // *********************************************
 
@@ -790,7 +761,7 @@ namespace gempba {
 
         /* singleton*/
         mpi_centralized_scheduler() {
-            init(NULL, NULL);
+            init(nullptr, nullptr);
         }
 
         void init(int *p_argc, char *p_argv[]) {
