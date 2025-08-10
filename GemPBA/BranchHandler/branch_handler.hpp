@@ -249,14 +249,12 @@ namespace gempba {
         }
 
         /**
-        * This method is thread safe: Updates the reference value and optionally retrieves the most up-to-date value.
+        * This method is thread safe: Updates the reference value
         *
         * @param p_new_ref_value the most promising new reference value for the solution in the scope calling this method
-        * @param p_most_up_to_date A pointer to an integer where the most up-to-date value will be stored.
-        * If nullptr, the most up-to-date value is not retrieved.
         * @return True if the reference value was successfully updated, false otherwise.
         */
-        bool try_update_reference_value(const int p_new_ref_value, int *p_most_up_to_date = nullptr) {
+        bool try_update_reference_value(const int p_new_ref_value) {
             std::scoped_lock<std::mutex> v_lock(m_mutex);
 
             if (should_update_result(p_new_ref_value)) {
@@ -264,9 +262,6 @@ namespace gempba {
                 return true;
             }
 
-            if (p_most_up_to_date) {
-                *p_most_up_to_date = m_reference_value;
-            }
             return false;
         }
 
