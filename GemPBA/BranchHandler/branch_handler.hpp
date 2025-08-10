@@ -233,12 +233,26 @@ namespace gempba {
             return v_nanoseconds * 1.0e-9; // convert to seconds
         }
 
+        /**
+         * Updates the most up-to-date result. This method overrides the previous result without any checks, and should be used only in multithreading mode. (Not multiprocessing)
+         * @tparam T Type of the result
+         * @param p_new_result the most promising new result for the solution in the scope calling this method
+         */
         template<typename T>
         void try_update_result(T &p_new_result) {
             std::unique_lock v_lock(m_mutex);
             this->m_best_solution = std::make_any<decltype(p_new_result)>(p_new_result);
         }
 
+        /**
+         * This method is thread safe: Updates the most up-to-date result if the new reference value is better than the current one. This should be used in multiprocessing mode because it
+         * uses a serializer to convert the result into bytes.
+         *
+         * @tparam T Type of the result
+         * @param p_new_result the most promising new result for the solution in the scope calling this method
+         * @param p_new_reference_value the most promising new reference value that represents the result
+         * @param p_serializer a function that serializes the result into a string
+         */
         template<typename T>
         void try_update_result(T &p_new_result, int p_new_reference_value, std::function<task_packet(T&)> &p_serializer) {
             std::unique_lock v_lock(m_mutex);
