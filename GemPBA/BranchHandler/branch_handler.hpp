@@ -238,11 +238,17 @@ namespace gempba {
          * Updates the most up-to-date result. This method overrides the previous result without any checks, and should be used only in multithreading mode. (Not multiprocessing)
          * @tparam T Type of the result
          * @param p_new_result the most promising new result for the solution in the scope calling this method
+         * @param p_new_reference_value the most promising new reference value that represents the result
          */
         template<typename T>
-        void try_update_result(T &p_new_result) {
+        void try_update_result(T &p_new_result, const int p_new_reference_value) {
             std::unique_lock v_lock(m_mutex);
+            if (!should_update_result(p_new_reference_value)) {
+                return;
+            }
+
             this->m_best_solution = std::make_any<decltype(p_new_result)>(p_new_result);
+            this->m_reference_value = p_new_reference_value;
         }
 
         /**

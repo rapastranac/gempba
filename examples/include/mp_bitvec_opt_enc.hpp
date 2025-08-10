@@ -442,7 +442,6 @@ private:
             //branchHandler.setBestVal(solsize);
             std::function<gempba::task_packet(int &)> v_serializer = make_single_serializer<int>();
             branchHandler.try_update_result(solsize, solsize, v_serializer);
-            branchHandler.try_update_reference_value(solsize);
 
             auto clock = std::chrono::system_clock::now();
             std::time_t time = std::chrono::system_clock::to_time_t(clock); //it includes a "\n"

@@ -176,9 +176,8 @@ private:
         std::scoped_lock<std::mutex> lck(mtx);
         if (graph.coverSize() < branchHandler.reference_value()) {
             int SZ = graph.coverSize(); // debuggin line
-            branchHandler.try_update_result(graph);
+            branchHandler.try_update_result(graph, graph.coverSize());
 
-            branchHandler.try_update_reference_value(graph.coverSize());
             foundAtDepth = depth;
             recurrent_msg(id);
 
