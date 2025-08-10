@@ -50,34 +50,34 @@ namespace gempba {
         class ResultHolder;
 
     private:
-        std::atomic<size_t> numThreadRequests;
+        std::atomic<size_t> m_thread_requests;
         /*This section refers to the strategy wrapping a function
             then pruning data to be used by the wrapped function<<---*/
-        std::any bestSolution;
-        result bestSolution_serialized;
+        std::any m_best_solution;
+        result m_best_solution_serialized;
 
-        DLB_Handler &dlb = gempba::DLB_Handler::getInstance();
-        load_balancing_strategy _loadBalancingStrategy = QUASI_HORIZONTAL;
+        DLB_Handler &m_load_balancer = DLB_Handler::getInstance();
+        load_balancing_strategy m_load_balancing_strategy = QUASI_HORIZONTAL;
 
-        int refValueLocal = INT_MIN;
+        int m_reference_value = INT_MIN;
         goal m_goal = MAXIMISE;
 
         /*------------------------------------------------------>>end*/
         /* "processor_count" would allow setting by default the maximum number of threads
             that the machine can handle unless the user invokes setMaxThreads() */
 
-        unsigned int processor_count;
-        std::atomic<long long> idleTime;
-        std::mutex mtx; // local mutex
+        unsigned int m_processor_count;
+        std::atomic<long long> m_idle_time;
+        std::mutex m_mutex; // local mutex
         std::condition_variable cv;
-        std::unique_ptr<ThreadPool::Pool> thread_pool;
+        std::unique_ptr<ThreadPool::Pool> m_thread_pool;
 
         branch_handler() :
-            bestSolution_serialized(result::EMPTY) {
+            m_best_solution_serialized(result::EMPTY) {
 
-            processor_count = std::thread::hardware_concurrency();
-            idleTime = 0;
-            numThreadRequests = 0;
+            m_processor_count = std::thread::hardware_concurrency();
+            m_idle_time = 0;
+            m_thread_requests = 0;
         }
 
 
@@ -86,24 +86,24 @@ namespace gempba {
       */
         template<typename Ret, typename F, typename HolderType, std::enable_if_t<std::is_void_v<Ret>, int> = 0>
         bool try_top_holder(F &f, HolderType &holder) {
-            if (_loadBalancingStrategy == QUASI_HORIZONTAL) {
-                HolderType *upperHolder = dlb.find_top_holder(&holder);
+            if (m_load_balancing_strategy == QUASI_HORIZONTAL) {
+                HolderType *upperHolder = m_load_balancer.find_top_holder(&holder);
                 if (upperHolder) {
                     if (upperHolder->isTreated())
                         throw std::runtime_error("Attempt to push a treated holder\n");
 
                     if (upperHolder->evaluate_branch_checkIn()) {
                         // checks if it's worth it to push
-                        this->numThreadRequests++;
+                        this->m_thread_requests++;
                         upperHolder->setPushStatus();
-                        gempba::args_handler::unpack_and_push_void(*thread_pool, f, upperHolder->getArgs());
+                        gempba::args_handler::unpack_and_push_void(*m_thread_pool, f, upperHolder->getArgs());
                     } else {
                         // discard otherwise
                         upperHolder->setDiscard();
                     }
                     return true; // top holder found whether discarded or pushed
                 }
-                dlb.pop_left_sibling(&holder); // pops holder from parent's children
+                m_load_balancer.pop_left_sibling(&holder); // pops holder from parent's children
             }
             return false; // top holder isn't found or just DLB is disabled
         }
@@ -118,9 +118,9 @@ namespace gempba {
                 NOTE: if top holder found, it'll keep trying to find more
             */
             while (true) {
-                std::unique_lock<std::mutex> lck(mtx, std::defer_lock);
+                std::unique_lock<std::mutex> lck(m_mutex, std::defer_lock);
                 if (lck.try_lock()) {
-                    if (thread_pool->n_idle() > 0) {
+                    if (m_thread_pool->n_idle() > 0) {
 
                         if (try_top_holder<Ret>(f, holder)) {
                             continue; // keeps iterating from root to current level
@@ -129,11 +129,11 @@ namespace gempba {
                                 throw std::runtime_error("Attempt to push a treated holder\n");
 
                             // after this line, only leftMost holder should be pushed
-                            this->numThreadRequests++;
+                            this->m_thread_requests++;
                             holder.setPushStatus();
-                            dlb.prune(&holder);
+                            m_load_balancer.prune(&holder);
 
-                            gempba::args_handler::unpack_and_push_void(*thread_pool, f, holder.getArgs());
+                            gempba::args_handler::unpack_and_push_void(*m_thread_pool, f, holder.getArgs());
                             return true; // pushed to the pool
                         }
                     }
@@ -150,26 +150,26 @@ namespace gempba {
         bool push_multithreading(F &f, int id, HolderType &holder) {
             /*This lock must be acquired before checking the condition,
             even though numThread is atomic*/
-            std::unique_lock<std::mutex> lck(mtx);
+            std::unique_lock<std::mutex> lck(m_mutex);
             // if (busyThreads < thread_pool->size())
-            if (thread_pool->n_idle() > 0) {
-                if (_loadBalancingStrategy == QUASI_HORIZONTAL) {
+            if (m_thread_pool->n_idle() > 0) {
+                if (m_load_balancing_strategy == QUASI_HORIZONTAL) {
                     // bool res = try_top_holder<Ret>(lck, f, holder);
                     // if (res)
                     //	return false; //if top holder found, then it should return false to keep trying
 
-                    dlb.pop_left_sibling(&holder);
+                    m_load_balancer.pop_left_sibling(&holder);
                 }
-                this->numThreadRequests++;
+                this->m_thread_requests++;
                 holder.setPushStatus();
 
                 lck.unlock();
-                auto ret = gempba::args_handler::unpack_and_push_non_void(*thread_pool, f, holder.getArgs());
+                auto ret = gempba::args_handler::unpack_and_push_non_void(*m_thread_pool, f, holder.getArgs());
                 holder.hold_future(std::move(ret));
                 return true;
             } else {
                 lck.unlock();
-                if (_loadBalancingStrategy == QUASI_HORIZONTAL) {
+                if (m_load_balancing_strategy == QUASI_HORIZONTAL) {
                     auto ret = this->forward<Ret>(f, id, holder, true);
                     holder.hold_actual_result(ret);
                 } else {
@@ -200,56 +200,56 @@ namespace gempba {
         //</editor-fold>
 
         void set_load_balancing_strategy(load_balancing_strategy strategy) {
-            this->_loadBalancingStrategy = strategy;
+            this->m_load_balancing_strategy = strategy;
         };
 
         load_balancing_strategy get_load_balancing_strategy() const {
-            return _loadBalancingStrategy;
+            return m_load_balancing_strategy;
         }
 
         double getPoolIdleTime() {
-            return thread_pool->idle_time() / (double) processor_count;
+            return m_thread_pool->idle_time() / (double) m_processor_count;
         }
 
         int getPoolSize() const {
-            return (int) this->thread_pool->size();
+            return (int) this->m_thread_pool->size();
         }
 
         void initThreadPool(int poolSize) {
-            this->processor_count = poolSize;
-            thread_pool = std::make_unique<ThreadPool::Pool>(poolSize);
+            this->m_processor_count = poolSize;
+            m_thread_pool = std::make_unique<ThreadPool::Pool>(poolSize);
         }
 
         void lock() {
-            this->mtx.lock();
+            this->m_mutex.lock();
         }
 
         void unlock() {
-            this->mtx.unlock();
+            this->m_mutex.unlock();
         }
 
         // seconds
         double idle_time() {
-            double nanoseconds = (double) idleTime / ((double) processor_count + 1.0);
+            double nanoseconds = (double) m_idle_time / ((double) m_processor_count + 1.0);
             return (double) nanoseconds * 1.0e-9; // convert to seconds
         }
 
         void holdSolution(auto &bestLocalSolution) {
-            std::unique_lock<std::mutex> lck(mtx);
-            this->bestSolution = std::make_any<decltype(bestLocalSolution)>(bestLocalSolution);
+            std::unique_lock<std::mutex> lck(m_mutex);
+            this->m_best_solution = std::make_any<decltype(bestLocalSolution)>(bestLocalSolution);
         }
 
         void holdSolution(int refValueLocal, auto &solution, auto &serializer) {
-            std::unique_lock<std::mutex> lck(mtx);
+            std::unique_lock<std::mutex> lck(m_mutex);
 
             const auto v_packet = static_cast<task_packet>(serializer(solution));
 
-            this->bestSolution_serialized = {refValueLocal, v_packet};
+            this->m_best_solution_serialized = {refValueLocal, v_packet};
         }
 
         // get number of successful thread requests
         size_t number_thread_requests() {
-            return numThreadRequests.load();
+            return m_thread_requests.load();
         }
 
         void set_goal(const goal p_goal) {
@@ -259,9 +259,9 @@ namespace gempba {
                     return; // maximise by default
                 }
                 case MINIMISE: {
-                    refValueLocal = INT_MAX;
+                    m_reference_value = INT_MAX;
                     #if GEMPBA_MULTIPROCESSING
-                    mpiScheduler->set_goal(MINIMISE); // TODO redundant
+                    m_mpi_scheduler->set_goal(MINIMISE); // TODO redundant
                     #endif
                 }
             };
@@ -271,7 +271,7 @@ namespace gempba {
         // get number for this rank
         int rank_me() {
             #if GEMPBA_MULTIPROCESSING
-            return mpiScheduler->rank_me();
+            return m_mpi_scheduler->rank_me();
             #else
             return -1; // no multiprocessing enabled
             #endif
@@ -285,7 +285,7 @@ namespace gempba {
         */
         void wait() {
             utils::print_mpi_debug_comments("Main thread waiting results \n");
-            this->thread_pool->wait();
+            this->m_thread_pool->wait();
         }
 
         // wall time
@@ -299,15 +299,15 @@ namespace gempba {
         }
 
         bool has_result() {
-            return bestSolution.has_value();
+            return m_best_solution.has_value();
         }
 
         bool isDone() {
-            return thread_pool->hasFinished();
+            return m_thread_pool->hasFinished();
         }
 
         void clear_result() {
-            bestSolution.reset();
+            m_best_solution.reset();
         }
 
 
@@ -319,11 +319,11 @@ namespace gempba {
         [[nodiscard]] auto fetchSolution() -> SolutionType {
             // fetching results caught by the library=
 
-            return std::any_cast<SolutionType>(bestSolution);
+            return std::any_cast<SolutionType>(m_best_solution);
         }
 
         int refValue() const {
-            return refValueLocal;
+            return m_reference_value;
         }
 
         /**
@@ -331,7 +331,7 @@ namespace gempba {
          * @param refValue first approximation of the best reference value of the solution
          */
         void setRefValue(int refValue) {
-            this->refValueLocal = refValue;
+            this->m_reference_value = refValue;
         }
 
         /**
@@ -343,17 +343,17 @@ namespace gempba {
         * @return True if the reference value was successfully updated, false otherwise.
         */
         bool updateRefValue(int new_refValue, int *mostUpToDate = nullptr) {
-            std::scoped_lock<std::mutex> lck(mtx);
+            std::scoped_lock<std::mutex> lck(m_mutex);
 
-            const bool v_is_reference_value_increasing = m_goal == MAXIMISE && new_refValue > refValueLocal;
-            const bool v_is_reference_value_decreasing = m_goal == MINIMISE && new_refValue < refValueLocal;
+            const bool v_is_reference_value_increasing = m_goal == MAXIMISE && new_refValue > m_reference_value;
+            const bool v_is_reference_value_decreasing = m_goal == MINIMISE && new_refValue < m_reference_value;
             if (v_is_reference_value_increasing || v_is_reference_value_decreasing) {
-                refValueLocal = new_refValue;
+                m_reference_value = new_refValue;
                 return true;
             }
 
             if (mostUpToDate) {
-                *mostUpToDate = refValueLocal;
+                *mostUpToDate = m_reference_value;
             }
             return false;
         }
@@ -372,8 +372,8 @@ namespace gempba {
         template<typename Ret, typename F, typename HolderType, std::enable_if_t<std::is_void_v<Ret>, int> = 0>
         void force_push(F &f, int id, HolderType &holder) {
             holder.setPushStatus();
-            dlb.prune(&holder);
-            gempba::args_handler::unpack_and_push_void(*thread_pool, f, holder.getArgs());
+            m_load_balancer.prune(&holder);
+            gempba::args_handler::unpack_and_push_void(*m_thread_pool, f, holder.getArgs());
         }
 
         /**
@@ -389,7 +389,7 @@ namespace gempba {
         template<typename Ret, typename F, typename HolderType, std::enable_if_t<!std::is_void_v<Ret>, int> = 0>
         void force_push(F &f, int id, HolderType &holder) {
             holder.setPushStatus();
-            dlb.prune(&holder);
+            m_load_balancer.prune(&holder);
             gempba::args_handler::unpack_and_forward_non_void(f, id, holder.getArgs(), holder);
         }
 
@@ -433,8 +433,8 @@ namespace gempba {
             if (holder.is_pushed())
                 return;
             #endif
-            if (_loadBalancingStrategy == QUASI_HORIZONTAL) {
-                dlb.checkLeftSibling(&holder); // it checks if root must be moved
+            if (m_load_balancing_strategy == QUASI_HORIZONTAL) {
+                m_load_balancer.checkLeftSibling(&holder); // it checks if root must be moved
             }
 
             holder.setForwardStatus();
@@ -449,8 +449,8 @@ namespace gempba {
                 return holder.get();
             }
 
-            if (_loadBalancingStrategy == QUASI_HORIZONTAL) {
-                dlb.checkLeftSibling(&holder);
+            if (m_load_balancing_strategy == QUASI_HORIZONTAL) {
+                m_load_balancer.checkLeftSibling(&holder);
             }
 
             return forward<Ret>(f, threadId, holder);
@@ -460,12 +460,12 @@ namespace gempba {
         #if GEMPBA_MULTIPROCESSING
 
     private:
-        gempba::scheduler_parent *mpiScheduler = nullptr;
-        std::mutex mtx_MPI; // mutex to ensure MPI_THREAD_SERIALIZED
-        int world_rank = -1; // get the rank of the process
-        int world_size = -1; // get the number of processes/nodes
-        char processor_name[128]{}; // name of the node
-        MPI_Comm *world_Comm = nullptr; // world communicator MPI
+        scheduler_parent *m_mpi_scheduler = nullptr;
+        std::mutex m_mpi_mutex; // mutex to ensure MPI_THREAD_SERIALIZED
+        int m_world_rank = -1; // get the rank of the process
+        int m_world_size = -1; // get the number of processes/nodes
+        char m_processor_name[128]{}; // name of the node
+        MPI_Comm *m_world_communicator = nullptr; // world communicator MPI
 
 
         bool push_multiprocess(int id, auto &holder, auto &&serializer) {
@@ -478,10 +478,10 @@ namespace gempba {
                 NOTE: if top holder found, it'll keep trying to find more
             */
             while (true) {
-                std::unique_lock<std::mutex> lck(mtx_MPI, std::defer_lock);
+                std::unique_lock<std::mutex> lck(m_mpi_mutex, std::defer_lock);
                 if (lck.try_lock()) {
                     // if mutex acquired, other threads will jump this section
-                    if (mpiScheduler->open_sending_channel()) {
+                    if (m_mpi_scheduler->open_sending_channel()) {
                         auto getBuffer = [&serializer](auto &tuple) {
                             return std::apply(serializer, tuple);
                         };
@@ -496,9 +496,9 @@ namespace gempba {
                             }
 
                             task_packet v_buffer = getBuffer(holder.getArgs());
-                            mpiScheduler->push(std::move(v_buffer)); // this closes the sending channel internally
+                            m_mpi_scheduler->push(std::move(v_buffer)); // this closes the sending channel internally
                             holder.setMPISent();
-                            dlb.prune(&holder);
+                            m_load_balancer.prune(&holder);
                             return true;
                         }
                     }
@@ -535,24 +535,24 @@ namespace gempba {
 
     public:
         MPI_Comm &getCommunicator() {
-            return *world_Comm;
+            return *m_world_communicator;
         }
 
         // if multiprocessing, BranchHandler should have access to the mpi scheduler
         void passMPIScheduler(scheduler_parent *mpiScheduler) {
-            this->mpiScheduler = mpiScheduler;
-            this->world_rank = this->mpiScheduler->rank_me();
+            this->m_mpi_scheduler = mpiScheduler;
+            this->m_world_rank = this->m_mpi_scheduler->rank_me();
         }
 
         int getWorldRank() const {
-            return world_rank;
+            return m_world_rank;
         }
 
 
         //<editor-fold desc="In construction... non-void  functions">
         template<typename Ret, typename HolderType, typename Serialize, std::enable_if_t<!std::is_void_v<Ret>, int> = 0>
         void reply(Serialize &&serialize, HolderType &holder, int src) {
-            utils::print_mpi_debug_comments("rank {} entered reply! \n", world_rank);
+            utils::print_mpi_debug_comments("rank {} entered reply! \n", m_world_rank);
             // default construction of a return type "Ret"
             Ret res; // TODO .. why in separate lines?
             res = holder.get();
@@ -566,29 +566,29 @@ namespace gempba {
 
                 int v_ref_value_local = refValue();
                 task_packet v_candidate{v_buffer};
-                bestSolution_serialized = {v_ref_value_local, v_candidate};
+                m_best_solution_serialized = {v_ref_value_local, v_candidate};
 
             } else {
                 // some other node requested help, and it is surely waiting for the return value
 
-                utils::print_mpi_debug_comments("rank {} about to reply to {}! \n", world_rank, src);
-                std::unique_lock<std::mutex> lck(mtx_MPI); // no other thread can retrieve nor send via MPI
+                utils::print_mpi_debug_comments("rank {} about to reply to {}! \n", m_world_rank, src);
+                std::unique_lock<std::mutex> lck(m_mpi_mutex); // no other thread can retrieve nor send via MPI
 
                 std::stringstream ss;
                 serialize(ss, res);
                 int count = ss.str().size();
                 task_packet v_task_packet(ss.str());
 
-                int err = MPI_Ssend(v_task_packet.data(), count, MPI_BYTE, src, 0, *world_Comm); // this might be wrong anyway due to the tag
+                int err = MPI_Ssend(v_task_packet.data(), count, MPI_BYTE, src, 0, *m_world_communicator); // this might be wrong anyway due to the tag
                 if (err != MPI_SUCCESS) {
-                    spdlog::error("result could not be sent from rank {} to rank {}! \n", world_rank, src);
+                    spdlog::error("result could not be sent from rank {} to rank {}! \n", m_world_rank, src);
                 }
             }
         }
 
         template<typename Ret, typename HolderType, typename Serialize, std::enable_if_t<std::is_void_v<Ret>, int> = 0>
         void reply(Serialize &&, HolderType &, int) {
-            thread_pool->wait();
+            m_thread_pool->wait();
         }
 
         //</editor-fold>
@@ -599,24 +599,24 @@ namespace gempba {
          */
         template<typename HolderType>
         bool try_top_holder(auto &getBuffer, HolderType &holder) {
-            if (_loadBalancingStrategy == QUASI_HORIZONTAL) {
-                HolderType *upperHolder = dlb.find_top_holder(&holder); //  if it finds it, then the root has already been lowered
+            if (m_load_balancing_strategy == QUASI_HORIZONTAL) {
+                HolderType *upperHolder = m_load_balancer.find_top_holder(&holder); //  if it finds it, then the root has already been lowered
                 if (upperHolder) {
                     if (upperHolder->isTreated())
                         throw std::runtime_error("Attempt to push a treated holder\n");
 
                     if (upperHolder->evaluate_branch_checkIn()) {
-                        upperHolder->setMPISent(true, mpiScheduler->next_process());
+                        upperHolder->setMPISent(true, m_mpi_scheduler->next_process());
                         task_packet v_buffer = getBuffer(upperHolder->getArgs());
-                        mpiScheduler->push(std::move(v_buffer));
+                        m_mpi_scheduler->push(std::move(v_buffer));
                     } else {
                         upperHolder->setDiscard();
                         // WARNING, ATTENTION, CUIDADO! holder discarded, flagged as sent but not really sent, then sendingChannel should be released!!!!
-                        mpiScheduler->close_sending_channel();
+                        m_mpi_scheduler->close_sending_channel();
                     }
                     return true; // top holder found whether discarded or pushed
                 }
-                dlb.pop_left_sibling(&holder); // pops holder from parent's children
+                m_load_balancer.pop_left_sibling(&holder); // pops holder from parent's children
             }
             return false; // top holder not found
         }
@@ -643,8 +643,8 @@ namespace gempba {
                 // return {}; // nope, if it was pushed, then the result should be retrieved in here
             }
 
-            if (_loadBalancingStrategy == QUASI_HORIZONTAL) {
-                dlb.checkLeftSibling(&holder);
+            if (m_load_balancing_strategy == QUASI_HORIZONTAL) {
+                m_load_balancer.checkLeftSibling(&holder);
             }
 
             return forward<Ret>(f, threadId, holder);
@@ -670,7 +670,7 @@ namespace gempba {
 
             utils::print_mpi_debug_comments("About to build Decoder");
             std::function<std::shared_ptr<ResultHolderParent>(task_packet)> decoder = [this, &callable, &deserializer](task_packet p_packet) {
-                std::shared_ptr<ResultHolderParent> smart_ptr = std::make_shared<HolderType>(dlb, -1);
+                std::shared_ptr<ResultHolderParent> smart_ptr = std::make_shared<HolderType>(m_load_balancer, -1);
                 auto *holder = dynamic_cast<HolderType *>(smart_ptr.get());
 
                 std::stringstream ss;
@@ -693,10 +693,10 @@ namespace gempba {
         // this returns a lambda function which returns the best results as raw data
         [[nodiscard]] std::function<result()> constructResultFetcher() {
             return [this]() {
-                if (bestSolution_serialized.get_reference_value() == -1) {
+                if (m_best_solution_serialized.get_reference_value() == -1) {
                     return result::EMPTY;
                 } else {
-                    return bestSolution_serialized;
+                    return m_best_solution_serialized;
                 }
             };
         }
