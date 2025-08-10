@@ -410,7 +410,6 @@ namespace gempba {
             while (true) {
                 int v_buffer;
                 int v_buffer_char_count = 0;
-                task_packet *v_buffer_packet = nullptr;
                 MPI_Status status;
 
                 int flag;
@@ -442,24 +441,20 @@ namespace gempba {
                 }
 
                 // at this point, probe succeeded => there is something to receive
-                if (status.MPI_TAG == TASK_FOR_CENTER) {
-
-                    MPI_Get_count(&status, MPI_BYTE, &v_buffer_char_count);
-                    v_buffer_packet = new task_packet(v_buffer_char_count);
-                    MPI_Recv(v_buffer_packet->data(), v_buffer_char_count, MPI_BYTE, status.MPI_SOURCE, status.MPI_TAG, m_world_comm, &status);
-                } else {
-                    v_buffer = consume_int_message(status, m_world_comm);
-                }
 
                 switch (status.MPI_TAG) {
                     case STATE_RUNNING: // received if and only if a worker receives from other but center
                     {
+                        consume_int_message(status, m_world_comm);
+
                         m_process_state[status.MPI_SOURCE] = STATE_RUNNING; // node was assigned, now it's running
                         m_nodes_running++;
                         m_total_requests++;
                     }
                     break;
                     case STATE_AVAILABLE: {
+                        consume_int_message(status, m_world_comm);
+
                         #ifdef GEMPBA_DEBUG_COMMENTS
                         spdlog::debug("center received state_available from rank {}\n", status.MPI_SOURCE);
                         #endif
@@ -473,7 +468,7 @@ namespace gempba {
                         /* if center reaches this point, for sure nodes have attained a better reference value
                                 or they are not up-to-date, thus it is required to broadcast it whether this value
                                 changes or not  */
-                        const int v_reference_global_candidate = v_buffer;
+                        const int v_reference_global_candidate = consume_int_message(status, m_world_comm);
 
                         #ifdef GEMPBA_DEBUG_COMMENTS
                         spdlog::debug("center received refValue {} from rank {}\n", v_reference_global_candidate, status.MPI_SOURCE);
@@ -504,9 +499,10 @@ namespace gempba {
                     break;
                     case TASK_FOR_CENTER: {
 
-                        if (v_buffer_packet == nullptr) {
-                            throw std::runtime_error("v_buffer_packet is nullptr, this should not happen");
-                        }
+                        // receives task from worker
+                        MPI_Get_count(&status, MPI_BYTE, &v_buffer_char_count);
+                        task_packet *v_buffer_packet = new task_packet(v_buffer_char_count);
+                        MPI_Recv(v_buffer_packet->data(), v_buffer_char_count, MPI_BYTE, status.MPI_SOURCE, status.MPI_TAG, m_world_comm, &status);
 
                         task_packet msg{*v_buffer_packet}; //copy
                         m_center_queue.push(msg);
@@ -540,8 +536,7 @@ namespace gempba {
             }
 
             std::cout << "CENTER HAS TERMINATED" << std::endl;
-            std::cout << "Max queue size = " << m_max_queue_size << ",   Peak memory (MB) = " << getPeakRSS() / (1024 * 1024)
-                    << std::endl;
+            std::cout << "Max queue size = " << m_max_queue_size << ",   Peak memory (MB) = " << getPeakRSS() / (1024 * 1024) << std::endl;
 
             /*
             after breaking the previous loop, all jobs are finished and the only remaining step
