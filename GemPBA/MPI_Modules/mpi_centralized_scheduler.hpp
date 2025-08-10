@@ -422,6 +422,12 @@ namespace gempba {
             }
         }
 
+        int consume_int_message(MPI_Status status, const MPI_Comm &p_communicator) {
+            int v_buffer;
+            MPI_Recv(&v_buffer, 1, MPI_INT, status.MPI_SOURCE, status.MPI_TAG, p_communicator, &status);
+            return v_buffer;
+        }
+
         /*	run the center node */
         void run_center(task_packet &p_seed) override {
             task_packet v_task_packet = p_seed;
@@ -472,7 +478,7 @@ namespace gempba {
                     v_buffer_packet = new task_packet(v_buffer_char_count);
                     MPI_Recv(v_buffer_packet->data(), v_buffer_char_count, MPI_BYTE, status.MPI_SOURCE, status.MPI_TAG, m_world_comm, &status);
                 } else {
-                    MPI_Recv(&v_buffer, 1, MPI_INT, status.MPI_SOURCE, status.MPI_TAG, m_world_comm, &status);
+                    v_buffer = consume_int_message(status, m_world_comm);
                 }
 
                 switch (status.MPI_TAG) {
