@@ -273,6 +273,7 @@ namespace gempba {
 
             const auto v_packet = static_cast<task_packet>(p_serializer(p_new_result));
             this->m_best_solution_serialized = {p_new_reference_value, v_packet};
+            this->m_reference_value = p_new_reference_value;
 
             return true;
         }
