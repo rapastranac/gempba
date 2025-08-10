@@ -178,7 +178,7 @@ private:
             int SZ = graph.coverSize(); // debuggin line
             branchHandler.hold_solution(graph);
 
-            branchHandler.update_reference_value(graph.coverSize());
+            branchHandler.try_update_reference_value(graph.coverSize());
             foundAtDepth = depth;
             recurrent_msg(id);
 

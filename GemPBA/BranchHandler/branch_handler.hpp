@@ -341,7 +341,7 @@ namespace gempba {
         * If nullptr, the most up-to-date value is not retrieved.
         * @return True if the reference value was successfully updated, false otherwise.
         */
-        bool update_reference_value(const int p_new_ref_value, int *p_most_up_to_date = nullptr) {
+        bool try_update_reference_value(const int p_new_ref_value, int *p_most_up_to_date = nullptr) {
             std::scoped_lock<std::mutex> lck(m_mutex);
 
             if (should_update_result(p_new_ref_value)) {
