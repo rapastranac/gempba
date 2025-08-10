@@ -286,7 +286,7 @@ namespace gempba {
         * @param p_new_ref_value the most promising new reference value for the solution in the scope calling this method
         * @return True if the reference value was successfully updated, false otherwise.
         */
-        bool try_update_reference_value(const int p_new_ref_value) {
+        bool try_update_reference_value_and_invalidate_result(const int p_new_ref_value) {
             std::scoped_lock<std::mutex> v_lock(m_mutex);
 
             if (should_update_result(p_new_ref_value)) {
