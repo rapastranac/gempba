@@ -2,17 +2,14 @@
 #define MP_BITVECT_OPT_ENC_CENTRAL_HPP
 
 
-#include "VertexCover.hpp"
 #include <atomic>
-#include <array>
-#include <random>
-#include <spdlog/spdlog.h>
 #include <functional>
-#include <utils/ipc/task_packet.hpp>
-
+#include <random>
 #include <boost/dynamic_bitset.hpp>
-#include <boost/container/set.hpp>
-#include <boost/unordered_set.hpp>
+#include <spdlog/spdlog.h>
+
+#include <utils/ipc/task_packet.hpp>
+#include "VertexCover.hpp"
 
 using namespace boost;
 
@@ -87,6 +84,7 @@ std::function<gempba::task_packet(T&)> make_single_serializer() {
         return v_ser;
     };
 }
+
 
 void helper_dser(auto &archive, auto &first) {
     archive >> first;

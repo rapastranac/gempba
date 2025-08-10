@@ -1,25 +1,19 @@
- #ifndef MP_BITVECT_BASIC_ENC_CENTRAL_HPP
+#ifndef MP_BITVECT_BASIC_ENC_CENTRAL_HPP
 #define MP_BITVECT_BASIC_ENC_CENTRAL_HPP
 
 
-#include "VertexCover.hpp"
 #include <atomic>
-#include <array>
-#include <random>
-#include <spdlog/spdlog.h>
-
-#include <map>
-#include <boost/dynamic_bitset.hpp>
-#include <boost/container/set.hpp>
-#include <boost/unordered_set.hpp>
-#include <boost/unordered_map.hpp>
-#include <boost/container/flat_map.hpp>
 #include <format>
 #include <functional>
-#include <utils/ipc/task_packet.hpp>
-
-
+#include <map>
 #include <memory_resource>
+#include <random>
+#include <boost/dynamic_bitset.hpp>
+#include <boost/container/flat_map.hpp>
+#include <spdlog/spdlog.h>
+
+#include <utils/ipc/task_packet.hpp>
+#include "VertexCover.hpp"
 
 using namespace boost;
 
@@ -135,12 +129,12 @@ auto serializer = [](auto &&... args) {
 };
 
 template<typename T>
-std::function<gempba::task_packet(T&)> make_single_serializer() {
-     return [&](T &p_arg) {
-         gempba::task_packet v_ser = serializer(p_arg);
-         return v_ser;
-     };
- }
+std::function<gempba::task_packet(T &)> make_single_serializer() {
+    return [&](T &p_arg) {
+        gempba::task_packet v_ser = serializer(p_arg);
+        return v_ser;
+    };
+}
 
 void helper_dser(auto &archive, auto &first) {
     archive >> first;

@@ -1,34 +1,35 @@
 ﻿#ifndef BRANCHHANDLER_H
 #define BRANCHHANDLER_H
 
-#include "args_handler.hpp"
+#include <any>
+#include <atomic>
+#include <climits>
+#include <cmath>
+#include <functional>
+#include <list>
+#include <mutex>
+#include <thread>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <bits/stdc++.h>
+#include <sys/time.h>
+
+#include <BranchHandler/ThreadPool.hpp>
+#include <BranchHandler/args_handler.hpp>
 #include <DLB/DLB_Handler.hpp>
-#include "ThreadPool.hpp"
-#include "utils/utils.hpp"
-#include "utils/gempba_utils.hpp"
-#include "MPI_Modules/mpi_scheduler.hpp"
+#include <MPI_Modules/mpi_scheduler.hpp>
+#include <utils/gempba_utils.hpp>
+#include <utils/utils.hpp>
 
 
 #if GEMPBA_MULTIPROCESSING
 
-#include <mpi.h>
 #include <cstdio>
+#include <mpi.h>
 
 #endif
 
-#include <any>
-#include <atomic>
-#include <bits/stdc++.h>
-#include <climits>
-#include <list>
-#include <cmath>
-#include <mutex>
-#include <sys/time.h>
-#include <tuple>
-#include <type_traits>
-#include <typeinfo>
-#include <utility>
-#include <thread>
 
 /*
  * Created by Andres Pastrana on 2019
@@ -254,7 +255,7 @@ namespace gempba {
          * @param p_serializer a function that serializes the result into a string
          */
         template<typename T>
-        void try_update_result(T &p_new_result, int p_new_reference_value, std::function<task_packet(T&)> &p_serializer) {
+        void try_update_result(T &p_new_result, int p_new_reference_value, std::function<task_packet(T &)> &p_serializer) {
             std::unique_lock v_lock(m_mutex);
 
             if (!should_update_result(p_new_reference_value)) {
