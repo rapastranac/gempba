@@ -240,7 +240,7 @@ namespace gempba {
         }
 
         template<typename T>
-        void try_update_result(int p_new_reference_value, T &p_new_result, std::function<task_packet(T&)> &p_serializer) {
+        void try_update_result(T &p_new_result, int p_new_reference_value, std::function<task_packet(T&)> &p_serializer) {
             std::unique_lock v_lock(m_mutex);
 
             const auto v_packet = static_cast<task_packet>(p_serializer(p_new_result));
