@@ -503,20 +503,24 @@ namespace gempba {
                         /* if center reaches this point, for sure nodes have attained a better reference value
                                 or they are not up-to-date, thus it is required to broadcast it whether this value
                                 changes or not  */
-                        #ifdef GEMPBA_DEBUG_COMMENTS
-                        spdlog::debug("center received refValue {} from rank {}\n", v_buffer, status.MPI_SOURCE);
-                        #endif
-                        bool signal = false;
+                        const int v_reference_global_candidate = v_buffer;
 
-                        if ((m_goal == MAXIMISE && v_buffer > m_ref_value_global) || (m_goal == MINIMISE && v_buffer < m_ref_value_global)) {
-                            m_ref_value_global = v_buffer;
-                            signal = true;
+                        #ifdef GEMPBA_DEBUG_COMMENTS
+                        spdlog::debug("center received refValue {} from rank {}\n", v_reference_global_candidate, status.MPI_SOURCE);
+                        #endif
+
+
+                        bool v_should_broadcast = should_broadcast_global(m_goal, m_ref_value_global, v_reference_global_candidate);
+
+                        if (v_should_broadcast) {
+                            m_ref_value_global = v_reference_global_candidate;
+                            v_should_broadcast = true;
                             for (int rank = 1; rank < m_world_size; rank++) {
                                 MPI_Send(&m_ref_value_global, 1, MPI_INT, rank, REFVAL_UPDATE_TAG, m_ref_value_global_communicator);
                             }
                         }
 
-                        if (signal) {
+                        if (v_should_broadcast) {
                             static int success = 0;
                             success++;
                             spdlog::debug("refValueGlobal updated to : {} by rank {}\n", m_ref_value_global, status.MPI_SOURCE);
@@ -807,15 +811,21 @@ namespace gempba {
          * ---------------------------------------------------------------------------------*/
 
         static bool should_update_global(const goal p_goal, const int p_global_reference_value, const int p_local_reference_value) {
-            const bool local_max_is_better = p_goal == MAXIMISE && p_local_reference_value > p_global_reference_value;
-            const bool local_min_is_better = p_goal == MINIMISE && p_local_reference_value < p_global_reference_value;
-            return local_max_is_better || local_min_is_better;
+            return should_update(p_goal, p_global_reference_value, p_local_reference_value);
         }
 
         static bool should_update_local(const goal p_goal, const int p_global_reference_value, const int p_local_reference_value) {
-            const bool global_max_is_better = p_goal == MAXIMISE && p_global_reference_value > p_local_reference_value;
-            const bool global_min_is_better = p_goal == MINIMISE && p_global_reference_value < p_local_reference_value;
-            return global_max_is_better || global_min_is_better;
+            return should_update(p_goal, p_local_reference_value, p_global_reference_value);
+        }
+
+        static bool should_broadcast_global(const goal p_goal, const int p_old_global, const int p_new_global) {
+            return should_update(p_goal, p_old_global, p_new_global);
+        }
+
+        static bool should_update(const goal p_goal, const int p_old_value, const int p_new_value) {
+            const bool new_max_is_better = p_goal == MAXIMISE && p_new_value > p_old_value;
+            const bool new_min_is_better = p_goal == MINIMISE && p_new_value < p_old_value;
+            return new_max_is_better || new_min_is_better;
         }
     };
 
