@@ -239,16 +239,18 @@ namespace gempba {
          * @tparam T Type of the result
          * @param p_new_result the most promising new result for the solution in the scope calling this method
          * @param p_new_reference_value the most promising new reference value that represents the result
+        * @return True if the result was successfully updated, false otherwise.
          */
         template<typename T>
-        void try_update_result(T &p_new_result, const int p_new_reference_value) {
+        bool try_update_result(T &p_new_result, const int p_new_reference_value) {
             std::unique_lock v_lock(m_mutex);
             if (!should_update_result(p_new_reference_value)) {
-                return;
+                return false;
             }
 
             this->m_best_solution = std::make_any<decltype(p_new_result)>(p_new_result);
             this->m_reference_value = p_new_reference_value;
+            return true;
         }
 
         /**
@@ -259,18 +261,20 @@ namespace gempba {
          * @param p_new_result the most promising new result for the solution in the scope calling this method
          * @param p_new_reference_value the most promising new reference value that represents the result
          * @param p_serializer a function that serializes the result into a string
+         * @return True if the result was successfully updated, false otherwise.
          */
         template<typename T>
-        void try_update_result(T &p_new_result, int p_new_reference_value, std::function<task_packet(T &)> &p_serializer) {
+        bool try_update_result(T &p_new_result, int p_new_reference_value, std::function<task_packet(T &)> &p_serializer) {
             std::unique_lock v_lock(m_mutex);
 
             if (!should_update_result(p_new_reference_value)) {
-                return;
+                return false;
             }
 
             const auto v_packet = static_cast<task_packet>(p_serializer(p_new_result));
-
             this->m_best_solution_serialized = {p_new_reference_value, v_packet};
+
+            return true;
         }
 
         /**
