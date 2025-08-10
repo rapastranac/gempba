@@ -243,6 +243,10 @@ namespace gempba {
         void try_update_result(T &p_new_result, int p_new_reference_value, std::function<task_packet(T&)> &p_serializer) {
             std::unique_lock v_lock(m_mutex);
 
+            if (!should_update_result(p_new_reference_value)) {
+                return;
+            }
+
             const auto v_packet = static_cast<task_packet>(p_serializer(p_new_result));
 
             this->m_best_solution_serialized = {p_new_reference_value, v_packet};
