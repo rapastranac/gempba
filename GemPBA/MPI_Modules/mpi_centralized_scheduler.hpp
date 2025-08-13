@@ -1,4 +1,3 @@
-#pragma once
 #ifndef MPI_SCHEDULER_CENTRALIZED_HPP
 #define MPI_SCHEDULER_CENTRALIZED_HPP
 
@@ -42,7 +41,8 @@
 #define STATE_AVAILABLE 3
 
 #define TERMINATION_TAG 6
-#define REFVAL_UPDATE_TAG 9
+#define REFVAL_PROPOSAL_TAG 9
+#define REFVAL_UPDATE_TAG 10
 
 #define TASK_FROM_CENTER_TAG 12
 
@@ -190,49 +190,39 @@ namespace gempba {
                       std::function<result()> &p_result_fetcher) override {
             MPI_Barrier(m_world_comm);
 
+            bool v_is_terminated = false;
             while (true) {
-                MPI_Status status;
-                int count; // count to be received
-                int flag = 0;
+                const MPI_Status status = probe_communicators_on_worker();
 
-                while (!flag) // this allows  to receive refValue or nextProcess even if this process has turned into waiting mode
-                {
-                    if (probe_reference_value()) // different communicator
-                        continue; // center might update this value even if this process is idle
-
-                    if (probe_center_request()) // different communicator
-                        continue; // center might update this value even if this process is idle
-
-                    MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, m_world_comm, &flag, &status); // for regular messages
-                    if (flag)
+                switch (status.MPI_TAG) {
+                    case TERMINATION_TAG: {
+                        process_termination(status);
+                        v_is_terminated = true;
                         break;
+                    }
+                    case REFVAL_UPDATE_TAG: {
+                        receive_reference_value_from_center(status);
+                        break;
+                    }
+                    case CENTER_IS_FULL_TAG: {
+                        consume_center_is_full_tag(status);
+                        break;
+                    }
+                    case CENTER_IS_FREE_TAG: {
+                        consume_center_is_free_tag(status);
+                        break;
+                    }
+                    case TASK_FROM_CENTER_TAG: {
+                        process_message(p_branch_handler, p_buffer_decoder, status);
+                        break;
+                    }
+                    default: {
+                        // nothing
+                    };
                 }
-                MPI_Get_count(&status, MPI_BYTE, &count); // receives total number of datatype elements of the message
 
-                utils::print_mpi_debug_comments("rank {}, received message from rank {}, tag {}, count : {}\n", m_world_rank, status.MPI_SOURCE, status.MPI_TAG, count);
-
-                task_packet v_task_packet(count);
-                MPI_Recv(v_task_packet.data(), count, MPI_BYTE, MPI_ANY_SOURCE, MPI_ANY_TAG, m_world_comm, &status);
-
-                if (is_terminated(status.MPI_TAG)) {
-                    break;
-                }
-
-                if (status.MPI_TAG == TASK_FROM_CENTER_TAG) {
-
-                    notify_running_state();
-                    m_number_tasks_received++;
-
-                    utils::print_mpi_debug_comments("rank {}, pushing buffer to thread pool", m_world_rank, status.MPI_SOURCE);
-                    //  push to the thread pool *********************************************************************
-                    std::shared_ptr<ResultHolderParent> v_holder = p_buffer_decoder(v_task_packet); // holder might be useful for non-void functions
-                    utils::print_mpi_debug_comments("... DONE\n", m_world_rank, status.MPI_SOURCE);
-                    // **********************************************************************************************
-
-                    task_funneling(p_branch_handler);
-                    notify_available_state();
-
-                    // TODO: refVal
+                if (v_is_terminated) {
+                    break; // exit loop
                 }
             }
             /**
@@ -265,50 +255,146 @@ namespace gempba {
         }
 
     private:
-        // when a node is working, it loops through here
-        void task_funneling(branch_handler &p_branch_handler);
-
         // checks for a ref value update from center
-        int probe_reference_value() {
-            int flag = 0;
-            MPI_Status status;
-            MPI_Iprobe(CENTER, REFVAL_UPDATE_TAG, m_ref_value_global_communicator, &flag, &status);
-
-            if (flag) {
-                utils::print_mpi_debug_comments("rank {}, about to receive refValue from Center\n", m_world_rank);
-                MPI_Recv(&m_ref_value_global, 1, MPI_INT, CENTER, REFVAL_UPDATE_TAG, m_ref_value_global_communicator, &status);
-                utils::print_mpi_debug_comments("rank {}, received refValue: {} from Center\n", m_world_rank, m_ref_value_global);
+        void maybe_receive_reference_value_from_center() {
+            std::optional<MPI_Status> opt = probe_reference_value_comm();
+            if (opt.has_value()) {
+                receive_reference_value_from_center(opt.value());
             }
+        }
 
-            return flag;
+        void process_message(branch_handler &p_branch_handler, const std::function<std::shared_ptr<ResultHolderParent>(task_packet)> &p_buffer_decoder, MPI_Status p_status) {
+            // Receives the task  -------------------------------------------------------------------------------------------
+            int count;
+            MPI_Get_count(&p_status, MPI_BYTE, &count);
+
+            task_packet v_task_packet(count);
+            MPI_Recv(v_task_packet.data(), count, MPI_BYTE, p_status.MPI_SOURCE, p_status.MPI_TAG, m_world_comm, &p_status);
+
+            utils::print_mpi_debug_comments("rank {}, received message from rank {}, tag {}, count : {}\n", m_world_rank, p_status.MPI_SOURCE, p_status.MPI_TAG, count);
+
+            // Here, we have a task to process  -----------------------------------------------------------------------------
+            notify_running_state();
+            m_number_tasks_received++;
+
+            utils::print_mpi_debug_comments("rank {}, pushing buffer to thread pool", m_world_rank, p_status.MPI_SOURCE);
+
+            //  push to the thread pool *********************************************************************
+            std::shared_ptr<ResultHolderParent> v_holder = p_buffer_decoder(v_task_packet); // holder might be useful for non-void functions
+            utils::print_mpi_debug_comments("... DONE\n", m_world_rank, p_status.MPI_SOURCE);
+            // **********************************************************************************************
+
+            task_funneling(p_branch_handler);
+            notify_available_state();
+        }
+
+        void receive_reference_value_from_center(MPI_Status status) {
+            utils::print_mpi_debug_comments("rank {}, about to receive refValue from Center\n", m_world_rank);
+            MPI_Recv(&m_ref_value_global, 1, MPI_INT, CENTER, REFVAL_UPDATE_TAG, m_ref_value_global_communicator, &status);
+            utils::print_mpi_debug_comments("rank {}, received refValue: {} from Center\n", m_world_rank, m_ref_value_global);
+        }
+
+        void process_termination(MPI_Status p_status) {
+
+            MPI_Recv(nullptr, 0, MPI_BYTE, p_status.MPI_SOURCE, TERMINATION_TAG, m_world_comm, &p_status);
+            utils::print_mpi_debug_comments("rank {}, received message from rank {}", m_world_rank, p_status.MPI_SOURCE);
+
+            spdlog::debug("rank {} exited\n", m_world_rank);
+            MPI_Barrier(m_world_comm);
+        }
+
+        MPI_Status probe_communicators_on_worker() {
+            static int branch = 0;
+
+            while (true) {
+                switch (branch % 3) {
+                    case 0:
+                        if (auto v = probe_reference_value_comm(); v.has_value()) {
+                            return v.value();
+                        }
+                        break;
+                    case 1:
+                        if (auto v = probe_center_fullness_comm(); v.has_value()) {
+                            return v.value();
+                        }
+                        break;
+                    case 2:
+                        if (auto v = probe_world_comm(); v.has_value()) {
+                            return v.value();
+                        }
+                        break;
+                }
+
+                // Increment and reset before overflow
+                if (++branch > INT_MAX - 1000) {
+                    branch = 0;
+                }
+            }
+        }
+
+        std::optional<MPI_Status> probe_reference_value_comm() {
+            int v_is_message_received = 0; // logical
+
+            MPI_Status v_status;
+            MPI_Iprobe(CENTER, REFVAL_PROPOSAL_TAG, m_ref_value_global_communicator, &v_is_message_received, &v_status);
+            if (v_is_message_received) {
+                return v_status;
+
+            }
+            return std::nullopt;
+        }
+
+        std::optional<MPI_Status> probe_center_fullness_comm() {
+            int v_is_message_received = 0;
+            MPI_Status v_status;
+            MPI_Iprobe(CENTER, MPI_ANY_TAG, m_center_fullness_communicator, &v_is_message_received, &v_status); // for regular messages
+            if (v_is_message_received) {
+                return v_status;
+            }
+            return std::nullopt;
+        }
+
+        std::optional<MPI_Status> probe_world_comm() {
+            int v_is_message_received = 0;
+            MPI_Status v_status;
+            MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, m_world_comm, &v_is_message_received, &v_status); // for regular messages
+            if (v_is_message_received) {
+                return v_status;
+            }
+            return std::nullopt;
         }
 
         // checks for a new assigned process from center
-        bool probe_center_request() {
-            int flag1 = 0;
-            int flag2 = 0;
-            MPI_Status status;
-            MPI_Iprobe(CENTER, CENTER_IS_FULL_TAG, m_center_fullness_communicator, &flag1, &status);
-
-            if (flag1) {
-                task_packet v_buf(1); // buffer to receive the message
-                MPI_Recv(v_buf.data(), 1, MPI_BYTE, CENTER, CENTER_IS_FULL_TAG, m_center_fullness_communicator, &status);
-                m_is_center_full = true;
-                utils::print_mpi_debug_comments("Node {} received full center\n", rank_me());
+        void maybe_receive_center_fullness() {
+            std::optional<MPI_Status> opt = probe_center_fullness_comm();
+            if (!opt.has_value()) {
+                return;
             }
+            const MPI_Status status = opt.value();
 
-            MPI_Iprobe(CENTER, CENTER_IS_FREE_TAG, m_center_fullness_communicator, &flag2, &status);
-
-            if (flag2) {
-                task_packet v_buf(1); // buffer to receive the message
-                MPI_Recv(v_buf.data(), 1, MPI_BYTE, CENTER, CENTER_IS_FREE_TAG, m_center_fullness_communicator, &status);
-                m_is_center_full = false;
-
-                utils::print_mpi_debug_comments("Node {} received free center\n", rank_me());
+            if (status.MPI_TAG == CENTER_IS_FULL_TAG) {
+                consume_center_is_full_tag(status);
+            } else if (status.MPI_TAG == CENTER_IS_FREE_TAG) {
+                consume_center_is_free_tag(status);
             }
-
-            return (flag1 || flag2);
         }
+
+        void consume_center_is_full_tag(MPI_Status p_status) {
+            MPI_Recv(nullptr, 0, MPI_BYTE, CENTER, CENTER_IS_FULL_TAG, m_center_fullness_communicator, &p_status);
+            m_is_center_full = true;
+
+            utils::print_mpi_debug_comments("Node {} received full center\n", rank_me());
+        }
+
+        void consume_center_is_free_tag(MPI_Status p_status) {
+            MPI_Recv(nullptr, 0, MPI_BYTE, CENTER, CENTER_IS_FREE_TAG, m_center_fullness_communicator, &p_status);
+            m_is_center_full = false;
+
+            utils::print_mpi_debug_comments("Node {} received free center\n", rank_me());
+        }
+
+        // when a node is working, it loops through here
+        void task_funneling(branch_handler &p_branch_handler);
 
         // if ref value received, it attempts updating local value
         // if local value is better than the one in center, then local best value is sent to center
@@ -391,102 +477,53 @@ namespace gempba {
             send_seed(v_task_packet);
 
             while (true) {
-                int v_buffer;
-                int v_buffer_char_count = 0;
-                MPI_Status status;
 
-                int flag;
-                MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, m_world_comm, &flag, &status);
-
-                if (!flag) {
-                    const double v_begin = MPI_Wtime();
-
-                    while (!flag && (utils::diff_time(v_begin, MPI_Wtime()) < TIMEOUT_TIME)) {
-                        MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, m_world_comm, &flag, &status);
-
-                        if (!flag) {
-                            clear_buffer();
-                            monitor_and_notify_center_status();
-                        }
-                    }
-
-                    if (!flag) {
-                        if (m_nodes_running == 0) {
-                            break; // Cancellation due to TIMEOUT
-                        }
-                    }
+                auto v_status_opt = probe_communicators_center_on_center();
+                if (!v_status_opt.has_value()) {
+                    spdlog::info("rank {}: probe_communicators_center received TIMEOUT, exiting center run", m_world_rank);
+                    break;
                 }
+                MPI_Status v_status = v_status_opt.value();
 
-                if (!flag) {
-                    clear_buffer();
-                    monitor_and_notify_center_status();
-                    continue;
-                }
+                switch (v_status.MPI_TAG) {
+                    case STATE_RUNNING: {
+                        // received if and only if a worker receives from other but center
 
-                // at this point, probe succeeded => there is something to receive
+                        consume_int_message(v_status, m_world_comm);
 
-                switch (status.MPI_TAG) {
-                    case STATE_RUNNING: // received if and only if a worker receives from other but center
-                    {
-                        consume_int_message(status, m_world_comm);
-
-                        m_process_state[status.MPI_SOURCE] = STATE_RUNNING; // node was assigned, now it's running
+                        m_process_state[v_status.MPI_SOURCE] = STATE_RUNNING; // node was assigned, now it's running
                         m_nodes_running++;
                         m_total_requests++;
                     }
                     break;
                     case STATE_AVAILABLE: {
-                        consume_int_message(status, m_world_comm);
+                        consume_int_message(v_status, m_world_comm);
 
-                        utils::print_mpi_debug_comments("center received state_available from rank {}\n", status.MPI_SOURCE);
-                        m_process_state[status.MPI_SOURCE] = STATE_AVAILABLE;
+                        utils::print_mpi_debug_comments("center received state_available from rank {}\n", v_status.MPI_SOURCE);
+                        m_process_state[v_status.MPI_SOURCE] = STATE_AVAILABLE;
                         m_nodes_available++;
                         m_nodes_running--;
                         m_total_requests++;
                     }
                     break;
-                    case REFVAL_UPDATE_TAG: {
-                        /* if center reaches this point, for sure nodes have attained a better reference value
-                                or they are not up-to-date, thus it is required to broadcast it whether this value
-                                changes or not  */
-                        const int v_reference_global_candidate = consume_int_message(status, m_world_comm);
-
-                        utils::print_mpi_debug_comments("center received refValue {} from rank {}\n", v_reference_global_candidate, status.MPI_SOURCE);
-
-                        bool v_should_broadcast = should_broadcast_global(m_goal, m_ref_value_global, v_reference_global_candidate);
-
-                        if (v_should_broadcast) {
-                            m_ref_value_global = v_reference_global_candidate;
-                            v_should_broadcast = true;
-                            for (int rank = 1; rank < m_world_size; rank++) {
-                                MPI_Send(&m_ref_value_global, 1, MPI_INT, rank, REFVAL_UPDATE_TAG, m_ref_value_global_communicator);
-                            }
-                        }
-
-                        if (v_should_broadcast) {
-                            static int success = 0;
-                            success++;
-                            spdlog::debug("refValueGlobal updated to : {} by rank {}\n", m_ref_value_global, status.MPI_SOURCE);
-                        } else {
-                            static int failures = 0;
-                            failures++;
-                            spdlog::debug("FAILED updates : {}, refValueGlobal : {} by rank {}\n", failures, m_ref_value_global, status.MPI_SOURCE);
-                        }
-                        ++m_total_requests;
+                    case REFVAL_PROPOSAL_TAG: {
+                        const int v_candidate_global_reference_value = consume_int_message(v_status, m_ref_value_global_communicator);
+                        maybe_broadcast_global_reference_value(v_candidate_global_reference_value, v_status);
                     }
                     break;
                     case TASK_FOR_CENTER: {
-
                         // receives task from worker
-                        MPI_Get_count(&status, MPI_BYTE, &v_buffer_char_count);
+                        int v_buffer_char_count;
+                        MPI_Get_count(&v_status, MPI_BYTE, &v_buffer_char_count);
                         task_packet v_task(v_buffer_char_count);
-                        MPI_Recv(v_task.data(), v_buffer_char_count, MPI_BYTE, status.MPI_SOURCE, status.MPI_TAG, m_world_comm, &status);
+                        MPI_Recv(v_task.data(), v_buffer_char_count, MPI_BYTE, v_status.MPI_SOURCE, v_status.MPI_TAG, m_world_comm, &v_status);
 
                         m_center_queue.push(v_task);
 
                         if (m_center_queue.size() > m_max_queue_size) {
-                            if (m_center_queue.size() % 10000 == 0)
-                                std::cout << "CENTER queue size reached " << m_center_queue.size() << std::endl;
+                            if (m_center_queue.size() % 10000 == 0) {
+                                spdlog::debug("CENTER queue size reached {}\n", m_center_queue.size());
+                            }
                             m_max_queue_size = m_center_queue.size();
                         }
 
@@ -500,7 +537,7 @@ namespace gempba {
                             }
                         }
 
-                        utils::print_mpi_debug_comments("center received task from {}, current queue size is {}\n", status.MPI_SOURCE, m_center_queue.size());
+                        utils::print_mpi_debug_comments("center received task from {}, current queue size is {}\n", v_status.MPI_SOURCE, m_center_queue.size());
                     }
                     break;
                 }
@@ -525,6 +562,99 @@ namespace gempba {
         }
 
     private:
+        void maybe_broadcast_global_reference_value(const int p_new_global_reference_value, MPI_Status status) {
+            utils::print_mpi_debug_comments("center received refValue {} from rank {}\n", p_new_global_reference_value, status.MPI_SOURCE);
+
+            const bool v_should_broadcast = should_broadcast_global(m_goal, m_ref_value_global, p_new_global_reference_value);
+            if (!v_should_broadcast) {
+                static int failures = 0;
+                failures++;
+                spdlog::debug("FAILED updates : {}, refValueGlobal : {} by rank {}\n", failures, m_ref_value_global, status.MPI_SOURCE);
+                return;
+            }
+
+            m_ref_value_global = p_new_global_reference_value;
+            for (int rank = 1; rank < m_world_size; rank++) {
+                MPI_Send(&m_ref_value_global, 1, MPI_INT, rank, REFVAL_UPDATE_TAG, m_ref_value_global_communicator);
+            }
+
+            static int success = 0;
+            success++;
+            spdlog::debug("SUCCESSFUL updates: {}, refValueGlobal updated to : {} by rank {}\n", success, m_ref_value_global, status.MPI_SOURCE);
+        }
+
+        /**
+        * Only returns when a message is received from any of the communicators.
+        * @return MPI_Status of the received message, or std::nullopt only when all processes have finished or a timeout occurs.
+        */
+        std::optional<MPI_Status> probe_communicators_center_on_center() {
+            long v_cycles = 0;
+            static int branch = 0;
+            while (true) {
+                const double v_wall_time0 = MPI_Wtime();
+                while (true) {
+                    switch (branch % 2) {
+                        case 0: {
+                            if (const auto v_optional = probe_world_comm_center(); v_optional.has_value()) {
+                                return v_optional;
+                            }
+                            // if no message received, check for center fullness
+                            clear_buffer();
+                            monitor_and_notify_center_status();
+                            break;
+                        }
+                        case 1: {
+                            if (auto v_optional = probe_reference_value_comm_center(); v_optional.has_value()) {
+                                return v_optional;
+                            }
+                            break;
+                        }
+                    }
+                    if (++branch > INT_MAX - 1000) {
+                        branch = 0;
+                    }
+                    ++v_cycles;
+                    double v_elapsed = utils::diff_time(v_wall_time0, MPI_Wtime());
+                    if (v_elapsed > TIMEOUT_TIME) {
+                        spdlog::debug("rank {}: no messages received in {} seconds, cycles: {}", m_world_rank, v_elapsed, v_cycles);
+                        break;
+                    }
+                }
+
+                if (m_nodes_running < 0) {
+                    spdlog::throw_spdlog_ex("rank {}: m_nodes_running is negative, this should not happen", m_world_rank);
+                }
+
+                // Timeout or termination condition
+                if (m_nodes_running == 0) {
+                    spdlog::debug("rank {}: probe_communicators_center received TIMEOUT", m_world_rank);
+                    return std::nullopt;
+                }
+            }
+        }
+
+        std::optional<MPI_Status> probe_world_comm_center() {
+            int v_is_message_received = 0;
+            MPI_Status v_status;
+            MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, m_world_comm, &v_is_message_received, &v_status); // for regular messages
+            if (v_is_message_received) {
+                return v_status;
+            }
+            return std::nullopt;
+        }
+
+        std::optional<MPI_Status> probe_reference_value_comm_center() {
+            int v_is_message_received = 0; // logical
+            MPI_Status v_status;
+            MPI_Iprobe(MPI_ANY_SOURCE, REFVAL_PROPOSAL_TAG, m_ref_value_global_communicator, &v_is_message_received, &v_status);
+            if (v_is_message_received) {
+                // spdlog::info("rank {}: probe_reference_value_comm_center received message from rank {}\n", world_rank, status.MPI_SOURCE);
+                return v_status;
+            }
+            return std::nullopt;
+        }
+
+
         void monitor_and_notify_center_status() {
             const size_t v_current_memory = getCurrentRSS() / (1024 * 1024); // ram usage in megabytes
 
@@ -539,8 +669,7 @@ namespace gempba {
             // last iter, center wasn't full but now it is => warn nodes to stop sending
             if (v_current_memory > MAX_MEMORY_MB || m_center_queue.size() > CENTER_NBSTORED_TASKS_PER_PROCESS * m_world_size) {
                 for (int rank = 1; rank < m_world_size; rank++) {
-                    std::byte v_tmp{0};
-                    MPI_Send(&v_tmp, 1, MPI_BYTE, rank, CENTER_IS_FULL_TAG, m_center_fullness_communicator);
+                    MPI_Send(nullptr, 0, MPI_BYTE, rank, CENTER_IS_FULL_TAG, m_center_fullness_communicator);
                 }
                 m_center_last_full_status = true;
                 m_time_centerfull_sent = MPI_Wtime();
@@ -553,8 +682,7 @@ namespace gempba {
             // last iter, center was full but now it has space => warn others it's ok
             if (v_current_memory <= 0.9 * MAX_MEMORY_MB && m_center_queue.size() < CENTER_NBSTORED_TASKS_PER_PROCESS * m_world_size * 0.8) {
                 for (int rank = 1; rank < m_world_size; rank++) {
-                    std::byte v_tmp{0};
-                    MPI_Send(&v_tmp, 1, MPI_BYTE, rank, CENTER_IS_FREE_TAG, m_center_fullness_communicator);
+                    MPI_Send(nullptr, 0, MPI_BYTE, rank, CENTER_IS_FREE_TAG, m_center_fullness_communicator);
                 }
                 m_center_last_full_status = false;
 
@@ -591,10 +719,7 @@ namespace gempba {
 
         void notify_termination() {
             for (int rank = 1; rank < m_world_size; rank++) {
-                char v_buffer[] = "exit signal";
-                int v_count = sizeof(v_buffer);
-                task_packet v_task_packet(v_buffer, v_count);
-                MPI_Send(v_task_packet.data(), v_count, MPI_BYTE, rank, TERMINATION_TAG, m_world_comm); // send positive signal
+                MPI_Send(nullptr, 0, MPI_BYTE, rank, TERMINATION_TAG, m_world_comm); // send positive signal
             }
             MPI_Barrier(m_world_comm);
         }
