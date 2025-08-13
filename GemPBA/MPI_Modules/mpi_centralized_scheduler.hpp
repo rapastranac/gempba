@@ -290,7 +290,7 @@ namespace gempba {
 
         void receive_reference_value_from_center(MPI_Status status) {
             utils::print_mpi_debug_comments("rank {}, about to receive refValue from Center\n", m_world_rank);
-            MPI_Recv(&m_ref_value_global, 1, MPI_INT, CENTER, REFVAL_UPDATE_TAG, m_ref_value_global_communicator, &status);
+            MPI_Recv(&m_ref_value_global, 1, MPI_INT, CENTER, REFVAL_UPDATE_TAG, m_global_reference_value_communicator, &status);
             utils::print_mpi_debug_comments("rank {}, received refValue: {} from Center\n", m_world_rank, m_ref_value_global);
         }
 
@@ -336,7 +336,7 @@ namespace gempba {
             int v_is_message_received = 0; // logical
 
             MPI_Status v_status;
-            MPI_Iprobe(CENTER, REFVAL_PROPOSAL_TAG, m_ref_value_global_communicator, &v_is_message_received, &v_status);
+            MPI_Iprobe(CENTER, REFVAL_PROPOSAL_TAG, m_global_reference_value_communicator, &v_is_message_received, &v_status);
             if (v_is_message_received) {
                 return v_status;
 
@@ -507,7 +507,7 @@ namespace gempba {
                     }
                     break;
                     case REFVAL_PROPOSAL_TAG: {
-                        const int v_candidate_global_reference_value = consume_int_message(v_status, m_ref_value_global_communicator);
+                        const int v_candidate_global_reference_value = consume_int_message(v_status, m_global_reference_value_communicator);
                         maybe_broadcast_global_reference_value(v_candidate_global_reference_value, v_status);
                     }
                     break;
@@ -575,7 +575,7 @@ namespace gempba {
 
             m_ref_value_global = p_new_global_reference_value;
             for (int rank = 1; rank < m_world_size; rank++) {
-                MPI_Send(&m_ref_value_global, 1, MPI_INT, rank, REFVAL_UPDATE_TAG, m_ref_value_global_communicator);
+                MPI_Send(&m_ref_value_global, 1, MPI_INT, rank, REFVAL_UPDATE_TAG, m_global_reference_value_communicator);
             }
 
             static int success = 0;
@@ -646,7 +646,7 @@ namespace gempba {
         std::optional<MPI_Status> probe_reference_value_comm_center() {
             int v_is_message_received = 0; // logical
             MPI_Status v_status;
-            MPI_Iprobe(MPI_ANY_SOURCE, REFVAL_PROPOSAL_TAG, m_ref_value_global_communicator, &v_is_message_received, &v_status);
+            MPI_Iprobe(MPI_ANY_SOURCE, REFVAL_PROPOSAL_TAG, m_global_reference_value_communicator, &v_is_message_received, &v_status);
             if (v_is_message_received) {
                 // spdlog::info("rank {}: probe_reference_value_comm_center received message from rank {}\n", world_rank, status.MPI_SOURCE);
                 return v_status;
@@ -784,7 +784,7 @@ namespace gempba {
 
         void create_communicators() {
             MPI_Comm_dup(MPI_COMM_WORLD, &m_world_comm); // world communicator for this library
-            MPI_Comm_dup(MPI_COMM_WORLD, &m_ref_value_global_communicator); // exclusive communicator for reference value - one-sided comm
+            MPI_Comm_dup(MPI_COMM_WORLD, &m_global_reference_value_communicator); // exclusive communicator for reference value - one-sided comm
 
             MPI_Comm_dup(MPI_COMM_WORLD, &m_center_fullness_communicator);
 
@@ -805,7 +805,7 @@ namespace gempba {
         }
 
         void deallocate_mpi() {
-            MPI_Comm_free(&m_ref_value_global_communicator);
+            MPI_Comm_free(&m_global_reference_value_communicator);
             MPI_Comm_free(&m_center_fullness_communicator);
 
             MPI_Comm_free(&m_world_comm);
@@ -847,7 +847,7 @@ namespace gempba {
         bool m_exit = false;
 
         // MPI_Group world_group;		  // all ranks belong to this group
-        MPI_Comm m_ref_value_global_communicator; // attached to win_refValueGlobal
+        MPI_Comm m_global_reference_value_communicator; // attached to win_refValueGlobal
         MPI_Comm m_center_fullness_communicator;
 
         MPI_Comm m_world_comm; // world communicator
