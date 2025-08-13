@@ -94,7 +94,7 @@ namespace gempba {
 
         task_packet fetch_solution() override {
             for (int rank = 1; rank < m_world_size; rank++) {
-                if (m_best_results[rank].get_reference_value() == m_ref_value_global) {
+                if (m_best_results[rank].get_reference_value() == m_global_reference_value) {
                     return m_best_results[rank].get_task_packet();
                 }
             }
@@ -182,7 +182,7 @@ namespace gempba {
             this->m_goal = p_goal;
 
             if (p_goal == MINIMISE) // minimisation
-                m_ref_value_global = INT_MAX;
+                m_global_reference_value = INT_MAX;
         }
 
 
@@ -290,8 +290,8 @@ namespace gempba {
 
         void receive_reference_value_from_center(MPI_Status status) {
             utils::print_mpi_debug_comments("rank {}, about to receive refValue from Center\n", m_world_rank);
-            MPI_Recv(&m_ref_value_global, 1, MPI_INT, CENTER, REFVAL_UPDATE_TAG, m_global_reference_value_communicator, &status);
-            utils::print_mpi_debug_comments("rank {}, received refValue: {} from Center\n", m_world_rank, m_ref_value_global);
+            MPI_Recv(&m_global_reference_value, 1, MPI_INT, CENTER, REFVAL_UPDATE_TAG, m_global_reference_value_communicator, &status);
+            utils::print_mpi_debug_comments("rank {}, received refValue: {} from Center\n", m_world_rank, m_global_reference_value);
         }
 
         void process_termination(MPI_Status p_status) {
@@ -565,22 +565,22 @@ namespace gempba {
         void maybe_broadcast_global_reference_value(const int p_new_global_reference_value, MPI_Status status) {
             utils::print_mpi_debug_comments("center received refValue {} from rank {}\n", p_new_global_reference_value, status.MPI_SOURCE);
 
-            const bool v_should_broadcast = should_broadcast_global(m_goal, m_ref_value_global, p_new_global_reference_value);
+            const bool v_should_broadcast = should_broadcast_global(m_goal, m_global_reference_value, p_new_global_reference_value);
             if (!v_should_broadcast) {
                 static int failures = 0;
                 failures++;
-                spdlog::debug("FAILED updates : {}, refValueGlobal : {} by rank {}\n", failures, m_ref_value_global, status.MPI_SOURCE);
+                spdlog::debug("FAILED updates : {}, refValueGlobal : {} by rank {}\n", failures, m_global_reference_value, status.MPI_SOURCE);
                 return;
             }
 
-            m_ref_value_global = p_new_global_reference_value;
+            m_global_reference_value = p_new_global_reference_value;
             for (int rank = 1; rank < m_world_size; rank++) {
-                MPI_Send(&m_ref_value_global, 1, MPI_INT, rank, REFVAL_UPDATE_TAG, m_global_reference_value_communicator);
+                MPI_Send(&m_global_reference_value, 1, MPI_INT, rank, REFVAL_UPDATE_TAG, m_global_reference_value_communicator);
             }
 
             static int success = 0;
             success++;
-            spdlog::debug("SUCCESSFUL updates: {}, refValueGlobal updated to : {} by rank {}\n", success, m_ref_value_global, status.MPI_SOURCE);
+            spdlog::debug("SUCCESSFUL updates: {}, refValueGlobal updated to : {} by rank {}\n", success, m_global_reference_value, status.MPI_SOURCE);
         }
 
         /**
@@ -816,7 +816,7 @@ namespace gempba {
             m_process_tree.resize(m_world_size);
             m_max_queue_size = 0;
 
-            m_ref_value_global = INT_MIN;
+            m_global_reference_value = INT_MIN;
 
             if (m_world_rank == 0)
                 m_best_results.resize(m_world_size, result::EMPTY);
@@ -853,7 +853,7 @@ namespace gempba {
         MPI_Comm m_world_comm; // world communicator
 
 
-        int m_ref_value_global;
+        int m_global_reference_value;
 
         bool m_is_center_full = false;
 
