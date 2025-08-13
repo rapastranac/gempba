@@ -1,4 +1,3 @@
-#pragma once
 #ifndef MPI_SCHEDULER_HPP
 #define MPI_SCHEDULER_HPP
 
@@ -789,8 +788,6 @@ namespace gempba {
         }
 
     private:
-        int m_argc;
-        char **m_argv;
         int m_world_rank; // get the rank of the process
         int m_world_size; // get the number of processes/nodes
         char m_processor_name[128]; // name of the node
@@ -831,7 +828,7 @@ namespace gempba {
 
         /* singleton*/
         mpi_scheduler() {
-            init(NULL, NULL);
+            init(nullptr, nullptr);
         }
 
         void init(int *p_argc, char *p_argv[]) {

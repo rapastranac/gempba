@@ -110,13 +110,13 @@ namespace gempba {
             spdlog::debug("\n \n \n");
             spdlog::debug("*****************************************************\n");
             spdlog::debug("Elapsed time : {:4.3f} \n", elapsed_time());
-            spdlog::debug("Total number of requests : {} \n", m_total_requests);
+            spdlog::debug("Total number of requests : {} \n", m_total_requests_number);
             spdlog::debug("*****************************************************\n");
             spdlog::debug("\n \n \n");
         }
 
         [[nodiscard]] size_t get_total_requests() const override {
-            return m_total_requests;
+            return m_total_requests_number;
         }
 
         void set_custom_initial_topology(tree &&p_tree) override {
@@ -146,11 +146,11 @@ namespace gempba {
         }
 
         [[nodiscard]] int tasks_recvd() const override {
-            return m_number_tasks_received;
+            return m_received_tasks;
         }
 
         [[nodiscard]] int tasks_sent() const override {
-            return m_number_tasks_sent;
+            return m_sent_tasks;
         }
 
         void barrier() override {
@@ -275,7 +275,7 @@ namespace gempba {
 
             // Here, we have a task to process  -----------------------------------------------------------------------------
             notify_running_state();
-            m_number_tasks_received++;
+            m_received_tasks++;
 
             utils::print_mpi_debug_comments("rank {}, pushing buffer to thread pool", m_world_rank, p_status.MPI_SOURCE);
 
@@ -493,7 +493,7 @@ namespace gempba {
 
                         m_process_state[v_status.MPI_SOURCE] = STATE_RUNNING; // node was assigned, now it's running
                         m_nodes_running++;
-                        m_total_requests++;
+                        m_total_requests_number++;
                     }
                     break;
                     case STATE_AVAILABLE: {
@@ -503,7 +503,7 @@ namespace gempba {
                         m_process_state[v_status.MPI_SOURCE] = STATE_AVAILABLE;
                         m_nodes_available++;
                         m_nodes_running--;
-                        m_total_requests++;
+                        m_total_requests_number++;
                     }
                     break;
                     case REFVAL_PROPOSAL_TAG: {
@@ -527,7 +527,7 @@ namespace gempba {
                             m_max_queue_size = m_center_queue.size();
                         }
 
-                        m_total_requests++;
+                        m_total_requests_number++;
 
 
                         if (m_center_queue.size() > 2 * CENTER_NBSTORED_TASKS_PER_PROCESS * m_world_size) {
@@ -807,7 +807,6 @@ namespace gempba {
         void deallocate_mpi() {
             MPI_Comm_free(&m_global_reference_value_communicator);
             MPI_Comm_free(&m_center_fullness_communicator);
-
             MPI_Comm_free(&m_world_comm);
         }
 
@@ -815,7 +814,6 @@ namespace gempba {
             m_process_state.resize(m_world_size, STATE_AVAILABLE);
             m_process_tree.resize(m_world_size);
             m_max_queue_size = 0;
-
             m_global_reference_value = INT_MIN;
 
             if (m_world_rank == 0)
@@ -825,14 +823,12 @@ namespace gempba {
         }
 
     private:
-        int m_argc;
-        char **m_argv;
         int m_world_rank; // get the rank of the process
         int m_world_size; // get the number of processes/nodes
         char m_processor_name[128]; // name of the node
 
-        int m_number_tasks_received = 0;
-        int m_number_tasks_sent = 0;
+        int m_received_tasks = 0;
+        int m_sent_tasks = 0;
         int m_nodes_running = 0;
         int m_nodes_available = 0;
         std::vector<int> m_process_state; // state of the nodes : running, assigned or available
@@ -841,16 +837,14 @@ namespace gempba {
 
         std::mutex m_mutex;
         std::atomic<bool> m_transmitting;
-        int m_dest_rank_tmp = -1;
+        int m_destination_rank = -1;
 
         Queue<task_packet *> m_task_queue;
         bool m_exit = false;
 
-        // MPI_Group world_group;		  // all ranks belong to this group
-        MPI_Comm m_global_reference_value_communicator; // attached to win_refValueGlobal
-        MPI_Comm m_center_fullness_communicator;
-
-        MPI_Comm m_world_comm; // world communicator
+        MPI_Comm m_global_reference_value_communicator; // BIDIRECTIONAL
+        MPI_Comm m_center_fullness_communicator; // CENTER TO WORKER (ONLY)
+        MPI_Comm m_world_comm; // BIDIRECTIONAL
 
 
         int m_global_reference_value;
@@ -864,7 +858,7 @@ namespace gempba {
         size_t m_threads_per_process = std::thread::hardware_concurrency(); // detects the number of logical processors in machine
 
         // statistics
-        size_t m_total_requests = 0;
+        size_t m_total_requests_number = 0;
         double m_start_time = 0;
         double m_end_time = 0;
 

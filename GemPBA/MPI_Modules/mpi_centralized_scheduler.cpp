@@ -12,7 +12,7 @@ namespace gempba {
                 std::scoped_lock<std::mutex> v_lock(m_mutex);
 
                 std::unique_ptr<task_packet> v_pointer(v_message);
-                m_number_tasks_sent++;
+                m_sent_tasks++;
 
                 send_task_to_center(*v_message);
 
@@ -44,7 +44,7 @@ namespace gempba {
             }
         }
         #ifdef GEMPBA_DEBUG_COMMENTS
-        spdlog::debug("rank {} sent {} tasks\n", m_world_rank, m_number_tasks_sent);
+        spdlog::debug("rank {} sent {} tasks\n", m_world_rank, m_sent_tasks);
         #endif
 
         if (!m_task_queue.empty())
