@@ -28,7 +28,7 @@
 TEST(result_test, empty_singleton_has_expected_defaults) {
     const gempba::result &v_empty = gempba::result::EMPTY;
 
-    EXPECT_EQ(v_empty.get_reference_value(), -1);
+    EXPECT_EQ(v_empty.get_score(), -1);
     EXPECT_TRUE(v_empty.get_task_packet().empty());
 }
 
@@ -38,7 +38,7 @@ TEST(result_test, constructor_initializes_members_correctly) {
 
     gempba::result v_res(42, v_packet);
 
-    EXPECT_EQ(v_res.get_reference_value(), 42);
+    EXPECT_EQ(v_res.get_score(), 42);
     EXPECT_EQ(v_res.get_task_packet().size(), v_packet.size());
 
     for (std::size_t i = 0; i < v_packet.size(); ++i) {
@@ -51,7 +51,7 @@ TEST(result_test, copy_constructor_copies_values) {
     const gempba::result v_original(7, v_packet);
     const gempba::result &v_copy(v_original);
 
-    EXPECT_EQ(v_copy.get_reference_value(), 7);
+    EXPECT_EQ(v_copy.get_score(), 7);
     EXPECT_EQ(v_copy.get_task_packet().size(), 3);
 }
 
@@ -60,7 +60,7 @@ TEST(result_test, move_constructor_moves_values) {
     gempba::result v_original(123, v_packet);
     const gempba::result v_moved(std::move(v_original));
 
-    EXPECT_EQ(v_moved.get_reference_value(), 123);
+    EXPECT_EQ(v_moved.get_score(), 123);
     EXPECT_EQ(v_moved.get_task_packet().size(), 3);
 }
 
@@ -71,7 +71,7 @@ TEST(result_test, copy_assignment_copies_values) {
 
     v_b = v_a;
 
-    EXPECT_EQ(v_b.get_reference_value(), 1);
+    EXPECT_EQ(v_b.get_score(), 1);
     EXPECT_EQ(v_b.get_task_packet().size(), 3);
     EXPECT_EQ(v_b.get_task_packet().data()[0], std::byte{'1'});
 }
@@ -82,7 +82,7 @@ TEST(result_test, move_assignment_moves_values) {
 
     v_b = std::move(v_a);
 
-    EXPECT_EQ(v_b.get_reference_value(), 11);
+    EXPECT_EQ(v_b.get_score(), 11);
     EXPECT_EQ(v_b.get_task_packet().size(), 4);
 }
 

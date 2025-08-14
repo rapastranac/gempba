@@ -27,20 +27,21 @@
 
 #include <utility>
 
+#include <utils/ipc/score.hpp>
 #include <utils/ipc/task_packet.hpp>
 
 namespace gempba {
     class result {
         result() :
-            m_reference_value(-1), m_task_packet(task_packet::EMPTY) {
+            m_score(score::make(-1)), m_task_packet(task_packet::EMPTY) {
         }
 
-        int m_reference_value;
+        score m_score;
         task_packet m_task_packet;
 
     public:
-        result(const int p_reference_value, task_packet p_task_packet) :
-            m_reference_value(p_reference_value), m_task_packet(std::move(p_task_packet)) {
+        result(const int p_score, task_packet p_task_packet) :
+            m_score(score::make(p_score)), m_task_packet(std::move(p_task_packet)) {
         }
 
         // Copy constructor
@@ -59,15 +60,15 @@ namespace gempba {
         ~result() = default;
 
         bool operator==(const result &p_other) const {
-            return m_reference_value == p_other.m_reference_value && m_task_packet == p_other.m_task_packet;
+            return m_score == p_other.m_score && m_task_packet == p_other.m_task_packet;
         }
 
         bool operator!=(const result &p_other) const {
             return !(*this == p_other);
         }
 
-        [[nodiscard]] int get_reference_value() const {
-            return m_reference_value;
+        [[nodiscard]] int get_score() const {
+            return m_score.get_loose<int>();
         }
 
         [[nodiscard]] task_packet get_task_packet() const {

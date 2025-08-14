@@ -94,7 +94,7 @@ namespace gempba {
 
         task_packet fetch_solution() override {
             for (int rank = 1; rank < m_world_size; rank++) {
-                if (m_best_results[rank].get_reference_value() == m_global_reference_value) {
+                if (m_best_results[rank].get_score() == m_global_reference_value) {
                     return m_best_results[rank].get_task_packet();
                 }
             }
@@ -429,7 +429,7 @@ namespace gempba {
         /*	send solution attained from node to the center node */
         void send_solution(const std::function<result()> &p_result_fetcher) {
             const result v_result = p_result_fetcher();
-            const int v_ref_val = v_result.get_reference_value();
+            const int v_ref_val = v_result.get_score();
             task_packet v_task_packet = v_result.get_task_packet();
 
             if (v_result == result::EMPTY) {
