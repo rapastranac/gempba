@@ -67,8 +67,12 @@ namespace gempba {
             return !(*this == p_other);
         }
 
-        [[nodiscard]] int get_score() const {
+        [[nodiscard]] int get_score_as_integer() const {
             return m_score.get_loose<int>();
+        }
+
+        [[nodiscard]] score get_score() const {
+            return m_score;
         }
 
         [[nodiscard]] task_packet get_task_packet() const {

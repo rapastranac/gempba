@@ -721,7 +721,7 @@ namespace gempba {
         // this returns a lambda function which returns the best results as raw data
         [[nodiscard]] std::function<result()> construct_result_fetcher() {
             return [this]() {
-                if (m_best_solution_serialized.get_score() == -1) {
+                if (m_best_solution_serialized.get_score_as_integer() == -1) {
                     return result::EMPTY;
                 } else {
                     return m_best_solution_serialized;
