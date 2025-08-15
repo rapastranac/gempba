@@ -6,14 +6,13 @@ echo "Starting run at: $(date)"
 ## Release ---------------------------------------------------------------------
 JOB_ID=9999             # SLURM
 NODES=9999              # SLURM, this is the number of nodes in a super cluster
-TASKS_PER_NODE=4        # SLURM, this is the number of tasks per node
+TASKS_PER_NODE=3        # SLURM, this is the number of tasks per node
 TASKS_PER_SOCKET=9999   # SLURM,
 CPUS_PER_TASK=4         # SLURM, this is the number of cores per process
-THREADS_PER_TASK=16     # GEMPBA, this is the number of threads per process
 GRAPH_FILE=data/prob_4/400/00400_1
 
 # From the following args variable, only CPUS_PER_TASK is used by the project, the rest is used only for stats purposes
-args="-job_id $JOB_ID -nodes $NODES -ntasks_per_node $TASKS_PER_NODE -ntasks_per_socket $TASKS_PER_SOCKET -cpus_per_task $CPUS_PER_TASK -nthreads_per_task $THREADS_PER_TASK -I $GRAPH_FILE"
+args="-job_id $JOB_ID -nodes $NODES -ntasks_per_node $TASKS_PER_NODE -ntasks_per_socket $TASKS_PER_SOCKET -cpus_per_task $CPUS_PER_TASK -I $GRAPH_FILE"
 
 # Here below are the scenarios to run, uncomment the one you want to run.
 

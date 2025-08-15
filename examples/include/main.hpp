@@ -20,7 +20,6 @@ struct Params {
     int ntasks_per_socket;
     int cpus_per_task;
     int prob;
-    int thread_per_task;
     std::string filename;
 };
 
@@ -65,12 +64,6 @@ Params parse(int argc, char *argv[]) {
             .default_value(int{4})
             .action([](const std::string &value) { return std::stoi(value); });
 
-    program.add_argument("-nthreads_per_task", "--nthreads_per_task")
-            .help("Number of thread per task")
-            .nargs(1)
-            .default_value(int{4})
-            .action([](const std::string &value) { return std::stoi(value); });
-
     program.add_argument("-I", "--indir")
             .help("Input directory of the graph to be read")
             .nargs(1)
@@ -90,14 +83,13 @@ Params parse(int argc, char *argv[]) {
     int ntasks_per_socket = program.get<int>("--ntasks_per_socket");
     int cpus_per_task = program.get<int>("--cpus_per_task");
     int prob = program.get<int>("--prob");
-    int threads_per_task = program.get<int>("--nthreads_per_task");
     auto filename = program.get<std::string>("--indir");
 
 
     spdlog::info("argc: {}, nodes: {}, ntasks_per_node: {}, ntasks_per_socket: {}, cpus_per_task: {}, prob : {}, filename: {} \n",
                  argc, nodes, ntasks_per_node, ntasks_per_socket, cpus_per_task, prob, filename);
 
-    return Params{job_id, nodes, ntasks_per_node, ntasks_per_socket, cpus_per_task, prob, threads_per_task, filename};
+    return Params{job_id, nodes, ntasks_per_node, ntasks_per_socket, cpus_per_task, prob, filename};
 }
 
 std::string create_directory(std::string root) {
