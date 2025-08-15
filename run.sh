@@ -20,16 +20,16 @@ args="-job_id $JOB_ID -nodes $NODES -ntasks_per_node $TASKS_PER_NODE -ntasks_per
 ## Multiprocessing scenarios:
 
 #  - Bitvector Optimized Encoding Semi-Centralized
-mpirun -n $TASKS_PER_NODE -display-map --bind-to core --map-by numa:PE=1 --report-bindings ./bin/mp_bitvect_opt_enc_semi $args
+mpirun -n "$TASKS_PER_NODE" --bind-to core --map-by slot:PE="$CPUS_PER_TASK" --report-bindings ./bin/mp_bitvect_opt_enc_semi $args
 
 #  - Bitvector Optimized Encoding Centralized
-#mpirun -n $TASKS_PER_NODE -display-map --bind-to core --map-by numa:PE=1 --report-bindings ./bin/mp_bitvect_opt_enc_central $args
+#mpirun -n "$TASKS_PER_NODE" --bind-to core --map-by slot:PE="$CPUS_PER_TASK" --report-bindings ./bin/mp_bitvect_opt_enc_central $args
 
 #  - Bitvector Basic Encoding Semi-Centralized
-#mpirun -n $TASKS_PER_NODE -display-map --bind-to core --map-by numa:PE=1 --report-bindings ./bin/mp_bitvect_basic_enc_semi $args
+#mpirun -n "$TASKS_PER_NODE" --bind-to core --map-by slot:PE="$CPUS_PER_TASK" --report-bindings ./bin/mp_bitvect_basic_enc_semi $args
 
 #  - Bitvector Basic Encoding Centralized
-#mpirun -n $TASKS_PER_NODE -display-map --bind-to core --map-by numa:PE=1 --report-bindings ./bin/mp_bitvect_basic_enc_central $args
+#mpirun -n "$TASKS_PER_NODE" --bind-to core --map-by slot:PE="$CPUS_PER_TASK" --report-bindings ./bin/mp_bitvect_basic_enc_central $args
 
 ## Multithreading scenarios:
 
