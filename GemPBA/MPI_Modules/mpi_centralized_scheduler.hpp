@@ -798,7 +798,7 @@ namespace gempba {
                         score v_score{};
                         MPI_Recv(&v_score, sizeof(score), MPI_BYTE, rank, HAS_RESULT_TAG, m_world_comm, &status);
 
-                        m_best_results[rank] = result{v_score.get_loose<int>(), v_task_packet};
+                        m_best_results[rank] = result{v_score, v_task_packet};
 
                         spdlog::debug("solution received from rank {}, count : {}, refVal {} \n", rank, count, v_score.get_loose<int>());
                     }

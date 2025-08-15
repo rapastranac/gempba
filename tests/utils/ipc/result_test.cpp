@@ -36,7 +36,8 @@ TEST(result_test, constructor_initializes_members_correctly) {
     const std::string v_message = "hello";
     gempba::task_packet v_packet(v_message);
 
-    gempba::result v_res(42, v_packet);
+    const gempba::score v_score = gempba::score::make(42);
+    const gempba::result v_res(v_score, v_packet);
 
     EXPECT_EQ(v_res.get_score_as_integer(), 42);
     EXPECT_EQ(v_res.get_task_packet().size(), v_packet.size());
@@ -48,7 +49,8 @@ TEST(result_test, constructor_initializes_members_correctly) {
 
 TEST(result_test, copy_constructor_copies_values) {
     const gempba::task_packet v_packet("abc");
-    const gempba::result v_original(7, v_packet);
+    const gempba::score v_score = gempba::score::make(7);
+    const gempba::result v_original(v_score, v_packet);
     const gempba::result &v_copy(v_original);
 
     EXPECT_EQ(v_copy.get_score_as_integer(), 7);
@@ -57,7 +59,8 @@ TEST(result_test, copy_constructor_copies_values) {
 
 TEST(result_test, move_constructor_moves_values) {
     const gempba::task_packet v_packet("xyz");
-    gempba::result v_original(123, v_packet);
+    const gempba::score v_score = gempba::score::make(123);
+    gempba::result v_original(v_score, v_packet);
     const gempba::result v_moved(std::move(v_original));
 
     EXPECT_EQ(v_moved.get_score_as_integer(), 123);
@@ -66,8 +69,10 @@ TEST(result_test, move_constructor_moves_values) {
 
 TEST(result_test, copy_assignment_copies_values) {
     const gempba::task_packet v_packet("123");
-    const gempba::result v_a(1, v_packet);
-    gempba::result v_b(2, gempba::task_packet("456"));
+    const gempba::score v_score1 = gempba::score::make(1);
+    const gempba::result v_a(v_score1, v_packet);
+    const gempba::score v_score2 = gempba::score::make(2);
+    gempba::result v_b(v_score2, gempba::task_packet("456"));
 
     v_b = v_a;
 
@@ -77,8 +82,10 @@ TEST(result_test, copy_assignment_copies_values) {
 }
 
 TEST(result_test, move_assignment_moves_values) {
-    gempba::result v_a(11, gempba::task_packet("data"));
-    gempba::result v_b(22, gempba::task_packet("temp"));
+    const gempba::score v_score1 = gempba::score::make(11);
+    gempba::result v_a(v_score1, gempba::task_packet("data"));
+    const gempba::score v_score2 = gempba::score::make(22);
+    gempba::result v_b(v_score2, gempba::task_packet("temp"));
 
     v_b = std::move(v_a);
 
@@ -88,12 +95,16 @@ TEST(result_test, move_assignment_moves_values) {
 
 
 TEST(result_test, equality_operator_behaves_correctly) {
-    const gempba::result v_result1(10, gempba::task_packet(5));
-    const gempba::result v_result2(10, gempba::task_packet(5));
-    const gempba::result v_result3(20, gempba::task_packet(5));
-    const gempba::result v_result4(10, gempba::task_packet(6));
+    const gempba::score v_score1 = gempba::score::make(10);
+    const gempba::score v_score2 = gempba::score::make(20);
+    const gempba::score v_score3 = gempba::score::make(-1);
+
+    const gempba::result v_result1(v_score1, gempba::task_packet(5));
+    const gempba::result v_result2(v_score1, gempba::task_packet(5));
+    const gempba::result v_result3(v_score2, gempba::task_packet(5));
+    const gempba::result v_result4(v_score1, gempba::task_packet(6));
     const gempba::result v_default_empty = gempba::result::EMPTY;
-    const gempba::result v_manual_empty(-1, gempba::task_packet::EMPTY);
+    const gempba::result v_manual_empty(v_score3, gempba::task_packet::EMPTY);
 
     // Equal when all fields match
     EXPECT_TRUE(v_result1 == v_result2);
@@ -114,7 +125,8 @@ TEST(result_test, equality_operator_behaves_correctly) {
 
 TEST(result_test, empty_instance_is_consistent) {
     const gempba::result v_empty1 = gempba::result::EMPTY;
-    const gempba::result v_empty2(-1, gempba::task_packet::EMPTY);
+    const gempba::score v_score = gempba::score::make(-1);
+    const gempba::result v_empty2(v_score, gempba::task_packet::EMPTY);
 
     // EMPTY should be equal to manually created empty result
     EXPECT_TRUE(v_empty1 == v_empty2);

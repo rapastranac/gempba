@@ -40,8 +40,8 @@ namespace gempba {
         task_packet m_task_packet;
 
     public:
-        result(const int p_score, task_packet p_task_packet) :
-            m_score(score::make(p_score)), m_task_packet(std::move(p_task_packet)) {
+        result(const score &p_score, task_packet p_task_packet) :
+            m_score(p_score), m_task_packet(std::move(p_task_packet)) {
         }
 
         // Copy constructor

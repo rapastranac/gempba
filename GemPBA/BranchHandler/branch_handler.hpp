@@ -272,7 +272,7 @@ namespace gempba {
             }
 
             const auto v_packet = static_cast<task_packet>(p_serializer(p_new_result));
-            this->m_best_solution_serialized = {p_new_reference_value, v_packet};
+            this->m_best_solution_serialized = {score::make(p_new_reference_value), v_packet};
             this->m_reference_value = p_new_reference_value;
 
             return true;
@@ -594,7 +594,7 @@ namespace gempba {
 
                 int v_ref_value_local = reference_value();
                 task_packet v_candidate{v_buffer};
-                m_best_solution_serialized = {v_ref_value_local, v_candidate};
+                m_best_solution_serialized = {score::make(v_ref_value_local), v_candidate};
 
             } else {
                 // some other node requested help, and it is surely waiting for the return value
