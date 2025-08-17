@@ -40,7 +40,7 @@ namespace gempba {
             begin = std::chrono::steady_clock::now();
 
             try {
-                branchHandler.set_reference_value(currentMVCSize);
+                branchHandler.set_score(score::make(currentMVCSize));
                 HolderType *dummyParent = new HolderType(dlb, -1); {
                     graph_res = mvc(-1, 0, graph, dummyParent);
                 }
@@ -61,7 +61,7 @@ namespace gempba {
             end = std::chrono::steady_clock::now();
             elapsed_secs = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
 
-            printf("refGlobal : %d \n", branchHandler.reference_value());
+            printf("refGlobal : %d \n", branchHandler.get_score().get<int>());
             return true;
         }
 
@@ -73,7 +73,7 @@ namespace gempba {
             //size_t mm = maximum_matching(graph);
             //size_t k = relaxation(k1, k2);
 
-            if (graph.coverSize() + std::max({LB, degLB, acLB}) >= (size_t) branchHandler.reference_value()) {
+            if (graph.coverSize() + std::max({LB, degLB, acLB}) >= static_cast<size_t>(branchHandler.get_score().get<int>())) {
                 //size_t addition = k + graph.coverSize();
                 //return;
                 return {};
@@ -93,7 +93,7 @@ namespace gempba {
             holderLeft.setDepth(depth);
             holderRight.setDepth(depth);
 
-            int referenceValue = branchHandler.reference_value();
+            int referenceValue = branchHandler.get_score().get<int>();
 
             holderLeft.bind_branch_checkIn([&graph, &v, referenceValue, &depth, &holderLeft] {
                 Graph g = graph;
@@ -147,7 +147,7 @@ namespace gempba {
         }
 
         Graph termination(Graph &graph) {
-            bool updated = branchHandler.try_update_result(graph, graph.size());
+            bool updated = branchHandler.try_update_result(graph, gempba::score::make(graph.size()));
 
             if (updated) {
                 return graph;

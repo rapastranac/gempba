@@ -60,7 +60,7 @@ namespace gempba {
         DLB_Handler &m_load_balancer = DLB_Handler::getInstance();
         load_balancing_strategy m_load_balancing_strategy = QUASI_HORIZONTAL;
 
-        int m_reference_value = INT_MIN;
+        score m_score = score::make(INT_MIN);
         goal m_goal = MAXIMISE;
 
         /*------------------------------------------------------>>end*/
@@ -235,45 +235,45 @@ namespace gempba {
         }
 
         /**
-         * Updates the most up-to-date result. This method overrides the previous result without any checks, and should be used only in multithreading mode. (Not multiprocessing)
+         * Updates the most up-to-date result. This method attempts to update the result, and should be used only in multithreading mode. (Not multiprocessing)
          * @tparam T Type of the result
          * @param p_new_result the most promising new result for the solution in the scope calling this method
-         * @param p_new_reference_value the most promising new reference value that represents the result
+         * @param p_new_score the most promising new score that represents the result
         * @return True if the result was successfully updated, false otherwise.
          */
         template<typename T>
-        bool try_update_result(T &p_new_result, const int p_new_reference_value) {
+        bool try_update_result(T &p_new_result, const score p_new_score) {
             std::unique_lock v_lock(m_mutex);
-            if (!should_update_result(p_new_reference_value)) {
+            if (!should_update_result(p_new_score)) {
                 return false;
             }
 
             this->m_best_solution = std::make_any<decltype(p_new_result)>(p_new_result);
-            this->m_reference_value = p_new_reference_value;
+            this->m_score = p_new_score;
             return true;
         }
 
         /**
-         * This method is thread safe: Updates the most up-to-date result if the new reference value is better than the current one. This should be used in multiprocessing mode because it
+         * This method is thread safe: Updates the most up-to-date result if the new score is better than the current one. This should be used in multiprocessing mode because it
          * uses a serializer to convert the result into bytes.
          *
          * @tparam T Type of the result
          * @param p_new_result the most promising new result for the solution in the scope calling this method
-         * @param p_new_reference_value the most promising new reference value that represents the result
+         * @param p_new_score the most promising new score that represents the result
          * @param p_serializer a function that serializes the result into a string
          * @return True if the result was successfully updated, false otherwise.
          */
         template<typename T>
-        bool try_update_result(T &p_new_result, int p_new_reference_value, std::function<task_packet(T &)> &p_serializer) {
+        bool try_update_result(T &p_new_result, score p_new_score, std::function<task_packet(T &)> &p_serializer) {
             std::unique_lock v_lock(m_mutex);
 
-            if (!should_update_result(p_new_reference_value)) {
+            if (!should_update_result(p_new_score)) {
                 return false;
             }
 
             const auto v_packet = static_cast<task_packet>(p_serializer(p_new_result));
-            this->m_best_solution_serialized = {p_new_reference_value, v_packet};
-            this->m_reference_value = p_new_reference_value;
+            this->m_best_solution_serialized = {p_new_score, v_packet};
+            this->m_score = p_new_score;
 
             return true;
         }
@@ -281,16 +281,16 @@ namespace gempba {
         /**
         * Warning: This is not meant to be used directly by the user. This is called only by the scheduler.
         *
-        * This method is thread safe: Updates the most up-to-date reference value if the new reference value is better than the current one, and clears any previous result.
+        * This method is thread safe: Updates the most up-to-date score if the new score is better than the current one, and clears any previous result.
         *
-        * @param p_new_ref_value the most promising new reference value for the solution in the scope calling this method
-        * @return True if the reference value was successfully updated, false otherwise.
+        * @param p_new_score the most promising new score for the solution in the scope calling this method
+        * @return True if the score was successfully updated, false otherwise.
         */
-        bool try_update_reference_value_and_invalidate_result(const int p_new_ref_value) {
+        bool try_update_score_and_invalidate_result(const score &p_new_score) {
             std::scoped_lock<std::mutex> v_lock(m_mutex);
 
-            if (should_update_result(p_new_ref_value)) {
-                m_reference_value = p_new_ref_value;
+            if (should_update_result(p_new_score)) {
+                m_score = p_new_score;
                 clear_result();
                 return true;
             }
@@ -303,20 +303,54 @@ namespace gempba {
             return m_thread_requests.load();
         }
 
-        void set_goal(const goal p_goal) {
+        void set_goal(const goal p_goal, const score_type p_type) {
             m_goal = p_goal;
-            switch (p_goal) {
-                case MAXIMISE: {
-                    return; // maximise by default
+            switch (p_type) {
+                case score_type::I32: {
+                    if (p_goal == MAXIMISE) {
+                        m_score = score::make(INT_MIN); // maximisation
+                    } else {
+                        m_score = score::make(INT_MAX); // minimisation
+                    }
+                    break;
                 }
-                case MINIMISE: {
-                    m_reference_value = INT_MAX;
-                    #if GEMPBA_MULTIPROCESSING
-                    m_mpi_scheduler->set_goal(MINIMISE); // TODO redundant
-                    #endif
+                case score_type::I64: {
+                    if (p_goal == MAXIMISE) {
+                        m_score = score::make(LONG_MIN); // maximisation
+                    } else {
+                        m_score = score::make(LONG_MAX); // minimisation
+                    }
+                    break;
                 }
-            };
-
+                case score_type::F32: {
+                    if (p_goal == MAXIMISE) {
+                        m_score = score::make(FLT_MIN); // maximisation
+                    } else {
+                        m_score = score::make(FLT_MAX); // minimisation
+                    }
+                    break;
+                }
+                case score_type::F64: {
+                    if (p_goal == MAXIMISE) {
+                        m_score = score::make(DBL_MIN); // maximisation
+                    } else {
+                        m_score = score::make(DBL_MAX); // minimisation
+                    }
+                    break;
+                }
+                case score_type::F128: {
+                    if (p_goal == MAXIMISE) {
+                        m_score = score::make(LDBL_MIN); // maximisation
+                    } else {
+                        m_score = score::make(LDBL_MAX); // minimisation
+                    }
+                    break;
+                }
+            }
+            // set the goal in the MPI scheduler if multiprocessing is enabled
+            #if GEMPBA_MULTIPROCESSING
+            m_mpi_scheduler->set_goal(p_goal, p_type);
+            #endif
         }
 
         // get number for this rank
@@ -374,16 +408,16 @@ namespace gempba {
             return std::any_cast<SolutionType>(m_best_solution);
         }
 
-        int reference_value() const {
-            return m_reference_value;
+        score get_score() const {
+            return m_score;
         }
 
         /**
          * if multiprocessing is used, then every process should call this method before starting
-         * @param p_reference_value first approximation of the best reference value of the solution
+         * @param p_score first approximation of the score that represents the best solution
          */
-        void set_reference_value(const int p_reference_value) {
-            this->m_reference_value = p_reference_value;
+        void set_score(const score &p_score) {
+            this->m_score = p_score;
         }
 
 
@@ -592,7 +626,7 @@ namespace gempba {
                 std::string v_buffer;
                 p_serialize(v_buffer, res);
 
-                int v_ref_value_local = reference_value();
+                score v_ref_value_local = get_score();
                 task_packet v_candidate{v_buffer};
                 m_best_solution_serialized = {v_ref_value_local, v_candidate};
 
@@ -721,7 +755,7 @@ namespace gempba {
         // this returns a lambda function which returns the best results as raw data
         [[nodiscard]] std::function<result()> construct_result_fetcher() {
             return [this]() {
-                if (m_best_solution_serialized.get_reference_value() == -1) {
+                if (m_best_solution_serialized.get_score_as_integer() == -1) {
                     return result::EMPTY;
                 } else {
                     return m_best_solution_serialized;
@@ -740,9 +774,9 @@ namespace gempba {
         #endif
 
     private:
-        [[nodiscard]] bool should_update_result(const int p_new_reference_value) const {
-            const bool v_new_max_is_better = m_goal == MAXIMISE && p_new_reference_value > m_reference_value;
-            const bool v_new_min_is_better = m_goal == MINIMISE && p_new_reference_value < m_reference_value;
+        [[nodiscard]] bool should_update_result(const score &p_new_score) const {
+            const bool v_new_max_is_better = m_goal == MAXIMISE && p_new_score > m_score;
+            const bool v_new_min_is_better = m_goal == MINIMISE && p_new_score < m_score;
             return v_new_max_is_better || v_new_min_is_better;
         }
     };
