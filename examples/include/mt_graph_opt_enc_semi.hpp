@@ -77,7 +77,7 @@ public:
         end = std::chrono::steady_clock::now();
         elapsed_secs = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
 
-        printf("refGlobal : %d \n", branchHandler.get_score());
+        printf("refGlobal : %d \n", branchHandler.get_score().get_loose<int>());
         return true;
     }
 
@@ -90,7 +90,7 @@ public:
         size_t k = relaxation(LB, UB);
         //std::max({LB, degLB, acLB})
 
-        if (k + graph.coverSize() >= (size_t) branchHandler.get_score()) {
+        if (k + graph.coverSize() >= (size_t) branchHandler.get_score().get_loose<int>()) {
             //size_t addition = k + graph.coverSize();
             return;
         }
@@ -127,7 +127,7 @@ public:
                 spdlog::debug("rank {}, thread {}, cover is empty\n", branchHandler.rank_me(), id);
                 throw;
             }
-            if (C < branchHandler.get_score()) // user's condition to see if it's worth it to make branch call
+            if (C < branchHandler.get_score().get_loose<int>()) // user's condition to see if it's worth it to make branch call
             {
                 int newDepth = depth + 1;
                 hol_l.holdArgs(newDepth, g);
@@ -145,7 +145,7 @@ public:
             g.clean_graph();
             //g.removeZeroVertexDegree();
             int C = g.coverSize();
-            if (C < branchHandler.get_score()) // user's condition to see if it's worth it to make branch call
+            if (C < branchHandler.get_score().get_loose<int>()) // user's condition to see if it's worth it to make branch call
             {
                 int newDepth = depth + 1;
                 hol_r.holdArgs(newDepth, g);
@@ -174,7 +174,7 @@ public:
 private:
     void terminate_condition(Graph &graph, int id, int depth) {
         std::scoped_lock<std::mutex> lck(mtx);
-        if (graph.coverSize() < branchHandler.get_score()) {
+        if (graph.coverSize() < branchHandler.get_score().get_loose<int>()) {
             int SZ = graph.coverSize(); // debuggin line
             branchHandler.try_update_result(graph, gempba::score::make(graph.coverSize()));
 

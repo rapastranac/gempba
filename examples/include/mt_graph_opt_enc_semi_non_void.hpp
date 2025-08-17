@@ -61,7 +61,7 @@ namespace gempba {
             end = std::chrono::steady_clock::now();
             elapsed_secs = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
 
-            printf("refGlobal : %d \n", branchHandler.get_score());
+            printf("refGlobal : %d \n", branchHandler.get_score().get_loose<int>());
             return true;
         }
 
@@ -73,7 +73,7 @@ namespace gempba {
             //size_t mm = maximum_matching(graph);
             //size_t k = relaxation(k1, k2);
 
-            if (graph.coverSize() + std::max({LB, degLB, acLB}) >= (size_t) branchHandler.get_score()) {
+            if (graph.coverSize() + std::max({LB, degLB, acLB}) >= static_cast<size_t>(branchHandler.get_score().get_loose<int>())) {
                 //size_t addition = k + graph.coverSize();
                 //return;
                 return {};
@@ -93,7 +93,7 @@ namespace gempba {
             holderLeft.setDepth(depth);
             holderRight.setDepth(depth);
 
-            int referenceValue = branchHandler.get_score();
+            int referenceValue = branchHandler.get_score().get_loose<int>();
 
             holderLeft.bind_branch_checkIn([&graph, &v, referenceValue, &depth, &holderLeft] {
                 Graph g = graph;

@@ -408,8 +408,8 @@ namespace gempba {
             return std::any_cast<SolutionType>(m_best_solution);
         }
 
-        int get_score() const {
-            return m_score.get_loose<int>();
+        score get_score() const {
+            return m_score;
         }
 
         /**
@@ -626,9 +626,9 @@ namespace gempba {
                 std::string v_buffer;
                 p_serialize(v_buffer, res);
 
-                int v_ref_value_local = get_score();
+                score v_ref_value_local = get_score();
                 task_packet v_candidate{v_buffer};
-                m_best_solution_serialized = {score::make(v_ref_value_local), v_candidate};
+                m_best_solution_serialized = {v_ref_value_local, v_candidate};
 
             } else {
                 // some other node requested help, and it is surely waiting for the return value
