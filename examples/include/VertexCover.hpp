@@ -294,7 +294,7 @@ public:
     void recurrent_msg(int id) {
         auto clock = std::chrono::system_clock::now();
         std::time_t time = std::chrono::system_clock::to_time_t(clock); //it includes a "\n"
-        string col1 = fmt::format("VC = {}", branchHandler.get_score().get_loose<int>());
+        string col1 = fmt::format("VC = {}", branchHandler.get_score().to_string());
         string col2 = fmt::format("process {}, thread {}, {}", branchHandler.rank_me(), id, std::ctime(&time));
         cout << std::internal
                 << std::setfill('.')
