@@ -329,7 +329,7 @@ private:
             return;
 
         if (solsize < branchHandler.get_score()) {
-            branchHandler.try_update_result(solsize, solsize);
+            branchHandler.try_update_result(solsize, gempba::score::make(solsize));
 
             auto clock = std::chrono::system_clock::now();
             std::time_t time = std::chrono::system_clock::to_time_t(clock); //it includes a "\n"

@@ -176,7 +176,7 @@ private:
         std::scoped_lock<std::mutex> lck(mtx);
         if (graph.coverSize() < branchHandler.get_score()) {
             int SZ = graph.coverSize(); // debuggin line
-            branchHandler.try_update_result(graph, graph.coverSize());
+            branchHandler.try_update_result(graph, gempba::score::make(graph.coverSize()));
 
             foundAtDepth = depth;
             recurrent_msg(id);

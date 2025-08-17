@@ -238,44 +238,42 @@ namespace gempba {
          * Updates the most up-to-date result. This method overrides the previous result without any checks, and should be used only in multithreading mode. (Not multiprocessing)
          * @tparam T Type of the result
          * @param p_new_result the most promising new result for the solution in the scope calling this method
-         * @param p_new_reference_value the most promising new reference value that represents the result
+         * @param p_new_score the most promising new score that represents the result
         * @return True if the result was successfully updated, false otherwise.
          */
         template<typename T>
-        bool try_update_result(T &p_new_result, const int p_new_reference_value) {
+        bool try_update_result(T &p_new_result, const score p_new_score) {
             std::unique_lock v_lock(m_mutex);
-            const score v_score_temp = score::make(p_new_reference_value);
-            if (!should_update_result(v_score_temp)) {
+            if (!should_update_result(p_new_score)) {
                 return false;
             }
 
             this->m_best_solution = std::make_any<decltype(p_new_result)>(p_new_result);
-            this->m_score = v_score_temp;
+            this->m_score = p_new_score;
             return true;
         }
 
         /**
-         * This method is thread safe: Updates the most up-to-date result if the new reference value is better than the current one. This should be used in multiprocessing mode because it
+         * This method is thread safe: Updates the most up-to-date result if the new score is better than the current one. This should be used in multiprocessing mode because it
          * uses a serializer to convert the result into bytes.
          *
          * @tparam T Type of the result
          * @param p_new_result the most promising new result for the solution in the scope calling this method
-         * @param p_new_reference_value the most promising new reference value that represents the result
+         * @param p_new_score the most promising new score that represents the result
          * @param p_serializer a function that serializes the result into a string
          * @return True if the result was successfully updated, false otherwise.
          */
         template<typename T>
-        bool try_update_result(T &p_new_result, int p_new_reference_value, std::function<task_packet(T &)> &p_serializer) {
+        bool try_update_result(T &p_new_result, score p_new_score, std::function<task_packet(T &)> &p_serializer) {
             std::unique_lock v_lock(m_mutex);
-            const score v_score_temp = score::make(p_new_reference_value);
 
-            if (!should_update_result(v_score_temp)) {
+            if (!should_update_result(p_new_score)) {
                 return false;
             }
 
             const auto v_packet = static_cast<task_packet>(p_serializer(p_new_result));
-            this->m_best_solution_serialized = {v_score_temp, v_packet};
-            this->m_score = v_score_temp;
+            this->m_best_solution_serialized = {p_new_score, v_packet};
+            this->m_score = p_new_score;
 
             return true;
         }
@@ -283,17 +281,16 @@ namespace gempba {
         /**
         * Warning: This is not meant to be used directly by the user. This is called only by the scheduler.
         *
-        * This method is thread safe: Updates the most up-to-date reference value if the new reference value is better than the current one, and clears any previous result.
+        * This method is thread safe: Updates the most up-to-date score if the new score is better than the current one, and clears any previous result.
         *
-        * @param p_new_ref_value the most promising new reference value for the solution in the scope calling this method
-        * @return True if the reference value was successfully updated, false otherwise.
+        * @param p_new_score the most promising new score for the solution in the scope calling this method
+        * @return True if the score was successfully updated, false otherwise.
         */
-        bool try_update_reference_value_and_invalidate_result(const int p_new_ref_value) {
+        bool try_update_score_and_invalidate_result(const score &p_new_score) {
             std::scoped_lock<std::mutex> v_lock(m_mutex);
-            const score v_score_temp = score::make(p_new_ref_value);
 
-            if (should_update_result(v_score_temp)) {
-                m_score = v_score_temp;
+            if (should_update_result(p_new_score)) {
+                m_score = p_new_score;
                 clear_result();
                 return true;
             }
@@ -417,7 +414,7 @@ namespace gempba {
 
         /**
          * if multiprocessing is used, then every process should call this method before starting
-         * @param p_score first approximation of the best reference value of the solution
+         * @param p_score first approximation of the score that represents the best solution
          */
         void set_score(const int p_score) {
             this->m_score = score::make(p_score);

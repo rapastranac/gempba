@@ -63,7 +63,7 @@ namespace gempba {
         const score v_reference_local = score::make(p_branch_handler.get_score()); // constant within this scope
 
         if (should_update_local(m_goal, v_reference_global, v_reference_local)) {
-            p_branch_handler.try_update_reference_value_and_invalidate_result(v_reference_global.get_loose<int>());
+            p_branch_handler.try_update_score_and_invalidate_result(v_reference_global);
         } else if (should_update_global(m_goal, v_reference_global, v_reference_local)) {
             MPI_Ssend(&v_reference_local, sizeof(score), MPI_BYTE, CENTER_NODE, REFERENCE_VAL_PROPOSAL, m_global_reference_value_communicator);
         }
