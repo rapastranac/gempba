@@ -1,5 +1,6 @@
 #ifndef GEMPBA_CENTRALIZED_UTILS_HPP
 #define GEMPBA_CENTRALIZED_UTILS_HPP
+#include <utils/ipc/task_packet.hpp>
 
 /*
  * Author:  David Robert Nadeau
@@ -45,17 +46,17 @@ inline int getNbSetBits(char c) {
     return (c * 01001001001ULL & 042104210421ULL) % 017;
 }
 
-inline int getNbSetBits(std::pair<char *, int> task) {
+inline int getNbSetBits(gempba::task_packet task) {
     int nb = 0;
-    for (int i = 0; i < task.second; ++i) {
-        nb += getNbSetBits(task.first[i]);
+    for (const std::byte &v_byte: task) {
+        nb += getNbSetBits(static_cast<char>(v_byte));
     }
     return nb;
 }
 
 class TaskComparator {
 public:
-    bool operator()(std::pair<char *, int> t1, std::pair<char *, int> t2) {
+    bool operator()(gempba::task_packet t1, gempba::task_packet t2) {
 
         int n1 = getNbSetBits(t1);
         int n2 = getNbSetBits(t2);

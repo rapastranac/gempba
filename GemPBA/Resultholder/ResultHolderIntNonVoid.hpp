@@ -68,25 +68,22 @@ namespace gempba {
                 utils::print_mpi_debug_comments("rank {} entered get() to retrieve from {}! \n", this->branchHandler.world_rank, this->dest_rank);
 
                 MPI_Status status;
-                int Bytes;
+                int v_count;
 
                 MPI_Probe(this->dest_rank, MPI_ANY_TAG, this->branchHandler.getCommunicator(), &status); // receives status before receiving the message
-                MPI_Get_count(&status, MPI_CHAR, &Bytes); // receives total number of datatype elements of the message
+                MPI_Get_count(&status, MPI_BYTE, &v_count); // receives total number of datatype elements of the message
 
-                char *in_buffer = new char[Bytes];
-                MPI_Recv(in_buffer, Bytes, MPI_CHAR, this->dest_rank, MPI_ANY_TAG,
-                         this->branchHandler.getCommunicator(), &status);
+                task_packet v_task_packet(v_count);
+                MPI_Recv(v_task_packet.data(), v_count, MPI_BYTE, this->dest_rank, MPI_ANY_TAG, this->branchHandler.getCommunicator(), &status);
 
                 // printf("rank %d received %d Bytes from %d! \n", branchHandler.world_rank, Bytes, dest_rank);
-                utils::print_mpi_debug_comments("rank {} received {} Bytes from {}! \n", this->branchHandler.world_rank, Bytes, this->dest_rank);
+                utils::print_mpi_debug_comments("rank {} received {} Bytes from {}! \n", this->branchHandler.world_rank, v_count, this->dest_rank);
 
                 std::stringstream ss;
-                for (int i = 0; i < Bytes; i++)
-                    ss << in_buffer[i];
+                ss.write(reinterpret_cast<const char *>(v_task_packet.data()), v_count);
 
                 Ret temp;
                 f_deser(ss, temp);
-                delete[] in_buffer;
 
                 this->isRetrieved = true;
 

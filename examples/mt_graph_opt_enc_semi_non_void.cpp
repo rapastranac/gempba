@@ -4,7 +4,7 @@
 #include <string>
 
 int run(int numThreads, int prob, std::string &filename) {
-    auto &handler = gempba::BranchHandler::getInstance(); // parallel GemPBA
+    auto &handler = gempba::branch_handler::get_instance(); // parallel GemPBA
 
     Graph graph;
     Graph oGraph;
@@ -23,7 +23,7 @@ int run(int numThreads, int prob, std::string &filename) {
 int main(int argc, char *argv[]) {
     Params params = parse(argc, argv);
 
-    int thread_per_task = params.thread_per_task;
+    int thread_per_task = params.cpus_per_task;
     int prob = params.prob;
     auto filename = params.filename;
 

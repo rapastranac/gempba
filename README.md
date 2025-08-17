@@ -470,11 +470,11 @@ If the environment has been properly setup for multiprocessing, the center proce
 
 - initialise:
   - BranchHandler();
-  - MPIScheduler();
+  - mpi_scheduler();
 - read input data
 - build arguments that will be passed to the function that we want to parallelise.
-- serialise these arguments to create a string data buffer. ```std::string```
-- invoke the ``` mpiScheduler.runCenter(buffer.data(),buffer.size()) ``` to passed the raw data buffer ```char[]```.
+- serialise these arguments to create a task_packet data buffer. ```gempba::task_packet```
+- invoke the ``` mpiScheduler.run_center(seed_packet) ``` to pass the raw data buffer ```gempba::task_packet```.
 
 
 <br /> 
@@ -483,12 +483,12 @@ All other processes will do the following steps:
 
 - initialise:
   - BranchHandler();
-  - MPIScheduler();
+  - mpi_scheduler();
 - read input data
   - This is only necessary if all processes need a global copy of the initial data set. Otherwise it can be avoided.
 - Initialise a buffer decoder. This instance will know the data types that the received buffer is going to be converted to.
-- Initialise the ```resultFetcher```. This instance will fetch the result from the *branch handler* the process has ended all its tasks, and it will send it back to the corresponding process. This *result fetcher* is usually invoked when the center has notified termination to all the processes. However, it is aimed to be used for non-void functions, when this result must be returned to another process different from the center.
-- invoke ```mpiScheduler.runNode(branchHandler, bufferDecoder, resultFetcher, serializer)```
+- Initialise the ```result_fetcher```. This instance will fetch the result from the *branch handler* the process has ended all its tasks, and it will send it back to the corresponding process. This *result fetcher* is usually invoked when the center has notified termination to all the processes. However, it is aimed to be used for non-void functions, when this result must be returned to another process different from the center.
+- invoke ```mpiScheduler.run_node(branch_handler, buffer_decoder, result_fetcher, serializer)```
 
 <br /> 
 These functions are synchronised such that no process ends until all of them have properly finished their duties.
@@ -496,7 +496,7 @@ These functions are synchronised such that no process ends until all of them hav
 After doing this, if the user wants to fetch the solution. It should invoke from the center process:
 
 ```cpp
-std::string buffer = mpiScheduler.fetchSolution();
+gempba::task_packet buffer = mpiScheduler.fetchSolution();
 ```
 
 Which is the best solution according to the user's criteria, stored in a serial fashion. This buffer must be deserialised in order to have the actual solution.
@@ -507,7 +507,7 @@ Thus a way to set up the ```main.cpp``` would go like this.
 
 ```cpp
 
-#include "MPI_Scheduler.hpp"
+#include "mpi_scheduler.hpp"
 #include "BranchHandler.hpp"
 
 auto deserializer = [](std::stringstream &ss, auto &...args) {
@@ -516,15 +516,15 @@ auto deserializer = [](std::stringstream &ss, auto &...args) {
 };
 
 auto serializer = [](auto &&...args) {
-    return // std::string type
+    return // gempba::task_packet type
 };
 
 
 int main(){
     // parallel library local reference (BranchHandler is a singleton )
 	auto &branchHandler = gempba::BranchHandler::getInstance(); 
-    // Interprocess communication handler local reference (MPI_Scheduler is a singleton)
-	auto &mpiScheduler = gempba::MPI_Scheduler::getInstance();
+    // Interprocess communication handler local reference (mpi_scheduler is a singleton)
+	auto &mpiScheduler = gempba::mpi_scheduler::get_instance();
     /* gets the rank of the current process, so we know which process is 
         the center */
 	int rank = mpiScheduler.rank_me();
@@ -562,10 +562,10 @@ int main(){
     if (rank == 0) {
         //   or initial data can be read in here by only the rank 0
 
-        // input arguments are serialized and converted to a std::string
-        std::string buffer = serializer(instance, f, d);
+        // input arguments are serialized and converted to a gempba::task_packet
+        gempba::task_packet  seed_packet = serializer(instance, f, d);
 		// center process receive only the raw buffer and its size
-		mpiScheduler.runCenter(buffer.data(), buffer.size());
+		mpiScheduler.run_center(seed_packet);
 	}
 	else
 	{
@@ -589,10 +589,10 @@ int main(){
             but it is sent to the center process only when the execution is terminated.
             
             This method is in charge of directly fetching the result from the Branch Handler as a
-            std::pair<int, std::string> */
+            gempba::result */
 		auto resultFetcher = branchHandler.constructResultFetcher();
-        // Finally these instances are passed through the runNode(...) method
-		mpiScheduler.runNode(branchHandler, bufferDecoder, resultFetcher, serializer);
+        // Finally these instances are passed through the run_node(...) method
+		mpiScheduler.run_node(branchHandler, bufferDecoder, resultFetcher, serializer);
 	}
     /* this is a barrier just in case the user want to ensure that all processes reach this part 
         before continuing */
@@ -644,13 +644,13 @@ int main(){
 
     if (rank == 0) { 
 		mpiScheduler.printStats();
-		std::string buffer = mpiScheduler.fetchSolution(); // returns a stringstream
+		gempba::task_packet buffer = mpiScheduler.fetchSolution(); // returns a stringstream
 
         /* Solution data type must coincide with the data type passed through
         the method BranchHandler::holdSolution(...) */
         SolType solution;
         std::stringstream ss;
-        ss << buffer;   // buffer passed to a stringstream
+        ss.write(reinterpret_cast<const char *>(packet.data()), static_cast<int>(packet.size())); // buffer passed to a stringstream   
 		deserializer(ss, solution);
 
         // do something else with the solution
@@ -690,18 +690,18 @@ int main(){
 
 ```cpp
 #include "BranchHandler.hpp"
-#include "MPI_Scheduler.hpp"
+#include "mpi_scheduler.hpp"
 
 auto deserializer = [](std::stringstream &ss, auto &...args){/*procedure*/};
 
 auto serializer = [](auto &&...args){
     /*procedure*/
-    return /* std::string type */ 
+    return /* gempba::task_packet type */ 
     };
 
 int main(){
     auto &branchHandler = gempba::BranchHandler::getInstance(); 
-    auto &mpiScheduler = gempba::MPI_Scheduler::getInstance();
+    auto &mpiScheduler = gempba::mpi_scheduler::get_instance();
     int rank = mpiScheduler.rank_me();
     branchHandler.passMPIScheduler(&mpiScheduler);
 
@@ -716,22 +716,22 @@ int main(){
     branchHandler.set_lookup_strategy(gempba::MINIMISE);
     branchHandler.setRefValue(/* some integer*/); 
     if (rank == 0) {
-        std::string buffer = serializer(instance, f, d);
-        mpiScheduler.runCenter(buffer.data(), buffer.size());
+        gempba::task_packet seed_packet = serializer(instance, f, d);
+        mpiScheduler.run_center(seed_packet);
     }
     else {
         branchHandler.initThreadPool(numThreads);
         auto bufferDecoder = branchHandler.constructBufferDecoder<void, MyClass, float, double>(foo, deserializer);
         auto resultFetcher = branchHandler.constructResultFetcher();
-        mpiScheduler.runNode(branchHandler, bufferDecoder, resultFetcher, serializer);
+        mpiScheduler.run_node(branchHandler, bufferDecoder, resultFetcher, serializer);
     }
     mpiScheduler.barrier();
 
     if (rank == 0) { 
-        std::string buffer = mpiScheduler.fetchSolution(); 
+        gempba::task_packet buffer = mpiScheduler.fetchSolution(); 
         SolType solution;
         std::stringstream ss;
-        ss << buffer;
+        ss.write(reinterpret_cast<const char *>(packet.data()), static_cast<int>(packet.size()));
         deserializer(ss, solution);
 
         // do something with "solution"
@@ -821,7 +821,7 @@ void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
 ```
 
 
-As you may have noticed, within the termination condition, the solution is captured in a serial fashion. This solution is stored in a ```std::pair<int, string>``` data type, where the integer is the reference value associated with the solution. This reference value is used by the ```MpiScheduler``` when retrieving the global solution by the means of comparing the best value so far against the solutions attained by each process.
+As you may have noticed, within the termination condition, the solution is captured in a serial fashion. This solution is stored in a ```gempba::result``` data type, where the integer is the reference value associated with the solution. This reference value is used by the ```MpiScheduler``` when retrieving the global solution by the means of comparing the best value so far against the solutions attained by each process.
 
 As for the parallel calls, the method ```BranchHandler::try_push_MT(...)``` is changed to ```BranchHandler::try_push_MP(..., serializer)```.
 
@@ -835,7 +835,7 @@ Internally, ```try_push_MP``` will invoke the ```MpiScheduler``` to ascertain fo
 
 The *GemPBA* library includes an optional centralized scheduler for comparison purposes only. It can be activated by compiling with the flag ```-D SCHEDULER_CENTRALIZED```.
 
-To use this feature, simply include the ```MPI_Scheduler_Centralized.hpp``` header file instead of the semicentralized scheduler's header.
+To use this feature, simply include the ```mpi_scheduler_Centralized.hpp``` header file instead of the semicentralized scheduler's header.
 
 
 **Note:** The centralized scheduler is not part of the project's scope, but it is mentioned here for completeness. Depending on your project structure, you might need to add additional imports due to hidden dependencies within the *GemPBA* library.

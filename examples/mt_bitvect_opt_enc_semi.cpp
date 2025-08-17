@@ -2,7 +2,7 @@
 #include "include/mt_bitvect_opt_enc.hpp"
 
 #include <Resultholder/ResultHolder.hpp>
-#include <BranchHandler/BranchHandler.hpp>
+#include <BranchHandler/branch_handler.hpp>
 #include <DLB/DLB_Handler.hpp>
 
 #include <iostream>
@@ -15,7 +15,7 @@
 int run(int numThreads, int prob, std::string &filename) {
     using HolderType = gempba::ResultHolder<void, int, gbitset, int>;
 
-    auto &branchHandler = gempba::BranchHandler::getInstance(); // parallel library
+    auto &branchHandler = gempba::branch_handler::get_instance(); // parallel library
     auto &dlb = gempba::DLB_Handler::getInstance();
 
     cout << "NUMTHREADS= " << numThreads << endl;
@@ -35,8 +35,8 @@ int run(int numThreads, int prob, std::string &filename) {
     gbitset allzeros(gsize);
     gbitset allones = ~allzeros;
 
-    branchHandler.setRefValue(gsize);
-    branchHandler.set_lookup_strategy(gempba::MINIMISE);
+    branchHandler.set_reference_value(gsize);
+    branchHandler.set_goal(gempba::MINIMISE);
 
     int zero = 0;
     int solsize = graph.size();
@@ -49,15 +49,15 @@ int run(int numThreads, int prob, std::string &filename) {
     holder.holdArgs(zero, allones, zero);
 
     double start = branchHandler.WTime();
-    branchHandler.initThreadPool(numThreads);
+    branchHandler.init_thread_pool(numThreads);
     branchHandler.force_push<void>(function, -1, holder);
     branchHandler.wait();
     double end = branchHandler.WTime();
 
-    double idl_tm = branchHandler.getPoolIdleTime();
+    double idl_tm = branchHandler.get_pool_idle_time();
     size_t rqst = branchHandler.number_thread_requests();
 
-    int solution = branchHandler.fetchSolution<int>();
+    int solution = branchHandler.fetch_solution<int>();
     spdlog::debug("\n\n\nCover size : {} \n", solution);
 
     spdlog::debug("Global pool idle time: {0:.6f} seconds\n\n\n", idl_tm);
@@ -78,11 +78,7 @@ int run(int numThreads, int prob, std::string &filename) {
 int main(int argc, char *argv[]) {
     Params params = parse(argc, argv);
 
-    int job_id = params.job_id;
-    int nodes = params.nodes;
-    int ntasks_per_node = params.ntasks_per_node;
-    int ntasks_per_socket = params.ntasks_per_socket;
-    int thread_per_task = params.thread_per_task;
+    int thread_per_task = params.cpus_per_task;
     int prob = params.prob;
     auto filename = params.filename;
 

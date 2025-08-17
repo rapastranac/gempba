@@ -4,61 +4,61 @@
 #include <functional>
 #include <memory>
 #include <mpi.h>
-#include <string>
-#include <utility>
+#include <utils/ipc/result.hpp>
+#include <utils/ipc/task_packet.hpp>
 #include <utils/tree.hpp>
+#include <utils/gempba_utils.hpp>
 
 namespace gempba {
 
     class ResultHolderParent;
 
-    class BranchHandler;
+    class branch_handler;
 
-
-    class SchedulerParent {
+    class scheduler_parent {
     public:
-        SchedulerParent() = default;
+        scheduler_parent() = default;
 
-        virtual ~SchedulerParent() = default;
+        virtual ~scheduler_parent() = default;
 
-        virtual int rank_me() const = 0;
+        [[nodiscard]] virtual int rank_me() const = 0;
 
-        virtual std::string fetchSolution() = 0;
+        virtual task_packet fetch_solution() = 0;
 
-        virtual std::vector<std::pair<int, std::string> > fetchResVec() = 0;
+        virtual std::vector<result> fetch_result_vector() = 0;
 
-        virtual void printStats() = 0;
+        virtual void print_stats() = 0;
 
-        virtual double elapsedTime() const = 0;
+        [[nodiscard]] virtual double elapsed_time() const = 0;
 
-        virtual void allgather(void *recvbuf, void *sendbuf, MPI_Datatype mpi_datatype) = 0;
+        virtual void allgather(void *p_recvbuf, void *p_sendbuf, MPI_Datatype p_mpi_datatype) = 0;
 
-        virtual void gather(void *sendbuf, int sendcount, MPI_Datatype sendtype, void *recvbuf, int recvcount, MPI_Datatype recvtype, int root) = 0;
+        virtual void gather(void *p_sendbuf, int p_sendcount, MPI_Datatype p_sendtype, void *p_recvbuf, int p_recvcount, MPI_Datatype p_recvtype, int p_root) = 0;
 
-        virtual int getWorldSize() const = 0;
+        [[nodiscard]] virtual int get_world_size() const = 0;
 
-        virtual int tasksRecvd() const = 0;
+        [[nodiscard]] virtual int tasks_recvd() const = 0;
 
-        virtual int tasksSent() const = 0;
+        [[nodiscard]] virtual int tasks_sent() const = 0;
 
         virtual void barrier() = 0;
 
-        virtual bool openSendingChannel() = 0;
+        virtual bool open_sending_channel() = 0;
 
-        virtual void closeSendingChannel() = 0;
+        virtual void close_sending_channel() = 0;
 
-        virtual int nextProcess() const = 0;
+        [[nodiscard]] virtual int next_process() const = 0;
 
-        virtual void setRefValStrategyLookup(bool maximisation) = 0;
+        virtual void set_goal(goal p_goal) = 0;
 
-        virtual void push(std::string &&message) = 0;
+        virtual void push(task_packet &&p_task_packet) = 0;
 
-        virtual void runNode(BranchHandler &handler, std::function<std::shared_ptr<ResultHolderParent>(char *, int)> &bufferDecoder,
-                             std::function<std::pair<int, std::string>()> &resultFetcher) = 0;
+        virtual void run_node(branch_handler &p_branch_handler, std::function<std::shared_ptr<ResultHolderParent>(task_packet)> &p_buffer_decoder,
+                              std::function<result()> &p_result_fetcher) = 0;
 
-        virtual void runCenter(const char *SEED, const int SEED_SIZE) = 0;
+        virtual void run_center(task_packet &p_seed) = 0;
 
-        virtual size_t getTotalRequests() const = 0;
+        [[nodiscard]] virtual size_t get_total_requests() const = 0;
 
         virtual void set_custom_initial_topology(tree &&p_tree) = 0;
 

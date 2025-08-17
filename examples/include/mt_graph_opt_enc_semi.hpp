@@ -24,7 +24,7 @@ public:
         cout << msg_center;
         outFile(msg_center, "");
 
-        this->branchHandler.initThreadPool(numThreads);
+        this->branchHandler.init_thread_pool(numThreads);
 
         //size_t _k_mm = maximum_matching(graph);
         //size_t _k_uBound = graph.max_k();
@@ -46,8 +46,8 @@ public:
         begin = std::chrono::steady_clock::now();
 
         try {
-            branchHandler.setRefValue(currentMVCSize);
-            branchHandler.set_lookup_strategy(gempba::MINIMISE);
+            branchHandler.set_reference_value(currentMVCSize);
+            branchHandler.set_goal(gempba::MINIMISE);
             //mvc(-1, 0, graph);
             //testing ****************************************
             HolderType initial(dlb, -1); {
@@ -60,7 +60,7 @@ public:
             //************************************************
 
             branchHandler.wait();
-            graph_res = branchHandler.fetchSolution<Graph>();
+            graph_res = branchHandler.fetch_solution<Graph>();
             graph_res2 = graph_res;
             cover = graph_res.postProcessing();
         } catch (std::exception &e) {
@@ -77,7 +77,7 @@ public:
         end = std::chrono::steady_clock::now();
         elapsed_secs = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
 
-        printf("refGlobal : %d \n", branchHandler.refValue());
+        printf("refGlobal : %d \n", branchHandler.reference_value());
         return true;
     }
 
@@ -90,7 +90,7 @@ public:
         size_t k = relaxation(LB, UB);
         //std::max({LB, degLB, acLB})
 
-        if (k + graph.coverSize() >= (size_t) branchHandler.refValue()) {
+        if (k + graph.coverSize() >= (size_t) branchHandler.reference_value()) {
             //size_t addition = k + graph.coverSize();
             return;
         }
@@ -127,7 +127,7 @@ public:
                 spdlog::debug("rank {}, thread {}, cover is empty\n", branchHandler.rank_me(), id);
                 throw;
             }
-            if (C < branchHandler.refValue()) // user's condition to see if it's worth it to make branch call
+            if (C < branchHandler.reference_value()) // user's condition to see if it's worth it to make branch call
             {
                 int newDepth = depth + 1;
                 hol_l.holdArgs(newDepth, g);
@@ -145,7 +145,7 @@ public:
             g.clean_graph();
             //g.removeZeroVertexDegree();
             int C = g.coverSize();
-            if (C < branchHandler.refValue()) // user's condition to see if it's worth it to make branch call
+            if (C < branchHandler.reference_value()) // user's condition to see if it's worth it to make branch call
             {
                 int newDepth = depth + 1;
                 hol_r.holdArgs(newDepth, g);
@@ -159,7 +159,7 @@ public:
             //if (nbVertices < 50)
             //	branchHandler.forward<void>(_f, id, hol_l);
             //else
-            branchHandler.try_push_MT<void>(_f, id, hol_l);
+            branchHandler.try_push_mt<void>(_f, id, hol_l);
         }
         if (hol_r.evaluate_branch_checkIn()) {
             branchHandler.forward<void>(_f, id, hol_r);
@@ -174,11 +174,10 @@ public:
 private:
     void terminate_condition(Graph &graph, int id, int depth) {
         std::scoped_lock<std::mutex> lck(mtx);
-        if (graph.coverSize() < branchHandler.refValue()) {
+        if (graph.coverSize() < branchHandler.reference_value()) {
             int SZ = graph.coverSize(); // debuggin line
-            branchHandler.holdSolution(graph);
+            branchHandler.try_update_result(graph, graph.coverSize());
 
-            branchHandler.updateRefValue(graph.coverSize());
             foundAtDepth = depth;
             recurrent_msg(id);
 

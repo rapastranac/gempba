@@ -20,7 +20,6 @@ struct Params {
     int ntasks_per_socket;
     int cpus_per_task;
     int prob;
-    int thread_per_task;
     std::string filename;
 };
 
@@ -65,12 +64,6 @@ Params parse(int argc, char *argv[]) {
             .default_value(int{4})
             .action([](const std::string &value) { return std::stoi(value); });
 
-    program.add_argument("-nthreads_per_task", "--nthreads_per_task")
-            .help("Number of thread per task")
-            .nargs(1)
-            .default_value(int{4})
-            .action([](const std::string &value) { return std::stoi(value); });
-
     program.add_argument("-I", "--indir")
             .help("Input directory of the graph to be read")
             .nargs(1)
@@ -90,14 +83,13 @@ Params parse(int argc, char *argv[]) {
     int ntasks_per_socket = program.get<int>("--ntasks_per_socket");
     int cpus_per_task = program.get<int>("--cpus_per_task");
     int prob = program.get<int>("--prob");
-    int threads_per_task = program.get<int>("--nthreads_per_task");
     auto filename = program.get<std::string>("--indir");
 
 
     spdlog::info("argc: {}, nodes: {}, ntasks_per_node: {}, ntasks_per_socket: {}, cpus_per_task: {}, prob : {}, filename: {} \n",
                  argc, nodes, ntasks_per_node, ntasks_per_socket, cpus_per_task, prob, filename);
 
-    return Params{job_id, nodes, ntasks_per_node, ntasks_per_socket, cpus_per_task, prob, threads_per_task, filename};
+    return Params{job_id, nodes, ntasks_per_node, ntasks_per_socket, cpus_per_task, prob, filename};
 }
 
 std::string create_directory(std::string root) {
@@ -123,7 +115,7 @@ std::string create_directory(std::string root, std::string folder, T... dir) {
 }
 
 void printToSummaryFile(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int cpus_per_task,
-                        const std::string &filename_directory, gempba::SchedulerParent &mpiScheduler, int gsize,
+                        const std::string &filename_directory, gempba::scheduler_parent &mpiScheduler, int gsize,
                         int world_size, const std::vector<size_t> &threadRequests, const std::vector<int> &nTasksRecvd,
                         const std::vector<int> &nTasksSent, int solSize, double global_cpu_idle_time,
                         size_t totalThreadRequests) {
@@ -139,9 +131,9 @@ void printToSummaryFile(int job_id, int nodes, int ntasks_per_node, int ntasks_p
     myfile << "cpus-per-task:\t" << cpus_per_task << std::endl;
     myfile << "graph size:\t\t" << gsize << std::endl;
     myfile << "cover size:\t\t" << solSize << std::endl;
-    myfile << "process requests:\t\t" << mpiScheduler.getTotalRequests() << std::endl;
+    myfile << "process requests:\t\t" << mpiScheduler.get_total_requests() << std::endl;
     myfile << "thread requests:\t\t" << totalThreadRequests << std::endl;
-    myfile << "elapsed time:\t\t" << mpiScheduler.elapsedTime() << std::endl;
+    myfile << "elapsed time:\t\t" << mpiScheduler.elapsed_time() << std::endl;
     myfile << "cpu idle time (global):\t" << global_cpu_idle_time << std::endl;
     myfile << "wall idle time (global):\t" << global_cpu_idle_time / (world_size - 1) << std::endl;
 

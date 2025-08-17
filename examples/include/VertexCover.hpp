@@ -5,7 +5,7 @@
 #include <boost/archive/text_iarchive.hpp>
 
 #include "Graph.hpp"
-#include "BranchHandler/BranchHandler.hpp"
+#include "BranchHandler/branch_handler.hpp"
 #include "Resultholder/ResultHolder.hpp"
 #include "util.hpp"
 #include <format>
@@ -230,8 +230,8 @@ public:
                 << "\n";
 
         col1 = "Pool idle time:";
-        col2 = Util::ToString((double) (branchHandler.getPoolIdleTime()));
-        col3 = Util::ToString((double) (branchHandler.getPoolIdleTime() * 100.0 / (elapsed_secs * 1.0e-9))) + "%";
+        col2 = Util::ToString((double) (branchHandler.get_pool_idle_time()));
+        col3 = Util::ToString((double) (branchHandler.get_pool_idle_time() * 100.0 / (elapsed_secs * 1.0e-9))) + "%";
 
         cout << std::left << std::setw(wide * 0.3)
                 << col1
@@ -283,7 +283,7 @@ public:
                 << Util::ToString((int) leaves) << ","
                 << Util::ToString((int) measured_Depth) << ","
                 << Util::ToString((double) (branchHandler.idle_time() * 1.0e-9)) << ","
-                << Util::ToString((double) (branchHandler.getPoolIdleTime())) << "\n";
+                << Util::ToString((double) (branchHandler.get_pool_idle_time())) << "\n";
         output_raw.close();
     }
 
@@ -294,7 +294,7 @@ public:
     void recurrent_msg(int id) {
         auto clock = std::chrono::system_clock::now();
         std::time_t time = std::chrono::system_clock::to_time_t(clock); //it includes a "\n"
-        string col1 = fmt::format("VC = {}", branchHandler.refValue());
+        string col1 = fmt::format("VC = {}", branchHandler.reference_value());
         string col2 = fmt::format("process {}, thread {}, {}", branchHandler.rank_me(), id, std::ctime(&time));
         cout << std::internal
                 << std::setfill('.')
@@ -336,7 +336,7 @@ protected:
 
 protected:
     gempba::DLB_Handler &dlb = gempba::DLB_Handler::getInstance();
-    gempba::BranchHandler &branchHandler = gempba::BranchHandler::getInstance();
+    gempba::branch_handler &branchHandler = gempba::branch_handler::get_instance();
 
     Graph graph;
     Graph graph_res;

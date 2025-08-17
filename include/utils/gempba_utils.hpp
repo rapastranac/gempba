@@ -3,7 +3,7 @@
 
 namespace gempba {
 
-    enum lookup_strategy {
+    enum goal {
         MAXIMISE, MINIMISE
     };
 

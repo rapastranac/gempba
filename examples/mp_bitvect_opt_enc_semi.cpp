@@ -19,13 +19,13 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
     std::cout << "USING SEMI-CENTRALIZED STRATEGY" << std::endl;
 
 
-    gempba::BranchHandler &branchHandler = gempba::BranchHandler::getInstance(); // parallel library
+    gempba::branch_handler &branchHandler = gempba::branch_handler::get_instance(); // parallel library
 
     // NOTE: instantiated object depends on SCHEDULER_CENTRALIZED macro
-    auto &mpiScheduler = gempba::MPI_Scheduler::getInstance();
+    auto &mpiScheduler = gempba::mpi_scheduler::get_instance();
 
     int rank = mpiScheduler.rank_me();
-    branchHandler.passMPIScheduler(&mpiScheduler);
+    branchHandler.pass_mpi_scheduler(&mpiScheduler);
 
     std::cout << "NUMTHREADS= " << threads_per_task << std::endl;
 
@@ -48,15 +48,15 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
     gbitset allzeros(gsize);
     gbitset allones = ~allzeros;
 
-    branchHandler.setRefValue(gsize); // thus, all processes know the best value so far
-    branchHandler.set_lookup_strategy(gempba::MINIMISE);
+    branchHandler.set_reference_value(gsize); // thus, all processes know the best value so far
+    branchHandler.set_goal(gempba::MINIMISE);
 
     int zero = 0;
     int solsize = graph.size();
     std::cout << "solsize=" << solsize << std::endl;
     mpiScheduler.barrier();
 
-    std::string buffer = serializer(zero, allones, zero);
+    gempba::task_packet v_buffer = serializer(zero, allones, zero);
 
 
     std::cout << "Starting MPI node " << branchHandler.rank_me() << std::endl;
@@ -70,23 +70,24 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
 
     if (rank == 0) {
         // center process
-        mpiScheduler.runCenter(buffer.data(), buffer.size());
+        gempba::task_packet v_seed(v_buffer);
+        mpiScheduler.run_center(v_seed);
     } else {
         /*	worker process
             main thread will take care of Inter-process communication (IPC), dedicated core
             numThreads could be the number of physical cores managed by this process - 1
         */
-        branchHandler.initThreadPool(threads_per_task);
+        branchHandler.init_thread_pool(threads_per_task);
 
-        std::function<std::shared_ptr<gempba::ResultHolderParent>(char *, int)> bufferDecoder = branchHandler.constructBufferDecoder<void, int, gbitset, int>(function, deserializer);
+        std::function<std::shared_ptr<gempba::ResultHolderParent>(gempba::task_packet)> bufferDecoder = branchHandler.construct_buffer_decoder<void, int, gbitset, int>(function, deserializer);
         utils::print_mpi_debug_comments("Buffer decoded fetched successfully!\n");
-        std::function<std::pair<int, std::string>()> resultFetcher = branchHandler.constructResultFetcher();
-        mpiScheduler.runNode(branchHandler, bufferDecoder, resultFetcher);
+        std::function<gempba::result()> resultFetcher = branchHandler.construct_result_fetcher();
+        mpiScheduler.run_node(branchHandler, bufferDecoder, resultFetcher);
     }
     mpiScheduler.barrier();
     // *****************************************************************************************
     // this is a generic way of getting information from all the other processes after execution retuns
-    auto world_size = mpiScheduler.getWorldSize();
+    auto world_size = mpiScheduler.get_world_size();
     std::vector<double> idleTime(world_size);
     std::vector<size_t> threadRequests(world_size);
     std::vector<int> nTasksRecvd(world_size);
@@ -99,11 +100,11 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
 
     if (rank != 0) {
         // rank 0 does not run the main function
-        idl_tm = branchHandler.getPoolIdleTime();
+        idl_tm = branchHandler.get_pool_idle_time();
         rqst = branchHandler.number_thread_requests();
 
-        taskRecvd = mpiScheduler.tasksRecvd();
-        taskSent = mpiScheduler.tasksSent();
+        taskRecvd = mpiScheduler.tasks_recvd();
+        taskSent = mpiScheduler.tasks_sent();
     }
 
     // here below, idl_tm is the idle time of the other ranks, which is gathered by .allgather() and stored in
@@ -117,16 +118,16 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
     // *****************************************************************************************
 
     if (rank == 0) {
-        auto solutions = mpiScheduler.fetchResVec();
+        std::vector<gempba::result> solutions = mpiScheduler.fetch_result_vector();
 
-        mpiScheduler.printStats();
+        mpiScheduler.print_stats();
 
         // print sumation of refValGlobal
         int solsize;
         std::stringstream ss;
-        std::string buffer = mpiScheduler.fetchSolution(); // returns a std::stringstream
+        gempba::task_packet packet = mpiScheduler.fetch_solution(); // returns a std::stringstream
 
-        ss << buffer;
+        ss.write(reinterpret_cast<const char *>(packet.data()), static_cast<int>(packet.size()));
 
         deserializer(ss, solsize);
         spdlog::debug("Cover size : {} \n", solsize);
