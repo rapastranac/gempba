@@ -60,7 +60,7 @@ namespace gempba {
         DLB_Handler &m_load_balancer = DLB_Handler::getInstance();
         load_balancing_strategy m_load_balancing_strategy = QUASI_HORIZONTAL;
 
-        int m_reference_value = INT_MIN;
+        score m_score = score::make(INT_MIN);
         goal m_goal = MAXIMISE;
 
         /*------------------------------------------------------>>end*/
@@ -244,12 +244,13 @@ namespace gempba {
         template<typename T>
         bool try_update_result(T &p_new_result, const int p_new_reference_value) {
             std::unique_lock v_lock(m_mutex);
-            if (!should_update_result(p_new_reference_value)) {
+            const score v_score_temp = score::make(p_new_reference_value);
+            if (!should_update_result(v_score_temp)) {
                 return false;
             }
 
             this->m_best_solution = std::make_any<decltype(p_new_result)>(p_new_result);
-            this->m_reference_value = p_new_reference_value;
+            this->m_score = v_score_temp;
             return true;
         }
 
@@ -266,14 +267,15 @@ namespace gempba {
         template<typename T>
         bool try_update_result(T &p_new_result, int p_new_reference_value, std::function<task_packet(T &)> &p_serializer) {
             std::unique_lock v_lock(m_mutex);
+            const score v_score_temp = score::make(p_new_reference_value);
 
-            if (!should_update_result(p_new_reference_value)) {
+            if (!should_update_result(v_score_temp)) {
                 return false;
             }
 
             const auto v_packet = static_cast<task_packet>(p_serializer(p_new_result));
-            this->m_best_solution_serialized = {score::make(p_new_reference_value), v_packet};
-            this->m_reference_value = p_new_reference_value;
+            this->m_best_solution_serialized = {v_score_temp, v_packet};
+            this->m_score = v_score_temp;
 
             return true;
         }
@@ -288,9 +290,10 @@ namespace gempba {
         */
         bool try_update_reference_value_and_invalidate_result(const int p_new_ref_value) {
             std::scoped_lock<std::mutex> v_lock(m_mutex);
+            const score v_score_temp = score::make(p_new_ref_value);
 
-            if (should_update_result(p_new_ref_value)) {
-                m_reference_value = p_new_ref_value;
+            if (should_update_result(v_score_temp)) {
+                m_score = v_score_temp;
                 clear_result();
                 return true;
             }
@@ -310,7 +313,7 @@ namespace gempba {
                     return; // maximise by default
                 }
                 case MINIMISE: {
-                    m_reference_value = INT_MAX;
+                    m_score = score::make(INT_MAX);
                     #if GEMPBA_MULTIPROCESSING
                     m_mpi_scheduler->set_goal(MINIMISE, score_type::I32);
                     #endif
@@ -375,7 +378,7 @@ namespace gempba {
         }
 
         int reference_value() const {
-            return m_reference_value;
+            return m_score.get_loose<int>();
         }
 
         /**
@@ -383,7 +386,7 @@ namespace gempba {
          * @param p_reference_value first approximation of the best reference value of the solution
          */
         void set_reference_value(const int p_reference_value) {
-            this->m_reference_value = p_reference_value;
+            this->m_score = score::make(p_reference_value);
         }
 
 
@@ -740,9 +743,9 @@ namespace gempba {
         #endif
 
     private:
-        [[nodiscard]] bool should_update_result(const int p_new_reference_value) const {
-            const bool v_new_max_is_better = m_goal == MAXIMISE && p_new_reference_value > m_reference_value;
-            const bool v_new_min_is_better = m_goal == MINIMISE && p_new_reference_value < m_reference_value;
+        [[nodiscard]] bool should_update_result(const score &p_new_score) const {
+            const bool v_new_max_is_better = m_goal == MAXIMISE && p_new_score > m_score;
+            const bool v_new_min_is_better = m_goal == MINIMISE && p_new_score < m_score;
             return v_new_max_is_better || v_new_min_is_better;
         }
     };
