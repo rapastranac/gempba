@@ -47,7 +47,7 @@ public:
 
         try {
             branchHandler.set_reference_value(currentMVCSize);
-            branchHandler.set_goal(gempba::MINIMISE);
+            branchHandler.set_goal(gempba::MINIMISE, gempba::score_type::I32);
             //mvc(-1, 0, graph);
             //testing ****************************************
             HolderType initial(dlb, -1); {

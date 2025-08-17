@@ -50,7 +50,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
     gbitset allones = ~allzeros;
 
     branchHandler.set_reference_value(gsize); // thus, all processes know the best value so far
-    branchHandler.set_goal(gempba::MINIMISE);
+    branchHandler.set_goal(gempba::MINIMISE, gempba::score_type::I32);
 
     int zero = 0;
     int solsize = graph.size();

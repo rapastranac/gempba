@@ -306,20 +306,54 @@ namespace gempba {
             return m_thread_requests.load();
         }
 
-        void set_goal(const goal p_goal) {
+        void set_goal(const goal p_goal, const score_type p_type) {
             m_goal = p_goal;
-            switch (p_goal) {
-                case MAXIMISE: {
-                    return; // maximise by default
+            switch (p_type) {
+                case score_type::I32: {
+                    if (p_goal == MAXIMISE) {
+                        m_score = score::make(INT_MIN); // maximisation
+                    } else {
+                        m_score = score::make(INT_MAX); // minimisation
+                    }
+                    break;
                 }
-                case MINIMISE: {
-                    m_score = score::make(INT_MAX);
-                    #if GEMPBA_MULTIPROCESSING
-                    m_mpi_scheduler->set_goal(MINIMISE, score_type::I32);
-                    #endif
+                case score_type::I64: {
+                    if (p_goal == MAXIMISE) {
+                        m_score = score::make(LONG_MIN); // maximisation
+                    } else {
+                        m_score = score::make(LONG_MAX); // minimisation
+                    }
+                    break;
                 }
-            };
-
+                case score_type::F32: {
+                    if (p_goal == MAXIMISE) {
+                        m_score = score::make(FLT_MIN); // maximisation
+                    } else {
+                        m_score = score::make(FLT_MAX); // minimisation
+                    }
+                    break;
+                }
+                case score_type::F64: {
+                    if (p_goal == MAXIMISE) {
+                        m_score = score::make(DBL_MIN); // maximisation
+                    } else {
+                        m_score = score::make(DBL_MAX); // minimisation
+                    }
+                    break;
+                }
+                case score_type::F128: {
+                    if (p_goal == MAXIMISE) {
+                        m_score = score::make(LDBL_MIN); // maximisation
+                    } else {
+                        m_score = score::make(LDBL_MAX); // minimisation
+                    }
+                    break;
+                }
+            }
+            // set the goal in the MPI scheduler if multiprocessing is enabled
+            #if GEMPBA_MULTIPROCESSING
+            m_mpi_scheduler->set_goal(p_goal, p_type);
+            #endif
         }
 
         // get number for this rank
