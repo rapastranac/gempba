@@ -329,9 +329,9 @@ namespace gempba {
         void task_funneling(branch_handler &p_branch_handler);
 
         void receive_reference_value(MPI_Status p_status) {
-            utils::print_mpi_debug_comments("rank {}, about to receive refValue from Center\n", m_world_rank);
+            utils::print_mpi_debug_comments("rank {}, about to receive global score from Center\n", m_world_rank);
             MPI_Recv(&m_global_score, sizeof(score), MPI_BYTE, CENTER_NODE, REFERENCE_VAL_UPDATE, m_global_reference_value_communicator, &p_status);
-            utils::print_mpi_debug_comments("rank {}, received refValue: {} from Center\n", m_world_rank, m_global_score.to_string());
+            utils::print_mpi_debug_comments("rank {}, received global score: {} from Center\n", m_world_rank, m_global_score.to_string());
         }
 
         std::optional<MPI_Status> probe_reference_value_comm() {
@@ -558,13 +558,13 @@ namespace gempba {
         * or they are not up-to-date, thus it is required to broadcast it whether this value changes or not
         */
         void maybe_broadcast_global_reference_value(const score &p_new_global_score, MPI_Status p_status) {
-            utils::print_mpi_debug_comments("center received refValue {} from rank {}\n", p_new_global_score.to_string(), p_status.MPI_SOURCE);
+            utils::print_mpi_debug_comments("center received global score {} from rank {}\n", p_new_global_score.to_string(), p_status.MPI_SOURCE);
 
             const bool v_should_broadcast = should_broadcast_global(m_goal, m_global_score, p_new_global_score);
             if (!v_should_broadcast) {
                 static int failures = 0;
                 failures++;
-                spdlog::debug("FAILED updates : {}, refValueGlobal : {} by rank {}\n", failures, m_global_score.to_string(), p_status.MPI_SOURCE);
+                spdlog::debug("FAILED updates : {}, m_global_score : {} by rank {}\n", failures, m_global_score.to_string(), p_status.MPI_SOURCE);
                 return;
             }
 
@@ -575,7 +575,7 @@ namespace gempba {
 
             static int success = 0;
             success++;
-            spdlog::info("SUCCESSFUL updates: {}, refValueGlobal updated to : {} by rank {}\n", success, m_global_score.to_string(), p_status.MPI_SOURCE);
+            spdlog::info("SUCCESSFUL updates: {}, m_global_score updated to : {} by rank {}\n", success, m_global_score.to_string(), p_status.MPI_SOURCE);
         }
 
         std::optional<MPI_Status> probe_reference_value_comm_center() {
@@ -766,7 +766,7 @@ namespace gempba {
                         MPI_Recv(&v_score, sizeof(score), MPI_BYTE, rank, HAS_RESULT, m_world_communicator, &status);
 
                         m_best_results[rank] = result{v_score, v_task_packet};
-                        spdlog::debug("solution received from rank {}, count : {}, refVal {} \n", rank, count, v_score.to_string());
+                        spdlog::debug("solution received from rank {}, count : {}, global score {} \n", rank, count, v_score.to_string());
                         break;
                     }
                     case NO_RESULT: {
