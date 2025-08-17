@@ -35,7 +35,7 @@ int run(int numThreads, int prob, std::string &filename) {
     gbitset allzeros(gsize);
     gbitset allones = ~allzeros;
 
-    branchHandler.set_score(gsize);
+    branchHandler.set_score(gempba::score::make(gsize));
     branchHandler.set_goal(gempba::MINIMISE, gempba::score_type::I32);
 
     int zero = 0;

@@ -40,7 +40,7 @@ namespace gempba {
             begin = std::chrono::steady_clock::now();
 
             try {
-                branchHandler.set_score(currentMVCSize);
+                branchHandler.set_score(score::make(currentMVCSize));
                 HolderType *dummyParent = new HolderType(dlb, -1); {
                     graph_res = mvc(-1, 0, graph, dummyParent);
                 }

@@ -416,8 +416,8 @@ namespace gempba {
          * if multiprocessing is used, then every process should call this method before starting
          * @param p_score first approximation of the score that represents the best solution
          */
-        void set_score(const int p_score) {
-            this->m_score = score::make(p_score);
+        void set_score(const score &p_score) {
+            this->m_score = p_score;
         }
 
 

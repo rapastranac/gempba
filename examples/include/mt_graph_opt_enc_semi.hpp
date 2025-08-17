@@ -46,7 +46,7 @@ public:
         begin = std::chrono::steady_clock::now();
 
         try {
-            branchHandler.set_score(currentMVCSize);
+            branchHandler.set_score(gempba::score::make(currentMVCSize));
             branchHandler.set_goal(gempba::MINIMISE, gempba::score_type::I32);
             //mvc(-1, 0, graph);
             //testing ****************************************
