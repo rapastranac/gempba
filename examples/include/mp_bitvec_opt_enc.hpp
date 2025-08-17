@@ -217,7 +217,7 @@ public:
             auto str = fmt::format(
                     "WR= {} ID= {} passes={} gsize={} refvalue={} solsize={} isskips={} deglbskips={} {}",
                     branchHandler.rank_me(), id, passes.load(), bits_in_graph.count(),
-                    branchHandler.reference_value(), cursol_size, is_skips, deglb_skips,
+                    branchHandler.get_score(), cursol_size, is_skips, deglb_skips,
                     std::ctime(&time));
 
             cout << str;
@@ -235,7 +235,7 @@ public:
             return;
         }
 
-        if (cursol_size >= branchHandler.reference_value()) {
+        if (cursol_size >= branchHandler.get_score()) {
             return;
         }
 
@@ -339,7 +339,7 @@ public:
         int indsetub = (int) (0.5f * (1.0f + sqrt(tmp)));
         int vclb = nbVertices - indsetub;
 
-        if (vclb + cursol_size >= branchHandler.reference_value()) {
+        if (vclb + cursol_size >= branchHandler.get_score()) {
             is_skips++;
             return;
         }
@@ -347,7 +347,7 @@ public:
         int degLB = 0; //getDegLB(bits_in_graph, nbEdgesDoubleCounted/2);
         degLB = (nbEdgesDoubleCounted / 2) / maxdeg;
         //cout<<"deglb="<<degLB<<" n="<<bits_in_graph.count()<<" refval="<<branchHandler.getRefValue()<<endl;
-        if (degLB + cursol_size >= branchHandler.reference_value()) {
+        if (degLB + cursol_size >= branchHandler.get_score()) {
             deglb_skips++;
             return;
         }
@@ -367,7 +367,7 @@ public:
         }
 
         hol_l.bind_branch_checkIn([&] {
-            int bestVal = branchHandler.reference_value();
+            int bestVal = branchHandler.get_score();
             gbitset ingraph1 = bits_in_graph;
 
             if (!ingraph1[maxdeg_v]) {
@@ -388,7 +388,7 @@ public:
         });
 
         hol_r.bind_branch_checkIn([&] {
-            int bestVal = branchHandler.reference_value();
+            int bestVal = branchHandler.get_score();
             //right branch = take out v nbrs
             gbitset ingraph2 = bits_in_graph;
 
@@ -438,7 +438,7 @@ private:
         if (solsize == 0)
             return;
 
-        if (solsize < branchHandler.reference_value()) {
+        if (solsize < branchHandler.get_score()) {
             //branchHandler.setBestVal(solsize);
             std::function<gempba::task_packet(int &)> v_serializer = make_single_serializer<int>();
             branchHandler.try_update_result(solsize, solsize, v_serializer);

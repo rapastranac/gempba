@@ -411,16 +411,16 @@ namespace gempba {
             return std::any_cast<SolutionType>(m_best_solution);
         }
 
-        int reference_value() const {
+        int get_score() const {
             return m_score.get_loose<int>();
         }
 
         /**
          * if multiprocessing is used, then every process should call this method before starting
-         * @param p_reference_value first approximation of the best reference value of the solution
+         * @param p_score first approximation of the best reference value of the solution
          */
-        void set_reference_value(const int p_reference_value) {
-            this->m_score = score::make(p_reference_value);
+        void set_score(const int p_score) {
+            this->m_score = score::make(p_score);
         }
 
 
@@ -629,7 +629,7 @@ namespace gempba {
                 std::string v_buffer;
                 p_serialize(v_buffer, res);
 
-                int v_ref_value_local = reference_value();
+                int v_ref_value_local = get_score();
                 task_packet v_candidate{v_buffer};
                 m_best_solution_serialized = {score::make(v_ref_value_local), v_candidate};
 

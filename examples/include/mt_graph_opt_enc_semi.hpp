@@ -46,7 +46,7 @@ public:
         begin = std::chrono::steady_clock::now();
 
         try {
-            branchHandler.set_reference_value(currentMVCSize);
+            branchHandler.set_score(currentMVCSize);
             branchHandler.set_goal(gempba::MINIMISE, gempba::score_type::I32);
             //mvc(-1, 0, graph);
             //testing ****************************************
@@ -77,7 +77,7 @@ public:
         end = std::chrono::steady_clock::now();
         elapsed_secs = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
 
-        printf("refGlobal : %d \n", branchHandler.reference_value());
+        printf("refGlobal : %d \n", branchHandler.get_score());
         return true;
     }
 
@@ -90,7 +90,7 @@ public:
         size_t k = relaxation(LB, UB);
         //std::max({LB, degLB, acLB})
 
-        if (k + graph.coverSize() >= (size_t) branchHandler.reference_value()) {
+        if (k + graph.coverSize() >= (size_t) branchHandler.get_score()) {
             //size_t addition = k + graph.coverSize();
             return;
         }
@@ -127,7 +127,7 @@ public:
                 spdlog::debug("rank {}, thread {}, cover is empty\n", branchHandler.rank_me(), id);
                 throw;
             }
-            if (C < branchHandler.reference_value()) // user's condition to see if it's worth it to make branch call
+            if (C < branchHandler.get_score()) // user's condition to see if it's worth it to make branch call
             {
                 int newDepth = depth + 1;
                 hol_l.holdArgs(newDepth, g);
@@ -145,7 +145,7 @@ public:
             g.clean_graph();
             //g.removeZeroVertexDegree();
             int C = g.coverSize();
-            if (C < branchHandler.reference_value()) // user's condition to see if it's worth it to make branch call
+            if (C < branchHandler.get_score()) // user's condition to see if it's worth it to make branch call
             {
                 int newDepth = depth + 1;
                 hol_r.holdArgs(newDepth, g);
@@ -174,7 +174,7 @@ public:
 private:
     void terminate_condition(Graph &graph, int id, int depth) {
         std::scoped_lock<std::mutex> lck(mtx);
-        if (graph.coverSize() < branchHandler.reference_value()) {
+        if (graph.coverSize() < branchHandler.get_score()) {
             int SZ = graph.coverSize(); // debuggin line
             branchHandler.try_update_result(graph, graph.coverSize());
 
