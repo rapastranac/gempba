@@ -56,13 +56,13 @@ namespace gempba {
     }
 
     void mpi_centralized_scheduler::update_ref_value(branch_handler &p_branch_handler) {
-        const int v_reference_global = m_global_reference_value; // constant within this scope
-        const int v_reference_local = p_branch_handler.reference_value(); // constant within this scope
+        const score v_reference_global = m_global_score; // constant within this scope
+        const score v_reference_local = score::make(p_branch_handler.reference_value()); // constant within this scope
 
         if (should_update_local(m_goal, v_reference_global, v_reference_local)) {
-            p_branch_handler.try_update_reference_value_and_invalidate_result(v_reference_global);
+            p_branch_handler.try_update_reference_value_and_invalidate_result(v_reference_global.get_loose<int>());
         } else if (should_update_global(m_goal, v_reference_global, v_reference_local)) {
-            MPI_Ssend(&v_reference_local, 1, MPI_INT, CENTER, REFVAL_PROPOSAL_TAG, m_global_reference_value_communicator);
+            MPI_Ssend(&v_reference_local, sizeof(score), MPI_BYTE, CENTER, REFVAL_PROPOSAL_TAG, m_global_reference_value_communicator);
         }
     }
 }

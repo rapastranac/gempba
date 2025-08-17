@@ -9,11 +9,10 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cfloat>
 #include <climits>
 #include <cstdio>
 #include <cstdlib> /* srand, rand */
-#include <cstring>
-#include <ctime>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -94,7 +93,7 @@ namespace gempba {
 
         task_packet fetch_solution() override {
             for (int rank = 1; rank < m_world_size; rank++) {
-                if (m_best_results[rank].get_score_as_integer() == m_global_reference_value) {
+                if (m_best_results[rank].get_score() == m_global_score) {
                     return m_best_results[rank].get_task_packet();
                 }
             }
@@ -178,11 +177,50 @@ namespace gempba {
             m_mutex.unlock();
         }
 
-        void set_goal(goal p_goal) override {
+        void set_goal(const goal p_goal, const score_type p_type) override {
             this->m_goal = p_goal;
-
-            if (p_goal == MINIMISE) // minimisation
-                m_global_reference_value = INT_MAX;
+            switch (p_type) {
+                case score_type::I32: {
+                    if (p_goal == MAXIMISE) {
+                        m_global_score = score::make(INT_MIN); // maximisation
+                    } else {
+                        m_global_score = score::make(INT_MAX); // minimisation
+                    }
+                    break;
+                }
+                case score_type::I64: {
+                    if (p_goal == MAXIMISE) {
+                        m_global_score = score::make(LONG_MIN); // maximisation
+                    } else {
+                        m_global_score = score::make(LONG_MAX); // minimisation
+                    }
+                    break;
+                }
+                case score_type::F32: {
+                    if (p_goal == MAXIMISE) {
+                        m_global_score = score::make(FLT_MIN); // maximisation
+                    } else {
+                        m_global_score = score::make(FLT_MAX); // minimisation
+                    }
+                    break;
+                }
+                case score_type::F64: {
+                    if (p_goal == MAXIMISE) {
+                        m_global_score = score::make(DBL_MIN); // maximisation
+                    } else {
+                        m_global_score = score::make(DBL_MAX); // minimisation
+                    }
+                    break;
+                }
+                case score_type::F128: {
+                    if (p_goal == MAXIMISE) {
+                        m_global_score = score::make(LDBL_MIN); // maximisation
+                    } else {
+                        m_global_score = score::make(LDBL_MAX); // minimisation
+                    }
+                    break;
+                }
+            }
         }
 
 
@@ -290,8 +328,8 @@ namespace gempba {
 
         void receive_reference_value_from_center(MPI_Status status) {
             utils::print_mpi_debug_comments("rank {}, about to receive refValue from Center\n", m_world_rank);
-            MPI_Recv(&m_global_reference_value, 1, MPI_INT, CENTER, REFVAL_UPDATE_TAG, m_global_reference_value_communicator, &status);
-            utils::print_mpi_debug_comments("rank {}, received refValue: {} from Center\n", m_world_rank, m_global_reference_value);
+            MPI_Recv(&m_global_score, sizeof(score), MPI_BYTE, CENTER, REFVAL_UPDATE_TAG, m_global_reference_value_communicator, &status);
+            utils::print_mpi_debug_comments("rank {}, received refValue: {} from Center\n", m_world_rank, m_global_score.get_loose<int>());
         }
 
         void process_termination(MPI_Status p_status) {
@@ -429,14 +467,14 @@ namespace gempba {
         /*	send solution attained from node to the center node */
         void send_solution(const std::function<result()> &p_result_fetcher) {
             const result v_result = p_result_fetcher();
-            const int v_ref_val = v_result.get_score_as_integer();
+            const score v_score = v_result.get_score();
             task_packet v_task_packet = v_result.get_task_packet();
 
             if (v_result == result::EMPTY) {
                 MPI_Send(nullptr, 0, MPI_BYTE, CENTER, NO_RESULT_TAG, m_world_comm);
             } else {
                 MPI_Send(v_task_packet.data(), static_cast<int>(v_task_packet.size()), MPI_BYTE, CENTER, HAS_RESULT_TAG, m_world_comm);
-                MPI_Send(&v_ref_val, 1, MPI_INT, 0, HAS_RESULT_TAG, m_world_comm);
+                MPI_Send(&v_score, sizeof(score), MPI_BYTE, 0, HAS_RESULT_TAG, m_world_comm);
             }
         }
 
@@ -465,6 +503,12 @@ namespace gempba {
             int v_buffer;
             MPI_Recv(&v_buffer, 1, MPI_INT, status.MPI_SOURCE, status.MPI_TAG, p_communicator, &status);
             return v_buffer;
+        }
+
+        score consume_score_flag(MPI_Status p_status) {
+            score v_score;
+            MPI_Recv(&v_score, sizeof(score), MPI_BYTE, p_status.MPI_SOURCE, p_status.MPI_TAG, m_global_reference_value_communicator, &p_status);
+            return v_score;
         }
 
         /*	run the center node */
@@ -507,7 +551,7 @@ namespace gempba {
                     }
                     break;
                     case REFVAL_PROPOSAL_TAG: {
-                        const int v_candidate_global_reference_value = consume_int_message(v_status, m_global_reference_value_communicator);
+                        score v_candidate_global_reference_value = consume_score_flag(v_status);
                         maybe_broadcast_global_reference_value(v_candidate_global_reference_value, v_status);
                     }
                     break;
@@ -562,25 +606,25 @@ namespace gempba {
         }
 
     private:
-        void maybe_broadcast_global_reference_value(const int p_new_global_reference_value, MPI_Status status) {
-            utils::print_mpi_debug_comments("center received refValue {} from rank {}\n", p_new_global_reference_value, status.MPI_SOURCE);
+        void maybe_broadcast_global_reference_value(const score &p_new_global_score, MPI_Status status) {
+            utils::print_mpi_debug_comments("center received refValue {} from rank {}\n", p_new_global_score.get_loose<int>(), status.MPI_SOURCE);
 
-            const bool v_should_broadcast = should_broadcast_global(m_goal, m_global_reference_value, p_new_global_reference_value);
+            const bool v_should_broadcast = should_broadcast_global(m_goal, m_global_score, p_new_global_score);
             if (!v_should_broadcast) {
                 static int failures = 0;
                 failures++;
-                spdlog::debug("FAILED updates : {}, refValueGlobal : {} by rank {}\n", failures, m_global_reference_value, status.MPI_SOURCE);
+                spdlog::debug("FAILED updates : {}, refValueGlobal : {} by rank {}\n", failures, m_global_score.get_loose<int>(), status.MPI_SOURCE);
                 return;
             }
 
-            m_global_reference_value = p_new_global_reference_value;
+            m_global_score = p_new_global_score;
             for (int rank = 1; rank < m_world_size; rank++) {
-                MPI_Send(&m_global_reference_value, 1, MPI_INT, rank, REFVAL_UPDATE_TAG, m_global_reference_value_communicator);
+                MPI_Send(&m_global_score, sizeof(score), MPI_BYTE, rank, REFVAL_UPDATE_TAG, m_global_reference_value_communicator);
             }
 
             static int success = 0;
             success++;
-            spdlog::debug("SUCCESSFUL updates: {}, refValueGlobal updated to : {} by rank {}\n", success, m_global_reference_value, status.MPI_SOURCE);
+            spdlog::debug("SUCCESSFUL updates: {}, refValueGlobal updated to : {} by rank {}\n", success, m_global_score.get_loose<int>(), status.MPI_SOURCE);
         }
 
         /**
@@ -751,12 +795,12 @@ namespace gempba {
                 switch (status.MPI_TAG) {
                     case HAS_RESULT_TAG: {
 
-                        int v_reference_value;
-                        MPI_Recv(&v_reference_value, 1, MPI_INT, rank, HAS_RESULT_TAG, m_world_comm, &status);
+                        score v_score{};
+                        MPI_Recv(&v_score, sizeof(score), MPI_BYTE, rank, HAS_RESULT_TAG, m_world_comm, &status);
 
-                        m_best_results[rank] = result{v_reference_value, v_task_packet};
+                        m_best_results[rank] = result{v_score.get_loose<int>(), v_task_packet};
 
-                        spdlog::debug("solution received from rank {}, count : {}, refVal {} \n", rank, count, v_reference_value);
+                        spdlog::debug("solution received from rank {}, count : {}, refVal {} \n", rank, count, v_score.get_loose<int>());
                     }
                     break;
 
@@ -814,7 +858,7 @@ namespace gempba {
             m_process_state.resize(m_world_size, STATE_AVAILABLE);
             m_process_tree.resize(m_world_size);
             m_max_queue_size = 0;
-            m_global_reference_value = INT_MIN;
+            m_global_score = score::make(INT_MIN);
 
             if (m_world_rank == 0)
                 m_best_results.resize(m_world_size, result::EMPTY);
@@ -846,8 +890,7 @@ namespace gempba {
         MPI_Comm m_center_fullness_communicator; // CENTER TO WORKER (ONLY)
         MPI_Comm m_world_comm; // BIDIRECTIONAL
 
-
-        int m_global_reference_value;
+        score m_global_score;
 
         bool m_is_center_full = false;
 
@@ -897,19 +940,19 @@ namespace gempba {
          * utility functions to determine whether to update global or local reference values
          * ---------------------------------------------------------------------------------*/
 
-        static bool should_update_global(const goal p_goal, const int p_global_reference_value, const int p_local_reference_value) {
+        static bool should_update_global(const goal p_goal, const score &p_global_reference_value, const score &p_local_reference_value) {
             return should_update(p_goal, p_global_reference_value, p_local_reference_value);
         }
 
-        static bool should_update_local(const goal p_goal, const int p_global_reference_value, const int p_local_reference_value) {
+        static bool should_update_local(const goal p_goal, const score &p_global_reference_value, const score &p_local_reference_value) {
             return should_update(p_goal, p_local_reference_value, p_global_reference_value);
         }
 
-        static bool should_broadcast_global(const goal p_goal, const int p_old_global, const int p_new_global) {
+        static bool should_broadcast_global(const goal p_goal, const score &p_old_global, const score &p_new_global) {
             return should_update(p_goal, p_old_global, p_new_global);
         }
 
-        static bool should_update(const goal p_goal, const int p_old_value, const int p_new_value) {
+        static bool should_update(const goal p_goal, const score &p_old_value, const score &p_new_value) {
             const bool new_max_is_better = p_goal == MAXIMISE && p_new_value > p_old_value;
             const bool new_min_is_better = p_goal == MINIMISE && p_new_value < p_old_value;
             return new_max_is_better || new_min_is_better;

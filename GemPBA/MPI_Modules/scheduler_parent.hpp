@@ -5,6 +5,7 @@
 #include <memory>
 #include <mpi.h>
 #include <utils/ipc/result.hpp>
+#include <utils/ipc/score.hpp>
 #include <utils/ipc/task_packet.hpp>
 #include <utils/tree.hpp>
 #include <utils/gempba_utils.hpp>
@@ -49,7 +50,7 @@ namespace gempba {
 
         [[nodiscard]] virtual int next_process() const = 0;
 
-        virtual void set_goal(goal p_goal) = 0;
+        virtual void set_goal(goal p_goal, score_type p_type) = 0;
 
         virtual void push(task_packet &&p_task_packet) = 0;
 

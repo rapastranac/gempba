@@ -312,7 +312,7 @@ namespace gempba {
                 case MINIMISE: {
                     m_reference_value = INT_MAX;
                     #if GEMPBA_MULTIPROCESSING
-                    m_mpi_scheduler->set_goal(MINIMISE); // TODO redundant
+                    m_mpi_scheduler->set_goal(MINIMISE, score_type::I32);
                     #endif
                 }
             };
