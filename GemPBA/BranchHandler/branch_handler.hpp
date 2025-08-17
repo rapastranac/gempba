@@ -235,7 +235,7 @@ namespace gempba {
         }
 
         /**
-         * Updates the most up-to-date result. This method overrides the previous result without any checks, and should be used only in multithreading mode. (Not multiprocessing)
+         * Updates the most up-to-date result. This method attempts to update the result, and should be used only in multithreading mode. (Not multiprocessing)
          * @tparam T Type of the result
          * @param p_new_result the most promising new result for the solution in the scope calling this method
          * @param p_new_score the most promising new score that represents the result

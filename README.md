@@ -10,7 +10,7 @@
 - **CMake** ≥ 3.28
 - **OpenMPI** ≥ 4.0
 - **Boost** libraries (optional, only for examples and tests)
-- **GoogleTest** if you want to run the tests (Not fetched by default)
+- **GoogleTest** if you want to run and compile the tests (Not fetched by default)
 
 ## Testing
 
@@ -28,7 +28,7 @@ List of dependencies:
 
 # Installation:
 ## How to include the GemPBA library in your project
-To include the *GemPBA* library in your project, you can either clone the repository or download it as a zip file. After that, you can include the necessary headers in your source files.
+To include the **GemPBA** library in your project, you can either clone the repository or download it as a zip file. After that, you can include the necessary headers in your source files.
 
 However, it is recommended to use **CPM** to manage the **GemPBA** library in your project. This way, you can easily keep track of updates and dependencies. If you don't have an `${WORKSPACE}/external` folder in your project, you can create one and add the following `external/CMakeLists.txt` file to it:
 
@@ -117,17 +117,34 @@ This tool will help you parallelize almost any branching algorithm that seemed i
  
  - *MPI Scheduler:*
 
-    This additional module is in charge of establishing inter-process communication using a lightweight semi-centralised topology. If multiprocessing parallelism is of the user's interest, then this module must be used and passed to the Branch Handler just after its initialisation,
+    This additional module is in charge of establishing inter-process communication using a lightweight semi-centralized topology. If multiprocessing parallelism is of the user's interest, then this module must be used and passed to the Branch Handler just after its initialization,
     
 
 <br /> 
 <br />
 
+
+## Concepts
+The following concepts are essential to understand how to use the **GemPBA** library. 
+
+ - `gempba::goal`: 
+    This is an enumeration that defines the goal of the algorithm, whether it is a minimization or maximization problem. The default value is maximization.
+ - `gempba::score`:
+    This is a class that wraps a primitive type, which is used to compare the quality of the solutions found so far. It can be an integer, float, double, etc. The user must define the type of score he wants to use by passing it to the `branch_handler` using the method ```set_goal(gempba::goal, gempba::score_type)```.
+ - `gempba::score_type`:
+    This is an enumeration that defines the primitive type that will be used as a score. The available types are: `I32`, `I64`, `F32`, `F64`, `F128`. The default value is `I32`.
+
+Most branching algorithm aim to find the best solution according to a certain criteria, which is usually a minimization or maximization problem. The **GemPBA** library is designed to handle both types of problems, and it is up to the user to define the goal of the algorithm. Whether we are minimizing or maximizing, the library will handle the comparison of the numerical values found so far, and it will store the best solution according to the user's criteria. 
+
+The score (formerly known as reference_value) is anything that can be used to represent the quality of the solution found so far. It can be the size of the solution, the cost of it, or any other metric that the user wants to use. As per the examples in this project, the size of the solution is used as the score to compare the solutions found so far, which is an integer value. If the user wants to use a different metric, he can do so by defining the type of score he wants to use.
+
+There is no need to initialize the score value nor the goal if this is a maximization problem and the score wraps an integer. However, if the user wants to use a different type of score or if the problem is a minimization one, then he must set these values using the method ```branch_handler::set_goal(gempba::goal, gempba::score_type)```. It is the user's responsibility to set the score value if it is not the default one and be consistent when updating it, otherwise unexpected behaviour might occur.
+
 ## Multithreading
 
-This is the easiest environment to setup, which is in turn the fastest to implement. In general the user must modify only the main functions to be parallelised. If the algorithm uses more than a single function recursion, this can also be parallelised.
+This is the easiest environment to set up, which is in turn the fastest to implement. In general the user must modify only the main functions to be parallelized. If the algorithm uses more than a single function recursion, this can also be parallelized.
 
-Consider the following function with three branches per recursion. Essentially, when finding a solution, every algorithm can be reduced to a minimisation or maximisation problem. For the sake of the following example, let's assume that it is a minimisation problem.
+Consider the following function with three branches per recursion. Essentially, when finding a solution, every algorithm can be reduced to a minimization or maximization problem. For the sake of the following example, let's assume that it is a minimization problem.
 
 ```cpp
 void foo(MyClass instance, float f, double d){
@@ -148,7 +165,7 @@ void foo(MyClass instance, float f, double d){
 }
 ```
 
-In order to parallelise the previous code, the function signature should change like this.
+In order to parallelize the previous code, the function signature should change like this.
 <br /> 
 
 ```cpp
@@ -157,24 +174,24 @@ void foo(int id, MyClass instance, float f, double d, void *parent = nullptr);
 
 <br />
 
- Where ```id``` stands for thread ID and ```parent``` is designed to used the *Novel Dynamic Load Balancing*.
+ Where ```id``` stands for thread ID and ```parent``` is designed to use the *Novel Dynamic Load Balancing*.
 
  These additional arguments are to be used by the library only, yet the user could also use them to track like threads utilization and other scenarios that it might find applicable.
 
 
- Thus, the parallelised version of the code will be like as follows.
+ Thus, the parallelized version of the code will be like as follows.
 
  ```cpp
 std::mutex mtx;
 auto &dlb = gempba::DLB_Handler::getInstance();
-auto &branchHandler = gempba::BranchHandler::getInstance();
+auto &branchHandler = gempba::branch_handler::get_instance();
 using HolderType = gempba::ResultHolder<void, MyClass, float, double>;
 
 void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
 
     // local solution might be the size of any input argument
 
-    if (localSolution < branchHandler.refValue()){
+    if (localSolution < branchHandler.get_score().get<int>()){
         /* the following mutex ensures that one best solution so far is
         store at a time */
         std::scoped_lock<std::mutex> lock(mtx); 
@@ -182,14 +199,15 @@ void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
         /*  if the condition is met, then the solution can be stored in
         the library, which can be retrieved at the end of the
         execution, if the solution is not required to be stored, then
-        there is no need to invoke this method nor to use the mutex */   
-        branchHandler.holdSolution(localSolution);
+        there is no need to invoke this method nor use the mutex */   
         
-        /*this method stores the best reference value of the solution 
-        found so far, which is usually the size of it. It is thread safe,
-        and no synchronisation methods are required from the user's end
-        as long as holdSolution() is not invoked.*/
-        branchHandler.updateRefValue(localSolution.size());
+        // We wrap the size of the solution in a gempba::score
+        gempba::score score = gempba::score::make(localSolution);
+       
+        /* Attempt to hold the solution in the `branch_handler`, update might fail
+        * because another thread might have found a better solution in the meantime.
+        */  
+        branchHandler.try_update_result(localSolution, score);
         
         return;
     }
@@ -204,35 +222,35 @@ void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
     /* The dynamic load balancing uses tracks the search tree using these
     temporary arguments holders.*/
 
-    HolderType rHolder_l(dlb, id, parent);
-    HolderType rHolder_m(dlb, id, parent);
-    HolderType rHolder_r(dlb, id, parent);
+    HolderType result_holder_left(dlb, id, parent);
+    HolderType result_holder_middle(dlb, id, parent);
+    HolderType result_holder_right(dlb, id, parent);
 
     /*  if parent is nullptr, then a virtual root is should be created
     such that branches within this scope can be accessed from below */
     if (branchHandler.get_load_balancing_strategy() == gempba::QUASI_HORIZONTAL) {
         dummyParent = new HolderType(dlb, id);
-        dlb.linkVirtualRoot(id, dummyParent, rHolder_l, rHolder_m, rHolder_r);
+        dlb.linkVirtualRoot(id, dummyParent, result_holder_left, result_holder_middle, result_holder_right);
     }
 
     /* arguments for each branch should be constructed before making any
-    branch call since, there is no guarantee of parallelising each branch 
+    branch call since, there is no guarantee of parallelizing each branch 
     on this recursion level*/
-    rHolder_l.holdArgs(instance_l, f_l, d_l);
-    rHolder_m.holdArgs(instance_m, f_m, d_m);
-    rHolder_r.holdArgs(instance_r, f_r, d_r);
+    result_holder_left.holdArgs(instance_l, f_l, d_l);
+    result_holder_middle.holdArgs(instance_m, f_m, d_m);
+    result_holder_right.holdArgs(instance_r, f_r, d_r);
 
 
-    /*  The try_push_MT<>() method is aynchronous as long as an available
-    processor is found, other wise, it explore branch in a senquential fashion*/
-    branchHandler.try_push_MT<void>(foo, id, rHolder_l);
-    branchHandler.try_push_MT<void>(foo, id, rHolder_m);
+    /*  The try_push_mt<>() method is aynchronous as long as an available
+    processor is found, otherwise, it explore branch in a senquential fashion*/
+    branchHandler.try_push_mt<void>(foo, id, result_holder_left);
+    branchHandler.try_push_mt<void>(foo, id, result_holder_middle);
     
 
     /*  it makes no sense to call asynchronously the last branch, since it
     can be safely be executed sequentially, yet, if down the search tree,the owner thread of this search domain finds an available processor, 
     then this branch can be sent to another processor.*/
-    branchHandler.forward<void>(foo, id, rHolder_r);
+    branchHandler.forward<void>(foo, id, result_holder_right);
 
     
     // if virtual root allocated, memory should be freed
@@ -246,7 +264,7 @@ void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
 <br /> 
 <br />
 
-As seen above, the parallelisation of this algorithm is straightforward once the library is well managed. It is worth highlighting that input arguments must be ready before any branch calling, since down this branch, the ```DLB``` might try to call a sibling branch at this level, and it will receive only empty data. This might introduce some unnecessary memory utilization. Also, instantiating an input parameter will lead to passing outdated arguments to the functions that may be discarded just after invoking the function. This can be minimised by other available techniques discussed later.
+As seen above, the parallelization of this algorithm is straightforward once the library is well managed. It is worth highlighting that input arguments must be ready before any branch calling, since down this branch, the ```DLB``` might try to call a sibling branch at this level, and it will receive only empty data. This might introduce some unnecessary memory utilization. Also, instantiating an input parameter will lead to passing outdated arguments to the functions that may be discarded just after invoking the function. This can be minimized by other available techniques discussed later.
 
 Let's imagine that there are three functions ```foo1, foo2, foo3```, and they call each other recursively. Like the following snippet.
 
@@ -269,43 +287,44 @@ void foo1(MyClass instance, float f, double d){
 }
 ```
 
-Parallelising the program would not be any different than the version presented above. We should only pay attention to match the proper arguments to the corresponding function. Which just modifies the parallel version, excluding the comment. It will result as follows.
+Parallelizing the program would not be any different than the version presented above. We should only pay attention to match the proper arguments to the corresponding function. Which just modifies the parallel version, excluding the comment. It will result as follows.
 <br /> 
 <br />
 
  ```cpp
 std::mutex mtx;
 auto &dlb = gempba::DLB_Handler::getInstance();
-auto &branchHandler = gempba::BranchHandler::getInstance();
+auto &branchHandler = gempba::branch_handler::get_instance();
 using HolderType = gempba::ResultHolder<void, MyClass, float, double>;
 
 void foo1(int id, MyClass instance, float f, double d, void *parent = nullptr)
 
-    if (localSolution < branchHandler.refValue()){
-        std::scoped_lock<std::mutex> lock(mtx); 
-        branchHandler.holdSolution(localSolution);
-        branchHandler.updateRefValue(localSolution.size());
+    if (localSolution < branchHandler.get_score().get<int>()){
+        std::scoped_lock<std::mutex> lock(mtx);
+
+        auto score = gempba::score::make(localSolution.size());
+        branch_handler.try_update_result(localSolution, score);
         return;
     }
 
     
     HolderType *dummyParent = nullptr;
-    HolderType rHolder_l(dlb, id, parent);
-    HolderType rHolder_m(dlb, id, parent);
-    HolderType rHolder_r(dlb, id, parent);
+    HolderType result_holder_left(dlb, id, parent);
+    HolderType result_holder_middle(dlb, id, parent);
+    HolderType result_holder_right(dlb, id, parent);
 
     if (branchHandler.get_load_balancing_strategy() == gempba::QUASI_HORIZONTAL) {
         dummyParent = new HolderType(dlb, id);
-        dlb.linkVirtualRoot(id, dummyParent, rHolder_l, rHolder_m, rHolder_r);
+        dlb.linkVirtualRoot(id, dummyParent, result_holder_left, result_holder_middle, result_holder_right);
     }
 
-    rHolder_l.holdArgs(instance_l, f_l, d_l);
-    rHolder_m.holdArgs(instance_m, f_m, d_m);
-    rHolder_r.holdArgs(instance_r, f_r, d_r);
+    result_holder_left.holdArgs(instance_l, f_l, d_l);
+    result_holder_middle.holdArgs(instance_m, f_m, d_m);
+    result_holder_right.holdArgs(instance_r, f_r, d_r);
 
-    branchHandler.try_push_MT<void>(foo1, id, rHolder_l);
-    branchHandler.try_push_MT<void>(foo2, id, rHolder_m);
-    branchHandler.forward<void>(foo3, id, rHolder_r);
+    branchHandler.try_push_mt<void>(foo1, id, result_holder_left);
+    branchHandler.try_push_mt<void>(foo2, id, result_holder_middle);
+    branchHandler.forward<void>(foo3, id, result_holder_right);
 
     if (dummyParent)
             delete dummyParent;
@@ -315,16 +334,16 @@ void foo1(int id, MyClass instance, float f, double d, void *parent = nullptr)
 ```
 
 
-If there is no interest in parallelising a branch, it can simply be invoked as its sequential fashion, however the two new arguments must be considered. For instance, the last branch.
+If there is no interest in parallelizing a branch, it can simply be invoked as its sequential fashion, however the two new arguments must be considered. For instance, the last branch.
 
 ``` foo(id, instance_r, f_r, d_r, nullptr) ```
 
 If this branch is to be run sequentially, then no instance of ```gempba::ResultHolder``` should be created for it.
 
 
-Most of the time, the code of a branching algorithm is optimised to check if the branch is worth it to explore. What usually happens is that the instances to be passed are compared somehow against the best solution so far, and therefore it is possible to conclude that a branch is leading to a better or worse solution.
+Most of the time, the code of a branching algorithm is optimized to check if the branch is worth it to explore. What usually happens is that the instances to be passed are compared somehow against the best solution so far, and therefore it is possible to conclude that a branch is leading to a better or worse solution.
 
-Then, an optimised version of our sequential algorithm would be as follows.
+Then, an optimized version of our sequential algorithm would be as follows.
 
 
 
@@ -356,72 +375,72 @@ The branch checking in the above code does not change in its parallel version.
 ***GemPBA*** has a method to avoid instantiating input parameters for each branch, which is the ```bind_branch_checkIn``` method. This method guarantees to instantiate the input arguments just before using them, thus guaranteeing to use the most up-to-date values. This avoids sending useless data to processors just to be discarded by the algorithm in the first few lines.
 
 
-Let's optimise our reference parallel code. 
+Let's optimize our reference parallel code. 
 <br /> 
 <br />
 
  ```cpp
 std::mutex mtx;
 auto &dlb = gempba::DLB_Handler::getInstance();
-auto &branchHandler = gempba::BranchHandler::getInstance();
+auto &branchHandler = gempba::branch_handler::get_instance();
 using HolderType = gempba::ResultHolder<void, MyClass, float, double>;
 
 void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
 
-    if (localSolution < branchHandler.refValue()){
+    if (localSolution < branchHandler.get_score().get<int>()){
         std::scoped_lock<std::mutex> lock(mtx); 
-        branchHandler.holdSolution(localSolution);
-        branchHandler.updateRefValue(localSolution.size());
+        auto score = gempba::score::make(localSolution.size());
+        branchHandler.try_update_result(localSolution, score);
         
         return;
     }
 
     HolderType *dummyParent = nullptr;
-    HolderType rHolder_l(dlb, id, parent);
-    HolderType rHolder_m(dlb, id, parent);
-    HolderType rHolder_r(dlb, id, parent);
+    HolderType result_holder_left(dlb, id, parent);
+    HolderType result_holder_middle(dlb, id, parent);
+    HolderType result_holder_right(dlb, id, parent);
 
     if (branchHandler.get_load_balancing_strategy() == gempba::QUASI_HORIZONTAL){
         dummyParent = new HolderType(dlb, id);
-        dlb.linkVirtualRoot(id, dummyParent, rHolder_l, rHolder_m, rHolder_r);
+        dlb.linkVirtualRoot(id, dummyParent, result_holder_left, result_holder_middle, result_holder_right);
     }
     
 
-    rHolder_l.bind_branch_checkIn([&]{
+    result_holder_left.bind_branch_checkIn([&]{
                                       /* arguments intantiation instance_l, f_l, d_l */
                                       if (/* left branch leads to a better solution */){
-                                          rHolder_l.holdArgs(instance_l, f_l, d_l);
+                                          result_holder_left.holdArgs(instance_l, f_l, d_l);
                                           return true;
                                       }
                                       else { return false;}                                          
                                   });
 
-    rHolder_m.bind_branch_checkIn([&]{
+    result_holder_middle.bind_branch_checkIn([&]{
                                       /* arguments intantiation instance_m, f_m, d_m */
                                       if (/* middle branch leads to a better solution */){
-                                          rHolder_m.holdArgs(instance_m, f_m, d_m);
+                                          result_holder_middle.holdArgs(instance_m, f_m, d_m);
                                           return true;
                                       }
                                       else { return false;}                                          
                                   });
 
-    rHolder_r.bind_branch_checkIn([&]{
+    result_holder_right.bind_branch_checkIn([&]{
                                       /* arguments intantiation instance_r, f_r, d_r */
                                       if (/* right branch leads to a better solution */){
-                                          rHolder_r.holdArgs(instance_r, f_r, d_r);
+                                          result_holder_right.holdArgs(instance_r, f_r, d_r);
                                           return true;
                                       }
                                       else { return false;}                                          
                                   });
 
-    if (rHolder_l.evaluate_branch_checkIn()){
-        branchHandler.try_push_MT<void>(foo, id, rHolder_l);
+    if (result_holder_left.evaluate_branch_checkIn()){
+        branchHandler.try_push_mt<void>(foo, id, result_holder_left);
     }
-    if (rHolder_m.evaluate_branch_checkIn()){
-        branchHandler.try_push_MT<void>(foo, id, rHolder_m);
+    if (result_holder_middle.evaluate_branch_checkIn()){
+        branchHandler.try_push_mt<void>(foo, id, result_holder_middle);
     }
-    if (rHolder_r.evaluate_branch_checkIn()){
-        branchHandler.forward<void>(foo, id, rHolder_r);
+    if (result_holder_right.evaluate_branch_checkIn()){
+        branchHandler.forward<void>(foo, id, result_holder_right);
     }
 
     if (dummyParent)
@@ -432,7 +451,7 @@ void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
 ```
 
 
-As seen above, the ```HolderType``` instance wraps a lambda function, where the instantiation is delegated to it, and it must return a boolean. The purpose of this lambda function is to be able to tell the library if it is worth it to invoke a branch. Then, after the instantiation within the lambda function scope, this is verified. Since it is reading the most up-to-date values, now it is possible to use the custom verification to skip a branch or not. If it is worth it, then the ```HolderType``` instance holds the arguments as usual and the lambda function returns ```true```. If it is not worth it, there is no need to hold arguments, and the lambda function returns ```false```. Note that the lambda function captures by references, this is important if we implement this as a memory optimiser.
+As seen above, the ```HolderType``` instance wraps a lambda function, where the instantiation is delegated to it, and it must return a boolean. The purpose of this lambda function is to be able to tell the library if it is worth it to invoke a branch. Then, after the instantiation within the lambda function scope, this is verified. Since it is reading the most up-to-date values, now it is possible to use the custom verification to skip a branch or not. If it is worth it, then the ```HolderType``` instance holds the arguments as usual and the lambda function returns ```true```. If it is not worth it, there is no need to hold arguments, and the lambda function returns ```false```. Note that the lambda function captures by references, this is important if we implement this as a memory optimizer.
 
 
 Since this lambda function wraps the branch verification condition, there is no need to write it again in the main scope, since it can be simply invoked by calling the method ```evaluate_branch_checkIn()``` as shown above.
@@ -450,30 +469,30 @@ This ```evaluate_branch_checkIn()``` method is also invoked internally in ***Gem
 
 ## Multiprocessing
 
-This is aimed for advanced users who might want to massively parallelise their applications. However, a user without parallelisation experience would be able to set this up eaisly. Before continue reading, we encourage the reader to learn and undertand the difference between a process and a thread.
+This is aimed for advanced users who might want to massively parallelize their applications. However, a user without parallelization experience would be able to set this up eaisly. Before continue reading, we encourage the reader to learn and undertand the difference between a process and a thread.
 
 Multiprocessing can also be used within a single machine depending on the user's interests.
 
 
-***GemPBA*** uses *openmpi* to establish interprocess communication. In order to achieve better performance, a semi-centralised topology is the core of the communication. When launching your program with *openmpi*, the next command is used in the bash.
+***GemPBA*** uses *openmpi* to establish interprocess communication. In order to achieve better performance, a semi-centralized topology is the core of the communication. When launching your program with *openmpi*, a similar command as follows is used in the bash.
 
 ```
-    mpirun -n 10 --oversubscribe a.out args...
+    mpirun -n 10 --oversubscribe a.out args...
 ```
 
 The ```-n``` tells *openmpi* the number of processes to be spawned. The keyword. ```--oversubscribe``` is usually included if all launching processes will be executed within a machine that does not have at least the same number of physical cores. ```a.out``` is the executable and ```args...``` stands for any other argument that the application receives before running.
 
 
-When executing the aforementioned command, it will launch *N* copies of the program that will do exactly the same. The trick is to make them communicate. For this, the semi-centralised topology is implemented. 
+When executing the aforementioned command, it will launch *N* copies of the program that will do exactly the same. The trick is to make them communicate. For this, the semi-centralized topology is implemented. 
 
 If the environment has been properly setup for multiprocessing, the center process (rank 0) will do the following steps:
 
-- initialise:
-  - BranchHandler();
+- initialize:
+  - branch_handler();
   - mpi_scheduler();
 - read input data
-- build arguments that will be passed to the function that we want to parallelise.
-- serialise these arguments to create a task_packet data buffer. ```gempba::task_packet```
+- build arguments that will be passed to the function that we want to parallelize.
+- serialize these arguments to create a task_packet data buffer. ```gempba::task_packet```
 - invoke the ``` mpiScheduler.run_center(seed_packet) ``` to pass the raw data buffer ```gempba::task_packet```.
 
 
@@ -481,25 +500,25 @@ If the environment has been properly setup for multiprocessing, the center proce
 
 All other processes will do the following steps:
 
-- initialise:
-  - BranchHandler();
+- initialize:
+  - branch_handler();
   - mpi_scheduler();
 - read input data
-  - This is only necessary if all processes need a global copy of the initial data set. Otherwise it can be avoided.
-- Initialise a buffer decoder. This instance will know the data types that the received buffer is going to be converted to.
-- Initialise the ```result_fetcher```. This instance will fetch the result from the *branch handler* the process has ended all its tasks, and it will send it back to the corresponding process. This *result fetcher* is usually invoked when the center has notified termination to all the processes. However, it is aimed to be used for non-void functions, when this result must be returned to another process different from the center.
+  - This is only necessary if all processes need a global copy of the initial data set. Otherwise, it can be avoided.
+- Initialize a buffer decoder. This instance will know the data types that the received buffer is going to be converted to.
+- Initialize the ```result_fetcher```. This instance will fetch the result from the *branch handler* the process has ended all its tasks, and it will send it back to the corresponding process. This *result fetcher* is usually invoked when the center has notified termination to all the processes. However, it is aimed to be used for non-void functions, when this result must be returned to another process different from the center.
 - invoke ```mpiScheduler.run_node(branch_handler, buffer_decoder, result_fetcher, serializer)```
 
 <br /> 
-These functions are synchronised such that no process ends until all of them have properly finished their duties.
+These functions are synchronized such that no process ends until all of them have properly finished their duties.
 
 After doing this, if the user wants to fetch the solution. It should invoke from the center process:
 
 ```cpp
-gempba::task_packet buffer = mpiScheduler.fetchSolution();
+gempba::task_packet buffer = mpiScheduler.fetch_solution();
 ```
 
-Which is the best solution according to the user's criteria, stored in a serial fashion. This buffer must be deserialised in order to have the actual solution.
+Which is the best solution according to the user's criteria, stored in a serial fashion. This buffer must be deserialized in order to have the actual solution.
 
 
 Thus a way to set up the ```main.cpp``` would go like this.
@@ -508,7 +527,7 @@ Thus a way to set up the ```main.cpp``` would go like this.
 ```cpp
 
 #include "mpi_scheduler.hpp"
-#include "BranchHandler.hpp"
+#include "branch_handler.hpp"
 
 auto deserializer = [](std::stringstream &ss, auto &...args) {
     // - serialize arguments into stream ss
@@ -522,7 +541,7 @@ auto serializer = [](auto &&...args) {
 
 int main(){
     // parallel library local reference (BranchHandler is a singleton )
-	auto &branchHandler = gempba::BranchHandler::getInstance(); 
+	auto &branchHandler = gempba::branch_handler::get_instance(); 
     // Interprocess communication handler local reference (mpi_scheduler is a singleton)
 	auto &mpiScheduler = gempba::mpi_scheduler::get_instance();
     /* gets the rank of the current process, so we know which process is 
@@ -530,7 +549,7 @@ int main(){
 	int rank = mpiScheduler.rank_me();
     /* mpiScheduler is manually passed so the Branch Handler can invoke it
         to pass task to other processes    */
-	branchHandler.passMPIScheduler(&mpiScheduler);
+	branchHandler.pass_mpi_scheduler(&mpiScheduler);
 
     // arguments initialization so each process knows their data types.
     MyClass instance;
@@ -542,16 +561,16 @@ int main(){
     *   would be able to use it
     */
     
-    /* set if the algorithm might be seen as a maximisation or minimsation problem
-    the two available keyworsd are: minimise or maximise, not case sensitive.
-    If maximisation, reference value or best value so far is INT_MIN
-    If minimisation, reference value or best value so far is INT_MAX
+    /* set if the algorithm might be seen as a maximization or minimzation problem
+    the two available keyworsd are: minimize or maximize, not case sensitive.
+    If maximization, score or best value so far is INT_MIN (for I32) or the minimum for the supported types.
+    If minimization, score or best value so far is INT_MAX (for I32) or the maximum for the supported types.
     
-    By default, GemPBA maximises, thus the below line is optional for maximisation*/
-	branchHandler.set_lookup_strategy(gempba::MAXIMISE);
+    By default, GemPBA maximizes, thus the below line is optional for maximization*/
+	branchHandler.set_goal(gempba::goal::MAXIMISE, gempba::score_type::I32);
 
     // Here we set the best value so far if known somehow, optional
-    branchHandler.setRefValue(/* some integer*/); 
+    branchHandler.set_score(gempba::score::make(/* some primitive*/)); 
 
 
 
@@ -574,23 +593,23 @@ int main(){
 			numThreads could be the number of physical cores managed by this process - 1
 		*/
         // only workers need to initialized a pool
-		branchHandler.initThreadPool(numThreads);
+		branchHandler.init_thread_pool(numThreads);
         
         /*  Workers need to know the type of the incoming buffers, for this we invoke the method
-            constructBufferDecoder<returnType, Type1, Type2>(foo, deserializer)
+            construct_buffer_decoder<returnType, Type1, Type2>(foo, deserializer)
             Note that the user only must pass the original argument types in the function ingoring 
             the thread ID and parent arguments. As seen above, this method receives the target function
             and a instance of the deserializer such that the library can decode this buffer and
             construct the arguments from the buffer and then forward them to the function.
         */
-		auto bufferDecoder = branchHandler.constructBufferDecoder<void, MyClass, float, double>(foo, deserializer);
+		auto bufferDecoder = branchHandler.construct_buffer_decoder<void, MyClass, float, double>(foo, deserializer);
         /* Workers are constantly searching for a solution, for which some processes might attain it
             and some others might not. This solution is also constantly replaced for a most promising one
             but it is sent to the center process only when the execution is terminated.
             
             This method is in charge of directly fetching the result from the Branch Handler as a
             gempba::result */
-		auto resultFetcher = branchHandler.constructResultFetcher();
+		auto resultFetcher = branchHandler.construct_result_fetcher();
         // Finally these instances are passed through the run_node(...) method
 		mpiScheduler.run_node(branchHandler, bufferDecoder, resultFetcher, serializer);
 	}
@@ -618,7 +637,7 @@ int main(){
     */
 
     // fetch the total number of participatin processes
-    int world_size = mpiScheduler.getWorldSize();
+    int world_size = mpiScheduler.get_world_size();
     /* creates a vector to fetch the idle time of each process
         it can also be a simple array 
         double idleTime[worldSize];
@@ -629,7 +648,7 @@ int main(){
 
     // rank 0 does not instantiate a thread pool
     if (rank != 0) { 
-		idl_tm = branchHandler.getPoolIdleTime();
+		idl_tm = branchHandler.get_pool_idle_time();
     }
 
     /* a pointer to the buffer is passed
@@ -643,11 +662,11 @@ int main(){
         in the center process, another if statement is required.    */
 
     if (rank == 0) { 
-		mpiScheduler.printStats();
-		gempba::task_packet buffer = mpiScheduler.fetchSolution(); // returns a stringstream
+		mpiScheduler.print_stats();
+		gempba::task_packet buffer = mpiScheduler.fetch_solution(); // returns a stringstream
 
         /* Solution data type must coincide with the data type passed through
-        the method BranchHandler::holdSolution(...) */
+        the method branch_handler::try_update_result(...) */
         SolType solution;
         std::stringstream ss;
         ss.write(reinterpret_cast<const char *>(packet.data()), static_cast<int>(packet.size())); // buffer passed to a stringstream   
@@ -659,7 +678,7 @@ int main(){
 ```
 
 As seen above, it is pretty simple to set the multi-processing environment since the difficult
-synchronisation part is delagated to the ***GemPBA***. 
+synchronization part is delagated to the ***GemPBA***. 
 
 
 If we compare the aforementioned code vs a sequential version, we could notice that there are 
@@ -689,7 +708,7 @@ int main(){
 - #### Multiprocessing main.cpp
 
 ```cpp
-#include "BranchHandler.hpp"
+#include "branch_handler.hpp"
 #include "mpi_scheduler.hpp"
 
 auto deserializer = [](std::stringstream &ss, auto &...args){/*procedure*/};
@@ -700,10 +719,10 @@ auto serializer = [](auto &&...args){
     };
 
 int main(){
-    auto &branchHandler = gempba::BranchHandler::getInstance(); 
+    auto &branchHandler = gempba::branch_handler::get_instance(); 
     auto &mpiScheduler = gempba::mpi_scheduler::get_instance();
     int rank = mpiScheduler.rank_me();
-    branchHandler.passMPIScheduler(&mpiScheduler);
+    branchHandler.pass_mpi_scheduler(&mpiScheduler);
 
     MyClass instance;
     float f;
@@ -713,22 +732,22 @@ int main(){
     *   initial data reading
     */
     
-    branchHandler.set_lookup_strategy(gempba::MINIMISE);
-    branchHandler.setRefValue(/* some integer*/); 
+    branchHandler.set_goal(gempba::goal::MINIMISE, gempba::I32); // or any other type
+    branchHandler.set_score(gempba::score::make(/* some primitive*/)); 
     if (rank == 0) {
         gempba::task_packet seed_packet = serializer(instance, f, d);
         mpiScheduler.run_center(seed_packet);
     }
     else {
-        branchHandler.initThreadPool(numThreads);
-        auto bufferDecoder = branchHandler.constructBufferDecoder<void, MyClass, float, double>(foo, deserializer);
-        auto resultFetcher = branchHandler.constructResultFetcher();
+        branchHandler.init_thread_pool(numThreads);
+        auto bufferDecoder = branchHandler.construct_buffer_decoder<void, MyClass, float, double>(foo, deserializer);
+        auto resultFetcher = branchHandler.construct_result_fetcher();
         mpiScheduler.run_node(branchHandler, bufferDecoder, resultFetcher, serializer);
     }
     mpiScheduler.barrier();
 
     if (rank == 0) { 
-        gempba::task_packet buffer = mpiScheduler.fetchSolution(); 
+        gempba::task_packet buffer = mpiScheduler.fetch_solution(); 
         SolType solution;
         std::stringstream ss;
         ss.write(reinterpret_cast<const char *>(packet.data()), static_cast<int>(packet.size()));
@@ -752,65 +771,65 @@ Hence, the code modifications to convert the Multithreading function to Multipro
  ```cpp
 std::mutex mtx;
 auto &dlb = gempba::DLB_Handler::getInstance();
-auto &branchHandler = gempba::BranchHandler::getInstance();
+auto &branchHandler = gempba::branch_handler::get_instance();
 using HolderType = gempba::ResultHolder<void, MyClass, float, double>;
 
 void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
 
-    if (localSolution < branchHandler.refValue()){
-        std::scoped_lock<std::mutex> lock(mtx); 
-        branchHandler.holdSolution(localSolution.size(), localSolution, serializer);
-        branchHandler.updateRefValue(localSolution.size());
+    if (localSolution < branchHandler.get_score().get<int>()){
+        std::scoped_lock<std::mutex> lock(mtx);
+        gempba::score score = gempba::score::make(localSolution);
+        branchHandler.try_update_result(localSolution, score, serializer);
         
         return;
     }
 
     HolderType *dummyParent = nullptr;
-    HolderType rHolder_l(dlb, id, parent);
-    HolderType rHolder_m(dlb, id, parent);
-    HolderType rHolder_r(dlb, id, parent);
+    HolderType result_holder_left(dlb, id, parent);
+    HolderType result_holder_middle(dlb, id, parent);
+    HolderType result_holder_right(dlb, id, parent);
 
-    if (branchHandler.get_load_balancing_strategy()==gempba::QUASI_HORIZONTAL){
+    if (branchHandler.get_load_balancing_strategy() == gempba::QUASI_HORIZONTAL){
         dummyParent = new HolderType(dlb, id);
-        dlb.linkVirtualRoot(id, dummyParent, rHolder_l, rHolder_m, rHolder_r);
+        dlb.linkVirtualRoot(id, dummyParent, result_holder_left, result_holder_middle, result_holder_right);
     }
     
 
-    rHolder_l.bind_branch_checkIn([&]{
+    result_holder_left.bind_branch_checkIn([&]{
                                       /* arguments intantiation instance_l, f_l, d_l */
                                       if (/* left branch leads to a better solution */){
-                                          rHolder_l.holdArgs(instance_l, f_l, d_l);
+                                          result_holder_left.holdArgs(instance_l, f_l, d_l);
                                           return true;
                                       }
                                       else { return false;}                                          
                                   });
 
-    rHolder_m.bind_branch_checkIn([&]{
+    result_holder_middle.bind_branch_checkIn([&]{
                                       /* arguments intantiation instance_m, f_m, d_m */
                                       if (/* middle branch leads to a better solution */){
-                                          rHolder_m.holdArgs(instance_m, f_m, d_m);
+                                          result_holder_middle.holdArgs(instance_m, f_m, d_m);
                                           return true;
                                       }
                                       else { return false;}                                          
                                   });
 
-    rHolder_r.bind_branch_checkIn([&]{
+    result_holder_right.bind_branch_checkIn([&]{
                                       /* arguments intantiation instance_r, f_r, d_r */
                                       if (/* right branch leads to a better solution */){
-                                          rHolder_r.holdArgs(instance_r, f_r, d_r);
+                                          result_holder_right.holdArgs(instance_r, f_r, d_r);
                                           return true;
                                       }
                                       else { return false;}                                          
                                   });
 
-    if (rHolder_l.evaluate_branch_checkIn()){
-        branchHandler.try_push_MP<void>(foo, id, rHolder_l, serializer);
+    if (result_holder_left.evaluate_branch_checkIn()){
+        branchHandler.try_push_mp<void>(foo, id, result_holder_left, serializer);
     }
-    if (rHolder_m.evaluate_branch_checkIn()){
-        branchHandler.try_push_MP<void>(foo, id, rHolder_m, serializer);
+    if (result_holder_middle.evaluate_branch_checkIn()){
+        branchHandler.try_push_mp<void>(foo, id, result_holder_middle, serializer);
     }
-    if (rHolder_r.evaluate_branch_checkIn()){
-        branchHandler.forward<void>(foo, id, rHolder_r);
+    if (result_holder_right.evaluate_branch_checkIn()){
+        branchHandler.forward<void>(foo, id, result_holder_right);
     }
 
     if (dummyParent)
@@ -821,24 +840,21 @@ void foo(int id, MyClass instance, float f, double d, void *parent = nullptr)
 ```
 
 
-As you may have noticed, within the termination condition, the solution is captured in a serial fashion. This solution is stored in a ```gempba::result``` data type, where the integer is the reference value associated with the solution. This reference value is used by the ```MpiScheduler``` when retrieving the global solution by the means of comparing the best value so far against the solutions attained by each process.
+As you may have noticed, within the termination condition, the solution is captured in a serial fashion. This solution is stored in a ```gempba::result``` data type, where the integer is the `score` associated with the solution. This `score` is used by the ```mpi_scheduler``` when retrieving the global solution by the means of comparing the best score so far against the solutions attained by each process.
 
-As for the parallel calls, the method ```BranchHandler::try_push_MT(...)``` is changed to ```BranchHandler::try_push_MP(..., serializer)```.
+As for the parallel calls, the method ```branch_handler::try_push_mt(...)``` is changed to ```branch_handler::try_push_mp(..., serializer)```.
 
-This ```MT``` suffix stands for Multithreading whereas the ```MP``` suffix stands for Multiprocessing.
+This ```mt``` suffix stands for Multithreading whereas the ```mp``` suffix stands for Multiprocessing.
 
-Internally, ```try_push_MP``` will invoke the ```MpiScheduler``` to ascertain for any available processor, if none, then it will invoke ```try_push_MT``` for a local thread.
+Internally, ```try_push_mp``` will invoke the ```mpi_scheduler``` to ascertain for any available processor, if none, then it will invoke ```try_push_mt``` for a local thread.
 
-```try_push_MT``` and ```try_push_MP``` return ```true``` if the asynchronous operation was succeeding, otherwise, it will continue sequentially and when it returns, it will be ```false```.
+```try_push_mt``` and ```try_push_mp``` return ```true``` if the asynchronous operation was succeeding, otherwise, it will continue sequentially and when it returns, it will be ```false```.
 
 ### Multiprocessing with Centralized Scheduler (Optional)
 
-The *GemPBA* library includes an optional centralized scheduler for comparison purposes only. It can be activated by compiling with the flag ```-D SCHEDULER_CENTRALIZED```.
+The *GemPBA* library includes an optional centralized scheduler for comparison purposes only. It can be used by calling `gempba::mpi_centralized_scheduler::get_instance()`, see `mp_bitvect_opt_enc_central.cpp` or `mp_bitvect_basic_enc_central.cpp` for an example of how to use it.
 
-To use this feature, simply include the ```mpi_scheduler_Centralized.hpp``` header file instead of the semicentralized scheduler's header.
-
-
-**Note:** The centralized scheduler is not part of the project's scope, but it is mentioned here for completeness. Depending on your project structure, you might need to add additional imports due to hidden dependencies within the *GemPBA* library.
+**Note:** The centralized scheduler is not part of the project's scope, but it is mentioned here for completeness. Depending on your project structure, you might need to add additional imports due to hidden dependencies within the **GemPBA** library.
 
 
 ### Starring the project
