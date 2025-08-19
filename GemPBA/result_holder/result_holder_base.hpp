@@ -15,14 +15,14 @@
  */
 
 namespace gempba {
-    class DLB_Handler;
+    class dynamic_load_balancer_handler;
 
     template<typename... Args>
     class result_holder_base : public result_holder_parent {
-        friend class DLB_Handler;
+        friend class dynamic_load_balancer_handler;
 
     protected:
-        DLB_Handler &dlb;
+        dynamic_load_balancer_handler &dlb;
 
         std::tuple<Args...> tup;
         std::function<bool()> branch_checkIn;
@@ -48,7 +48,7 @@ namespace gempba {
         #endif
 
     public:
-        explicit result_holder_base(DLB_Handler &dlb) :
+        explicit result_holder_base(dynamic_load_balancer_handler &dlb) :
             dlb(dlb) {
         }
 

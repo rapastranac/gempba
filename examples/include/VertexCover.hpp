@@ -9,7 +9,7 @@
 #include "result_holder/result_holder.hpp"
 #include "util.hpp"
 #include <format>
-#include "DLB/DLB_Handler.hpp"
+#include "DLB/dynamic_load_balancer_handler.hpp"
 
 #include <algorithm>
 #include <filesystem>
@@ -335,7 +335,7 @@ protected:
     }
 
 protected:
-    gempba::DLB_Handler &dlb = gempba::DLB_Handler::getInstance();
+    gempba::dynamic_load_balancer_handler &dlb = gempba::dynamic_load_balancer_handler::getInstance();
     gempba::branch_handler &branchHandler = gempba::branch_handler::get_instance();
 
     Graph graph;

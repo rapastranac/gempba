@@ -3,7 +3,7 @@
 
 #include <result_holder/result_holder.hpp>
 #include <BranchHandler/branch_handler.hpp>
-#include <DLB/DLB_Handler.hpp>
+#include <DLB/dynamic_load_balancer_handler.hpp>
 
 #include <iostream>
 #include <istream>
@@ -16,7 +16,7 @@ int run(int numThreads, int prob, std::string &filename) {
     using HolderType = gempba::result_holder<void, int, gbitset, int>;
 
     auto &branchHandler = gempba::branch_handler::get_instance(); // parallel library
-    auto &dlb = gempba::DLB_Handler::getInstance();
+    auto &dlb = gempba::dynamic_load_balancer_handler::getInstance();
 
     cout << "NUMTHREADS= " << numThreads << endl;
 

@@ -13,7 +13,7 @@ namespace gempba {
 
     template<typename Ret, typename... Args>
     class result_holder : public result_holder_int<Ret, void, Args...> {
-        friend class DLB_Handler;
+        friend class dynamic_load_balancer_handler;
 
     private:
         void **root = nullptr; // raw pointer
@@ -23,7 +23,7 @@ namespace gempba {
 
     public:
         // default constructor, it has no parent, used for virtual roots
-        result_holder(DLB_Handler &dlb, int threadId) :
+        result_holder(dynamic_load_balancer_handler &dlb, int threadId) :
             result_holder_int<Ret, void, Args...>(dlb), result_holder_base<Args...>(dlb) {
             this->threadId = threadId;
             this->id = dlb.getUniqueId();
@@ -33,7 +33,7 @@ namespace gempba {
             this->isVirtual = true;
         }
 
-        result_holder(DLB_Handler &dlb, int threadId, void *parent) :
+        result_holder(dynamic_load_balancer_handler &dlb, int threadId, void *parent) :
             result_holder_int<Ret, void, Args...>(dlb), result_holder_base<Args...>(dlb) {
             this->threadId = threadId;
             this->id = this->dlb.getUniqueId();

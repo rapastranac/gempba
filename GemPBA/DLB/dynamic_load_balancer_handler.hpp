@@ -27,7 +27,7 @@ namespace gempba {
     class result_holder;
 
     // Dynamic Load Balancing
-    class DLB_Handler {
+    class dynamic_load_balancer_handler {
         template<typename Ret, typename... Args>
         friend
         class result_holder;
@@ -38,7 +38,7 @@ namespace gempba {
         std::atomic<long long> idleTime{0};
         int idCounter = 0;
 
-        DLB_Handler() = default;
+        dynamic_load_balancer_handler() = default;
 
 
         template<typename HolderType>
@@ -99,8 +99,8 @@ namespace gempba {
         }
 
     public:
-        static DLB_Handler &getInstance() {
-            static DLB_Handler instance;
+        static dynamic_load_balancer_handler &getInstance() {
+            static dynamic_load_balancer_handler instance;
             return instance;
         }
 
@@ -395,15 +395,15 @@ namespace gempba {
             holder->parent = nullptr;
         }
 
-        ~DLB_Handler() = default;
+        ~dynamic_load_balancer_handler() = default;
 
-        DLB_Handler(const DLB_Handler &) = delete;
+        dynamic_load_balancer_handler(const dynamic_load_balancer_handler &) = delete;
 
-        DLB_Handler(DLB_Handler &&) = delete;
+        dynamic_load_balancer_handler(dynamic_load_balancer_handler &&) = delete;
 
-        DLB_Handler &operator=(const DLB_Handler &) = delete;
+        dynamic_load_balancer_handler &operator=(const dynamic_load_balancer_handler &) = delete;
 
-        DLB_Handler &operator=(DLB_Handler &&) = delete;
+        dynamic_load_balancer_handler &operator=(dynamic_load_balancer_handler &&) = delete;
     };
 }
 #endif

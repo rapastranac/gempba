@@ -16,7 +16,7 @@
 #include <config.h>
 #include <BranchHandler/ThreadPool.hpp>
 #include <BranchHandler/args_handler.hpp>
-#include <DLB/DLB_Handler.hpp>
+#include <DLB/dynamic_load_balancer_handler.hpp>
 #include <schedulers/mpi_scheduler.hpp>
 #include <utils/gempba_utils.hpp>
 #include <utils/utils.hpp>
@@ -56,7 +56,7 @@ namespace gempba {
         std::any m_best_solution;
         result m_best_solution_serialized;
 
-        DLB_Handler &m_load_balancer = DLB_Handler::getInstance();
+        dynamic_load_balancer_handler &m_load_balancer = dynamic_load_balancer_handler::getInstance();
         load_balancing_strategy m_load_balancing_strategy = QUASI_HORIZONTAL;
 
         score m_score = score::make(INT_MIN);

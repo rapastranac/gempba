@@ -12,10 +12,10 @@
 namespace gempba {
     template<typename Ret, typename... Args>
     class result_holder_int<Ret, typename std::enable_if<std::is_void<Ret>::value>::type, Args...> : virtual public result_holder_base<Args...> {
-        friend class DLB_Handler;
+        friend class dynamic_load_balancer_handler;
 
     public:
-        explicit result_holder_int(DLB_Handler &dlb) :
+        explicit result_holder_int(dynamic_load_balancer_handler &dlb) :
             result_holder_base<Args...>(dlb) {
         }
 
