@@ -34,8 +34,6 @@
 #define MAX_MEMORY_MB (1024 * 10)
 #define CENTER_NBSTORED_TASKS_PER_PROCESS 1000
 
-#define TIMEOUT_TIME 2
-
 namespace gempba {
 
     class branch_handler;
@@ -78,8 +76,8 @@ namespace gempba {
             finalize();
         }
 
-        static mpi_centralized_scheduler &get_instance() {
-            static mpi_centralized_scheduler instance;
+        static mpi_centralized_scheduler &get_instance(const double p_timeout = 3.0) {
+            static mpi_centralized_scheduler instance(p_timeout);
             return instance;
         }
 
@@ -120,7 +118,7 @@ namespace gempba {
         }
 
         [[nodiscard]] double elapsed_time() const override {
-            return (m_end_time - m_start_time) - static_cast<double>(TIMEOUT_TIME);
+            return (m_end_time - m_start_time) - static_cast<double>(m_timeout);
         }
 
         [[nodiscard]] int next_process() const override {
@@ -646,7 +644,7 @@ namespace gempba {
                     }
                     ++v_cycles;
                     double v_elapsed = utils::diff_time(v_wall_time0, MPI_Wtime());
-                    if (v_elapsed > TIMEOUT_TIME) {
+                    if (v_elapsed > m_timeout) {
                         spdlog::debug("rank {}: no messages received in {} seconds, cycles: {}", m_world_rank, v_elapsed, v_cycles);
                         break;
                     }
@@ -729,7 +727,7 @@ namespace gempba {
             while (true) {
                 MPI_Test(&p_request, &p_ready, &p_status);
                 // Check whether the underlying communication had already taken place
-                while (!p_ready && (utils::diff_time(p_begin, MPI_Wtime()) < TIMEOUT_TIME)) {
+                while (!p_ready && (utils::diff_time(p_begin, MPI_Wtime()) < m_timeout)) {
                     MPI_Test(&p_request, &p_ready, &p_status);
                     cycles++;
                 }
@@ -890,8 +888,14 @@ namespace gempba {
         double m_start_time = 0;
         double m_end_time = 0;
 
+        const double m_timeout; // seconds
+
         /* singleton*/
-        mpi_centralized_scheduler() {
+        mpi_centralized_scheduler(const double p_timeout) :
+            m_timeout(p_timeout) {
+            if (m_timeout <= 0) {
+                spdlog::throw_spdlog_ex(fmt::format("Timeout must be greater than 0, got: {:.8f}", m_timeout));
+            }
             init(nullptr, nullptr);
         }
 

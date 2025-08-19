@@ -10,10 +10,10 @@
 #include <mpi.h>
 #include <optional>
 #include <random>
-#include <spdlog/spdlog.h>
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <spdlog/spdlog.h>
 
 #include <MPI_Modules/scheduler_parent.hpp>
 #include <utils/Queue.hpp>
@@ -22,8 +22,6 @@
 #include <utils/utils.hpp>
 #include <utils/ipc/result.hpp>
 #include <utils/ipc/task_packet.hpp>
-
-#define TIMEOUT_TIME 3
 
 namespace gempba {
     class branch_handler;
@@ -53,8 +51,8 @@ namespace gempba {
             finalize();
         }
 
-        static mpi_scheduler &get_instance() {
-            static mpi_scheduler instance;
+        static mpi_scheduler &get_instance(const double p_timeout = 3.0) {
+            static mpi_scheduler instance(p_timeout);
             return instance;
         }
 
@@ -94,7 +92,7 @@ namespace gempba {
         }
 
         [[nodiscard]] double elapsed_time() const override {
-            return (m_end_time - m_start_time) - static_cast<double>(TIMEOUT_TIME);
+            return (m_end_time - m_start_time) - static_cast<double>(m_timeout);
         }
 
         void allgather(void *p_recvbuf, void *p_sendbuf, MPI_Datatype p_mpi_datatype) override {
@@ -623,7 +621,7 @@ namespace gempba {
                     }
                     ++v_cycles;
                     double v_elapsed = utils::diff_time(v_wall_time0, MPI_Wtime());
-                    if (v_elapsed > TIMEOUT_TIME) {
+                    if (v_elapsed > m_timeout) {
                         spdlog::debug("rank {}: no messages received in {} seconds, cycles: {}", m_world_rank, v_elapsed, v_cycles);
                         break;
                     }
@@ -704,7 +702,7 @@ namespace gempba {
             while (true) {
                 MPI_Test(&p_request, &p_ready, &p_status);
                 // Check whether the underlying communication had already taken place
-                while (!p_ready && (TIMEOUT_TIME > utils::diff_time(p_wall_time0, MPI_Wtime()))) {
+                while (!p_ready && (m_timeout > utils::diff_time(p_wall_time0, MPI_Wtime()))) {
                     MPI_Test(&p_request, &p_ready, &p_status);
                     v_cycles++;
                 }
@@ -865,8 +863,14 @@ namespace gempba {
         double m_start_time = 0;
         double m_end_time = 0;
 
+        const double m_timeout; // seconds
+
         /* singleton*/
-        mpi_scheduler() {
+        mpi_scheduler(const double p_timeout) :
+            m_timeout(p_timeout) {
+            if (m_timeout <= 0) {
+                spdlog::throw_spdlog_ex(fmt::format("Timeout must be greater than 0, got: {:.8f}", m_timeout));
+            }
             init(nullptr, nullptr);
         }
 
