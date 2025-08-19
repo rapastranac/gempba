@@ -6,7 +6,7 @@
 #include <tuple>
 
 #include <config.h>
-#include <Resultholder/ResultHolderParent.hpp>
+#include <Resultholder/result_holder_parent.hpp>
 
 /*
  * Created by Andres Pastrana on 2019
@@ -18,7 +18,7 @@ namespace gempba {
     class DLB_Handler;
 
     template<typename... Args>
-    class ResultHolderBase : public ResultHolderParent {
+    class ResultHolderBase : public result_holder_parent {
         friend class DLB_Handler;
 
     protected:

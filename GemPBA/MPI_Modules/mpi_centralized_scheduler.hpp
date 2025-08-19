@@ -3,7 +3,7 @@
 
 #include "centralized_utils.hpp"
 #include "scheduler_parent.hpp"
-#include "Resultholder/ResultHolderParent.hpp"
+#include "Resultholder/result_holder_parent.hpp"
 #include "utils/Queue.hpp"
 #include "utils/tree.hpp"
 
@@ -218,7 +218,7 @@ namespace gempba {
         }
 
 
-        void run_node(branch_handler &p_branch_handler, std::function<std::shared_ptr<ResultHolderParent>(task_packet)> &p_buffer_decoder,
+        void run_node(branch_handler &p_branch_handler, std::function<std::shared_ptr<result_holder_parent>(task_packet)> &p_buffer_decoder,
                       std::function<result()> &p_result_fetcher) override {
             MPI_Barrier(m_world_comm);
 
@@ -295,7 +295,7 @@ namespace gempba {
             }
         }
 
-        void process_message(branch_handler &p_branch_handler, const std::function<std::shared_ptr<ResultHolderParent>(task_packet)> &p_buffer_decoder, MPI_Status p_status) {
+        void process_message(branch_handler &p_branch_handler, const std::function<std::shared_ptr<result_holder_parent>(task_packet)> &p_buffer_decoder, MPI_Status p_status) {
             // Receives the task  -------------------------------------------------------------------------------------------
             int count;
             MPI_Get_count(&p_status, MPI_BYTE, &count);
@@ -312,7 +312,7 @@ namespace gempba {
             utils::print_mpi_debug_comments("rank {}, pushing buffer to thread pool", m_world_rank, p_status.MPI_SOURCE);
 
             //  push to the thread pool *********************************************************************
-            std::shared_ptr<ResultHolderParent> v_holder = p_buffer_decoder(v_task_packet); // holder might be useful for non-void functions
+            std::shared_ptr<result_holder_parent> v_holder = p_buffer_decoder(v_task_packet); // holder might be useful for non-void functions
             utils::print_mpi_debug_comments("... DONE\n", m_world_rank, p_status.MPI_SOURCE);
             // **********************************************************************************************
 

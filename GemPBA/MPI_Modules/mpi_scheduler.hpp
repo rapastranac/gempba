@@ -26,7 +26,7 @@
 namespace gempba {
     class branch_handler;
 
-    class ResultHolderParent;
+    class result_holder_parent;
 
     // inter process communication handler
     class mpi_scheduler final : public scheduler_parent {
@@ -223,7 +223,7 @@ namespace gempba {
             }
         }
 
-        void process_message(MPI_Status p_status, branch_handler &p_branch_handler, const std::function<std::shared_ptr<ResultHolderParent>(task_packet)> &p_buffer_decoder) {
+        void process_message(MPI_Status p_status, branch_handler &p_branch_handler, const std::function<std::shared_ptr<result_holder_parent>(task_packet)> &p_buffer_decoder) {
             int v_count; // count to be received
             MPI_Get_count(&p_status, MPI_BYTE, &v_count); // receives total number of datatype elements of the message
 
@@ -235,7 +235,7 @@ namespace gempba {
             m_received_tasks++;
 
             //  push to the thread pool *********************************************************************
-            std::shared_ptr<ResultHolderParent> v_holder = p_buffer_decoder(v_task_packet); // holder might be useful for non-void functions
+            std::shared_ptr<result_holder_parent> v_holder = p_buffer_decoder(v_task_packet); // holder might be useful for non-void functions
             utils::print_mpi_debug_comments("rank {}, pushed buffer to thread pool \n", m_world_rank, p_status.MPI_SOURCE);
             // **********************************************************************************************
 
@@ -254,7 +254,7 @@ namespace gempba {
         }
 
     public:
-        void run_node(branch_handler &p_branch_handler, std::function<std::shared_ptr<ResultHolderParent>(task_packet)> &p_buffer_decoder,
+        void run_node(branch_handler &p_branch_handler, std::function<std::shared_ptr<result_holder_parent>(task_packet)> &p_buffer_decoder,
                       std::function<result()> &p_result_fetcher) override {
             MPI_Barrier(m_world_communicator);
 

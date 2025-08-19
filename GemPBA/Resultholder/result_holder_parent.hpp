@@ -2,9 +2,9 @@
 #define GEMPBA_RESULTHOLDERPARENT_HPP
 
 namespace gempba {
-    class ResultHolderParent {
+    class result_holder_parent {
     public:
-        virtual ~ResultHolderParent() = default;
+        virtual ~result_holder_parent() = default;
 
     };
 }
