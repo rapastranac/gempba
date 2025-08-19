@@ -25,21 +25,6 @@
 
 #define TIMEOUT_TIME 3
 
-// sanity assignment
-enum tags {
-    CENTER_NODE = 0,
-    RUNNING_STATE = 1,
-    ASSIGNED_STATE = 2,
-    AVAILABLE_STATE = 3,
-    TERMINATION = 4,
-    REFERENCE_VAL_PROPOSAL = 5,
-    REFERENCE_VAL_UPDATE = 6,
-    NEXT_PROCESS = 7,
-    HAS_RESULT = 8,
-    NO_RESULT = 9,
-    TASK = 10,
-};
-
 namespace gempba {
     class branch_handler;
 
@@ -47,6 +32,21 @@ namespace gempba {
 
     // inter process communication handler
     class mpi_scheduler final : public scheduler_parent {
+
+        // sanity assignment
+        enum tags {
+            CENTER_NODE = 0,
+            RUNNING_STATE = 1,
+            ASSIGNED_STATE = 2,
+            AVAILABLE_STATE = 3,
+            TERMINATION = 4,
+            REFERENCE_VAL_PROPOSAL = 5,
+            REFERENCE_VAL_UPDATE = 6,
+            NEXT_PROCESS = 7,
+            HAS_RESULT = 8,
+            NO_RESULT = 9,
+            TASK = 10,
+        };
 
     public:
         ~mpi_scheduler() override {
