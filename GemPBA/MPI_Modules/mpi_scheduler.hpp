@@ -1,31 +1,27 @@
 #ifndef MPI_SCHEDULER_HPP
 #define MPI_SCHEDULER_HPP
 
-#include "scheduler_parent.hpp"
-#include "utils/Queue.hpp"
-#include "utils/tree.hpp"
-#include "utils/utils.hpp"
-
 #include <algorithm>
 #include <atomic>
 #include <cfloat>
 #include <climits>
-#include <cstdio>
 #include <cstdlib> /* srand, rand */
-#include <fstream>
 #include <memory>
 #include <mpi.h>
 #include <optional>
 #include <random>
+#include <spdlog/spdlog.h>
 #include <stdexcept>
 #include <string>
 #include <thread>
-#include <unistd.h>
 
+#include <MPI_Modules/scheduler_parent.hpp>
+#include <utils/Queue.hpp>
+#include <utils/gempba_utils.hpp>
+#include <utils/tree.hpp>
+#include <utils/utils.hpp>
 #include <utils/ipc/result.hpp>
 #include <utils/ipc/task_packet.hpp>
-
-#include "utils/gempba_utils.hpp"
 
 #define TIMEOUT_TIME 3
 
