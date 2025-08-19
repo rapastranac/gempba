@@ -37,7 +37,7 @@ enum tags {
     NEXT_PROCESS = 7,
     HAS_RESULT = 8,
     NO_RESULT = 9,
-    FUNCTION_ARGS = 10,
+    TASK = 10,
 };
 
 namespace gempba {
@@ -231,7 +231,7 @@ namespace gempba {
 
             utils::print_mpi_debug_comments("rank {}, received message from rank {}, count : {}\n", m_world_rank, p_status.MPI_SOURCE, v_count);
             task_packet v_task_packet(v_count);
-            MPI_Recv(v_task_packet.data(), v_count, MPI_BYTE, p_status.MPI_SOURCE, FUNCTION_ARGS, m_world_communicator, &p_status);
+            MPI_Recv(v_task_packet.data(), v_count, MPI_BYTE, p_status.MPI_SOURCE, TASK, m_world_communicator, &p_status);
 
             notify_running_state();
             m_received_tasks++;
@@ -278,7 +278,7 @@ namespace gempba {
                         receive_next_process(v_status);
                         break;
                     }
-                    case FUNCTION_ARGS: {
+                    case TASK: {
                         process_message(v_status, p_branch_handler, p_buffer_decoder);
                         break;
                     }
@@ -426,7 +426,7 @@ namespace gempba {
                     throw std::runtime_error("rank " + std::to_string(m_world_rank) + " attempting to send to itself !!!\n");
                 }
                 utils::print_mpi_debug_comments("rank {} about to send buffer to rank {}\n", m_world_rank, m_destination_rank);
-                MPI_Send(p_task_packet.data(), static_cast<int>(v_message_length), MPI_BYTE, m_destination_rank, FUNCTION_ARGS, m_world_communicator);
+                MPI_Send(p_task_packet.data(), static_cast<int>(v_message_length), MPI_BYTE, m_destination_rank, TASK, m_world_communicator);
                 utils::print_mpi_debug_comments("rank {} sent buffer to rank {}\n", m_world_rank, m_destination_rank);
                 m_destination_rank = -1;
             } else {
@@ -780,7 +780,7 @@ namespace gempba {
             m_process_state[dest] = RUNNING_STATE;
             // *********************************************
 
-            int err = MPI_Ssend(p_packet.data(), static_cast<int>(p_packet.size()), MPI_BYTE, dest, FUNCTION_ARGS, m_world_communicator); // send buffer
+            int err = MPI_Ssend(p_packet.data(), static_cast<int>(p_packet.size()), MPI_BYTE, dest, TASK, m_world_communicator); // send buffer
             if (err != MPI_SUCCESS)
                 spdlog::debug("buffer failed to send! \n");
 
