@@ -26,10 +26,10 @@ namespace gempba {
             } {
                 /* this section protects MPI calls */
                 std::scoped_lock<std::mutex> v_lock(m_mutex);
-                maybe_receive_reference_value_from_center();
+                maybe_receive_score_from_center();
                 maybe_receive_center_fullness();
 
-                update_ref_value(p_branch_handler);
+                update_score(p_branch_handler);
             }
 
             v_is_pop = m_task_queue.pop(v_message);
@@ -55,14 +55,14 @@ namespace gempba {
         // nice(0);
     }
 
-    void mpi_centralized_scheduler::update_ref_value(branch_handler &p_branch_handler) {
-        const score v_reference_global = m_global_score; // constant within this scope
-        const score v_reference_local = p_branch_handler.get_score(); // constant within this scope
+    void mpi_centralized_scheduler::update_score(branch_handler &p_branch_handler) {
+        const score v_global_score_temp = m_global_score; // constant within this scope
+        const score v_local_score_temp = p_branch_handler.get_score(); // constant within this scope
 
-        if (should_update_local(m_goal, v_reference_global, v_reference_local)) {
-            p_branch_handler.try_update_score_and_invalidate_result(v_reference_global);
-        } else if (should_update_global(m_goal, v_reference_global, v_reference_local)) {
-            MPI_Ssend(&v_reference_local, sizeof(score), MPI_BYTE, CENTER_NODE, REFERENCE_VAL_PROPOSAL, m_global_reference_value_communicator);
+        if (should_update_local(m_goal, v_global_score_temp, v_local_score_temp)) {
+            p_branch_handler.try_update_score_and_invalidate_result(v_global_score_temp);
+        } else if (should_update_global(m_goal, v_global_score_temp, v_local_score_temp)) {
+            MPI_Ssend(&v_local_score_temp, sizeof(score), MPI_BYTE, CENTER_NODE, SCORE_PROPOSAL, m_global_score_communicator);
         }
     }
 }
