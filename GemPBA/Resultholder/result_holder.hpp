@@ -2,7 +2,7 @@
 #define RESULTHOLDER_HPP
 
 #include <Resultholder/result_holder_int_non_void.hpp>
-#include <Resultholder/ResultHolderIntVoid.hpp>
+#include <Resultholder/result_holder_int_void.hpp>
 
 /*
  * Created by Andres Pastrana on 2019
