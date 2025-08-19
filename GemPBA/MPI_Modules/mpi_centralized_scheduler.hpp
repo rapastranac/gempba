@@ -32,31 +32,9 @@
 
 // max memory is in mb, e.g. 1024 * 10 = 10 GB
 #define MAX_MEMORY_MB (1024 * 10)
-
-#define CENTER 0
-
-#define STATE_RUNNING 1
-#define STATE_ASSIGNED 2
-#define STATE_AVAILABLE 3
-
-#define TERMINATION_TAG 6
-#define REFVAL_PROPOSAL_TAG 9
-#define REFVAL_UPDATE_TAG 10
-
-#define TASK_FROM_CENTER_TAG 12
-
-#define HAS_RESULT_TAG 13
-#define NO_RESULT_TAG 14
-
-#define TASK_FOR_CENTER 15
-
-#define CENTER_IS_FULL_TAG 16
-#define CENTER_IS_FREE_TAG 17
+#define CENTER_NBSTORED_TASKS_PER_PROCESS 1000
 
 #define TIMEOUT_TIME 2
-
-
-#define CENTER_NBSTORED_TASKS_PER_PROCESS 1000
 
 namespace gempba {
 
@@ -64,6 +42,24 @@ namespace gempba {
 
     // inter process communication handler
     class mpi_centralized_scheduler final : public scheduler_parent {
+
+        // sanity assignment
+        enum tags {
+            CENTER_NODE = 0,
+            RUNNING_STATE = 1,
+            ASSIGNED_STATE = 2,
+            AVAILABLE_STATE = 3,
+            TERMINATION = 4,
+            REFERENCE_VAL_PROPOSAL = 5,
+            REFERENCE_VAL_UPDATE = 6,
+            NEXT_PROCESS = 7,
+            HAS_RESULT = 8,
+            NO_RESULT = 9,
+            TASK_FROM_CENTER = 10,
+            TASK_FOR_CENTER = 11,
+            CENTER_IS_FULL = 12,
+            CENTER_IS_FREE = 13,
+        };
 
         std::priority_queue<task_packet, std::vector<task_packet>, TaskComparator> m_center_queue; //message, size
         //std::vector<task_packet> center_queue;
@@ -233,24 +229,24 @@ namespace gempba {
                 const MPI_Status status = probe_communicators_on_worker();
 
                 switch (status.MPI_TAG) {
-                    case TERMINATION_TAG: {
+                    case TERMINATION: {
                         process_termination(status);
                         v_is_terminated = true;
                         break;
                     }
-                    case REFVAL_UPDATE_TAG: {
+                    case REFERENCE_VAL_UPDATE: {
                         receive_reference_value_from_center(status);
                         break;
                     }
-                    case CENTER_IS_FULL_TAG: {
+                    case CENTER_IS_FULL: {
                         consume_center_is_full_tag(status);
                         break;
                     }
-                    case CENTER_IS_FREE_TAG: {
+                    case CENTER_IS_FREE: {
                         consume_center_is_free_tag(status);
                         break;
                     }
-                    case TASK_FROM_CENTER_TAG: {
+                    case TASK_FROM_CENTER: {
                         process_message(p_branch_handler, p_buffer_decoder, status);
                         break;
                     }
@@ -328,13 +324,13 @@ namespace gempba {
 
         void receive_reference_value_from_center(MPI_Status status) {
             utils::print_mpi_debug_comments("rank {}, about to receive global score from Center\n", m_world_rank);
-            MPI_Recv(&m_global_score, sizeof(score), MPI_BYTE, CENTER, REFVAL_UPDATE_TAG, m_global_reference_value_communicator, &status);
+            MPI_Recv(&m_global_score, sizeof(score), MPI_BYTE, CENTER_NODE, REFERENCE_VAL_UPDATE, m_global_reference_value_communicator, &status);
             utils::print_mpi_debug_comments("rank {}, received global score: {} from Center\n", m_world_rank, m_global_score.to_string());
         }
 
         void process_termination(MPI_Status p_status) {
 
-            MPI_Recv(nullptr, 0, MPI_BYTE, p_status.MPI_SOURCE, TERMINATION_TAG, m_world_comm, &p_status);
+            MPI_Recv(nullptr, 0, MPI_BYTE, p_status.MPI_SOURCE, TERMINATION, m_world_comm, &p_status);
             utils::print_mpi_debug_comments("rank {}, received message from rank {}", m_world_rank, p_status.MPI_SOURCE);
 
             spdlog::debug("rank {} exited\n", m_world_rank);
@@ -374,7 +370,7 @@ namespace gempba {
             int v_is_message_received = 0; // logical
 
             MPI_Status v_status;
-            MPI_Iprobe(CENTER, REFVAL_UPDATE_TAG, m_global_reference_value_communicator, &v_is_message_received, &v_status);
+            MPI_Iprobe(CENTER_NODE, REFERENCE_VAL_UPDATE, m_global_reference_value_communicator, &v_is_message_received, &v_status);
             if (v_is_message_received) {
                 return v_status;
 
@@ -385,7 +381,7 @@ namespace gempba {
         std::optional<MPI_Status> probe_center_fullness_comm() {
             int v_is_message_received = 0;
             MPI_Status v_status;
-            MPI_Iprobe(CENTER, MPI_ANY_TAG, m_center_fullness_communicator, &v_is_message_received, &v_status); // for regular messages
+            MPI_Iprobe(CENTER_NODE, MPI_ANY_TAG, m_center_fullness_communicator, &v_is_message_received, &v_status); // for regular messages
             if (v_is_message_received) {
                 return v_status;
             }
@@ -410,22 +406,22 @@ namespace gempba {
             }
             const MPI_Status status = opt.value();
 
-            if (status.MPI_TAG == CENTER_IS_FULL_TAG) {
+            if (status.MPI_TAG == CENTER_IS_FULL) {
                 consume_center_is_full_tag(status);
-            } else if (status.MPI_TAG == CENTER_IS_FREE_TAG) {
+            } else if (status.MPI_TAG == CENTER_IS_FREE) {
                 consume_center_is_free_tag(status);
             }
         }
 
         void consume_center_is_full_tag(MPI_Status p_status) {
-            MPI_Recv(nullptr, 0, MPI_BYTE, CENTER, CENTER_IS_FULL_TAG, m_center_fullness_communicator, &p_status);
+            MPI_Recv(nullptr, 0, MPI_BYTE, CENTER_NODE, CENTER_IS_FULL, m_center_fullness_communicator, &p_status);
             m_is_center_full = true;
 
             utils::print_mpi_debug_comments("Node {} received full center\n", rank_me());
         }
 
         void consume_center_is_free_tag(MPI_Status p_status) {
-            MPI_Recv(nullptr, 0, MPI_BYTE, CENTER, CENTER_IS_FREE_TAG, m_center_fullness_communicator, &p_status);
+            MPI_Recv(nullptr, 0, MPI_BYTE, CENTER_NODE, CENTER_IS_FREE, m_center_fullness_communicator, &p_status);
             m_is_center_full = false;
 
             utils::print_mpi_debug_comments("Node {} received free center\n", rank_me());
@@ -438,28 +434,19 @@ namespace gempba {
         // if local value is better than the one in center, then local best value is sent to center
         void update_ref_value(branch_handler &p_branch_handler);
 
-        bool is_terminated(int TAG) {
-            if (TAG == TERMINATION_TAG) {
-                spdlog::debug("rank {} exited\n", m_world_rank);
-                MPI_Barrier(m_world_comm);
-                return true;
-            }
-            return false;
-        }
-
         void notify_available_state() {
             utils::print_mpi_debug_comments("rank {} entered notifyAvailableState()\n", m_world_rank);
             constexpr int v_buffer = 0;
-            MPI_Send(&v_buffer, 1, MPI_INT, CENTER, STATE_AVAILABLE, m_world_comm);
+            MPI_Send(&v_buffer, 1, MPI_INT, CENTER_NODE, AVAILABLE_STATE, m_world_comm);
         }
 
         void notify_running_state() {
             int v_buffer = 0;
-            MPI_Send(&v_buffer, 1, MPI_INT, CENTER, STATE_RUNNING, m_world_comm);
+            MPI_Send(&v_buffer, 1, MPI_INT, CENTER_NODE, RUNNING_STATE, m_world_comm);
         }
 
         void send_task_to_center(task_packet &p_task_packet) {
-            MPI_Send(p_task_packet.data(), static_cast<int>(p_task_packet.size()), MPI_BYTE, CENTER, TASK_FOR_CENTER, m_world_comm);
+            MPI_Send(p_task_packet.data(), static_cast<int>(p_task_packet.size()), MPI_BYTE, CENTER_NODE, TASK_FOR_CENTER, m_world_comm);
         }
 
     public:
@@ -471,10 +458,10 @@ namespace gempba {
             task_packet v_task_packet = v_result.get_task_packet();
 
             if (v_result == result::EMPTY) {
-                MPI_Send(nullptr, 0, MPI_BYTE, CENTER, NO_RESULT_TAG, m_world_comm);
+                MPI_Send(nullptr, 0, MPI_BYTE, CENTER_NODE, NO_RESULT, m_world_comm);
             } else {
-                MPI_Send(v_task_packet.data(), static_cast<int>(v_task_packet.size()), MPI_BYTE, CENTER, HAS_RESULT_TAG, m_world_comm);
-                MPI_Send(&v_score, sizeof(score), MPI_BYTE, 0, HAS_RESULT_TAG, m_world_comm);
+                MPI_Send(v_task_packet.data(), static_cast<int>(v_task_packet.size()), MPI_BYTE, CENTER_NODE, HAS_RESULT, m_world_comm);
+                MPI_Send(&v_score, sizeof(score), MPI_BYTE, CENTER_NODE, HAS_RESULT, m_world_comm);
             }
         }
 
@@ -484,14 +471,14 @@ namespace gempba {
                 return;
 
             for (int rank = 1; rank < m_world_size; rank++) {
-                if (m_process_state[rank] == STATE_AVAILABLE) {
+                if (m_process_state[rank] == AVAILABLE_STATE) {
                     //pair<char *, size_t> msg = center_queue.back();
                     //center_queue.pop_back();
                     task_packet v_msg = m_center_queue.top();
                     m_center_queue.pop();
 
-                    MPI_Send(v_msg.data(), static_cast<int>(v_msg.size()), MPI_BYTE, rank, TASK_FROM_CENTER_TAG, m_world_comm);
-                    m_process_state[rank] = STATE_ASSIGNED;
+                    MPI_Send(v_msg.data(), static_cast<int>(v_msg.size()), MPI_BYTE, rank, TASK_FROM_CENTER, m_world_comm);
+                    m_process_state[rank] = ASSIGNED_STATE;
 
                     if (m_center_queue.empty())
                         return;
@@ -530,27 +517,27 @@ namespace gempba {
                 MPI_Status v_status = v_status_opt.value();
 
                 switch (v_status.MPI_TAG) {
-                    case STATE_RUNNING: {
+                    case RUNNING_STATE: {
                         // received if and only if a worker receives from other but center
 
                         consume_int_message(v_status, m_world_comm);
 
-                        m_process_state[v_status.MPI_SOURCE] = STATE_RUNNING; // node was assigned, now it's running
+                        m_process_state[v_status.MPI_SOURCE] = RUNNING_STATE; // node was assigned, now it's running
                         m_nodes_running++;
                         m_total_requests_number++;
                     }
                     break;
-                    case STATE_AVAILABLE: {
+                    case AVAILABLE_STATE: {
                         consume_int_message(v_status, m_world_comm);
 
                         utils::print_mpi_debug_comments("center received state_available from rank {}\n", v_status.MPI_SOURCE);
-                        m_process_state[v_status.MPI_SOURCE] = STATE_AVAILABLE;
+                        m_process_state[v_status.MPI_SOURCE] = AVAILABLE_STATE;
                         m_nodes_available++;
                         m_nodes_running--;
                         m_total_requests_number++;
                     }
                     break;
-                    case REFVAL_PROPOSAL_TAG: {
+                    case REFERENCE_VAL_PROPOSAL: {
                         score v_candidate_global_reference_value = consume_score_flag(v_status);
                         maybe_broadcast_global_reference_value(v_candidate_global_reference_value, v_status);
                     }
@@ -619,7 +606,7 @@ namespace gempba {
 
             m_global_score = p_new_global_score;
             for (int rank = 1; rank < m_world_size; rank++) {
-                MPI_Send(&m_global_score, sizeof(score), MPI_BYTE, rank, REFVAL_UPDATE_TAG, m_global_reference_value_communicator);
+                MPI_Send(&m_global_score, sizeof(score), MPI_BYTE, rank, REFERENCE_VAL_UPDATE, m_global_reference_value_communicator);
             }
 
             static int success = 0;
@@ -690,7 +677,7 @@ namespace gempba {
         std::optional<MPI_Status> probe_reference_value_comm_center() {
             int v_is_message_received = 0; // logical
             MPI_Status v_status;
-            MPI_Iprobe(MPI_ANY_SOURCE, REFVAL_PROPOSAL_TAG, m_global_reference_value_communicator, &v_is_message_received, &v_status);
+            MPI_Iprobe(MPI_ANY_SOURCE, REFERENCE_VAL_PROPOSAL, m_global_reference_value_communicator, &v_is_message_received, &v_status);
             if (v_is_message_received) {
                 // spdlog::info("rank {}: probe_reference_value_comm_center received message from rank {}\n", world_rank, status.MPI_SOURCE);
                 return v_status;
@@ -713,7 +700,7 @@ namespace gempba {
             // last iter, center wasn't full but now it is => warn nodes to stop sending
             if (v_current_memory > MAX_MEMORY_MB || m_center_queue.size() > CENTER_NBSTORED_TASKS_PER_PROCESS * m_world_size) {
                 for (int rank = 1; rank < m_world_size; rank++) {
-                    MPI_Send(nullptr, 0, MPI_BYTE, rank, CENTER_IS_FULL_TAG, m_center_fullness_communicator);
+                    MPI_Send(nullptr, 0, MPI_BYTE, rank, CENTER_IS_FULL, m_center_fullness_communicator);
                 }
                 m_center_last_full_status = true;
                 m_time_centerfull_sent = MPI_Wtime();
@@ -726,7 +713,7 @@ namespace gempba {
             // last iter, center was full but now it has space => warn others it's ok
             if (v_current_memory <= 0.9 * MAX_MEMORY_MB && m_center_queue.size() < CENTER_NBSTORED_TASKS_PER_PROCESS * m_world_size * 0.8) {
                 for (int rank = 1; rank < m_world_size; rank++) {
-                    MPI_Send(nullptr, 0, MPI_BYTE, rank, CENTER_IS_FREE_TAG, m_center_fullness_communicator);
+                    MPI_Send(nullptr, 0, MPI_BYTE, rank, CENTER_IS_FREE, m_center_fullness_communicator);
                 }
                 m_center_last_full_status = false;
 
@@ -763,14 +750,14 @@ namespace gempba {
 
         void notify_termination() {
             for (int rank = 1; rank < m_world_size; rank++) {
-                MPI_Send(nullptr, 0, MPI_BYTE, rank, TERMINATION_TAG, m_world_comm); // send positive signal
+                MPI_Send(nullptr, 0, MPI_BYTE, rank, TERMINATION, m_world_comm); // send positive signal
             }
             MPI_Barrier(m_world_comm);
         }
 
         int get_available() {
             for (int rank = 1; rank < m_world_size; rank++) {
-                if (m_process_state[rank] == STATE_AVAILABLE)
+                if (m_process_state[rank] == AVAILABLE_STATE)
                     return rank;
             }
             return -1; // all nodes are running
@@ -793,10 +780,10 @@ namespace gempba {
                 utils::print_mpi_debug_comments("fetching result from rank {} \n", rank);
 
                 switch (status.MPI_TAG) {
-                    case HAS_RESULT_TAG: {
+                    case HAS_RESULT: {
 
                         score v_score{};
-                        MPI_Recv(&v_score, sizeof(score), MPI_BYTE, rank, HAS_RESULT_TAG, m_world_comm, &status);
+                        MPI_Recv(&v_score, sizeof(score), MPI_BYTE, rank, HAS_RESULT, m_world_comm, &status);
 
                         m_best_results[rank] = result{v_score, v_task_packet};
 
@@ -804,7 +791,7 @@ namespace gempba {
                     }
                     break;
 
-                    case NO_RESULT_TAG: {
+                    case NO_RESULT: {
                         spdlog::debug("solution NOT received from rank {}\n", rank);
                     }
                     break;
@@ -816,10 +803,10 @@ namespace gempba {
             constexpr int v_dest = 1;
             // global synchronisation **********************
             m_nodes_available--;
-            m_process_state[v_dest] = STATE_RUNNING;
+            m_process_state[v_dest] = RUNNING_STATE;
             // *********************************************
 
-            int err = MPI_Ssend(p_packet.data(), static_cast<int>(p_packet.size()), MPI_BYTE, v_dest, TASK_FROM_CENTER_TAG, m_world_comm); // send buffer
+            int err = MPI_Ssend(p_packet.data(), static_cast<int>(p_packet.size()), MPI_BYTE, v_dest, TASK_FROM_CENTER, m_world_comm); // send buffer
             if (err != MPI_SUCCESS)
                 spdlog::debug("buffer failed to send! \n");
 
@@ -855,7 +842,7 @@ namespace gempba {
         }
 
         void init() {
-            m_process_state.resize(m_world_size, STATE_AVAILABLE);
+            m_process_state.resize(m_world_size, AVAILABLE_STATE);
             m_process_tree.resize(m_world_size);
             m_max_queue_size = 0;
             m_global_score = score::make(INT_MIN);

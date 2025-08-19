@@ -62,7 +62,7 @@ namespace gempba {
         if (should_update_local(m_goal, v_reference_global, v_reference_local)) {
             p_branch_handler.try_update_score_and_invalidate_result(v_reference_global);
         } else if (should_update_global(m_goal, v_reference_global, v_reference_local)) {
-            MPI_Ssend(&v_reference_local, sizeof(score), MPI_BYTE, CENTER, REFVAL_PROPOSAL_TAG, m_global_reference_value_communicator);
+            MPI_Ssend(&v_reference_local, sizeof(score), MPI_BYTE, CENTER_NODE, REFERENCE_VAL_PROPOSAL, m_global_reference_value_communicator);
         }
     }
 }
