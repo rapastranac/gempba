@@ -19,7 +19,7 @@
 #include <unistd.h>
 
 #include <result_holder/result_holder_parent.hpp>
-#include <schedulers/centralized_utils.hpp>
+#include <schedulers/impl/mpi/centralized_utils.hpp>
 #include <schedulers/api/scheduler_parent.hpp>
 #include <spdlog/spdlog.h>
 #include <utils/Queue.hpp>

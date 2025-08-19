@@ -1,5 +1,5 @@
 #include "include/mp_bitvect_basic_enc.hpp"
-#include "schedulers/mpi_centralized_scheduler.hpp"
+#include "schedulers/impl/mpi/mpi_centralized_scheduler.hpp"
 #include "include/main.hpp"
 
 #include <filesystem>

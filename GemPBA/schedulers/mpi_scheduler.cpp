@@ -1,4 +1,4 @@
-#include <schedulers/mpi_scheduler.hpp>
+#include <schedulers/impl/mpi/mpi_scheduler.hpp>
 #include <branch_handler/branch_handler.hpp>
 
 namespace gempba {

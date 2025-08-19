@@ -17,7 +17,7 @@
 #include <branch_handler/thread_pool.hpp>
 #include <branch_handler/args_handler.hpp>
 #include <dynamic_load_balancer/dynamic_load_balancer_handler.hpp>
-#include <schedulers/mpi_scheduler.hpp>
+#include <schedulers/impl/mpi/mpi_scheduler.hpp>
 #include <utils/gempba_utils.hpp>
 #include <utils/utils.hpp>
 
