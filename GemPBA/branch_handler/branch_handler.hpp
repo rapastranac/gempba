@@ -14,8 +14,8 @@
 #include <sys/time.h>
 
 #include <config.h>
-#include <BranchHandler/thread_pool.hpp>
-#include <BranchHandler/args_handler.hpp>
+#include <branch_handler/thread_pool.hpp>
+#include <branch_handler/args_handler.hpp>
 #include <dynamic_load_balancer/dynamic_load_balancer_handler.hpp>
 #include <schedulers/mpi_scheduler.hpp>
 #include <utils/gempba_utils.hpp>
