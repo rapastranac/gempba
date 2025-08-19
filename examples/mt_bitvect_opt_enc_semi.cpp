@@ -3,7 +3,7 @@
 
 #include <result_holder/result_holder.hpp>
 #include <BranchHandler/branch_handler.hpp>
-#include <DLB/dynamic_load_balancer_handler.hpp>
+#include <dynamic_load_balancer/dynamic_load_balancer_handler.hpp>
 
 #include <iostream>
 #include <istream>

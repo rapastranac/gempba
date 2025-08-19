@@ -9,7 +9,7 @@
 #include "result_holder/result_holder.hpp"
 #include "util.hpp"
 #include <format>
-#include "DLB/dynamic_load_balancer_handler.hpp"
+#include "dynamic_load_balancer/dynamic_load_balancer_handler.hpp"
 
 #include <algorithm>
 #include <filesystem>
