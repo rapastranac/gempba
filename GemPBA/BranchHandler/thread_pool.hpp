@@ -39,7 +39,7 @@
  * Inspired on https://github.com/vit-vit/CTPL
  * */
 
-namespace ThreadPool {
+namespace thread_pool {
 
     class Pool {
     public:

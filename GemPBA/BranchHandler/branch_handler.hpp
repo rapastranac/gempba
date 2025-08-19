@@ -14,7 +14,7 @@
 #include <sys/time.h>
 
 #include <config.h>
-#include <BranchHandler/ThreadPool.hpp>
+#include <BranchHandler/thread_pool.hpp>
 #include <BranchHandler/args_handler.hpp>
 #include <dynamic_load_balancer/dynamic_load_balancer_handler.hpp>
 #include <schedulers/mpi_scheduler.hpp>
@@ -69,7 +69,7 @@ namespace gempba {
         unsigned int m_processor_count;
         std::atomic<long long> m_idle_time;
         std::mutex m_mutex; // local mutex
-        std::unique_ptr<ThreadPool::Pool> m_thread_pool;
+        std::unique_ptr<thread_pool::Pool> m_thread_pool;
 
         branch_handler() :
             m_best_solution_serialized(result::EMPTY) {
@@ -216,7 +216,7 @@ namespace gempba {
 
         void init_thread_pool(int p_pool_size) {
             this->m_processor_count = p_pool_size;
-            m_thread_pool = std::make_unique<ThreadPool::Pool>(p_pool_size);
+            m_thread_pool = std::make_unique<thread_pool::Pool>(p_pool_size);
         }
 
         void lock() {

@@ -19,7 +19,7 @@ namespace gempba {
 
     class args_handler {
         template<typename F, typename... Args>
-        static constexpr decltype(auto) helper(ThreadPool::Pool &pool, F &&f, Args &&... args) {
+        static constexpr decltype(auto) helper(thread_pool::Pool &pool, F &&f, Args &&... args) {
             return pool.push(std::forward<F>(f), std::forward<Args>(args)..., nullptr);
         }
 
@@ -28,13 +28,15 @@ namespace gempba {
         // void Callable
 
         template<typename F, typename Tuple, size_t... I>
-        static constexpr decltype(auto) unpack_and_push_void(ThreadPool::Pool &pool, F &&f, Tuple &&t, std::index_sequence<I...>) {
+        static constexpr decltype(auto) unpack_and_push_void(thread_pool::Pool &pool, F &&f, Tuple &&t, std::index_sequence<I...>) {
             return helper(pool, std::forward<F>(f), std::get<I>(std::forward<Tuple>(t))...);
         }
 
         template<typename F, typename Tuple>
-        static constexpr decltype(auto) unpack_and_push_void(ThreadPool::Pool &pool, F &&f, Tuple &&t) {
-            return unpack_and_push_void(pool, std::forward<F>(f), std::forward<Tuple>(t), std::make_index_sequence<std::tuple_size_v<std::remove_reference_t<Tuple> > >{});
+        static constexpr decltype(auto) unpack_and_push_void(thread_pool::Pool &pool, F &&f, Tuple &&t) {
+            return unpack_and_push_void(pool, std::forward<F>(f),
+                                        std::forward<Tuple>(t),
+                                        std::make_index_sequence<std::tuple_size_v<std::remove_reference_t<Tuple> > >{});
         }
 
         /*-------------	This unpacks tuple before pushing to pool ---------------->end*/
@@ -43,12 +45,12 @@ namespace gempba {
         // non void callable
 
         template<typename F, typename Tuple, size_t... I>
-        static auto unpack_and_push_non_void(ThreadPool::Pool &pool, F &&f, Tuple &t, std::index_sequence<I...>) {
+        static auto unpack_and_push_non_void(thread_pool::Pool &pool, F &&f, Tuple &t, std::index_sequence<I...>) {
             return helper(pool, f, std::get<I>(t)...);
         }
 
         template<typename F, typename Tuple>
-        static auto unpack_and_push_non_void(ThreadPool::Pool &pool, F &&f, Tuple &t) {
+        static auto unpack_and_push_non_void(thread_pool::Pool &pool, F &&f, Tuple &t) {
             // https://stackoverflow.com/a/36656413/5248548
             static constexpr auto size = std::tuple_size<Tuple>::value;
             return unpack_and_push_non_void(pool, f, t, std::make_index_sequence<size>{});
