@@ -24,13 +24,13 @@
 
 namespace gempba {
     template<typename Ret, typename... Args>
-    class ResultHolder;
+    class result_holder;
 
     // Dynamic Load Balancing
     class DLB_Handler {
         template<typename Ret, typename... Args>
         friend
-        class ResultHolder;
+        class result_holder;
 
     private:
         std::map<int, void *> roots; // every thread will be solving a subtree, this point to their roots

@@ -16,7 +16,7 @@ using namespace boost;
 #define gbitset dynamic_bitset<>
 
 class VC_void_bitvec : public VertexCover {
-    using HolderType = gempba::ResultHolder<void, int, gbitset, int>;
+    using HolderType = gempba::result_holder<void, int, gbitset, int>;
 
 private:
     std::function<void(int, int, gbitset &, int, void *)> _f;

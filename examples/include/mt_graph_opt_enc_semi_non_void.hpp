@@ -9,7 +9,7 @@
 namespace gempba {
 
     class VC_non_void : public VertexCover {
-        using HolderType = gempba::ResultHolder<Graph, int, Graph>;
+        using HolderType = gempba::result_holder<Graph, int, Graph>;
 
     private:
         std::function<Graph(int, int, Graph, void *)> _f;

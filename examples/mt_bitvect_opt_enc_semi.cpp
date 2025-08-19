@@ -1,7 +1,7 @@
 #include "include/main.hpp"
 #include "include/mt_bitvect_opt_enc.hpp"
 
-#include <Resultholder/ResultHolder.hpp>
+#include <Resultholder/result_holder.hpp>
 #include <BranchHandler/branch_handler.hpp>
 #include <DLB/DLB_Handler.hpp>
 
@@ -13,7 +13,7 @@
 #include <unistd.h>
 
 int run(int numThreads, int prob, std::string &filename) {
-    using HolderType = gempba::ResultHolder<void, int, gbitset, int>;
+    using HolderType = gempba::result_holder<void, int, gbitset, int>;
 
     auto &branchHandler = gempba::branch_handler::get_instance(); // parallel library
     auto &dlb = gempba::DLB_Handler::getInstance();

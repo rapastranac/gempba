@@ -6,7 +6,7 @@
 #include "VertexCover.hpp"
 
 class MTGraphOptimizedEncodingSemiCentralized : public VertexCover {
-    using HolderType = gempba::ResultHolder<void, int, Graph>;
+    using HolderType = gempba::result_holder<void, int, Graph>;
 
 private:
     std::function<void(int, int, Graph &, void *)> _f;

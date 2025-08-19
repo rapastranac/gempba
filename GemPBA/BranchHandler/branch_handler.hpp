@@ -39,7 +39,7 @@ namespace gempba {
 
 
     template<typename Ret, typename... Args>
-    class ResultHolder;
+    class result_holder;
 
     class scheduler_parent;
 
@@ -47,7 +47,7 @@ namespace gempba {
 
         template<typename Ret, typename... Args>
         friend
-        class ResultHolder;
+        class result_holder;
 
     private:
         std::atomic<size_t> m_thread_requests;
@@ -727,7 +727,7 @@ namespace gempba {
             */
         template<typename Ret, typename... Args>
         [[nodiscard]] std::function<std::shared_ptr<ResultHolderParent>(task_packet)> construct_buffer_decoder(auto &p_callable, auto &p_deserializer) {
-            using HolderType = ResultHolder<Ret, Args...>;
+            using HolderType = result_holder<Ret, Args...>;
 
             utils::print_mpi_debug_comments("About to build Decoder");
             std::function<std::shared_ptr<ResultHolderParent>(task_packet)> decoder = [this, &p_callable, &p_deserializer](task_packet p_packet) {
