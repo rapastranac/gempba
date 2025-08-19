@@ -3,7 +3,7 @@
 
 #include "argparse/argparse.hpp"
 #include "Graph.hpp"
-#include <schedulers/api/scheduler_parent.hpp>
+#include <schedulers/api/scheduler.hpp>
 
 #include <iostream>
 #include <filesystem>
@@ -115,7 +115,7 @@ std::string create_directory(std::string root, std::string folder, T... dir) {
 }
 
 void printToSummaryFile(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int cpus_per_task,
-                        const std::string &filename_directory, gempba::scheduler_parent &mpiScheduler, int gsize,
+                        const std::string &filename_directory, gempba::scheduler &mpiScheduler, int gsize,
                         int world_size, const std::vector<size_t> &threadRequests, const std::vector<int> &nTasksRecvd,
                         const std::vector<int> &nTasksSent, int solSize, double global_cpu_idle_time,
                         size_t totalThreadRequests) {

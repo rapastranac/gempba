@@ -20,7 +20,7 @@
 
 #include <result_holder/result_holder_parent.hpp>
 #include <schedulers/impl/mpi/centralized_utils.hpp>
-#include <schedulers/api/scheduler_parent.hpp>
+#include <schedulers/api/scheduler.hpp>
 #include <spdlog/spdlog.h>
 #include <utils/Queue.hpp>
 #include <utils/gempba_utils.hpp>
@@ -38,7 +38,7 @@ namespace gempba {
     class branch_handler;
 
     // inter process communication handler
-    class mpi_centralized_scheduler final : public scheduler_parent {
+    class mpi_centralized_scheduler final : public scheduler {
 
         // sanity assignment
         enum tags {

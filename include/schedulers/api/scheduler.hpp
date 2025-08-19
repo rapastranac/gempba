@@ -16,11 +16,11 @@ namespace gempba {
 
     class branch_handler;
 
-    class scheduler_parent {
+    class scheduler {
     public:
-        scheduler_parent() = default;
+        scheduler() = default;
 
-        virtual ~scheduler_parent() = default;
+        virtual ~scheduler() = default;
 
         [[nodiscard]] virtual int rank_me() const = 0;
 

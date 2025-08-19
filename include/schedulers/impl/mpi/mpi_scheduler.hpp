@@ -14,7 +14,7 @@
 #include <string>
 #include <thread>
 
-#include <schedulers/api/scheduler_parent.hpp>
+#include <schedulers/api/scheduler.hpp>
 #include <spdlog/spdlog.h>
 #include <utils/Queue.hpp>
 #include <utils/gempba_utils.hpp>
@@ -29,7 +29,7 @@ namespace gempba {
     class result_holder_parent;
 
     // inter process communication handler
-    class mpi_scheduler final : public scheduler_parent {
+    class mpi_scheduler final : public scheduler {
 
         // sanity assignment
         enum tags {
