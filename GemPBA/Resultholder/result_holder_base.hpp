@@ -18,7 +18,7 @@ namespace gempba {
     class DLB_Handler;
 
     template<typename... Args>
-    class ResultHolderBase : public result_holder_parent {
+    class result_holder_base : public result_holder_parent {
         friend class DLB_Handler;
 
     protected:
@@ -48,11 +48,11 @@ namespace gempba {
         #endif
 
     public:
-        explicit ResultHolderBase(DLB_Handler &dlb) :
+        explicit result_holder_base(DLB_Handler &dlb) :
             dlb(dlb) {
         }
 
-        ~ResultHolderBase() override = default;
+        ~result_holder_base() override = default;
 
         void holdArgs(Args &... args) {
             this->tup = std::make_tuple(std::forward<Args &&>(args)...);

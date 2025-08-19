@@ -24,7 +24,7 @@ namespace gempba {
     public:
         // default constructor, it has no parent, used for virtual roots
         result_holder(DLB_Handler &dlb, int threadId) :
-            ResultHolderInt<Ret, void, Args...>(dlb), ResultHolderBase<Args...>(dlb) {
+            ResultHolderInt<Ret, void, Args...>(dlb), result_holder_base<Args...>(dlb) {
             this->threadId = threadId;
             this->id = dlb.getUniqueId();
             this->itself = this;
@@ -34,7 +34,7 @@ namespace gempba {
         }
 
         result_holder(DLB_Handler &dlb, int threadId, void *parent) :
-            ResultHolderInt<Ret, void, Args...>(dlb), ResultHolderBase<Args...>(dlb) {
+            ResultHolderInt<Ret, void, Args...>(dlb), result_holder_base<Args...>(dlb) {
             this->threadId = threadId;
             this->id = this->dlb.getUniqueId();
             this->itself = this;

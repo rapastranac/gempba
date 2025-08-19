@@ -7,12 +7,12 @@
  * rapastranac@gmail.com
  */
 
-#include "ResultHolderBase.hpp"
+#include "result_holder_base.hpp"
 
 namespace gempba {
 
     template<typename Ret, typename... Args>
-    class ResultHolderInt<Ret, typename std::enable_if<!std::is_void<Ret>::value>::type, Args...> : virtual public ResultHolderBase<Args...> {
+    class ResultHolderInt<Ret, typename std::enable_if<!std::is_void<Ret>::value>::type, Args...> : virtual public result_holder_base<Args...> {
         friend class DLB_Handler;
 
     protected:
@@ -21,7 +21,7 @@ namespace gempba {
 
     public:
         explicit ResultHolderInt(DLB_Handler &dlb) :
-            ResultHolderBase<Args...>(dlb) {
+            result_holder_base<Args...>(dlb) {
         }
 
         ~ResultHolderInt() override = default;
