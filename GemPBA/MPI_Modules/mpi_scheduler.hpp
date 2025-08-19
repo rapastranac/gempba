@@ -40,8 +40,8 @@ namespace gempba {
             ASSIGNED_STATE = 2,
             AVAILABLE_STATE = 3,
             TERMINATION = 4,
-            REFERENCE_VAL_PROPOSAL = 5,
-            REFERENCE_VAL_UPDATE = 6,
+            SCORE_PROPOSAL = 5,
+            SCORE_UPDATE = 6,
             NEXT_PROCESS = 7,
             HAS_RESULT = 8,
             NO_RESULT = 9,
@@ -202,7 +202,7 @@ namespace gempba {
             while (true) {
                 switch (branch % 3) {
                     case 0:
-                        if (auto v = probe_reference_value_comm(); v.has_value()) {
+                        if (auto v = probe_score_comm_at_node(); v.has_value()) {
                             return v.value();
                         }
                         break;
@@ -270,8 +270,8 @@ namespace gempba {
                         v_is_terminated = true; // temporary, it should always happen
                         break;
                     }
-                    case REFERENCE_VAL_UPDATE: {
-                        receive_reference_value(v_status);
+                    case SCORE_UPDATE: {
+                        receive_score(v_status);
                         break;
                     }
                     case NEXT_PROCESS: {
@@ -324,17 +324,17 @@ namespace gempba {
     private:
         void task_funneling(branch_handler &p_branch_handler);
 
-        void receive_reference_value(MPI_Status p_status) {
+        void receive_score(MPI_Status p_status) {
             utils::print_mpi_debug_comments("rank {}, about to receive global score from Center\n", m_world_rank);
-            MPI_Recv(&m_global_score, sizeof(score), MPI_BYTE, CENTER_NODE, REFERENCE_VAL_UPDATE, m_global_reference_value_communicator, &p_status);
+            MPI_Recv(&m_global_score, sizeof(score), MPI_BYTE, CENTER_NODE, SCORE_UPDATE, m_global_score_communicator, &p_status);
             utils::print_mpi_debug_comments("rank {}, received global score: {} from Center\n", m_world_rank, m_global_score.to_string());
         }
 
-        std::optional<MPI_Status> probe_reference_value_comm() {
+        std::optional<MPI_Status> probe_score_comm_at_node() {
             int v_is_message_received = 0; // logical
 
             MPI_Status v_status;
-            MPI_Iprobe(CENTER_NODE, REFERENCE_VAL_UPDATE, m_global_reference_value_communicator, &v_is_message_received, &v_status);
+            MPI_Iprobe(CENTER_NODE, SCORE_UPDATE, m_global_score_communicator, &v_is_message_received, &v_status);
             if (v_is_message_received) {
                 return v_status;
 
@@ -342,11 +342,11 @@ namespace gempba {
             return std::nullopt;
         }
 
-        // checks for a ref value update from center
-        void maybe_receive_reference_value() {
-            auto v_optional = probe_reference_value_comm();
+        // checks for a score update from center
+        void maybe_receive_score() {
+            auto v_optional = probe_score_comm_at_node();
             if (v_optional.has_value()) {
-                receive_reference_value(v_optional.value());
+                receive_score(v_optional.value());
             }
         }
 
@@ -388,9 +388,9 @@ namespace gempba {
             }
         }
 
-        // if ref value received, it attempts updating local value
+        // if score received, it attempts updating local value
         // if local value is better than the one in center, then the local best value is sent to center
-        void update_ref_value(branch_handler &p_branch_handler);
+        void update_score(branch_handler &p_branch_handler);
 
         /*	- return true is priority is acquired, false otherwise
             - priority released automatically if a message is pushed, otherwise it should be released manually
@@ -483,7 +483,7 @@ namespace gempba {
 
         score consume_score_flag(MPI_Status p_status) {
             score v_score;
-            MPI_Recv(&v_score, sizeof(score), MPI_BYTE, p_status.MPI_SOURCE, p_status.MPI_TAG, m_global_reference_value_communicator, &p_status);
+            MPI_Recv(&v_score, sizeof(score), MPI_BYTE, p_status.MPI_SOURCE, p_status.MPI_TAG, m_global_score_communicator, &p_status);
             return v_score;
         }
 
@@ -550,10 +550,10 @@ namespace gempba {
         }
 
         /**
-        * if center reaches this point, for sure workers have attained a better reference value,
+        * if center reaches this point, for sure workers have attained a better score
         * or they are not up-to-date, thus it is required to broadcast it whether this value changes or not
         */
-        void maybe_broadcast_global_reference_value(const score &p_new_global_score, MPI_Status p_status) {
+        void maybe_broadcast_global_score(const score &p_new_global_score, MPI_Status p_status) {
             utils::print_mpi_debug_comments("center received global score {} from rank {}\n", p_new_global_score.to_string(), p_status.MPI_SOURCE);
 
             const bool v_should_broadcast = should_broadcast_global(m_goal, m_global_score, p_new_global_score);
@@ -566,7 +566,7 @@ namespace gempba {
 
             m_global_score = p_new_global_score;
             for (int v_rank = 1; v_rank < m_world_size; v_rank++) {
-                MPI_Send(&m_global_score, sizeof(score), MPI_BYTE, v_rank, REFERENCE_VAL_UPDATE, m_global_reference_value_communicator);
+                MPI_Send(&m_global_score, sizeof(score), MPI_BYTE, v_rank, SCORE_UPDATE, m_global_score_communicator);
             }
 
             static int success = 0;
@@ -574,12 +574,11 @@ namespace gempba {
             spdlog::info("SUCCESSFUL updates: {}, m_global_score updated to : {} by rank {}\n", success, m_global_score.to_string(), p_status.MPI_SOURCE);
         }
 
-        std::optional<MPI_Status> probe_reference_value_comm_center() {
+        std::optional<MPI_Status> probe_score_comm_at_center() {
             int v_is_message_received = 0; // logical
             MPI_Status v_status;
-            MPI_Iprobe(MPI_ANY_SOURCE, REFERENCE_VAL_PROPOSAL, m_global_reference_value_communicator, &v_is_message_received, &v_status);
+            MPI_Iprobe(MPI_ANY_SOURCE, SCORE_PROPOSAL, m_global_score_communicator, &v_is_message_received, &v_status);
             if (v_is_message_received) {
-                // spdlog::info("rank {}: probe_reference_value_comm_center received message from rank {}\n", world_rank, status.MPI_SOURCE);
                 return v_status;
             }
             return std::nullopt;
@@ -613,7 +612,7 @@ namespace gempba {
                             break;
                         }
                         case 1: {
-                            if (auto v_optional = probe_reference_value_comm_center(); v_optional.has_value()) {
+                            if (auto v_optional = probe_score_comm_at_center(); v_optional.has_value()) {
                                 return v_optional;
                             }
                             break;
@@ -675,9 +674,9 @@ namespace gempba {
                         process_available(v_status);
                         break;
                     }
-                    case REFERENCE_VAL_PROPOSAL: {
-                        score v_candidate_global_reference_value = consume_score_flag(v_status);
-                        maybe_broadcast_global_reference_value(v_candidate_global_reference_value, v_status);
+                    case SCORE_PROPOSAL: {
+                        score v_candidate_global_score = consume_score_flag(v_status);
+                        maybe_broadcast_global_score(v_candidate_global_score, v_status);
                         break;
                     }
                 }
@@ -789,8 +788,8 @@ namespace gempba {
 
         void create_communicators() {
             MPI_Comm_dup(MPI_COMM_WORLD, &m_world_communicator); // world communicator for this library
-            MPI_Comm_dup(MPI_COMM_WORLD, &m_global_reference_value_communicator); // exclusive communicator for reference value - one-sided comm
-            MPI_Comm_dup(MPI_COMM_WORLD, &m_next_process_communicator); // exclusive communicator for next process - one-sided comm
+            MPI_Comm_dup(MPI_COMM_WORLD, &m_global_score_communicator); // exclusive communicator for score
+            MPI_Comm_dup(MPI_COMM_WORLD, &m_next_process_communicator); // exclusive communicator for next process
 
             MPI_Comm_size(m_world_communicator, &this->m_world_size);
             MPI_Comm_rank(m_world_communicator, &this->m_world_rank);
@@ -809,7 +808,7 @@ namespace gempba {
         }
 
         void deallocate_mpi() {
-            MPI_Comm_free(&m_global_reference_value_communicator);
+            MPI_Comm_free(&m_global_score_communicator);
             MPI_Comm_free(&m_next_process_communicator);
             MPI_Comm_free(&m_world_communicator);
         }
@@ -846,7 +845,7 @@ namespace gempba {
 
         Queue<task_packet *> m_tasks_queue;
 
-        MPI_Comm m_global_reference_value_communicator; // BIDIRECTIONAL
+        MPI_Comm m_global_score_communicator; // BIDIRECTIONAL
         MPI_Comm m_next_process_communicator; // CENTER TO WORKER (ONLY)
         MPI_Comm m_world_communicator; // BIDIRECTIONAL
 
@@ -898,15 +897,15 @@ namespace gempba {
         }
 
         /* ---------------------------------------------------------------------------------
-         * utility functions to determine whether to update global or local reference values
+         * utility functions to determine whether to update global or local score
          * ---------------------------------------------------------------------------------*/
 
-        static bool should_update_global(const goal p_goal, const score &p_global_reference_value, const score &p_local_reference_value) {
-            return should_update(p_goal, p_global_reference_value, p_local_reference_value);
+        static bool should_update_global(const goal p_goal, const score &p_global_score, const score &p_local_score) {
+            return should_update(p_goal, p_global_score, p_local_score);
         }
 
-        static bool should_update_local(const goal p_goal, const score &p_global_reference_value, const score &p_local_reference_value) {
-            return should_update(p_goal, p_local_reference_value, p_global_reference_value);
+        static bool should_update_local(const goal p_goal, const score &p_global_score, const score &p_local_score) {
+            return should_update(p_goal, p_local_score, p_global_score);
         }
 
         static bool should_broadcast_global(const goal p_goal, const score &p_old_global, const score &p_new_global) {
