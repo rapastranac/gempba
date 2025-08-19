@@ -17,7 +17,7 @@
 #include <BranchHandler/ThreadPool.hpp>
 #include <BranchHandler/args_handler.hpp>
 #include <DLB/DLB_Handler.hpp>
-#include <MPI_Modules/mpi_scheduler.hpp>
+#include <schedulers/mpi_scheduler.hpp>
 #include <utils/gempba_utils.hpp>
 #include <utils/utils.hpp>
 

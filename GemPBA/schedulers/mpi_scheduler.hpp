@@ -15,7 +15,7 @@
 #include <thread>
 #include <spdlog/spdlog.h>
 
-#include <MPI_Modules/scheduler_parent.hpp>
+#include <schedulers/scheduler_parent.hpp>
 #include <utils/Queue.hpp>
 #include <utils/gempba_utils.hpp>
 #include <utils/tree.hpp>
