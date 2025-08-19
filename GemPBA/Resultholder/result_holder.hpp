@@ -1,7 +1,7 @@
 #ifndef RESULTHOLDER_HPP
 #define RESULTHOLDER_HPP
 
-#include <Resultholder/ResultHolderIntNonVoid.hpp>
+#include <Resultholder/result_holder_int_non_void.hpp>
 #include <Resultholder/ResultHolderIntVoid.hpp>
 
 /*
