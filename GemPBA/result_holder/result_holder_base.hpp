@@ -6,7 +6,7 @@
 #include <tuple>
 
 #include <config.h>
-#include <Resultholder/result_holder_parent.hpp>
+#include <result_holder/result_holder_parent.hpp>
 
 /*
  * Created by Andres Pastrana on 2019

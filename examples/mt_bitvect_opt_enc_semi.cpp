@@ -1,7 +1,7 @@
 #include "include/main.hpp"
 #include "include/mt_bitvect_opt_enc.hpp"
 
-#include <Resultholder/result_holder.hpp>
+#include <result_holder/result_holder.hpp>
 #include <BranchHandler/branch_handler.hpp>
 #include <DLB/DLB_Handler.hpp>
 
