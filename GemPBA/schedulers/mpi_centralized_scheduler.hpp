@@ -1,12 +1,6 @@
 #ifndef MPI_SCHEDULER_CENTRALIZED_HPP
 #define MPI_SCHEDULER_CENTRALIZED_HPP
 
-#include "centralized_utils.hpp"
-#include "scheduler_parent.hpp"
-#include "result_holder/result_holder_parent.hpp"
-#include "utils/Queue.hpp"
-#include "utils/tree.hpp"
-
 #include <algorithm>
 #include <atomic>
 #include <cfloat>
@@ -23,12 +17,17 @@
 #include <string>
 #include <thread>
 #include <unistd.h>
-#include <spdlog/spdlog.h>
 
-#include "utils/gempba_utils.hpp"
-#include "utils/utils.hpp"
-#include "utils/ipc/result.hpp"
-#include "utils/ipc/task_packet.hpp"
+#include <result_holder/result_holder_parent.hpp>
+#include <schedulers/centralized_utils.hpp>
+#include <schedulers/api/scheduler_parent.hpp>
+#include <spdlog/spdlog.h>
+#include <utils/Queue.hpp>
+#include <utils/gempba_utils.hpp>
+#include <utils/tree.hpp>
+#include <utils/utils.hpp>
+#include <utils/ipc/result.hpp>
+#include <utils/ipc/task_packet.hpp>
 
 // max memory is in mb, e.g. 1024 * 10 = 10 GB
 #define MAX_MEMORY_MB (1024 * 10)

@@ -3,7 +3,7 @@
 
 #include "argparse/argparse.hpp"
 #include "Graph.hpp"
-#include "schedulers/scheduler_parent.hpp"
+#include <schedulers/api/scheduler_parent.hpp>
 
 #include <iostream>
 #include <filesystem>

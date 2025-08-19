@@ -13,9 +13,9 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
-#include <spdlog/spdlog.h>
 
-#include <schedulers/scheduler_parent.hpp>
+#include <schedulers/api/scheduler_parent.hpp>
+#include <spdlog/spdlog.h>
 #include <utils/Queue.hpp>
 #include <utils/gempba_utils.hpp>
 #include <utils/tree.hpp>
