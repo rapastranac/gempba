@@ -168,7 +168,7 @@ namespace gempba {
     };
 
     template<typename Ret, typename Enable = void, typename... Args>
-    class ResultHolderInt;
+    class result_holder_int;
 }
 
 #endif

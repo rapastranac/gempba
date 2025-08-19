@@ -12,7 +12,7 @@
 namespace gempba {
 
     template<typename Ret, typename... Args>
-    class ResultHolderInt<Ret, typename std::enable_if<!std::is_void<Ret>::value>::type, Args...> : virtual public result_holder_base<Args...> {
+    class result_holder_int<Ret, typename std::enable_if<!std::is_void<Ret>::value>::type, Args...> : virtual public result_holder_base<Args...> {
         friend class DLB_Handler;
 
     protected:
@@ -20,11 +20,11 @@ namespace gempba {
         Ret expected;
 
     public:
-        explicit ResultHolderInt(DLB_Handler &dlb) :
+        explicit result_holder_int(DLB_Handler &dlb) :
             result_holder_base<Args...>(dlb) {
         }
 
-        ~ResultHolderInt() override = default;
+        ~result_holder_int() override = default;
 
         void hold_future(std::future<Ret> &&expectedFut) {
             this->expectedFut = std::move(expectedFut);
