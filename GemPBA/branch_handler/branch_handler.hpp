@@ -290,7 +290,8 @@ namespace gempba {
 
             if (should_update_result(p_new_score)) {
                 m_score = p_new_score;
-                clear_result();
+                m_best_solution.reset();
+                m_best_solution_serialized = result::EMPTY;
                 return true;
             }
 
@@ -347,11 +348,6 @@ namespace gempba {
 
         bool is_done() const {
             return m_thread_pool->hasFinished();
-        }
-
-        void clear_result() {
-            m_best_solution.reset();
-            m_best_solution_serialized = result::EMPTY;
         }
 
 
