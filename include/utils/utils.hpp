@@ -25,10 +25,14 @@
 #define UTILS_H
 
 #include <any>
+#include <cfloat>
 #include <future>
 #include <spdlog/spdlog.h>
 #include <sys/time.h>
+#include <utils/gempba_utils.hpp>
 #include <utils/tree.hpp>
+#include <utils/ipc/score.hpp>
+
 
 
 /**
@@ -106,6 +110,45 @@ namespace utils {
             return -1.0;
         }
         return static_cast<double>(time.tv_sec) + static_cast<double>(time.tv_usec) * .000001;
+    }
+
+
+    static gempba::score get_default_score(const gempba::goal p_goal, const gempba::score_type p_type) {
+        switch (p_type) {
+            case gempba::score_type::I32: {
+                if (p_goal == gempba::MAXIMISE) {
+                    return gempba::score::make(INT_MIN); // maximisation
+                }
+                return gempba::score::make(INT_MAX); // minimisation
+            }
+            case gempba::score_type::I64: {
+                if (p_goal == gempba::MAXIMISE) {
+                    return gempba::score::make(LONG_MIN); // maximisation
+                }
+                return gempba::score::make(LONG_MAX); // minimisation
+            }
+            case gempba::score_type::F32: {
+                if (p_goal == gempba::MAXIMISE) {
+                    return gempba::score::make(FLT_MIN); // maximisation
+                }
+                return gempba::score::make(FLT_MAX); // minimisation
+            }
+            case gempba::score_type::F64: {
+                if (p_goal == gempba::MAXIMISE) {
+                    return gempba::score::make(DBL_MIN); // maximisation
+                }
+                return gempba::score::make(DBL_MAX); // minimisation
+            }
+            case gempba::score_type::F128: {
+                if (p_goal == gempba::MAXIMISE) {
+                    return gempba::score::make(LDBL_MIN); // maximisation
+                }
+                return gempba::score::make(LDBL_MAX); // minimisation
+            }
+            default: {
+                spdlog::throw_spdlog_ex("Invalid score type: {}", static_cast<int>(p_type));
+            }
+        }
     }
 }; // namespace utils
 

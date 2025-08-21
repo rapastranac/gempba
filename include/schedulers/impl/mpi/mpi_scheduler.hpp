@@ -149,48 +149,7 @@ namespace gempba {
 
         void set_goal(const goal p_goal, const score_type p_type) override {
             this->m_goal = p_goal;
-            switch (p_type) {
-                case score_type::I32: {
-                    if (p_goal == MAXIMISE) {
-                        m_global_score = score::make(INT_MIN); // maximisation
-                    } else {
-                        m_global_score = score::make(INT_MAX); // minimisation
-                    }
-                    break;
-                }
-                case score_type::I64: {
-                    if (p_goal == MAXIMISE) {
-                        m_global_score = score::make(LONG_MIN); // maximisation
-                    } else {
-                        m_global_score = score::make(LONG_MAX); // minimisation
-                    }
-                    break;
-                }
-                case score_type::F32: {
-                    if (p_goal == MAXIMISE) {
-                        m_global_score = score::make(FLT_MIN); // maximisation
-                    } else {
-                        m_global_score = score::make(FLT_MAX); // minimisation
-                    }
-                    break;
-                }
-                case score_type::F64: {
-                    if (p_goal == MAXIMISE) {
-                        m_global_score = score::make(DBL_MIN); // maximisation
-                    } else {
-                        m_global_score = score::make(DBL_MAX); // minimisation
-                    }
-                    break;
-                }
-                case score_type::F128: {
-                    if (p_goal == MAXIMISE) {
-                        m_global_score = score::make(LDBL_MIN); // maximisation
-                    } else {
-                        m_global_score = score::make(LDBL_MAX); // minimisation
-                    }
-                    break;
-                }
-            }
+            this->m_global_score = utils::get_default_score(p_goal, p_type);
         }
 
     private:
