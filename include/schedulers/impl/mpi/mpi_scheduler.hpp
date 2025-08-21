@@ -121,7 +121,7 @@ namespace gempba {
                 MPI_Barrier(m_world_communicator);
         }
 
-        bool open_sending_channel() override {
+        bool try_open_transmission_channel() override {
             if (m_mutex.try_lock()) // acquires mutex
             {
                 if (!m_transmitting.load()) // check if transmission in progress
@@ -138,7 +138,7 @@ namespace gempba {
         }
 
         /* this should be invoked only if priority is acquired*/
-        void close_sending_channel() override {
+        void close_transmission_channel() override {
             m_mutex.unlock();
         }
 
@@ -316,7 +316,7 @@ namespace gempba {
             }
 
             m_tasks_queue.push(v_message);
-            close_sending_channel();
+            close_transmission_channel();
         }
 
     private:

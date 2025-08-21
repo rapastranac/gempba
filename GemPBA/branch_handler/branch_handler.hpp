@@ -542,7 +542,7 @@ namespace gempba {
                 std::unique_lock<std::mutex> lck(m_mpi_mutex, std::defer_lock);
                 if (lck.try_lock()) {
                     // if mutex acquired, other threads will jump this section
-                    if (m_mpi_scheduler->open_sending_channel()) {
+                    if (m_mpi_scheduler->try_open_transmission_channel()) {
                         auto getBuffer = [&p_serializer](auto &tuple) {
                             return std::apply(p_serializer, tuple);
                         };
@@ -673,7 +673,7 @@ namespace gempba {
                     } else {
                         v_upper_holder->setDiscard();
                         // WARNING, ATTENTION, CUIDADO! holder discarded, flagged as sent but not really sent, then sendingChannel should be released!!!!
-                        m_mpi_scheduler->close_sending_channel();
+                        m_mpi_scheduler->close_transmission_channel();
                     }
                     return true; // top holder found whether discarded or pushed
                 }

@@ -44,9 +44,9 @@ namespace gempba {
 
         virtual void barrier() = 0;
 
-        virtual bool open_sending_channel() = 0;
+        virtual bool try_open_transmission_channel() = 0;
 
-        virtual void close_sending_channel() = 0;
+        virtual void close_transmission_channel() = 0;
 
         [[nodiscard]] virtual int next_process() const = 0;
 
