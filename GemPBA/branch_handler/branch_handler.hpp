@@ -494,34 +494,36 @@ namespace gempba {
                 NOTE: if top holder found, it'll keep trying to find more
             */
             while (true) {
-                std::unique_lock<std::mutex> lck(m_mpi_mutex, std::defer_lock);
-                if (lck.try_lock()) {
-                    // if mutex acquired, other threads will jump this section
-                    if (m_mpi_scheduler->try_open_transmission_channel()) {
-                        auto getBuffer = [&p_serializer](auto &tuple) {
-                            return std::apply(p_serializer, tuple);
-                        };
-
-                        if (try_top_holder(getBuffer, p_holder)) {
-                            // if top holder found, then it is pushed; therefore, priority is release internally
-                            continue; // keeps iterating from root to current level
-                        } else {
-                            // since priority is already acquired, take advantage of it to push the current holder
-                            if (p_holder.isTreated()) {
-                                throw std::runtime_error("Attempt to push a treated holder\n");
-                            }
-
-                            task_packet v_buffer = getBuffer(p_holder.getArgs());
-                            m_mpi_scheduler->push(std::move(v_buffer)); // this closes the sending channel internally
-                            p_holder.setMPISent();
-                            m_load_balancer.prune(&p_holder);
-                            return true;
-                        }
-                    }
-                    break;
-                } else {
+                std::unique_lock<std::mutex> v_lock(m_mpi_mutex, std::defer_lock);
+                if (!v_lock.try_lock()) {
                     break;
                 }
+                bool v_transmission_channel_open = m_mpi_scheduler->try_open_transmission_channel();
+                // if mutex acquired, other threads will jump this section
+                if (!v_transmission_channel_open) {
+                    break;
+                }
+
+                auto getBuffer = [&p_serializer](auto &tuple) {
+                    return std::apply(p_serializer, tuple);
+                };
+
+                const bool v_top_holder_found_and_pushed = try_top_holder(getBuffer, p_holder);
+                if (v_top_holder_found_and_pushed) {
+                    // if top holder found, then it is pushed; therefore, priority is release internally
+                    continue; // keeps iterating from root to current level
+                }
+
+                // since priority is already acquired, take advantage of it to push the current holder
+                if (p_holder.isTreated()) {
+                    throw std::runtime_error("Attempt to push a treated holder\n");
+                }
+
+                task_packet v_buffer = getBuffer(p_holder.getArgs());
+                m_mpi_scheduler->push(std::move(v_buffer)); // this closes the sending channel internally
+                p_holder.setMPISent();
+                m_load_balancer.prune(&p_holder);
+                return true;
             }
             return false;
         }
