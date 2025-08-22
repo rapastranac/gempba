@@ -84,7 +84,7 @@ namespace gempba {
       * this method should not possibly be accessed if priority (Thread Pool) is not acquired
       */
         template<typename Ret, typename F, typename HolderType, std::enable_if_t<std::is_void_v<Ret>, int> = 0>
-        bool try_top_holder(F &f, HolderType &holder) {
+        bool try_push_root_level_holder_remotely(F &f, HolderType &holder) {
             if (m_load_balancing_strategy == QUASI_HORIZONTAL) {
                 HolderType *upperHolder = m_load_balancer.find_top_holder(&holder);
                 if (upperHolder) {
@@ -121,7 +121,8 @@ namespace gempba {
                 if (lck.try_lock()) {
                     if (m_thread_pool->n_idle() > 0) {
 
-                        if (try_top_holder<Ret>(f, holder)) {
+                        const bool v_top_holder_found_and_pushed = try_push_root_level_holder_remotely<Ret>(f, holder);
+                        if (v_top_holder_found_and_pushed) {
                             continue; // keeps iterating from root to current level
                         } else {
                             if (holder.isTreated())
@@ -508,7 +509,7 @@ namespace gempba {
                     return std::apply(p_serializer, tuple);
                 };
 
-                const bool v_top_holder_found_and_pushed = try_top_holder(getBuffer, p_holder);
+                const bool v_top_holder_found_and_pushed = try_push_root_level_holder_remotely(getBuffer, p_holder);
                 if (v_top_holder_found_and_pushed) {
                     // if top holder found, then it is pushed; therefore, priority is release internally
                     continue; // keeps iterating from root to current level
@@ -615,7 +616,7 @@ namespace gempba {
          *  this method should not be possibly accessed if priority (MPI) not acquired
          */
         template<typename HolderType>
-        bool try_top_holder(auto &p_get_buffer, HolderType &p_holder) {
+        bool try_push_root_level_holder_remotely(auto &p_get_buffer, HolderType &p_holder) {
             if (m_load_balancing_strategy == QUASI_HORIZONTAL) {
                 HolderType *v_upper_holder = m_load_balancer.find_top_holder(&p_holder); //  if it finds it, then the root has already been lowered
                 if (v_upper_holder) {
