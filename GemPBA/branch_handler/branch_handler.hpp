@@ -118,29 +118,27 @@ namespace gempba {
             */
             while (true) {
                 std::unique_lock<std::mutex> lck(m_mutex, std::defer_lock);
-                if (lck.try_lock()) {
-                    if (m_thread_pool->n_idle() > 0) {
-
-                        const bool v_top_holder_found_and_pushed = try_push_root_level_holder_remotely<Ret>(f, holder);
-                        if (v_top_holder_found_and_pushed) {
-                            continue; // keeps iterating from root to current level
-                        } else {
-                            if (holder.isTreated())
-                                throw std::runtime_error("Attempt to push a treated holder\n");
-
-                            // after this line, only leftMost holder should be pushed
-                            this->m_thread_requests++;
-                            holder.setPushStatus();
-                            m_load_balancer.prune(&holder);
-
-                            gempba::args_handler::unpack_and_push_void(*m_thread_pool, f, holder.getArgs());
-                            return true; // pushed to the pool
-                        }
-                    }
-                    break; // mutex released at destruction
-                } else {
+                if (!lck.try_lock()) {
                     break;
                 }
+                if (m_thread_pool->n_idle() <= 0) {
+                    break; // mutex released at destruction
+                }
+                const bool v_top_holder_found_and_pushed = try_push_root_level_holder_remotely<Ret>(f, holder);
+                if (v_top_holder_found_and_pushed) {
+                    continue; // keeps iterating from root to current level
+                }
+                if (holder.isTreated()) {
+                    throw std::runtime_error("Attempt to push a treated holder\n");
+                }
+
+                // after this line, only leftMost holder should be pushed
+                this->m_thread_requests++;
+                holder.setPushStatus();
+                m_load_balancer.prune(&holder);
+
+                args_handler::unpack_and_push_void(*m_thread_pool, f, holder.getArgs());
+                return true; // pushed to the pool
             }
             this->forward<Ret>(f, id, holder);
             return false;
