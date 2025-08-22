@@ -494,14 +494,14 @@ namespace gempba {
                 NOTE: if top holder found, it'll keep trying to find more
             */
             while (true) {
-                std::unique_lock<std::mutex> v_lock(m_mpi_mutex, std::defer_lock);
+                std::unique_lock v_lock(m_mpi_mutex, std::defer_lock);
                 if (!v_lock.try_lock()) {
-                    break;
+                    return false;
                 }
                 bool v_transmission_channel_open = m_mpi_scheduler->try_open_transmission_channel();
                 // if mutex acquired, other threads will jump this section
                 if (!v_transmission_channel_open) {
-                    break;
+                    return false;
                 }
 
                 auto getBuffer = [&p_serializer](auto &tuple) {
@@ -525,7 +525,6 @@ namespace gempba {
                 m_load_balancer.prune(&p_holder);
                 return true;
             }
-            return false;
         }
 
         template<typename Ret, typename F, typename HolderType, typename F_SERIAL>
