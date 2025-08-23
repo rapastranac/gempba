@@ -28,6 +28,7 @@
 #include <bit>
 #include <compare>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <iomanip>
 #include <limits>
@@ -55,6 +56,27 @@ namespace gempba {
         score_type m_kind;
         std::array<std::byte, PAYLOAD_SIZE> m_payload;
 
+
+        /**
+         * Helper factory for supported numeric types
+         * @tparam T supported numeric type
+         * @param p_value value to be stored in the score
+         * @return score instance containing the value
+         */
+        template<typename T>
+        static constexpr score make_raw(T p_value) noexcept {
+            static_assert(IS_SUPPORTED<T>, "unsupported score type");
+            static_assert(sizeof(T) <= PAYLOAD_SIZE, "type too large for score payload");
+            score v_score{};
+            v_score.m_kind = TYPE_OF<T>;
+            auto v_bytes = std::bit_cast<std::array<std::byte, sizeof(T)> >(p_value);
+            std::memcpy(v_score.m_payload.data(), v_bytes.data(), sizeof(T));
+            if constexpr (sizeof(T) < PAYLOAD_SIZE) {
+                std::memset(v_score.m_payload.data() + sizeof(T), 0, PAYLOAD_SIZE - sizeof(T));
+            }
+            return v_score;
+        }
+
     public:
         /**
          * Factory for supported numeric types
@@ -64,17 +86,18 @@ namespace gempba {
          */
         template<typename T>
         static constexpr score make(T p_value) noexcept {
-            static_assert(IS_SUPPORTED<T>, "unsupported score type");
-            static_assert(sizeof(T) <= PAYLOAD_SIZE, "type too large for score payload");
-            score v_score{};
-            v_score.m_kind = TYPE_OF<T>;
-            auto v_bytes = std::bit_cast<std::array<std::byte, sizeof(T)> >(p_value);
-            std::memcpy(v_score.m_payload.data(), v_bytes.data(), sizeof(T));
-            // zero remaining payload bytes when sizeof(T) < payload_size
-            if constexpr (sizeof(T) < PAYLOAD_SIZE) {
-                std::memset(v_score.m_payload.data() + sizeof(T), 0, PAYLOAD_SIZE - sizeof(T));
+            using U = std::remove_cvref_t<T>;
+
+            if constexpr (std::is_integral_v<U> && sizeof(U) == 4) {
+                return make_raw<std::int32_t>(static_cast<std::int32_t>(p_value));
+            } else if constexpr (std::is_integral_v<U> && sizeof(U) == 8) {
+                return make_raw<std::int64_t>(static_cast<std::int64_t>(p_value));
+            } else if constexpr (std::same_as<U, float> || std::same_as<U, double> || std::same_as<U, long double>) {
+                return make_raw<U>(p_value);
+            } else {
+                static_assert(IS_SUPPORTED<U>, "unsupported score type");
             }
-            return v_score;
+            std::abort(); // std::unreachable in C++23
         }
 
         // Strong ordering
