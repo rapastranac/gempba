@@ -1,0 +1,62 @@
+name: C/C++ CI (Windows 2022)
+
+on:
+  push:
+    branches: [ "main", "${NUMBER}-*" ]
+  pull_request:
+    branches: [ "main", "${NUMBER}-*" ]
+
+jobs:
+  build:
+    runs-on: windows-2022
+
+    steps:
+      # 1️⃣ Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.ref }}
+
+      # 2️⃣ Set up MSYS2 environment and install dependencies
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: >-
+            base-devel
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-make
+            mingw-w64-x86_64-boost
+            mingw-w64-x86_64-msmpi
+            mingw-w64-x86_64-gtest
+            git
+
+      # 3️⃣ Echo versions of installed dependencies
+      - name: Echo Dependencies Version
+        shell: msys2 {0}
+        run: |
+          echo "g++: $(g++ --version | head -1 | awk '{print $NF}')"
+          echo "cmake: $(cmake --version | head -1 | awk '{print $3}')"
+          echo "make: $(make --version | head -1 | awk '{print $3}')"
+          echo "git: $(git --version | awk '{print $3}')"
+          echo "mingw-w64-x86_64-boost: $(pacman -Qi mingw-w64-x86_64-boost | grep Version | awk '{print $3}')"
+          echo "mingw-w64-x86_64-msmpi: $(pacman -Qi mingw-w64-x86_64-msmpi | grep Version | awk '{print $3}')"
+          echo "mingw-w64-x86_64-gtest: $(pacman -Qi mingw-w64-x86_64-gtest | grep Version | awk '{print $3}')"
+
+      # 4️⃣ Build the project
+      - name: Build
+        shell: msys2 {0}
+        run: |
+          mkdir -p build
+          cd build
+          cmake -G "MSYS Makefiles" ..
+          make -j2
+
+      # 5️⃣ Run tests
+      - name: Run tests
+        shell: msys2 {0}
+        run: |
+          cd "$GITHUB_WORKSPACE/bin"
+          ./all_tests.exe
