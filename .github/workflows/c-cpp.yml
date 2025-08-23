@@ -60,4 +60,4 @@ jobs:
       - name: Run Tests
         run: |
           cd ${GITHUB_WORKSPACE}/bin
-          ./all_tests.out
+          ./all_tests
