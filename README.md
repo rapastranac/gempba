@@ -1,6 +1,7 @@
 # Generic Massive Parallelisation of Branching Algorithms
 
-[![C/C++ CI](https://github.com/rapastranac/gempba/actions/workflows/c-cpp.yml/badge.svg)](https://github.com/rapastranac/gempba/actions/workflows/c-cpp.yml)
+[![C/C++ CI (Ubuntu 24.04)](https://github.com/rapastranac/gempba/actions/workflows/c-cpp-ubuntu.yml/badge.svg)](https://github.com/rapastranac/gempba/actions/workflows/c-cpp-ubuntu.yml)
+[![C/C++ CI (Windows 2022)](https://github.com/rapastranac/gempba/actions/workflows/c-cpp-windows.yml/badge.svg)](https://github.com/rapastranac/gempba/actions/workflows/c-cpp-windows.yml)
 ![GitHub License](https://img.shields.io/github/license/rapastranac/gempba)
 ![GitHub Release](https://img.shields.io/github/v/release/rapastranac/gempba)
 

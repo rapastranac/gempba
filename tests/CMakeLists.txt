@@ -29,10 +29,10 @@ if (NOT TEST_SOURCES)
 endif ()
 
 # Create a single test executable
-add_executable(all_tests.out ${TEST_SOURCES})
+add_executable(all_tests ${TEST_SOURCES})
 
 # Link necessary libraries (e.g., Google Test)
-target_link_libraries(all_tests.out
+target_link_libraries(all_tests
         PRIVATE
         gempba
         GTest::gtest
@@ -44,11 +44,11 @@ target_link_libraries(all_tests.out
 )
 
 # Compilation options by mode
-target_compile_options(all_tests.out PRIVATE
+target_compile_options(all_tests PRIVATE
         -Wall -Wextra -Wpedantic -pthread -fexceptions -fconcepts
         $<$<CONFIG:Debug>:-g -O0 -ggdb3 -DGEMPBA_DEBUG_COMMENTS>
         $<$<CONFIG:Release>:-O3 -DNDEBUG>
 )
 
 # Add the test to the testing system
-add_test(NAME all_tests.out COMMAND all_tests.out)
+add_test(NAME all_tests COMMAND all_tests)
