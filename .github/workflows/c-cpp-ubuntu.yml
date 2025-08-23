@@ -1,0 +1,66 @@
+name: C/C++ CI (Ubuntu 24.04)
+
+on:
+  push:
+    branches: [ "main", "${NUMBER}-*" ]
+  pull_request:
+    branches: [ "main", "${NUMBER}-*" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      # 1️⃣ Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.ref }}
+
+      # 2️⃣ Set up environment and install dependencies
+      - name: Setup Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential
+          sudo apt-get install -y cmake 
+          sudo apt-get install -y gcc 
+          sudo apt-get install -y make 
+          sudo apt-get install -y git
+          sudo apt-get install -y libboost-all-dev 
+          sudo apt-get install -y libopenmpi-dev 
+          sudo apt-get install -y libgtest-dev
+          sudo apt-get install -y libgmock-dev
+
+      # 3️⃣ Build and install GTest/GMock from source
+      - name: Build and install GTest/GMock
+        run: |
+          cd /usr/src/googletest
+          sudo cmake -S . -B build
+          sudo cmake --build build --target install
+
+      # 4️⃣ Echo versions of installed dependencies
+      - name: Echo Dependencies Version
+        run: |
+          echo "g++: $(g++ --version | head -1 | awk '{print $4}')"
+          echo "cmake: $(cmake --version | head -1 | awk '{print $3}')"
+          echo "make: $(make --version | head -1 | awk '{print $3}')"
+          echo "git: $(git --version | awk '{print $3}')"
+          echo "libboost-dev: $(dpkg -s libboost-dev | grep 'Version' | awk '{print $2}')"
+          echo "libopenmpi-dev: $(dpkg -s libopenmpi-dev | grep 'Version' | awk '{print $2}')"
+          echo "libgtest-dev: $(dpkg -s libgtest-dev | grep 'Version' | awk '{print $2}')"
+          echo "libgmock-dev: $(dpkg -s libgmock-dev | grep 'Version' | awk '{print $2}')"
+
+      # 5️⃣ Build the project
+      - name: Build the project
+        run: |
+          cd ${{ github.workspace }}
+          mkdir -p build
+          cd build
+          cmake ..
+          make -j$(nproc)
+        # 6️⃣ Run tests
+      - name: Run tests
+        run: |
+          cd ${{ github.workspace }}/bin
+          ./all_tests
