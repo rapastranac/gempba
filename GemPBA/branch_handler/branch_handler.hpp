@@ -526,16 +526,6 @@ namespace gempba {
             }
         }
 
-        template<typename Ret, typename F, typename HolderType, typename F_SERIAL>
-        bool push_multiprocess(F &f, int id, HolderType &holder, F_SERIAL &f_serial, bool) {
-            bool isSuccess = false;
-            while (!isSuccess) {
-                isSuccess = push_multiprocess<Ret>(f, id, holder, f_serial);
-            }
-
-            return isSuccess;
-        }
-
     public:
         MPI_Comm &get_communicator() {
             return *m_world_communicator;
