@@ -643,7 +643,7 @@ namespace gempba {
             it will proceed sequentially
         */
         template<typename Ret, typename F, typename HolderType, typename Serializer>
-        bool try_push_mp(F &p_function, int p_id, HolderType &p_holder, Serializer &&p_serializer) {
+        bool try_remote_submit(F &p_function, int p_id, HolderType &p_holder, Serializer &&p_serializer) {
             bool isSuccess = push_multiprocess(p_id, p_holder, p_serializer);
             return isSuccess ? isSuccess : try_push_mt<Ret>(p_function, p_id, p_holder);
         }
