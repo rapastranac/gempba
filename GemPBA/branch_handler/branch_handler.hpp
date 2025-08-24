@@ -536,19 +536,6 @@ namespace gempba {
             return isSuccess;
         }
 
-        template<typename Ret, typename F, typename HolderType, typename F_SERIAL, std::enable_if_t<!std::is_void_v<Ret>, int> = 0>
-        bool push_multiprocess(F &f, int id, HolderType &holder, F_SERIAL &f_serial) {
-            int r = try_another_process(holder, f_serial); // TODO .. this method does not exist, maybe remove!
-            if (r == 0) {
-                return true;
-            }
-            if (r == 2) {
-                return false;
-            }
-
-            return send<Ret>(f, id, holder);
-        }
-
     public:
         MPI_Comm &get_communicator() {
             return *m_world_communicator;
