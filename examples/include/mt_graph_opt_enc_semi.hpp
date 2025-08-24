@@ -159,7 +159,7 @@ public:
             //if (nbVertices < 50)
             //	branchHandler.forward<void>(_f, id, hol_l);
             //else
-            branchHandler.try_push_mt<void>(_f, id, hol_l);
+            branchHandler.try_local_submit<void>(_f, id, hol_l);
         }
         if (hol_r.evaluate_branch_checkIn()) {
             branchHandler.forward<void>(_f, id, hol_r);

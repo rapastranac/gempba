@@ -133,7 +133,7 @@ namespace gempba {
             Graph rightGraph;
 
             if (holderLeft.evaluate_branch_checkIn()) {
-                branchHandler.try_push_mt<Graph>(_f, id, holderLeft);
+                branchHandler.try_local_submit<Graph>(_f, id, holderLeft);
             }
 
             if (holderRight.evaluate_branch_checkIn()) {

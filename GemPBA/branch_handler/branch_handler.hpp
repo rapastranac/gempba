@@ -418,7 +418,7 @@ namespace gempba {
          * @return
          */
         template<typename Ret, typename F, typename HolderType>
-        bool try_push_mt(F &&p_function, int p_id, HolderType &p_holder) {
+        bool try_local_submit(F &&p_function, int p_id, HolderType &p_holder) {
             return push_multithreading<Ret>(p_function, p_id, p_holder);
         }
 
@@ -645,7 +645,7 @@ namespace gempba {
         template<typename Ret, typename F, typename HolderType, typename Serializer>
         bool try_remote_submit(F &p_function, int p_id, HolderType &p_holder, Serializer &&p_serializer) {
             bool isSuccess = push_multiprocess(p_id, p_holder, p_serializer);
-            return isSuccess ? isSuccess : try_push_mt<Ret>(p_function, p_id, p_holder);
+            return isSuccess ? isSuccess : try_local_submit<Ret>(p_function, p_id, p_holder);
         }
 
         template<typename Ret, typename F, typename HolderType, typename Deserializer, std::enable_if_t<!std::is_void_v<Ret>, int> = 0>

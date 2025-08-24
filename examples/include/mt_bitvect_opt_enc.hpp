@@ -304,7 +304,7 @@ public:
         });
 
         if (hol_l.evaluate_branch_checkIn()) {
-            branchHandler.try_push_mt<void>(_f, id, hol_l);
+            branchHandler.try_local_submit<void>(_f, id, hol_l);
         } else {
         }
 
