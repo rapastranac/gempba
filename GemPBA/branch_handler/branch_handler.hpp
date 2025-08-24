@@ -95,7 +95,7 @@ namespace gempba {
                         // checks if it's worth it to push
                         this->m_thread_requests++;
                         upperHolder->setPushStatus();
-                        gempba::args_handler::unpack_and_push_void(*m_thread_pool, f, upperHolder->getArgs());
+                        args_handler::unpack_and_push_void(*m_thread_pool, f, upperHolder->getArgs());
                     } else {
                         // discard otherwise
                         upperHolder->setDiscard();
@@ -162,7 +162,7 @@ namespace gempba {
                 holder.setPushStatus();
 
                 lck.unlock();
-                auto ret = gempba::args_handler::unpack_and_push_non_void(*m_thread_pool, f, holder.getArgs());
+                auto ret = args_handler::unpack_and_push_non_void(*m_thread_pool, f, holder.getArgs());
                 holder.hold_future(std::move(ret));
                 return true;
             } else {
@@ -388,7 +388,7 @@ namespace gempba {
         void force_push(F &p_function, int p_id, HolderType &p_holder) {
             p_holder.setPushStatus();
             m_load_balancer.prune(&p_holder);
-            gempba::args_handler::unpack_and_push_void(*m_thread_pool, p_function, p_holder.getArgs());
+            args_handler::unpack_and_push_void(*m_thread_pool, p_function, p_holder.getArgs());
         }
 
         /**
@@ -405,7 +405,7 @@ namespace gempba {
         void force_push(F &p_function, int p_id, HolderType &p_holder) {
             p_holder.setPushStatus();
             m_load_balancer.prune(&p_holder);
-            gempba::args_handler::unpack_and_forward_non_void(p_function, p_id, p_holder.getArgs(), p_holder);
+            args_handler::unpack_and_forward_non_void(p_function, p_id, p_holder.getArgs(), p_holder);
         }
 
         /**
@@ -430,7 +430,7 @@ namespace gempba {
             // TODO this is related to non-void function on multithreading mode
             // DLB not supported
             p_holder.setForwardStatus();
-            return gempba::args_handler::unpack_and_forward_non_void(p_function, p_thread_id, p_holder.getArgs(), &p_holder);
+            return args_handler::unpack_and_forward_non_void(p_function, p_thread_id, p_holder.getArgs(), &p_holder);
         }
 
         // no DLB_Handler ************************************************************************* end
@@ -453,7 +453,7 @@ namespace gempba {
             }
 
             p_holder.setForwardStatus();
-            gempba::args_handler::unpack_and_forward_void(p_function, p_thread_id, p_holder.getArgs(), &p_holder);
+            args_handler::unpack_and_forward_void(p_function, p_thread_id, p_holder.getArgs(), &p_holder);
         }
 
         template<typename Ret, typename F, typename HolderType, std::enable_if_t<!std::is_void_v<Ret>, int> = 0>
