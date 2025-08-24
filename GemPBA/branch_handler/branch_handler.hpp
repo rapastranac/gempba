@@ -483,7 +483,7 @@ namespace gempba {
         MPI_Comm *m_world_communicator = nullptr; // world communicator MPI
 
 
-        bool push_multiprocess(int p_id, auto &p_holder, auto &&p_serializer) {
+        bool send(int p_id, auto &p_holder, auto &&p_serializer) {
             /* the underlying loop breaks under one of the following scenarios:
                 - unable to acquire priority
                 - unable to acquire mutex
@@ -621,7 +621,7 @@ namespace gempba {
         */
         template<typename Ret, typename F, typename HolderType, typename Serializer>
         bool try_remote_submit(F &p_function, int p_id, HolderType &p_holder, Serializer &&p_serializer) {
-            bool isSuccess = push_multiprocess(p_id, p_holder, p_serializer);
+            bool isSuccess = send(p_id, p_holder, p_serializer);
             return isSuccess ? isSuccess : try_local_submit<Ret>(p_function, p_id, p_holder);
         }
 
