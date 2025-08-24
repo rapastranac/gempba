@@ -4,6 +4,8 @@
 #include <cstdio>
 #include <functional>
 #include <tuple>
+
+#include <config.h>
 #include <Resultholder/ResultHolderParent.hpp>
 
 /*
