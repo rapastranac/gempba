@@ -108,7 +108,7 @@ namespace gempba {
         }
 
         template<typename Ret, typename F, typename HolderType, std::enable_if_t<std::is_void_v<Ret>, int> = 0>
-        bool push_multithreading(F &&f, int id, HolderType &holder) {
+        bool send(F &&f, int id, HolderType &holder) {
             /* the underlying loop breaks under one of the following scenarios:
                 - mutex cannot be acquired
                 - there is no available thread in the pool
@@ -145,7 +145,7 @@ namespace gempba {
         }
 
         template<typename Ret, typename F, typename HolderType, std::enable_if_t<!std::is_void_v<Ret>, int> = 0>
-        bool push_multithreading(F &f, int id, HolderType &holder) {
+        bool send(F &f, int id, HolderType &holder) {
             /*This lock must be acquired before checking the condition,
             even though numThread is atomic*/
             std::unique_lock<std::mutex> lck(m_mutex);
@@ -419,7 +419,7 @@ namespace gempba {
          */
         template<typename Ret, typename F, typename HolderType>
         bool try_local_submit(F &&p_function, int p_id, HolderType &p_holder) {
-            return push_multithreading<Ret>(p_function, p_id, p_holder);
+            return send<Ret>(p_function, p_id, p_holder);
         }
 
     public:
@@ -546,7 +546,7 @@ namespace gempba {
                 return false;
             }
 
-            return push_multithreading<Ret>(f, id, holder);
+            return send<Ret>(f, id, holder);
         }
 
     public:
