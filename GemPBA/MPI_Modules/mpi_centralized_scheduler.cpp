@@ -43,7 +43,7 @@ namespace gempba {
                     break;
             }
         }
-        #ifdef GEMPBA_DEBUG_COMMENTS
+        #if GEMPBA_DEBUG_COMMENTS
         spdlog::debug("rank {} sent {} tasks\n", m_world_rank, m_sent_tasks);
         #endif
 

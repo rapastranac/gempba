@@ -150,13 +150,11 @@ namespace gempba {
                 return nullptr; // there is no parent
             }
 
-            /*
-            #ifdef GEMPBA_DEBUG_COMMENTS
-            fmt::print("rank {}, likely to get an upperHolder \n", -1);
+            #if GEMPBA_DEBUG_COMMENTS
+            spdlog::debug("rank {}, likely to get an upperHolder \n", -1);
             int N_children = root->children.size();
-            fmt::print("rank {}, root->children.size() = {} \n", -1, N_children);
-
-            #endif  */
+            spdlog::debug("rank {}, root->children.size() = {} \n", -1, N_children);
+            #endif
             /*Here below, we check is left child was pushed to pool, then the pointer to parent is pruned
                              parent
                           /  |  \   \  \
@@ -193,9 +191,9 @@ namespace gempba {
 
                 return secondHolder;
             } else if (root->children.size() == 2) {
-                //#ifdef GEMPBA_DEBUG_COMMENTS
-                //                fmt::print("rank {}, about to choose an upperHolder \n", -1);
-                //#endif
+                #if GEMPBA_DEBUG_COMMENTS
+                spdlog::debug("rank {}, about to choose an upperHolder \n", -1);
+                #endif
                 /*	this scope is meant to push right branch which was put in waiting line
                     because there was no available thread to push leftMost branch, then leftMost
                     will be the new root since after this scope right branch will have been
@@ -381,7 +379,8 @@ namespace gempba {
 
         template<typename HolderType, typename... Args>
         void linkVirtualRoot(int threadId, HolderType *virtualRoot, HolderType &child, Args &... args) {
-            virtualRoot->setDepth(child.depth); {
+            virtualRoot->setDepth(child.depth);
+            {
                 std::scoped_lock<std::mutex> lck(mtx);
                 child.parent = static_cast<HolderType *>(roots[threadId]);
                 child.root = &roots[threadId];

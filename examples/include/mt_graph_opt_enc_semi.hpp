@@ -96,9 +96,9 @@ public:
         }
 
         if (graph.size() == 0) {
-#ifdef GEMPBA_DEBUG_COMMENTS
-            printf("Leaf reached, depth : %d \n", depth);
-#endif
+            #if GEMPBA_DEBUG_COMMENTS
+            spdlog::debug("Leaf reached, depth : %d \n", depth);
+            #endif
             terminate_condition(graph, id, depth);
             return;
         }

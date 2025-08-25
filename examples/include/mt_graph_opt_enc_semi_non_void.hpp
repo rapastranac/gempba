@@ -41,7 +41,8 @@ namespace gempba {
 
             try {
                 branchHandler.set_score(score::make(currentMVCSize));
-                HolderType *dummyParent = new HolderType(dlb, -1); {
+                HolderType *dummyParent = new HolderType(dlb, -1);
+                {
                     graph_res = mvc(-1, 0, graph, dummyParent);
                 }
 
@@ -80,9 +81,9 @@ namespace gempba {
             }
 
             if (graph.size() == 0) {
-#ifdef GEMPBA_DEBUG_COMMENTS
-                printf("Leaf reached, depth : %d \n", depth);
-#endif
+                #if GEMPBA_DEBUG_COMMENTS
+                spdlog::debug("Leaf reached, depth : %d \n", depth);
+                #endif
                 return termination(graph);
             }
             int newDepth = depth + 1;
