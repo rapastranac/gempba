@@ -181,14 +181,6 @@ namespace gempba {
             m_thread_pool = std::make_unique<thread_pool::Pool>(p_pool_size);
         }
 
-        void lock() {
-            this->m_mutex.lock();
-        }
-
-        void unlock() {
-            this->m_mutex.unlock();
-        }
-
         // seconds
         double idle_time() const {
             const double v_nanoseconds = static_cast<double>(m_idle_time) / (static_cast<double>(m_processor_count) + 1.0);
