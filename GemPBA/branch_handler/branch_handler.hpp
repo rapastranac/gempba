@@ -323,24 +323,6 @@ namespace gempba {
             this->m_score = p_score;
         }
 
-
-        /**
-         * Asynchronous operation:
-         * Special care should be taken with this method, otherwise deadlocks might occur.
-         * It could be used once for pushing the first time.
-         * @tparam Ret return type
-         * @tparam F function type
-         * @tparam HolderType
-         * @param p_function function to be executed
-         * @param p_holder ResultHolder instance that wraps the function arguments and potential result
-         */
-        template<typename Ret, typename F, typename HolderType>
-        void force_push(F &p_function, int p_id, HolderType &p_holder) requires (std::is_void_v<Ret>) {
-            p_holder.setPushStatus();
-            m_load_balancer.prune(&p_holder);
-            args_handler::unpack_and_push_void(*m_thread_pool, p_function, p_holder.getArgs());
-        }
-
         /**
          * Asynchronous operation:
          * Special care should be taken with this method, otherwise deadlocks might occur.
@@ -352,7 +334,7 @@ namespace gempba {
          * @param p_holder ResultHolder instance that wraps the function arguments and potential result
          */
         template<typename Ret, typename F, typename HolderType>
-        void force_push(F &p_function, int p_id, HolderType &p_holder) requires (!std::is_void_v<Ret>) {
+        void force_local_submit(F &p_function, int p_id, HolderType &p_holder) requires (!std::is_void_v<Ret>) {
             p_holder.setPushStatus();
             m_load_balancer.prune(&p_holder);
             args_handler::unpack_and_forward_non_void(p_function, p_id, p_holder.getArgs(), p_holder);
@@ -371,6 +353,20 @@ namespace gempba {
         template<typename Ret, typename F, typename HolderType>
         void forward(F &p_function, int p_thread_id, HolderType &p_holder) {
             forward_helper<Ret>(p_function, p_thread_id, p_holder);
+        }
+
+        /**
+         * Asynchronous operation:
+         * It could be used once when submitting the first task.
+         * @tparam Ret return type
+         * @param p_function function to be executed
+         * @param p_holder ResultHolder instance that wraps the function arguments and potential result
+         */
+        template<typename Ret, typename F, typename HolderType>
+        void force_local_submit(F &p_function, int p_id, HolderType &p_holder) requires (std::is_void_v<Ret>) {
+            p_holder.setPushStatus();
+            m_load_balancer.prune(&p_holder);
+            args_handler::unpack_and_push_void(*m_thread_pool, p_function, p_holder.getArgs());
         }
 
         /**
@@ -708,7 +704,7 @@ namespace gempba {
                 auto _deserializer = std::bind_front(p_deserializer, std::ref(ss));
                 std::apply(_deserializer, holder->getArgs());
 
-                force_push<Ret>(p_callable, -1, *holder);
+                force_local_submit<Ret>(p_callable, -1, *holder);
 
                 return smart_ptr;
             };

@@ -54,7 +54,7 @@ public:
                 int depth = 0;
                 initial.holdArgs(depth, graph);
                 //branchHandler.try_push_MT<void>(_f, -1, initial);
-                branchHandler.force_push<void>(_f, -1, initial);
+                branchHandler.force_local_submit<void>(_f, -1, initial);
                 //mvc(-1, 0, graph, nullptr);
             }
             //************************************************

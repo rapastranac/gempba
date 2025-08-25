@@ -50,7 +50,7 @@ int run(int numThreads, int prob, std::string &filename) {
 
     double start = branchHandler.get_wall_time();
     branchHandler.init_thread_pool(numThreads);
-    branchHandler.force_push<void>(function, -1, holder);
+    branchHandler.force_local_submit<void>(function, -1, holder);
     branchHandler.wait();
     double end = branchHandler.get_wall_time();
 
