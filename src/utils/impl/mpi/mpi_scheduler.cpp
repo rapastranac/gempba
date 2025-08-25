@@ -47,7 +47,7 @@ namespace gempba {
                 }
             }
         }
-        utils::print_mpi_debug_comments("rank {} sent {} tasks\n", m_world_rank, m_sent_tasks);
+        utils::print_ipc_debug_comments("rank {} sent {} tasks\n", m_world_rank, m_sent_tasks);
 
         if (!m_tasks_queue.empty()) {
             throw std::runtime_error("leaving process with a pending message\n");

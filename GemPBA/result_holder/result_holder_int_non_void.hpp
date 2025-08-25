@@ -65,7 +65,7 @@ namespace gempba {
                                                         thus, mpi_thread_serialized is guaranteed */
 
                 // printf("rank %d entered get() to retrieve from %d! \n", branchHandler.world_rank, dest_rank);
-                utils::print_mpi_debug_comments("rank {} entered get() to retrieve from {}! \n", this->branchHandler.world_rank, this->dest_rank);
+                utils::print_ipc_debug_comments("rank {} entered get() to retrieve from {}! \n", this->branchHandler.world_rank, this->dest_rank);
 
                 MPI_Status status;
                 int v_count;
@@ -77,7 +77,7 @@ namespace gempba {
                 MPI_Recv(v_task_packet.data(), v_count, MPI_BYTE, this->dest_rank, MPI_ANY_TAG, this->branchHandler.getCommunicator(), &status);
 
                 // printf("rank %d received %d Bytes from %d! \n", branchHandler.world_rank, Bytes, dest_rank);
-                utils::print_mpi_debug_comments("rank {} received {} Bytes from {}! \n", this->branchHandler.world_rank, v_count, this->dest_rank);
+                utils::print_ipc_debug_comments("rank {} received {} Bytes from {}! \n", this->branchHandler.world_rank, v_count, this->dest_rank);
 
                 std::stringstream ss;
                 ss.write(reinterpret_cast<const char *>(v_task_packet.data()), v_count);

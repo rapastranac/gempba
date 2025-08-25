@@ -186,7 +186,7 @@ namespace gempba {
             int v_count; // count to be received
             MPI_Get_count(&p_status, MPI_BYTE, &v_count); // receives total number of datatype elements of the message
 
-            utils::print_mpi_debug_comments("rank {}, received message from rank {}, count : {}\n", m_world_rank, p_status.MPI_SOURCE, v_count);
+            utils::print_ipc_debug_comments("rank {}, received message from rank {}, count : {}\n", m_world_rank, p_status.MPI_SOURCE, v_count);
             task_packet v_task_packet(v_count);
             MPI_Recv(v_task_packet.data(), v_count, MPI_BYTE, p_status.MPI_SOURCE, TASK, m_world_communicator, &p_status);
 
@@ -195,7 +195,7 @@ namespace gempba {
 
             //  push to the thread pool *********************************************************************
             std::shared_ptr<result_holder_parent> v_holder = p_buffer_decoder(v_task_packet); // holder might be useful for non-void functions
-            utils::print_mpi_debug_comments("rank {}, pushed buffer to thread pool \n", m_world_rank, p_status.MPI_SOURCE);
+            utils::print_ipc_debug_comments("rank {}, pushed buffer to thread pool \n", m_world_rank, p_status.MPI_SOURCE);
             // **********************************************************************************************
 
             task_funneling(p_branch_handler);
@@ -206,7 +206,7 @@ namespace gempba {
             constexpr int v_count = 1; // count to be received
             int v_unused;
             MPI_Recv(&v_unused, v_count, MPI_INT, p_status.MPI_SOURCE, TERMINATION, m_world_communicator, &p_status);
-            utils::print_mpi_debug_comments("rank {}, received message from rank {}", m_world_rank, p_status.MPI_SOURCE);
+            utils::print_ipc_debug_comments("rank {}, received message from rank {}", m_world_rank, p_status.MPI_SOURCE);
 
             spdlog::debug("rank {} exited\n", m_world_rank);
             MPI_Barrier(m_world_communicator);
@@ -264,7 +264,7 @@ namespace gempba {
 
             m_transmitting = true;
             m_destination_rank = next_process();
-            utils::print_mpi_debug_comments("rank {} entered MPI_Scheduler::push(..) for the node {}\n", m_world_rank, m_destination_rank);
+            utils::print_ipc_debug_comments("rank {} entered MPI_Scheduler::push(..) for the node {}\n", m_world_rank, m_destination_rank);
             utils::shift_left(m_next_processes);
 
             const auto v_pck = std::make_shared<task_packet>(std::forward<task_packet &&>(p_task_packet));
@@ -282,9 +282,9 @@ namespace gempba {
         void task_funneling(branch_handler &p_branch_handler);
 
         void receive_score(MPI_Status p_status) {
-            utils::print_mpi_debug_comments("rank {}, about to receive global score from Center\n", m_world_rank);
+            utils::print_ipc_debug_comments("rank {}, about to receive global score from Center\n", m_world_rank);
             MPI_Recv(&m_global_score, sizeof(score), MPI_BYTE, CENTER_NODE, SCORE_UPDATE, m_global_score_communicator, &p_status);
-            utils::print_mpi_debug_comments("rank {}, received global score: {} from Center\n", m_world_rank, m_global_score.to_string());
+            utils::print_ipc_debug_comments("rank {}, received global score: {} from Center\n", m_world_rank, m_global_score.to_string());
         }
 
         std::optional<MPI_Status> probe_score_comm_at_node() {
@@ -320,9 +320,9 @@ namespace gempba {
         void receive_next_process(MPI_Status p_status) {
             int v_count;
             MPI_Get_count(&p_status, MPI_INT, &v_count); // 0 < count < world_size   -- safe
-            utils::print_mpi_debug_comments("rank {}, about to receive nextProcess from Center, count : {}\n", m_world_rank, v_count);
+            utils::print_ipc_debug_comments("rank {}, about to receive nextProcess from Center, count : {}\n", m_world_rank, v_count);
             MPI_Recv(m_next_processes.data(), v_count, MPI_INT, CENTER_NODE, NEXT_PROCESS, m_next_process_communicator, &p_status);
-            utils::print_mpi_debug_comments("rank {}, received nextProcess from Center, count : {}\n", m_world_rank, v_count);
+            utils::print_ipc_debug_comments("rank {}, received nextProcess from Center, count : {}\n", m_world_rank, v_count);
         }
 
         std::optional<MPI_Status> probe_next_process_comm() {
@@ -364,7 +364,7 @@ namespace gempba {
         void notify_available_state() {
             int buffer = 0;
             MPI_Send(&buffer, 1, MPI_INT, CENTER_NODE, AVAILABLE_STATE, m_world_communicator);
-            utils::print_mpi_debug_comments("rank {} entered notifyAvailableState()\n", m_world_rank);
+            utils::print_ipc_debug_comments("rank {} entered notifyAvailableState()\n", m_world_rank);
         }
 
         void notify_running_state() {
@@ -382,9 +382,9 @@ namespace gempba {
                 if (m_destination_rank == m_world_rank) {
                     throw std::runtime_error("rank " + std::to_string(m_world_rank) + " attempting to send to itself !!!\n");
                 }
-                utils::print_mpi_debug_comments("rank {} about to send buffer to rank {}\n", m_world_rank, m_destination_rank);
+                utils::print_ipc_debug_comments("rank {} about to send buffer to rank {}\n", m_world_rank, m_destination_rank);
                 MPI_Send(p_task_packet.data(), static_cast<int>(v_message_length), MPI_BYTE, m_destination_rank, TASK, m_world_communicator);
-                utils::print_mpi_debug_comments("rank {} sent buffer to rank {}\n", m_world_rank, m_destination_rank);
+                utils::print_ipc_debug_comments("rank {} sent buffer to rank {}\n", m_world_rank, m_destination_rank);
                 m_destination_rank = -1;
             } else {
                 throw std::runtime_error("rank " + std::to_string(m_world_rank) + ", could not send task to rank " + std::to_string(m_destination_rank) + "\n");
@@ -447,7 +447,7 @@ namespace gempba {
         void process_running(MPI_Status p_status) {
             m_process_state[p_status.MPI_SOURCE] = RUNNING_STATE; // node was assigned, now it's running
             ++m_nodes_running;
-            utils::print_mpi_debug_comments("rank {} reported running, nRunning :{}\n", p_status.MPI_SOURCE, m_nodes_running);
+            utils::print_ipc_debug_comments("rank {} reported running, nRunning :{}\n", p_status.MPI_SOURCE, m_nodes_running);
 
             if (m_process_tree[p_status.MPI_SOURCE].is_assigned())
                 m_process_tree[p_status.MPI_SOURCE].release();
@@ -474,7 +474,7 @@ namespace gempba {
             if (m_process_tree[p_status.MPI_SOURCE].is_assigned()) {
                 m_process_tree[p_status.MPI_SOURCE].release();
             }
-            utils::print_mpi_debug_comments("rank {} reported available, nRunning :{}\n", p_status.MPI_SOURCE, m_nodes_running);
+            utils::print_ipc_debug_comments("rank {} reported available, nRunning :{}\n", p_status.MPI_SOURCE, m_nodes_running);
             std::random_device v_rd; // Will be used to obtain a seed for the random number engine
             std::mt19937 v_gen(v_rd()); // Standard mersenne_twister_engine seeded with rd()
             std::uniform_int_distribution<> v_distrib(0, m_world_size); // uniform distribution [closed interval]
@@ -501,7 +501,7 @@ namespace gempba {
                 m_process_tree[v_rank].add_next(p_status.MPI_SOURCE); // assigns the returning node as a running node
                 m_process_state[p_status.MPI_SOURCE] = ASSIGNED_STATE; // it flags the returning node as assigned
                 --m_nodes_available; // assigned, not available anymore
-                utils::print_mpi_debug_comments("ASSIGNMENT:\trank {} <-- [{}]\n", v_rank, p_status.MPI_SOURCE);
+                utils::print_ipc_debug_comments("ASSIGNMENT:\trank {} <-- [{}]\n", v_rank, p_status.MPI_SOURCE);
                 break; // IMPORTANT: breaks for-loop
             }
         }
@@ -511,7 +511,7 @@ namespace gempba {
         * or they are not up-to-date, thus it is required to broadcast it whether this value changes or not
         */
         void maybe_broadcast_global_score(const score &p_new_global_score, MPI_Status p_status) {
-            utils::print_mpi_debug_comments("center received global score {} from rank {}\n", p_new_global_score.to_string(), p_status.MPI_SOURCE);
+            utils::print_ipc_debug_comments("center received global score {} from rank {}\n", p_new_global_score.to_string(), p_status.MPI_SOURCE);
 
             const bool v_should_broadcast = should_broadcast_global(m_goal, m_global_score, p_new_global_score);
             if (!v_should_broadcast) {
@@ -710,7 +710,7 @@ namespace gempba {
                 task_packet v_task_packet(count);
                 MPI_Recv(v_task_packet.data(), count, MPI_BYTE, rank, MPI_ANY_TAG, m_world_communicator, &status);
 
-                utils::print_mpi_debug_comments("fetching result from rank {} \n", rank);
+                utils::print_ipc_debug_comments("fetching result from rank {} \n", rank);
 
                 switch (status.MPI_TAG) {
                     case HAS_RESULT: {
@@ -852,11 +852,11 @@ namespace gempba {
         }
 
         void finalize() {
-            utils::print_mpi_debug_comments("rank {}, before deallocate \n", m_world_rank);
+            utils::print_ipc_debug_comments("rank {}, before deallocate \n", m_world_rank);
             deallocate_mpi();
-            utils::print_mpi_debug_comments("rank {}, after deallocate \n", m_world_rank);
+            utils::print_ipc_debug_comments("rank {}, after deallocate \n", m_world_rank);
             MPI_Finalize();
-            utils::print_mpi_debug_comments("rank {}, after MPI_Finalize() \n", m_world_rank);
+            utils::print_ipc_debug_comments("rank {}, after MPI_Finalize() \n", m_world_rank);
         }
 
         /* ---------------------------------------------------------------------------------

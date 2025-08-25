@@ -281,7 +281,7 @@ namespace gempba {
         * Provides synchronization with the main thread.
         */
         void wait() {
-            utils::print_mpi_debug_comments("Main thread waiting results \n");
+            utils::print_ipc_debug_comments("Main thread waiting results \n");
             this->m_thread_pool->wait();
         }
 
@@ -643,7 +643,7 @@ namespace gempba {
         [[nodiscard]] std::function<std::shared_ptr<result_holder_parent>(task_packet)> construct_buffer_decoder(auto &p_callable, auto &p_deserializer) {
             using HolderType = result_holder<Ret, Args...>;
 
-            utils::print_mpi_debug_comments("About to build Decoder");
+            utils::print_ipc_debug_comments("About to build Decoder");
             std::function<std::shared_ptr<result_holder_parent>(task_packet)> decoder = [this, &p_callable, &p_deserializer](task_packet p_packet) {
                 std::shared_ptr<result_holder_parent> smart_ptr = std::make_shared<HolderType>(m_load_balancer, -1);
                 auto *holder = dynamic_cast<HolderType *>(smart_ptr.get());
@@ -659,7 +659,7 @@ namespace gempba {
                 return smart_ptr;
             };
 
-            utils::print_mpi_debug_comments("Decoder built");
+            utils::print_ipc_debug_comments("Decoder built");
 
             return decoder;
         }

@@ -40,7 +40,7 @@
  */
 namespace utils {
     template<typename... T>
-    void print_mpi_debug_comments(const fmt::format_string<T...> &p_format_string, T &&... p_args) {
+    void print_ipc_debug_comments(const fmt::format_string<T...> &p_format_string, T &&... p_args) {
         #if GEMPBA_DEBUG_COMMENTS
         spdlog::debug(p_format_string, std::forward<T>(p_args)...);
         #endif
