@@ -51,8 +51,8 @@ namespace gempba {
         std::atomic<size_t> m_thread_requests;
         /*This section refers to the strategy wrapping a function
             then pruning data to be used by the wrapped function<<---*/
-        std::any m_best_solution;
-        result m_best_solution_serialized;
+        std::any m_best_result;
+        result m_best_result_serialized;
 
         dynamic_load_balancer_handler &m_load_balancer = dynamic_load_balancer_handler::getInstance();
         load_balancing_strategy m_load_balancing_strategy = QUASI_HORIZONTAL;
@@ -71,7 +71,7 @@ namespace gempba {
 
 
         branch_handler() :
-            m_best_solution_serialized(result::EMPTY) {
+            m_best_result_serialized(result::EMPTY) {
 
             m_processor_count = std::thread::hardware_concurrency();
             m_idle_time = 0;
@@ -200,7 +200,7 @@ namespace gempba {
                 return false;
             }
 
-            this->m_best_solution = std::make_any<decltype(p_new_result)>(p_new_result);
+            this->m_best_result = std::make_any<decltype(p_new_result)>(p_new_result);
             this->m_score = p_new_score;
             return true;
         }
@@ -224,7 +224,7 @@ namespace gempba {
             }
 
             const auto v_packet = static_cast<task_packet>(p_serializer(p_new_result));
-            this->m_best_solution_serialized = {p_new_score, v_packet};
+            this->m_best_result_serialized = {p_new_score, v_packet};
             this->m_score = p_new_score;
 
             return true;
@@ -243,8 +243,8 @@ namespace gempba {
 
             if (should_update_result(p_new_score)) {
                 m_score = p_new_score;
-                m_best_solution.reset();
-                m_best_solution_serialized = result::EMPTY;
+                m_best_result.reset();
+                m_best_result_serialized = result::EMPTY;
                 return true;
             }
 
@@ -291,7 +291,7 @@ namespace gempba {
         }
 
         bool has_result() const {
-            return m_best_solution.has_value();
+            return m_best_result.has_value();
         }
 
         bool is_done() const {
@@ -304,10 +304,10 @@ namespace gempba {
          * @tparam SolutionType
          */
         template<typename SolutionType>
-        [[nodiscard]] auto fetch_solution() -> SolutionType {
+        [[nodiscard]] auto fetch_result() -> SolutionType {
             // fetching results caught by the library=
 
-            return std::any_cast<SolutionType>(m_best_solution);
+            return std::any_cast<SolutionType>(m_best_result);
         }
 
         score get_score() const {
@@ -667,10 +667,10 @@ namespace gempba {
         // this returns a lambda function which returns the best results as raw data
         [[nodiscard]] std::function<result()> construct_result_fetcher() {
             return [this]() {
-                if (m_best_solution_serialized.get_score_as_integer() == -1) {
+                if (m_best_result_serialized.get_score_as_integer() == -1) {
                     return result::EMPTY;
                 } else {
-                    return m_best_solution_serialized;
+                    return m_best_result_serialized;
                 }
             };
         }

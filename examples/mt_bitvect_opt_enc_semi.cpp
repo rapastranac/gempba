@@ -57,7 +57,7 @@ int run(int numThreads, int prob, std::string &filename) {
     double idl_tm = branchHandler.get_pool_idle_time();
     size_t rqst = branchHandler.number_thread_requests();
 
-    int solution = branchHandler.fetch_solution<int>();
+    int solution = branchHandler.fetch_result<int>();
     spdlog::debug("\n\n\nCover size : {} \n", solution);
 
     spdlog::debug("Global pool idle time: {0:.6f} seconds\n\n\n", idl_tm);

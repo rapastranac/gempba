@@ -60,7 +60,7 @@ public:
             //************************************************
 
             branchHandler.wait();
-            graph_res = branchHandler.fetch_solution<Graph>();
+            graph_res = branchHandler.fetch_result<Graph>();
             graph_res2 = graph_res;
             cover = graph_res.postProcessing();
         } catch (std::exception &e) {
