@@ -572,7 +572,6 @@ namespace gempba {
         char m_processor_name[128]{}; // name of the node
         MPI_Comm *m_world_communicator = nullptr; // world communicator MPI
 
-
         bool send(int p_id, auto &p_holder, auto &&p_serializer) {
             /* the underlying loop breaks under one of the following scenarios:
                 - unable to acquire priority
@@ -617,10 +616,6 @@ namespace gempba {
         }
 
     public:
-        MPI_Comm &get_communicator() {
-            return *m_world_communicator;
-        }
-
         // if multiprocessing, BranchHandler should have access to the mpi scheduler
         void pass_scheduler(scheduler *p_mpi_scheduler) {
             this->m_mpi_scheduler = p_mpi_scheduler;
@@ -630,50 +625,6 @@ namespace gempba {
         int get_world_rank() const {
             return m_world_rank;
         }
-
-        //<editor-fold desc="In construction... non-void  functions">
-        template<typename Ret, typename HolderType, typename Serialize>
-        void reply(Serialize &&p_serialize, HolderType &p_holder, int p_src_rank) requires(!std::is_void_v<Ret>) {
-            utils::print_mpi_debug_comments("rank {} entered reply! \n", m_world_rank);
-            // default construction of a return type "Ret"
-            Ret res; // TODO .. why in separate lines?
-            res = p_holder.get();
-
-            // termination, since all recursions return to center node
-            if (p_src_rank == 0) {
-                utils::print_mpi_debug_comments("cover size() : {}, sending to center \n", res.coverSize());
-
-                std::string v_buffer;
-                p_serialize(v_buffer, res);
-
-                score v_ref_value_local = get_score();
-                task_packet v_candidate{v_buffer};
-                m_best_solution_serialized = {v_ref_value_local, v_candidate};
-
-            } else {
-                // some other node requested help, and it is surely waiting for the return value
-
-                utils::print_mpi_debug_comments("rank {} about to reply to {}! \n", m_world_rank, p_src_rank);
-                std::unique_lock<std::mutex> lck(m_mpi_mutex); // no other thread can retrieve nor send via MPI
-
-                std::stringstream ss;
-                p_serialize(ss, res);
-                int count = ss.str().size();
-                task_packet v_task_packet(ss.str());
-
-                int err = MPI_Ssend(v_task_packet.data(), count, MPI_BYTE, p_src_rank, 0, *m_world_communicator); // this might be wrong anyway due to the tag
-                if (err != MPI_SUCCESS) {
-                    spdlog::error("result could not be sent from rank {} to rank {}! \n", m_world_rank, p_src_rank);
-                }
-            }
-        }
-
-        template<typename Ret, typename HolderType, typename Serialize>
-        void reply(Serialize &&, HolderType &, int) requires (std::is_void_v<Ret>) {
-            m_thread_pool->wait();
-        }
-
-        //</editor-fold>
 
         /*
             Types must be passed through the brackets constructBufferDecoder<Ret, Args...>(..), so it is
@@ -714,7 +665,6 @@ namespace gempba {
             return decoder;
         }
 
-
         // this returns a lambda function which returns the best results as raw data
         [[nodiscard]] std::function<result()> construct_result_fetcher() {
             return [this]() {
@@ -725,17 +675,7 @@ namespace gempba {
                 }
             };
         }
-
-        // meant to be used with non-void functions
-        [[maybe_unused]] auto construct_result_fetcher(auto *p_holder, auto &&p_deserializer) {
-            return [this]() {
-                throw std::runtime_error("Not yet implemented");
-            };
-        }
-
-
         #endif
-
     private:
         [[nodiscard]] bool should_update_result(const score &p_new_score) const {
             const bool v_new_max_is_better = m_goal == MAXIMISE && p_new_score > m_score;
