@@ -287,13 +287,8 @@ namespace gempba {
         }
 
         // wall time
-        static double WTime() {
-            struct timeval time{};
-            if (gettimeofday(&time, NULL)) {
-                //  Handle error
-                return 0;
-            }
-            return (double) time.tv_sec + (double) time.tv_usec * .000001;
+        static double get_wall_time() {
+            return utils::wall_time();
         }
 
         bool has_result() const {

@@ -48,11 +48,11 @@ int run(int numThreads, int prob, std::string &filename) {
     HolderType holder(dlb, -1);
     holder.holdArgs(zero, allones, zero);
 
-    double start = branchHandler.WTime();
+    double start = branchHandler.get_wall_time();
     branchHandler.init_thread_pool(numThreads);
     branchHandler.force_push<void>(function, -1, holder);
     branchHandler.wait();
-    double end = branchHandler.WTime();
+    double end = branchHandler.get_wall_time();
 
     double idl_tm = branchHandler.get_pool_idle_time();
     size_t rqst = branchHandler.number_thread_requests();
