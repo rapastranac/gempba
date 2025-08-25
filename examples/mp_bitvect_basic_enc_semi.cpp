@@ -1,14 +1,15 @@
-#include "include/mp_bitvect_basic_enc.hpp"
-#include "include/main.hpp"
-
 #include <filesystem>
 #include <iostream>
 #include <istream>
 #include <sstream>
 #include <string>
-#include <spdlog/spdlog.h>
-#include <vector>
 #include <unistd.h>
+#include <vector>
+#include <spdlog/spdlog.h>
+
+#include <schedulers/impl/mpi/mpi_scheduler.hpp>
+#include "include/main.hpp"
+#include "include/mp_bitvect_basic_enc.hpp"
 
 using namespace std::placeholders;
 
@@ -81,7 +82,8 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
         */
         branchHandler.init_thread_pool(threads_per_task);
 
-        std::function<std::shared_ptr<gempba::result_holder_parent>(gempba::task_packet)> bufferDecoder = branchHandler.construct_buffer_decoder<void, int, BitGraph, int>(function, deserializer);
+        std::function<std::shared_ptr<gempba::result_holder_parent>(gempba::task_packet)> bufferDecoder = branchHandler.construct_buffer_decoder<void, int, BitGraph, int>(
+                function, deserializer);
         std::function<gempba::result()> resultFetcher = branchHandler.construct_result_fetcher();
         mpiScheduler.run_node(branchHandler, bufferDecoder, resultFetcher);
     }

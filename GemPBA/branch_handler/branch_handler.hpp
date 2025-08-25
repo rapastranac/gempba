@@ -17,7 +17,7 @@
 #include <branch_handler/thread_pool.hpp>
 #include <branch_handler/args_handler.hpp>
 #include <dynamic_load_balancer/dynamic_load_balancer_handler.hpp>
-#include <schedulers/impl/mpi/mpi_scheduler.hpp>
+#include <schedulers/api/scheduler.hpp>
 #include <utils/gempba_utils.hpp>
 #include <utils/utils.hpp>
 
@@ -25,7 +25,6 @@
 #if GEMPBA_MULTIPROCESSING
 
 #include <cstdio>
-#include <mpi.h>
 
 #endif
 
@@ -69,6 +68,7 @@ namespace gempba {
         std::atomic<long long> m_idle_time;
         std::mutex m_mutex; // local mutex
         std::unique_ptr<thread_pool::Pool> m_thread_pool;
+
 
         branch_handler() :
             m_best_solution_serialized(result::EMPTY) {
@@ -259,7 +259,7 @@ namespace gempba {
         void set_goal(const goal p_goal, const score_type p_type) {
             m_goal = p_goal;
             m_score = utils::get_default_score(p_goal, p_type);
-            // set the goal in the MPI scheduler if multiprocessing is enabled
+            // set the goal in the scheduler if multiprocessing is enabled
             #if GEMPBA_MULTIPROCESSING
             m_scheduler->set_goal(p_goal, p_type);
             #endif
@@ -533,8 +533,9 @@ namespace gempba {
 
         #if GEMPBA_MULTIPROCESSING
         /**
- *  this method should not be possibly accessed if priority (MPI) not acquired
- */
+         * @brief this method should not be possibly accessed if priority (IPC) not acquired
+         * @return true if top holder found and pushed, false otherwise
+         */
         template<typename HolderType>
         bool try_push_root_level_holder_remotely(auto &p_get_buffer, HolderType &p_holder) {
             if (m_load_balancing_strategy == QUASI_HORIZONTAL) {
@@ -565,11 +566,10 @@ namespace gempba {
     private:
         #if GEMPBA_MULTIPROCESSING
         scheduler *m_scheduler = nullptr;
-        std::mutex m_ipc_mutex; // mutex to ensure MPI_THREAD_SERIALIZED
+        std::mutex m_ipc_mutex; // mutex to ensure funnel access to IPC
         int m_world_rank = -1; // get the rank of the process
         int m_world_size = -1; // get the number of processes/nodes
         char m_processor_name[128]{}; // name of the node
-        MPI_Comm *m_world_communicator = nullptr; // world communicator MPI
 
         bool send(int p_id, auto &p_holder, auto &&p_serializer) {
             /* the underlying loop breaks under one of the following scenarios:
@@ -615,9 +615,9 @@ namespace gempba {
         }
 
     public:
-        // if multiprocessing, BranchHandler should have access to the mpi scheduler
-        void pass_scheduler(scheduler *p_mpi_scheduler) {
-            this->m_scheduler = p_mpi_scheduler;
+        // if multiprocessing, BranchHandler should have access to the scheduler
+        void pass_scheduler(scheduler *p_scheduler) {
+            this->m_scheduler = p_scheduler;
             this->m_world_rank = this->m_scheduler->rank_me();
         }
 
@@ -626,7 +626,7 @@ namespace gempba {
         }
 
         /*
-            Types must be passed through the brackets constructBufferDecoder<Ret, Args...>(..), so it is
+            Types must be passed through the brackets construct_buffer_decoder<Ret, Args...>(..), so it is
             known at compile time.
 
             Ret: stands for the return type of the main function
@@ -634,7 +634,7 @@ namespace gempba {
 
             input: this method receives the main algorithm and a deserializer.
 
-            return:  a lambda object who is in charge of receiving a raw buffer in MPI_Scheduler::runNode(...), this
+            return:  a lambda object that is in charge of receiving a raw buffer in scheduler::run_node(...), this
             lambda object will deserialize the buffer and create a new Holder containing
             the deserialized arguments.
             Lambda object will push to the thread pool, and it will return a pointer to the holder

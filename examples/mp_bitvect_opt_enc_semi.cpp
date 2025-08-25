@@ -1,14 +1,15 @@
-#include "include/mp_bitvec_opt_enc.hpp"
-#include "include/main.hpp"
-
 #include <filesystem>
 #include <iostream>
 #include <istream>
 #include <sstream>
 #include <string>
-#include <spdlog/spdlog.h>
-#include <vector>
 #include <unistd.h>
+#include <vector>
+#include <spdlog/spdlog.h>
+
+#include "include/main.hpp"
+#include "include/mp_bitvec_opt_enc.hpp"
+#include <schedulers/impl/mpi/mpi_scheduler.hpp>
 
 using namespace std::placeholders;
 
