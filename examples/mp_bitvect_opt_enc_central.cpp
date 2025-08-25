@@ -26,7 +26,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
     auto &mpiScheduler = gempba::mpi_centralized_scheduler::get_instance();
 
     int rank = mpiScheduler.rank_me();
-    branchHandler.pass_mpi_scheduler(&mpiScheduler);
+    branchHandler.pass_scheduler(&mpiScheduler);
 
     std::cout << "NUMTHREADS= " << threads_per_task << std::endl;
 

@@ -622,7 +622,7 @@ namespace gempba {
         }
 
         // if multiprocessing, BranchHandler should have access to the mpi scheduler
-        void pass_mpi_scheduler(scheduler *p_mpi_scheduler) {
+        void pass_scheduler(scheduler *p_mpi_scheduler) {
             this->m_mpi_scheduler = p_mpi_scheduler;
             this->m_world_rank = this->m_mpi_scheduler->rank_me();
         }
