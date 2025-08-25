@@ -79,7 +79,7 @@ namespace gempba {
         }
 
         template<typename Ret, typename F, typename HolderType>
-        bool send(F &&f, int id, HolderType &holder) requires (std::is_void_v<Ret>) {
+        bool send(F &&p_function, int p_id, HolderType &p_holder) requires (std::is_void_v<Ret>) {
             /* the underlying loop breaks under one of the following scenarios:
                 - mutex cannot be acquired
                 - there is no available thread in the pool
@@ -88,37 +88,37 @@ namespace gempba {
                 NOTE: if top holder found, it'll keep trying to find more
             */
             while (true) {
-                std::unique_lock<std::mutex> lck(m_mutex, std::defer_lock);
-                if (!lck.try_lock()) {
+                std::unique_lock v_lock(m_mutex, std::defer_lock);
+                if (!v_lock.try_lock()) {
                     break;
                 }
                 if (m_thread_pool->n_idle() <= 0) {
                     break; // mutex released at destruction
                 }
-                const bool v_top_holder_found_and_pushed = try_push_root_level_holder_remotely<Ret>(f, holder);
+                const bool v_top_holder_found_and_pushed = try_push_root_level_holder_remotely<Ret>(p_function, p_holder);
                 if (v_top_holder_found_and_pushed) {
                     continue; // keeps iterating from root to current level
                 }
-                if (holder.isTreated()) {
+                if (p_holder.isTreated()) {
                     throw std::runtime_error("Attempt to push a treated holder\n");
                 }
 
                 // after this line, only leftMost holder should be pushed
                 this->m_thread_requests++;
-                holder.setPushStatus();
-                m_load_balancer.prune(&holder);
+                p_holder.setPushStatus();
+                m_load_balancer.prune(&p_holder);
 
-                args_handler::unpack_and_push_void(*m_thread_pool, f, holder.getArgs());
+                args_handler::unpack_and_push_void(*m_thread_pool, p_function, p_holder.getArgs());
                 return true; // pushed to the pool
             }
             return false;
         }
 
         template<typename Ret, typename F, typename HolderType>
-        bool send(F &f, int id, HolderType &holder) requires (!std::is_void_v<Ret>) {
+        bool send(F &p_function, int p_id, HolderType &p_holder) requires (!std::is_void_v<Ret>) {
             /*This lock must be acquired before checking the condition,
             even though numThread is atomic*/
-            std::unique_lock<std::mutex> lck(m_mutex);
+            std::unique_lock v_lock(m_mutex);
             // if (busyThreads < thread_pool->size())
             if (m_thread_pool->n_idle() <= 0) {
                 return false;
@@ -129,14 +129,14 @@ namespace gempba {
                 // if (res)
                 //	return false; //if top holder found, then it should return false to keep trying
 
-                m_load_balancer.pop_left_sibling(&holder);
+                m_load_balancer.pop_left_sibling(&p_holder);
             }
             this->m_thread_requests++;
-            holder.setPushStatus();
+            p_holder.setPushStatus();
 
-            lck.unlock();
-            auto ret = args_handler::unpack_and_push_non_void(*m_thread_pool, f, holder.getArgs());
-            holder.hold_future(std::move(ret));
+            v_lock.unlock();
+            auto v_ret = args_handler::unpack_and_push_non_void(*m_thread_pool, p_function, p_holder.getArgs());
+            p_holder.hold_future(std::move(v_ret));
             return true;
         }
 
@@ -159,19 +159,19 @@ namespace gempba {
 
         //</editor-fold>
 
-        void set_load_balancing_strategy(load_balancing_strategy strategy) {
-            this->m_load_balancing_strategy = strategy;
+        void set_load_balancing_strategy(const load_balancing_strategy p_strategy) {
+            this->m_load_balancing_strategy = p_strategy;
         };
 
-        load_balancing_strategy get_load_balancing_strategy() const {
+        [[nodiscard]] load_balancing_strategy get_load_balancing_strategy() const {
             return m_load_balancing_strategy;
         }
 
-        double get_pool_idle_time() const {
+        [[nodiscard]] double get_pool_idle_time() const {
             return m_thread_pool->idle_time() / (double) m_processor_count;
         }
 
-        int get_pool_size() const {
+        [[nodiscard]] int get_pool_size() const {
             return (int) this->m_thread_pool->size();
         }
 
@@ -181,7 +181,7 @@ namespace gempba {
         }
 
         // seconds
-        double idle_time() const {
+        [[nodiscard]] double idle_time() const {
             const double v_nanoseconds = static_cast<double>(m_idle_time) / (static_cast<double>(m_processor_count) + 1.0);
             return v_nanoseconds * 1.0e-9; // convert to seconds
         }
@@ -252,7 +252,7 @@ namespace gempba {
         }
 
         // get number of successful thread requests
-        size_t number_thread_requests() const {
+        [[nodiscard]] size_t number_thread_requests() const {
             return m_thread_requests.load();
         }
 
@@ -266,7 +266,7 @@ namespace gempba {
         }
 
         // get number for this rank
-        int rank_me() {
+        [[nodiscard]] int rank_me() const {
             #if GEMPBA_MULTIPROCESSING
             return m_scheduler->rank_me();
             #else
@@ -290,11 +290,11 @@ namespace gempba {
             return utils::wall_time();
         }
 
-        bool has_result() const {
+        [[nodiscard]] bool has_result() const {
             return m_best_result.has_value();
         }
 
-        bool is_done() const {
+        [[nodiscard]] bool is_done() const {
             return m_thread_pool->hasFinished();
         }
 
@@ -310,7 +310,7 @@ namespace gempba {
             return std::any_cast<SolutionType>(m_best_result);
         }
 
-        score get_score() const {
+        [[nodiscard]] score get_score() const {
             return m_score;
         }
 
@@ -418,8 +418,8 @@ namespace gempba {
          */
         template<typename Ret, typename F, typename HolderType>
         void forward_helper(F &p_function, int p_thread_id, HolderType &p_holder) requires (!std::is_void_v<Ret>) {
-            auto ret = forward_internal<Ret>(p_function, p_thread_id, p_holder, true);
-            p_holder.hold_actual_result(ret);
+            auto v_ret = forward_internal<Ret>(p_function, p_thread_id, p_holder, true);
+            p_holder.hold_actual_result(v_ret);
         }
 
         /**
@@ -508,25 +508,25 @@ namespace gempba {
       * this method should not possibly be accessed if priority (Thread Pool) is not acquired
       */
         template<typename Ret, typename F, typename HolderType>
-        bool try_push_root_level_holder_remotely(F &f, HolderType &holder) requires (std::is_void_v<Ret>) {
+        bool try_push_root_level_holder_remotely(F &p_function, HolderType &p_holder) requires (std::is_void_v<Ret>) {
             if (m_load_balancing_strategy == QUASI_HORIZONTAL) {
-                HolderType *upperHolder = m_load_balancer.find_top_holder(&holder);
-                if (upperHolder) {
-                    if (upperHolder->isTreated())
+                HolderType *v_upper_holder = m_load_balancer.find_top_holder(&p_holder);
+                if (v_upper_holder) {
+                    if (v_upper_holder->isTreated())
                         throw std::runtime_error("Attempt to push a treated holder\n");
 
-                    if (upperHolder->evaluate_branch_checkIn()) {
+                    if (v_upper_holder->evaluate_branch_checkIn()) {
                         // checks if it's worth it to push
                         this->m_thread_requests++;
-                        upperHolder->setPushStatus();
-                        args_handler::unpack_and_push_void(*m_thread_pool, f, upperHolder->getArgs());
+                        v_upper_holder->setPushStatus();
+                        args_handler::unpack_and_push_void(*m_thread_pool, p_function, v_upper_holder->getArgs());
                     } else {
                         // discard otherwise
-                        upperHolder->setDiscard();
+                        v_upper_holder->setDiscard();
                     }
                     return true; // top holder found whether discarded or pushed
                 }
-                m_load_balancer.pop_left_sibling(&holder); // pops holder from parent's children
+                m_load_balancer.pop_left_sibling(&p_holder); // pops holder from parent's children
             }
             return false; // top holder isn't found or just DLB is disabled
         }
@@ -619,10 +619,6 @@ namespace gempba {
         void pass_scheduler(scheduler *p_scheduler) {
             this->m_scheduler = p_scheduler;
             this->m_world_rank = this->m_scheduler->rank_me();
-        }
-
-        int get_world_rank() const {
-            return m_world_rank;
         }
 
         /*
