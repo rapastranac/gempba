@@ -261,14 +261,14 @@ namespace gempba {
             m_score = utils::get_default_score(p_goal, p_type);
             // set the goal in the MPI scheduler if multiprocessing is enabled
             #if GEMPBA_MULTIPROCESSING
-            m_mpi_scheduler->set_goal(p_goal, p_type);
+            m_scheduler->set_goal(p_goal, p_type);
             #endif
         }
 
         // get number for this rank
         int rank_me() {
             #if GEMPBA_MULTIPROCESSING
-            return m_mpi_scheduler->rank_me();
+            return m_scheduler->rank_me();
             #else
             return -1; // no multiprocessing enabled
             #endif
@@ -544,13 +544,13 @@ namespace gempba {
                         throw std::runtime_error("Attempt to push a treated holder\n");
 
                     if (v_upper_holder->evaluate_branch_checkIn()) {
-                        v_upper_holder->setMPISent(true, m_mpi_scheduler->next_process());
+                        v_upper_holder->setMPISent(true, m_scheduler->next_process());
                         task_packet v_buffer = p_get_buffer(v_upper_holder->getArgs());
-                        m_mpi_scheduler->push(std::move(v_buffer));
+                        m_scheduler->push(std::move(v_buffer));
                     } else {
                         v_upper_holder->setDiscard();
                         // WARNING, ATTENTION, CUIDADO! holder discarded, flagged as sent but not really sent, then sendingChannel should be released!!!!
-                        m_mpi_scheduler->close_transmission_channel();
+                        m_scheduler->close_transmission_channel();
                     }
                     return true; // top holder found whether discarded or pushed
                 }
@@ -564,8 +564,8 @@ namespace gempba {
         //——————— IPC related attributes and member functions ———————//
     private:
         #if GEMPBA_MULTIPROCESSING
-        scheduler *m_mpi_scheduler = nullptr;
-        std::mutex m_mpi_mutex; // mutex to ensure MPI_THREAD_SERIALIZED
+        scheduler *m_scheduler = nullptr;
+        std::mutex m_ipc_mutex; // mutex to ensure MPI_THREAD_SERIALIZED
         int m_world_rank = -1; // get the rank of the process
         int m_world_size = -1; // get the number of processes/nodes
         char m_processor_name[128]{}; // name of the node
@@ -581,11 +581,11 @@ namespace gempba {
                 NOTE: if top holder found, it'll keep trying to find more
             */
             while (true) {
-                std::unique_lock v_lock(m_mpi_mutex, std::defer_lock);
+                std::unique_lock v_lock(m_ipc_mutex, std::defer_lock);
                 if (!v_lock.try_lock()) {
                     return false;
                 }
-                bool v_transmission_channel_open = m_mpi_scheduler->try_open_transmission_channel();
+                bool v_transmission_channel_open = m_scheduler->try_open_transmission_channel();
                 // if mutex acquired, other threads will jump this section
                 if (!v_transmission_channel_open) {
                     return false;
@@ -607,7 +607,7 @@ namespace gempba {
                 }
 
                 task_packet v_buffer = getBuffer(p_holder.getArgs());
-                m_mpi_scheduler->push(std::move(v_buffer)); // this closes the sending channel internally
+                m_scheduler->push(std::move(v_buffer)); // this closes the sending channel internally
                 p_holder.setMPISent();
                 m_load_balancer.prune(&p_holder);
                 return true;
@@ -617,8 +617,8 @@ namespace gempba {
     public:
         // if multiprocessing, BranchHandler should have access to the mpi scheduler
         void pass_scheduler(scheduler *p_mpi_scheduler) {
-            this->m_mpi_scheduler = p_mpi_scheduler;
-            this->m_world_rank = this->m_mpi_scheduler->rank_me();
+            this->m_scheduler = p_mpi_scheduler;
+            this->m_world_rank = this->m_scheduler->rank_me();
         }
 
         int get_world_rank() const {
