@@ -79,34 +79,6 @@ namespace gempba {
             m_thread_requests = 0;
         }
 
-
-        /**
-      * this method should not possibly be accessed if priority (Thread Pool) is not acquired
-      */
-        template<typename Ret, typename F, typename HolderType>
-        bool try_push_root_level_holder_remotely(F &f, HolderType &holder) requires (std::is_void_v<Ret>) {
-            if (m_load_balancing_strategy == QUASI_HORIZONTAL) {
-                HolderType *upperHolder = m_load_balancer.find_top_holder(&holder);
-                if (upperHolder) {
-                    if (upperHolder->isTreated())
-                        throw std::runtime_error("Attempt to push a treated holder\n");
-
-                    if (upperHolder->evaluate_branch_checkIn()) {
-                        // checks if it's worth it to push
-                        this->m_thread_requests++;
-                        upperHolder->setPushStatus();
-                        args_handler::unpack_and_push_void(*m_thread_pool, f, upperHolder->getArgs());
-                    } else {
-                        // discard otherwise
-                        upperHolder->setDiscard();
-                    }
-                    return true; // top holder found whether discarded or pushed
-                }
-                m_load_balancer.pop_left_sibling(&holder); // pops holder from parent's children
-            }
-            return false; // top holder isn't found or just DLB is disabled
-        }
-
         template<typename Ret, typename F, typename HolderType>
         bool send(F &&f, int id, HolderType &holder) requires (std::is_void_v<Ret>) {
             /* the underlying loop breaks under one of the following scenarios:
@@ -550,6 +522,62 @@ namespace gempba {
         }
         #endif
 
+        /**
+      * this method should not possibly be accessed if priority (Thread Pool) is not acquired
+      */
+        template<typename Ret, typename F, typename HolderType>
+        bool try_push_root_level_holder_remotely(F &f, HolderType &holder) requires (std::is_void_v<Ret>) {
+            if (m_load_balancing_strategy == QUASI_HORIZONTAL) {
+                HolderType *upperHolder = m_load_balancer.find_top_holder(&holder);
+                if (upperHolder) {
+                    if (upperHolder->isTreated())
+                        throw std::runtime_error("Attempt to push a treated holder\n");
+
+                    if (upperHolder->evaluate_branch_checkIn()) {
+                        // checks if it's worth it to push
+                        this->m_thread_requests++;
+                        upperHolder->setPushStatus();
+                        args_handler::unpack_and_push_void(*m_thread_pool, f, upperHolder->getArgs());
+                    } else {
+                        // discard otherwise
+                        upperHolder->setDiscard();
+                    }
+                    return true; // top holder found whether discarded or pushed
+                }
+                m_load_balancer.pop_left_sibling(&holder); // pops holder from parent's children
+            }
+            return false; // top holder isn't found or just DLB is disabled
+        }
+
+        #if GEMPBA_MULTIPROCESSING
+        /**
+ *  this method should not be possibly accessed if priority (MPI) not acquired
+ */
+        template<typename HolderType>
+        bool try_push_root_level_holder_remotely(auto &p_get_buffer, HolderType &p_holder) {
+            if (m_load_balancing_strategy == QUASI_HORIZONTAL) {
+                HolderType *v_upper_holder = m_load_balancer.find_top_holder(&p_holder); //  if it finds it, then the root has already been lowered
+                if (v_upper_holder) {
+                    if (v_upper_holder->isTreated())
+                        throw std::runtime_error("Attempt to push a treated holder\n");
+
+                    if (v_upper_holder->evaluate_branch_checkIn()) {
+                        v_upper_holder->setMPISent(true, m_mpi_scheduler->next_process());
+                        task_packet v_buffer = p_get_buffer(v_upper_holder->getArgs());
+                        m_mpi_scheduler->push(std::move(v_buffer));
+                    } else {
+                        v_upper_holder->setDiscard();
+                        // WARNING, ATTENTION, CUIDADO! holder discarded, flagged as sent but not really sent, then sendingChannel should be released!!!!
+                        m_mpi_scheduler->close_transmission_channel();
+                    }
+                    return true; // top holder found whether discarded or pushed
+                }
+                m_load_balancer.pop_left_sibling(&p_holder); // pops holder from parent's children
+            }
+            return false; // top holder not found
+        }
+        #endif
+
     public:
         #if GEMPBA_MULTIPROCESSING
 
@@ -663,34 +691,6 @@ namespace gempba {
         }
 
         //</editor-fold>
-
-
-        /**
-         *  this method should not be possibly accessed if priority (MPI) not acquired
-         */
-        template<typename HolderType>
-        bool try_push_root_level_holder_remotely(auto &p_get_buffer, HolderType &p_holder) {
-            if (m_load_balancing_strategy == QUASI_HORIZONTAL) {
-                HolderType *v_upper_holder = m_load_balancer.find_top_holder(&p_holder); //  if it finds it, then the root has already been lowered
-                if (v_upper_holder) {
-                    if (v_upper_holder->isTreated())
-                        throw std::runtime_error("Attempt to push a treated holder\n");
-
-                    if (v_upper_holder->evaluate_branch_checkIn()) {
-                        v_upper_holder->setMPISent(true, m_mpi_scheduler->next_process());
-                        task_packet v_buffer = p_get_buffer(v_upper_holder->getArgs());
-                        m_mpi_scheduler->push(std::move(v_buffer));
-                    } else {
-                        v_upper_holder->setDiscard();
-                        // WARNING, ATTENTION, CUIDADO! holder discarded, flagged as sent but not really sent, then sendingChannel should be released!!!!
-                        m_mpi_scheduler->close_transmission_channel();
-                    }
-                    return true; // top holder found whether discarded or pushed
-                }
-                m_load_balancer.pop_left_sibling(&p_holder); // pops holder from parent's children
-            }
-            return false; // top holder not found
-        }
 
         /*
             Types must be passed through the brackets constructBufferDecoder<Ret, Args...>(..), so it is
