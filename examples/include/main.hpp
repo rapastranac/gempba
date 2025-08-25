@@ -67,7 +67,7 @@ Params parse(int argc, char *argv[]) {
     program.add_argument("-I", "--indir")
             .help("Input directory of the graph to be read")
             .nargs(1)
-            .default_value(std::string{"input/prob_4/400/00400_1"})
+            .default_value(std::string{"data/prob_4/400/00400_1"})
             .action([](const std::string &value) { return value; });
     try {
         program.parse_args(argc, argv);

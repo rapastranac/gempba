@@ -137,7 +137,8 @@ namespace gempba {
             }
 
             if (holderRight.evaluate_branch_checkIn()) {
-                rightGraph = branchHandler.forward<Graph>(_f, id, holderRight);
+                branchHandler.forward<Graph>(_f, id, holderRight);
+                rightGraph = holderRight.get();
             }
 
             if (holderLeft.isFetchable()) {
