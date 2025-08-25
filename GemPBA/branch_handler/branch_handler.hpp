@@ -49,7 +49,6 @@ namespace gempba {
         friend
         class result_holder;
 
-    private:
         std::atomic<size_t> m_thread_requests;
         /*This section refers to the strategy wrapping a function
             then pruning data to be used by the wrapped function<<---*/
@@ -561,10 +560,10 @@ namespace gempba {
         }
         #endif
 
-    public:
-        #if GEMPBA_MULTIPROCESSING
 
+        //——————— IPC related attributes and member functions ———————//
     private:
+        #if GEMPBA_MULTIPROCESSING
         scheduler *m_mpi_scheduler = nullptr;
         std::mutex m_mpi_mutex; // mutex to ensure MPI_THREAD_SERIALIZED
         int m_world_rank = -1; // get the rank of the process
@@ -676,6 +675,7 @@ namespace gempba {
             };
         }
         #endif
+
     private:
         [[nodiscard]] bool should_update_result(const score &p_new_score) const {
             const bool v_new_max_is_better = m_goal == MAXIMISE && p_new_score > m_score;
