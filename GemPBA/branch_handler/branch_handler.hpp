@@ -1,5 +1,5 @@
-﻿#ifndef BRANCHHANDLER_H
-#define BRANCHHANDLER_H
+﻿#ifndef BRANCH_HANDLER_H
+#define BRANCH_HANDLER_H
 
 #include <any>
 #include <atomic>
@@ -11,26 +11,17 @@
 #include <type_traits>
 #include <utility>
 #include <bits/stdc++.h>
-#include <sys/time.h>
 
 #include <config.h>
-#include <branch_handler/thread_pool.hpp>
 #include <branch_handler/args_handler.hpp>
+#include <branch_handler/thread_pool.hpp>
 #include <dynamic_load_balancer/dynamic_load_balancer_handler.hpp>
 #include <schedulers/api/scheduler.hpp>
 #include <utils/gempba_utils.hpp>
 #include <utils/utils.hpp>
 
-
-#if GEMPBA_MULTIPROCESSING
-
-#include <cstdio>
-
-#endif
-
-
 /*
- * Created by Andres Pastrana on 2019
+ * Created by Andrés Pastrana on 2019
  * pasr1602@usherbrooke.ca
  * rapastranac@gmail.com
  */
@@ -79,7 +70,7 @@ namespace gempba {
         }
 
         template<typename Ret, typename F, typename HolderType>
-        bool send(F &&p_function, int p_id, HolderType &p_holder) requires (std::is_void_v<Ret>) {
+        bool send(F &&p_function, [[maybe_unused]] int p_thread_id, HolderType &p_holder) requires (std::is_void_v<Ret>) {
             /* the underlying loop breaks under one of the following scenarios:
                 - mutex cannot be acquired
                 - there is no available thread in the pool
@@ -104,7 +95,7 @@ namespace gempba {
                 }
 
                 // after this line, only leftMost holder should be pushed
-                this->m_thread_requests++;
+                ++this->m_thread_requests;
                 p_holder.setPushStatus();
                 m_load_balancer.prune(&p_holder);
 
@@ -115,7 +106,7 @@ namespace gempba {
         }
 
         template<typename Ret, typename F, typename HolderType>
-        bool send(F &p_function, int p_id, HolderType &p_holder) requires (!std::is_void_v<Ret>) {
+        bool send(F &p_function, [[maybe_unused]] int p_thread_id, HolderType &p_holder) requires (!std::is_void_v<Ret>) {
             /*This lock must be acquired before checking the condition,
             even though numThread is atomic*/
             std::unique_lock v_lock(m_mutex);
@@ -131,7 +122,7 @@ namespace gempba {
 
                 m_load_balancer.pop_left_sibling(&p_holder);
             }
-            this->m_thread_requests++;
+            ++this->m_thread_requests;
             p_holder.setPushStatus();
 
             v_lock.unlock();
@@ -168,11 +159,11 @@ namespace gempba {
         }
 
         [[nodiscard]] double get_pool_idle_time() const {
-            return m_thread_pool->idle_time() / (double) m_processor_count;
+            return m_thread_pool->idle_time() / static_cast<double>(m_processor_count);
         }
 
         [[nodiscard]] int get_pool_size() const {
-            return (int) this->m_thread_pool->size();
+            return static_cast<int>(this->m_thread_pool->size());
         }
 
         void init_thread_pool(int p_pool_size) {
@@ -280,7 +271,7 @@ namespace gempba {
         * Blocks the current thread until all tasks finish.
         * Provides synchronization with the main thread.
         */
-        void wait() {
+        void wait() const {
             utils::print_ipc_debug_comments("Main thread waiting results \n");
             this->m_thread_pool->wait();
         }
@@ -330,13 +321,14 @@ namespace gempba {
          * @tparam F function type
          * @tparam HolderType ResultHolder type
          * @param p_function function to be executed
+         * @param p_thread_id thread identifier
          * @param p_holder ResultHolder instance that wraps the function arguments and potential result
          */
         template<typename Ret, typename F, typename HolderType>
-        void force_local_submit(F &p_function, int p_id, HolderType &p_holder) requires (!std::is_void_v<Ret>) {
+        void force_local_submit(F &p_function, int p_thread_id, HolderType &p_holder) requires (!std::is_void_v<Ret>) {
             p_holder.setPushStatus();
             m_load_balancer.prune(&p_holder);
-            args_handler::unpack_and_forward_non_void(p_function, p_id, p_holder.getArgs(), p_holder);
+            args_handler::unpack_and_forward_non_void(p_function, p_thread_id, p_holder.getArgs(), p_holder);
         }
 
         /**
@@ -359,10 +351,11 @@ namespace gempba {
          * It could be used once when submitting the first task.
          * @tparam Ret return type
          * @param p_function function to be executed
+         * @param p_thread_id thread identifier
          * @param p_holder ResultHolder instance that wraps the function arguments and potential result
          */
         template<typename Ret, typename F, typename HolderType>
-        void force_local_submit(F &p_function, int p_id, HolderType &p_holder) requires (std::is_void_v<Ret>) {
+        void force_local_submit(F &p_function, [[maybe_unused]] int p_thread_id, HolderType &p_holder) requires (std::is_void_v<Ret>) {
             p_holder.setPushStatus();
             m_load_balancer.prune(&p_holder);
             args_handler::unpack_and_push_void(*m_thread_pool, p_function, p_holder.getArgs());
@@ -374,16 +367,16 @@ namespace gempba {
          * @tparam F function type
          * @tparam HolderType ResultHolder type
          * @param p_function function to be executed
-         * @param p_id thread identifier
+         * @param p_thread_id thread identifier
          * @param p_holder ResultHolder instance that wraps the function arguments and potential result
          * @return
          */
         template<typename Ret, typename F, typename HolderType>
-        bool try_local_submit(F &&p_function, int p_id, HolderType &p_holder) {
-            if (send<Ret>(p_function, p_id, p_holder)) {
+        bool try_local_submit(F &&p_function, int p_thread_id, HolderType &p_holder) {
+            if (send<Ret>(p_function, p_thread_id, p_holder)) {
                 return true;
             }
-            forward<Ret>(p_function, p_id, p_holder);
+            forward<Ret>(p_function, p_thread_id, p_holder);
             return false;
         }
 
@@ -392,17 +385,17 @@ namespace gempba {
          * It attempts to submit a task to the remote rank. If the remote rank is not available, it falls back to try_local_submit
          * @tparam Ret return type
          * @param p_function function to be executed
-         * @param p_id thread identifier
+         * @param p_thread_id thread identifier
          * @param p_holder ResultHolder instance that wraps the function arguments and potential result
          * @param p_serializer function that serializes the arguments into a gempba::task_packet
          * @return
          */
         template<typename Ret, typename F, typename HolderType, typename Serializer>
-        bool try_remote_submit(F &p_function, int p_id, HolderType &p_holder, Serializer &&p_serializer) {
-            if (send(p_id, p_holder, p_serializer)) {
+        bool try_remote_submit(F &p_function, int p_thread_id, HolderType &p_holder, Serializer &&p_serializer) {
+            if (send(p_thread_id, p_holder, p_serializer)) {
                 return true;
             }
-            return try_local_submit<Ret>(p_function, p_id, p_holder);
+            return try_local_submit<Ret>(p_function, p_thread_id, p_holder);
         }
         #endif
 
@@ -517,7 +510,7 @@ namespace gempba {
 
                     if (v_upper_holder->evaluate_branch_checkIn()) {
                         // checks if it's worth it to push
-                        this->m_thread_requests++;
+                        ++this->m_thread_requests;
                         v_upper_holder->setPushStatus();
                         args_handler::unpack_and_push_void(*m_thread_pool, p_function, v_upper_holder->getArgs());
                     } else {
@@ -571,7 +564,7 @@ namespace gempba {
         int m_world_size = -1; // get the number of processes/nodes
         char m_processor_name[128]{}; // name of the node
 
-        bool send(int p_id, auto &p_holder, auto &&p_serializer) {
+        bool send([[maybe_unused]] int p_thread_id, auto &p_holder, auto &&p_serializer) {
             /* the underlying loop breaks under one of the following scenarios:
                 - unable to acquire priority
                 - unable to acquire mutex
@@ -591,11 +584,11 @@ namespace gempba {
                     return false;
                 }
 
-                auto getBuffer = [&p_serializer](auto &tuple) {
-                    return std::apply(p_serializer, tuple);
+                auto v_buffer_getter = [&p_serializer](auto &p_tuple) {
+                    return std::apply(p_serializer, p_tuple);
                 };
 
-                const bool v_top_holder_found_and_pushed = try_push_root_level_holder_remotely(getBuffer, p_holder);
+                const bool v_top_holder_found_and_pushed = try_push_root_level_holder_remotely(v_buffer_getter, p_holder);
                 if (v_top_holder_found_and_pushed) {
                     // if top holder found, then it is pushed; therefore, priority is release internally
                     continue; // keeps iterating from root to current level
@@ -606,7 +599,7 @@ namespace gempba {
                     throw std::runtime_error("Attempt to push a treated holder\n");
                 }
 
-                task_packet v_buffer = getBuffer(p_holder.getArgs());
+                task_packet v_buffer = v_buffer_getter(p_holder.getArgs());
                 m_scheduler->push(std::move(v_buffer)); // this closes the sending channel internally
                 p_holder.setMPISent();
                 m_load_balancer.prune(&p_holder);
@@ -640,24 +633,24 @@ namespace gempba {
             using HolderType = result_holder<Ret, Args...>;
 
             utils::print_ipc_debug_comments("About to build Decoder");
-            std::function<std::shared_ptr<result_holder_parent>(task_packet)> decoder = [this, &p_callable, &p_deserializer](task_packet p_packet) {
-                std::shared_ptr<result_holder_parent> smart_ptr = std::make_shared<HolderType>(m_load_balancer, -1);
-                auto *holder = dynamic_cast<HolderType *>(smart_ptr.get());
+            std::function<std::shared_ptr<result_holder_parent>(task_packet)> v_decoder = [this, &p_callable, &p_deserializer](task_packet p_packet) {
+                std::shared_ptr<result_holder_parent> v_smart_ptr = std::make_shared<HolderType>(m_load_balancer, -1);
+                auto *v_holder = dynamic_cast<HolderType *>(v_smart_ptr.get());
 
-                std::stringstream ss;
-                ss.write(reinterpret_cast<const char *>(p_packet.data()), static_cast<int>(p_packet.size()));
+                std::stringstream v_ss;
+                v_ss.write(reinterpret_cast<const char *>(p_packet.data()), static_cast<int>(p_packet.size()));
 
-                auto _deserializer = std::bind_front(p_deserializer, std::ref(ss));
-                std::apply(_deserializer, holder->getArgs());
+                auto v_deserializer = std::bind_front(p_deserializer, std::ref(v_ss));
+                std::apply(v_deserializer, v_holder->getArgs());
 
-                force_local_submit<Ret>(p_callable, -1, *holder);
+                force_local_submit<Ret>(p_callable, -1, *v_holder);
 
-                return smart_ptr;
+                return v_smart_ptr;
             };
 
             utils::print_ipc_debug_comments("Decoder built");
 
-            return decoder;
+            return v_decoder;
         }
 
         // this returns a lambda function which returns the best results as raw data
