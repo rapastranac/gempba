@@ -55,7 +55,7 @@ namespace gempba {
         result m_best_result_serialized;
 
         dynamic_load_balancer_handler &m_load_balancer = dynamic_load_balancer_handler::getInstance();
-        load_balancing_strategy m_load_balancing_strategy = QUASI_HORIZONTAL;
+        balancing_policy m_load_balancing_strategy = QUASI_HORIZONTAL;
 
         score m_score = score::make(INT_MIN);
         goal m_goal = MAXIMISE;
@@ -159,11 +159,11 @@ namespace gempba {
 
         //</editor-fold>
 
-        void set_load_balancing_strategy(const load_balancing_strategy p_strategy) {
+        void set_load_balancing_strategy(const balancing_policy p_strategy) {
             this->m_load_balancing_strategy = p_strategy;
         };
 
-        [[nodiscard]] load_balancing_strategy get_load_balancing_strategy() const {
+        [[nodiscard]] balancing_policy get_load_balancing_strategy() const {
             return m_load_balancing_strategy;
         }
 

@@ -7,7 +7,7 @@ namespace gempba {
         MAXIMISE, MINIMISE
     };
 
-    enum load_balancing_strategy {
+    enum balancing_policy {
         QUASI_HORIZONTAL, // Our Novel Dynamic Load Balancer
         WORK_STEALING
     };
