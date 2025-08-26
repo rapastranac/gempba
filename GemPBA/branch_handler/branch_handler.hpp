@@ -55,7 +55,7 @@ namespace gempba {
         result m_best_result_serialized;
 
         dynamic_load_balancer_handler &m_load_balancer = dynamic_load_balancer_handler::getInstance();
-        balancing_policy m_load_balancing_strategy = QUASI_HORIZONTAL;
+        balancing_policy m_balancing_policy = QUASI_HORIZONTAL;
 
         score m_score = score::make(INT_MIN);
         goal m_goal = MAXIMISE;
@@ -124,7 +124,7 @@ namespace gempba {
                 return false;
             }
 
-            if (m_load_balancing_strategy == QUASI_HORIZONTAL) {
+            if (m_balancing_policy == QUASI_HORIZONTAL) {
                 // bool res = try_top_holder<Ret>(lck, f, holder);
                 // if (res)
                 //	return false; //if top holder found, then it should return false to keep trying
@@ -159,12 +159,12 @@ namespace gempba {
 
         //</editor-fold>
 
-        void set_load_balancing_strategy(const balancing_policy p_strategy) {
-            this->m_load_balancing_strategy = p_strategy;
+        void set_balancing_policy(const balancing_policy p_strategy) {
+            this->m_balancing_policy = p_strategy;
         };
 
-        [[nodiscard]] balancing_policy get_load_balancing_strategy() const {
-            return m_load_balancing_strategy;
+        [[nodiscard]] balancing_policy get_balancing_policy() const {
+            return m_balancing_policy;
         }
 
         [[nodiscard]] double get_pool_idle_time() const {
@@ -461,7 +461,7 @@ namespace gempba {
             if (p_holder.is_pushed())
                 return;
             #endif
-            if (m_load_balancing_strategy == QUASI_HORIZONTAL) {
+            if (m_balancing_policy == QUASI_HORIZONTAL) {
                 m_load_balancer.checkLeftSibling(&p_holder); // it checks if root must be moved
             }
 
@@ -477,7 +477,7 @@ namespace gempba {
                 return p_holder.get();
             }
 
-            if (m_load_balancing_strategy == QUASI_HORIZONTAL) {
+            if (m_balancing_policy == QUASI_HORIZONTAL) {
                 m_load_balancer.checkLeftSibling(&p_holder);
             }
 
@@ -496,7 +496,7 @@ namespace gempba {
                 // return {}; // nope, if it was pushed, then the result should be retrieved in here
             }
 
-            if (m_load_balancing_strategy == QUASI_HORIZONTAL) {
+            if (m_balancing_policy == QUASI_HORIZONTAL) {
                 m_load_balancer.checkLeftSibling(&p_holder);
             }
 
@@ -509,7 +509,7 @@ namespace gempba {
       */
         template<typename Ret, typename F, typename HolderType>
         bool try_push_root_level_holder_remotely(F &p_function, HolderType &p_holder) requires (std::is_void_v<Ret>) {
-            if (m_load_balancing_strategy == QUASI_HORIZONTAL) {
+            if (m_balancing_policy == QUASI_HORIZONTAL) {
                 HolderType *v_upper_holder = m_load_balancer.find_top_holder(&p_holder);
                 if (v_upper_holder) {
                     if (v_upper_holder->isTreated())
@@ -538,7 +538,7 @@ namespace gempba {
          */
         template<typename HolderType>
         bool try_push_root_level_holder_remotely(auto &p_get_buffer, HolderType &p_holder) {
-            if (m_load_balancing_strategy == QUASI_HORIZONTAL) {
+            if (m_balancing_policy == QUASI_HORIZONTAL) {
                 HolderType *v_upper_holder = m_load_balancer.find_top_holder(&p_holder); //  if it finds it, then the root has already been lowered
                 if (v_upper_holder) {
                     if (v_upper_holder->isTreated())
