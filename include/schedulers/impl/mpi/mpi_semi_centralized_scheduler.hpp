@@ -29,7 +29,7 @@ namespace gempba {
     class result_holder_parent;
 
     // inter process communication handler
-    class mpi_scheduler final : public scheduler {
+    class mpi_semi_centralized_scheduler final : public scheduler {
 
         // sanity assignment
         enum tags {
@@ -47,12 +47,12 @@ namespace gempba {
         };
 
     public:
-        ~mpi_scheduler() override {
+        ~mpi_semi_centralized_scheduler() override {
             finalize();
         }
 
-        static mpi_scheduler &get_instance(const double p_timeout = 3.0) {
-            static mpi_scheduler instance(p_timeout);
+        static mpi_semi_centralized_scheduler &get_instance(const double p_timeout = 3.0) {
+            static mpi_semi_centralized_scheduler instance(p_timeout);
             return instance;
         }
 
@@ -825,7 +825,7 @@ namespace gempba {
         const double m_timeout; // seconds
 
         /* singleton*/
-        mpi_scheduler(const double p_timeout) :
+        mpi_semi_centralized_scheduler(const double p_timeout) :
             m_timeout(p_timeout) {
             if (m_timeout <= 0) {
                 spdlog::throw_spdlog_ex(fmt::format("Timeout must be greater than 0, got: {:.8f}", m_timeout));

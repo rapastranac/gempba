@@ -1,8 +1,8 @@
-#include <schedulers/impl/mpi/mpi_scheduler.hpp>
+#include <schedulers/impl/mpi/mpi_semi_centralized_scheduler.hpp>
 #include <branch_handler/branch_handler.hpp>
 
 namespace gempba {
-    void mpi_scheduler::task_funneling(branch_handler &p_branch_handler) {
+    void mpi_semi_centralized_scheduler::task_funneling(branch_handler &p_branch_handler) {
         task_packet *v_packet = nullptr;
         bool v_is_pop = m_tasks_queue.pop(v_packet);
         // nice(18); // this method changes OS priority of current thread, it should be carefully used
@@ -58,7 +58,7 @@ namespace gempba {
         // nice(0);
     }
 
-    void mpi_scheduler::update_score(branch_handler &p_branch_handler) {
+    void mpi_semi_centralized_scheduler::update_score(branch_handler &p_branch_handler) {
         const score v_global_score_temp = m_global_score; // constant within this scope
         const score v_local_score_temp = p_branch_handler.get_score(); // constant within this scope
 

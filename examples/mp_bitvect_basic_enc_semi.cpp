@@ -7,7 +7,7 @@
 #include <vector>
 #include <spdlog/spdlog.h>
 
-#include <schedulers/impl/mpi/mpi_scheduler.hpp>
+#include <schedulers/impl/mpi/mpi_semi_centralized_scheduler.hpp>
 #include "include/main.hpp"
 #include "include/mp_bitvect_basic_enc.hpp"
 
@@ -23,7 +23,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
     auto &branchHandler = gempba::branch_handler::get_instance(); // parallel library
 
     // NOTE: instantiated object depends on SCHEDULER_CENTRALIZED macro
-    auto &mpiScheduler = gempba::mpi_scheduler::get_instance();
+    auto &mpiScheduler = gempba::mpi_semi_centralized_scheduler::get_instance();
 
     int rank = mpiScheduler.rank_me();
     branchHandler.pass_scheduler(&mpiScheduler);
