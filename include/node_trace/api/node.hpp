@@ -286,6 +286,9 @@ namespace gempba {
     inline bool operator!=(std::nullptr_t, const node &n) noexcept {
         return n != nullptr; // Reuse the member function
     }
+
+    template<typename F, typename Ret, typename... Args>
+    concept invokable = std::invocable<F, std::thread::id, Args..., node> && std::same_as<std::invoke_result_t<F, std::thread::id, Args..., node>, Ret>;
 } // namespace gempba
 
 #endif // GEMPBA_NODE_HPP
