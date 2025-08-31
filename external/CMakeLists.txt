@@ -14,6 +14,7 @@ include(${CPM_DOWNLOAD_LOCATION})
 CPMAddPackage(NAME argparse
         GITHUB_REPOSITORY p-ranav/argparse
         VERSION 3.0
+        GIT_SHALLOW TRUE          # shallow clone: minimal history
 )
 CPMAddPackage(
         NAME spdlog
@@ -22,6 +23,7 @@ CPMAddPackage(
         OPTIONS
         "SPDLOG_BUILD_SHARED OFF"
         "SPDLOG_BUILD_STATIC ON"
+        GIT_SHALLOW TRUE          # shallow clone: minimal history
 )
 
 # Define 'external_libs' as an INTERFACE library
