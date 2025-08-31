@@ -43,6 +43,9 @@ class tree {
 
         // this method allows to add a next node,
         void add_next(const int p_index) {
+            if (p_index >= static_cast<int>(m_tree.m_c.size())) {
+                spdlog::throw_spdlog_ex("node " + std::to_string(p_index) + " is out of bounds");
+            }
             if (m_tree[p_index].m_parent) {
                 spdlog::throw_spdlog_ex("node " + std::to_string(m_index) + " is already assigned to " + std::to_string(m_tree[p_index].m_parent->m_index));
             }
@@ -218,6 +221,27 @@ public:
     iterator begin() { return m_c.begin(); }
 
     iterator end() { return m_c.end(); }
+
+    [[nodiscard]] std::string to_string() const {
+        std::ostringstream v_oss;
+        for (size_t i = 0; i < m_c.size(); ++i) {
+            if (m_c[i].get_parent() == -1) {
+                print_node(v_oss, static_cast<int>(i), 0);
+            }
+        }
+        return v_oss.str();
+    }
+
+private:
+
+    void print_node(std::ostringstream& p_oss, const int p_index, const int p_indent) const {
+        const auto& v_node = m_c[p_index];
+        p_oss << std::string(p_indent * 2, ' ') << "- Node " << p_index << '\n';
+        for (const int & v_index : v_node) {
+            print_node(p_oss, v_index, p_indent + 1);
+        }
+    }
+
 };
 
 #endif

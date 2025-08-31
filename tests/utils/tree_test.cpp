@@ -22,6 +22,8 @@
  * SOFTWARE.
  */
 
+#include <filesystem>
+#include <fstream>
 #include <gtest/gtest.h>
 #include <utils/tree.hpp>
 
@@ -116,4 +118,71 @@ TEST(tree_test, invalid_pop_front) {
 TEST(tree_test, invalid_release) {
     tree instance(1);
     EXPECT_THROW(instance[0].release(), spdlog::spdlog_ex);
+}
+
+std::string get_test_resource_path(const std::string& p_name) {
+    namespace fs = std::filesystem;
+    const fs::path v_file_path = __FILE__;  // expands to something like /path/to/tests/test_tree.cpp
+    return (v_file_path.parent_path() / "resources" / p_name).string();
+}
+
+std::string load_resource(const std::string& p_filename) {
+    std::ifstream v_file(get_test_resource_path(p_filename));
+    if (!v_file.is_open()) {
+        throw std::runtime_error("Could not open resource: " + p_filename);
+    }
+
+    std::ostringstream v_ss;
+    v_ss << v_file.rdbuf();
+    return v_ss.str();
+}
+
+
+TEST(tree_test, to_string_test) {
+
+    {
+        tree v_tree(2);
+        v_tree[0].add_next(1);
+
+        const std::string v_output = v_tree.to_string();
+        const std::string v_expected = load_resource("tree0");
+
+        ASSERT_EQ(v_expected, v_output);
+    }
+
+    {
+        tree v_tree(8);
+        v_tree[0].add_next(1);
+        v_tree[0].add_next(2);
+        v_tree[0].add_next(3);
+        v_tree[0].add_next(4);
+        v_tree[0].add_next(5);
+        v_tree[0].add_next(6);
+        v_tree[0].add_next(7);
+
+        const std::string v_output = v_tree.to_string();
+        const std::string v_expected = load_resource("tree1");
+
+        ASSERT_EQ(v_expected, v_output);
+    }
+
+    {
+        tree v_tree(9);
+        v_tree[0].add_next(1);
+        v_tree[0].add_next(2);
+
+        v_tree[1].add_next(3);
+        v_tree[1].add_next(4);
+        v_tree[1].add_next(5);
+
+        v_tree[2].add_next(6);
+        v_tree[2].add_next(7);
+        v_tree[2].add_next(8);
+
+        const std::string v_output = v_tree.to_string();
+        const std::string v_expected = load_resource("tree2");
+
+        ASSERT_EQ(v_expected, v_output);
+    }
+
 }
