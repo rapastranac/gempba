@@ -374,7 +374,7 @@ namespace gempba {
             int v_is_message_received = 0; // logical
 
             MPI_Status v_status;
-            MPI_Iprobe(CENTER, REFVAL_PROPOSAL_TAG, m_global_reference_value_communicator, &v_is_message_received, &v_status);
+            MPI_Iprobe(CENTER, REFVAL_UPDATE_TAG, m_global_reference_value_communicator, &v_is_message_received, &v_status);
             if (v_is_message_received) {
                 return v_status;
 
