@@ -1,5 +1,5 @@
-#include "schedulers/impl/mpi/mpi_centralized_scheduler.hpp"
-#include "branch_handler/branch_handler.hpp"
+#include <branch_handling/branch_handler.hpp>
+#include <schedulers/impl/mpi/mpi_centralized_scheduler.hpp>
 
 namespace gempba {
     void mpi_centralized_scheduler::task_funneling(branch_handler &p_branch_handler) {

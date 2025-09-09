@@ -5,11 +5,11 @@
 #include <boost/archive/text_iarchive.hpp>
 
 #include "Graph.hpp"
-#include "branch_handler/branch_handler.hpp"
+#include <branch_handling/branch_handler.hpp>
+#include <dynamic_load_balancer/dynamic_load_balancer_handler.hpp>
 #include "result_holder/result_holder.hpp"
 #include "util.hpp"
 #include <format>
-#include "dynamic_load_balancer/dynamic_load_balancer_handler.hpp"
 
 #include <algorithm>
 #include <filesystem>

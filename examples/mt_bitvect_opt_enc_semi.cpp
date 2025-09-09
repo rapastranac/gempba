@@ -2,7 +2,7 @@
 #include "include/mt_bitvect_opt_enc.hpp"
 
 #include <result_holder/result_holder.hpp>
-#include <branch_handler/branch_handler.hpp>
+#include <branch_handling/branch_handler.hpp>
 #include <dynamic_load_balancer/dynamic_load_balancer_handler.hpp>
 
 #include <iostream>
