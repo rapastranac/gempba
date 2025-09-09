@@ -28,7 +28,7 @@ namespace gempba {
             } {
                 /* this section protects MPI calls */
                 std::scoped_lock<std::mutex> v_lock(m_mutex);
-                maybe_receive_score();
+                maybe_receive_score_from_center();
                 maybe_receive_next_process();
 
                 update_score(p_branch_handler);
