@@ -69,68 +69,6 @@ namespace gempba {
             m_thread_requests = 0;
         }
 
-        template<typename Ret, typename F, typename HolderType>
-        bool send(F &&p_function, [[maybe_unused]] int p_thread_id, HolderType &p_holder) requires (std::is_void_v<Ret>) {
-            /* the underlying loop breaks under one of the following scenarios:
-                - mutex cannot be acquired
-                - there is no available thread in the pool
-                - current level holder is pushed
-
-                NOTE: if top holder found, it'll keep trying to find more
-            */
-            while (true) {
-                std::unique_lock v_lock(m_mutex, std::defer_lock);
-                if (!v_lock.try_lock()) {
-                    break;
-                }
-                if (m_thread_pool->n_idle() <= 0) {
-                    break; // mutex released at destruction
-                }
-                const bool v_top_holder_found_and_pushed = try_push_root_level_holder_remotely<Ret>(p_function, p_holder);
-                if (v_top_holder_found_and_pushed) {
-                    continue; // keeps iterating from root to current level
-                }
-                if (p_holder.isTreated()) {
-                    throw std::runtime_error("Attempt to push a treated holder\n");
-                }
-
-                // after this line, only leftMost holder should be pushed
-                ++this->m_thread_requests;
-                p_holder.setPushStatus();
-                m_load_balancer.prune(&p_holder);
-
-                args_handler::unpack_and_push_void(*m_thread_pool, p_function, p_holder.getArgs());
-                return true; // pushed to the pool
-            }
-            return false;
-        }
-
-        template<typename Ret, typename F, typename HolderType>
-        bool send(F &p_function, [[maybe_unused]] int p_thread_id, HolderType &p_holder) requires (!std::is_void_v<Ret>) {
-            /*This lock must be acquired before checking the condition,
-            even though numThread is atomic*/
-            std::unique_lock v_lock(m_mutex);
-            // if (busyThreads < thread_pool->size())
-            if (m_thread_pool->n_idle() <= 0) {
-                return false;
-            }
-
-            if (m_balancing_policy == QUASI_HORIZONTAL) {
-                // bool res = try_top_holder<Ret>(lck, f, holder);
-                // if (res)
-                //	return false; //if top holder found, then it should return false to keep trying
-
-                m_load_balancer.pop_left_sibling(&p_holder);
-            }
-            ++this->m_thread_requests;
-            p_holder.setPushStatus();
-
-            v_lock.unlock();
-            auto v_ret = args_handler::unpack_and_push_non_void(*m_thread_pool, p_function, p_holder.getArgs());
-            p_holder.hold_future(std::move(v_ret));
-            return true;
-        }
-
     public:
         //<editor-fold desc="Construction/Destruction">
         static branch_handler &get_instance() {
@@ -666,6 +604,68 @@ namespace gempba {
         #endif
 
     private:
+        template<typename Ret, typename F, typename HolderType>
+        bool send(F &&p_function, [[maybe_unused]] int p_thread_id, HolderType &p_holder) requires (std::is_void_v<Ret>) {
+            /* the underlying loop breaks under one of the following scenarios:
+                - mutex cannot be acquired
+                - there is no available thread in the pool
+                - current level holder is pushed
+
+                NOTE: if top holder found, it'll keep trying to find more
+            */
+            while (true) {
+                std::unique_lock v_lock(m_mutex, std::defer_lock);
+                if (!v_lock.try_lock()) {
+                    break;
+                }
+                if (m_thread_pool->n_idle() <= 0) {
+                    break; // mutex released at destruction
+                }
+                const bool v_top_holder_found_and_pushed = try_push_root_level_holder_remotely<Ret>(p_function, p_holder);
+                if (v_top_holder_found_and_pushed) {
+                    continue; // keeps iterating from root to current level
+                }
+                if (p_holder.isTreated()) {
+                    throw std::runtime_error("Attempt to push a treated holder\n");
+                }
+
+                // after this line, only leftMost holder should be pushed
+                ++this->m_thread_requests;
+                p_holder.setPushStatus();
+                m_load_balancer.prune(&p_holder);
+
+                args_handler::unpack_and_push_void(*m_thread_pool, p_function, p_holder.getArgs());
+                return true; // pushed to the pool
+            }
+            return false;
+        }
+
+        template<typename Ret, typename F, typename HolderType>
+        bool send(F &p_function, [[maybe_unused]] int p_thread_id, HolderType &p_holder) requires (!std::is_void_v<Ret>) {
+            /*This lock must be acquired before checking the condition,
+            even though numThread is atomic*/
+            std::unique_lock v_lock(m_mutex);
+            // if (busyThreads < thread_pool->size())
+            if (m_thread_pool->n_idle() <= 0) {
+                return false;
+            }
+
+            if (m_balancing_policy == QUASI_HORIZONTAL) {
+                // bool res = try_top_holder<Ret>(lck, f, holder);
+                // if (res)
+                //	return false; //if top holder found, then it should return false to keep trying
+
+                m_load_balancer.pop_left_sibling(&p_holder);
+            }
+            ++this->m_thread_requests;
+            p_holder.setPushStatus();
+
+            v_lock.unlock();
+            auto v_ret = args_handler::unpack_and_push_non_void(*m_thread_pool, p_function, p_holder.getArgs());
+            p_holder.hold_future(std::move(v_ret));
+            return true;
+        }
+
         [[nodiscard]] bool should_update_result(const score &p_new_score) const {
             const bool v_new_max_is_better = m_goal == MAXIMISE && p_new_score > m_score;
             const bool v_new_min_is_better = m_goal == MINIMISE && p_new_score < m_score;
