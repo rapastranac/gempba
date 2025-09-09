@@ -56,16 +56,10 @@ namespace gempba {
         };
 
         std::priority_queue<task_packet, std::vector<task_packet>, TaskComparator> m_center_queue; //message, size
-        //std::vector<task_packet> center_queue;
 
         int m_max_queue_size;
         bool m_center_last_full_status = false;
-
         double m_time_centerfull_sent = 0;
-
-
-        std::vector<task_packet> m_local_outqueue;
-        std::vector<task_packet> m_local_inqueue;
 
     public:
         ~mpi_centralized_scheduler() override {
