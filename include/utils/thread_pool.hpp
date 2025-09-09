@@ -22,11 +22,9 @@
 #include <atomic>
 #include <functional>
 #include <future>
-#include <map>
 #include <memory>
 #include <mutex>
 #include <omp.h>
-#include <set>
 #include <thread>
 #include <utils/Queue.hpp>
 

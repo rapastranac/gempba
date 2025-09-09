@@ -7,7 +7,7 @@
 #include <type_traits>
 #include <utility>
 
-#include "branch_handler/thread_pool.hpp"
+#include <utils/thread_pool.hpp>
 
 /*
  * Created by Andrés Pastrana on 2019
