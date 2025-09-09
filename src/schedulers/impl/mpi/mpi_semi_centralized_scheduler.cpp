@@ -5,13 +5,12 @@ namespace gempba {
     void mpi_semi_centralized_scheduler::task_funneling(branch_handler &p_branch_handler) {
         task_packet *v_packet = nullptr;
         bool v_is_pop = m_tasks_queue.pop(v_packet);
-        // nice(18); // this method changes OS priority of current thread, it should be carefully used
 
         while (true) {
             while (v_is_pop) {
                 // as long as there is a message
 
-                std::scoped_lock<std::mutex> v_lock(m_mutex);
+                std::scoped_lock v_lock(m_mutex);
                 std::unique_ptr<task_packet> v_unique_pointer(v_packet);
                 m_sent_tasks++;
 
@@ -22,10 +21,12 @@ namespace gempba {
                 if (!v_is_pop) {
                     m_transmitting = false;
                 } else {
-                    delete v_packet;
-                    throw std::runtime_error("Task found in queue, this should not happen in taskFunneling()\n");
+                    // Let the unique_ptr handle cleanup automatically
+                    std::unique_ptr<task_packet> error_packet(v_packet);
+                    spdlog::throw_spdlog_ex("Task found in queue, this should not happen in task_funneling()\n");
                 }
-            } {
+            }
+            {
                 /* this section protects MPI calls */
                 std::scoped_lock<std::mutex> v_lock(m_mutex);
                 maybe_receive_score_from_center();
@@ -50,7 +51,7 @@ namespace gempba {
         utils::print_ipc_debug_comments("rank {} sent {} tasks\n", m_world_rank, m_sent_tasks);
 
         if (!m_tasks_queue.empty()) {
-            throw std::runtime_error("leaving process with a pending message\n");
+            spdlog::throw_spdlog_ex("leaving process with a pending message\n");
         }
         /* to reuse the task funneling, otherwise it will exit
         right away the second time the process receives a task*/

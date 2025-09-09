@@ -3,27 +3,30 @@
 
 namespace gempba {
     void mpi_centralized_scheduler::task_funneling(branch_handler &p_branch_handler) {
-        task_packet *v_message = nullptr;
-        bool v_is_pop = m_tasks_queue.pop(v_message);
+        task_packet *v_packet = nullptr;
+        bool v_is_pop = m_tasks_queue.pop(v_packet);
 
         while (true) {
-            while (v_is_pop) // as long as there is a message
-            {
-                std::scoped_lock<std::mutex> v_lock(m_mutex);
+            while (v_is_pop) {
+                // as long as there is a message
 
-                std::unique_ptr<task_packet> v_pointer(v_message);
+                std::scoped_lock v_lock(m_mutex);
+                std::unique_ptr<task_packet> v_unique_pointer(v_packet);
                 m_sent_tasks++;
 
-                send_task_to_center(*v_message);
+                send_task_to_center(*v_packet);
 
-                v_is_pop = m_tasks_queue.pop(v_message);
+                v_is_pop = m_tasks_queue.pop(v_packet);
 
-                if (!v_is_pop)
+                if (!v_is_pop) {
                     m_transmitting = false;
-                else {
-                    throw std::runtime_error("Task found in queue, this should not happen in taskFunneling()\n");
+                } else {
+                    // Let the unique_ptr handle cleanup automatically
+                    std::unique_ptr<task_packet> error_packet(v_packet);
+                    spdlog::throw_spdlog_ex("Task found in queue, this should not happen in task_funneling()\n");
                 }
-            } {
+            }
+            {
                 /* this section protects MPI calls */
                 std::scoped_lock<std::mutex> v_lock(m_mutex);
                 maybe_receive_score_from_center();
@@ -32,23 +35,23 @@ namespace gempba {
                 update_score(p_branch_handler);
             }
 
-            v_is_pop = m_tasks_queue.pop(v_message);
+            v_is_pop = m_tasks_queue.pop(v_packet);
 
             if (!v_is_pop && p_branch_handler.is_done()) {
                 /* by the time this thread realises that the thread pool has no more tasks,
                     another buffer might have been pushed, which should be verified in the next line*/
-                v_is_pop = m_tasks_queue.pop(v_message);
+                v_is_pop = m_tasks_queue.pop(v_packet);
 
-                if (!v_is_pop)
+                if (!v_is_pop) {
                     break;
+                }
             }
         }
-        #if GEMPBA_DEBUG_COMMENTS
-        spdlog::debug("rank {} sent {} tasks\n", m_world_rank, m_sent_tasks);
-        #endif
+        utils::print_ipc_debug_comments("rank {} sent {} tasks\n", m_world_rank, m_sent_tasks);
 
-        if (!m_tasks_queue.empty())
-            throw std::runtime_error("leaving process with a pending message\n");
+        if (!m_tasks_queue.empty()) {
+            spdlog::throw_spdlog_ex("leaving process with a pending message\n");
+        }
         /* to reuse the task funneling, otherwise it will exit
         right away the second time the process receives a task*/
 
