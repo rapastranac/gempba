@@ -211,3 +211,102 @@ TEST(score_test, to_string) {
     const std::string v_actual_f128 = v_score_f128.to_string();
     EXPECT_EQ(v_expected_f128, v_actual_f128);
 }
+
+
+TEST(score_test, make_and_get_u_i32) {
+    constexpr auto v_value = std::uint32_t{1'234'567'890};
+    const auto v_score = score::make(v_value);
+
+    // direct get
+    EXPECT_EQ(v_score.get<std::uint32_t>(), 1'234'567'890);
+
+    // try_get success
+    std::uint32_t v_ok{};
+    EXPECT_TRUE(v_score.try_get(v_ok));
+    EXPECT_EQ(v_ok, 1234567890);
+
+    // try_get wrong type
+    std::int64_t v_wrong{};
+    EXPECT_FALSE(v_score.try_get(v_wrong));
+
+    // to_string
+    EXPECT_EQ(v_score.to_string(), "1234567890");
+}
+
+TEST(score_test, make_and_get_u_i64) {
+    constexpr auto v_value = std::uint64_t{12'345'678'901'234'567'890ULL};
+    const auto v_score = score::make(v_value);
+
+    // direct get
+    EXPECT_EQ(v_score.get<std::uint64_t>(), 12'345'678'901'234'567'890ULL);
+
+    // try_get success
+    std::uint64_t v_ok{};
+    EXPECT_TRUE(v_score.try_get(v_ok));
+    EXPECT_EQ(v_ok, 12'345'678'901'234'567'890ULL);
+
+    // try_get wrong type
+    std::int64_t v_wrong{};
+    EXPECT_FALSE(v_score.try_get(v_wrong));
+
+    // to_string
+    EXPECT_EQ(v_score.to_string(), "12345678901234567890");
+}
+
+// copy/paste of make_and_get_u_i64, just to be explicit
+TEST(score_test, make_and_get_size_t) {
+    constexpr auto v_value = std::size_t{12'345'678'901'234'567'890ULL};
+    const auto v_score = score::make(v_value);
+
+    // direct get
+    EXPECT_EQ(v_score.get<std::size_t>(), 12'345'678'901'234'567'890ULL);
+
+    // try_get success
+    std::size_t v_ok{};
+    EXPECT_TRUE(v_score.try_get(v_ok));
+    EXPECT_EQ(v_ok, 12'345'678'901'234'567'890ULL);
+
+    // try_get wrong type
+    std::int64_t v_wrong{};
+    EXPECT_FALSE(v_score.try_get(v_wrong));
+
+    // to_string
+    EXPECT_EQ(v_score.to_string(), "12345678901234567890");
+}
+
+TEST(score_test, compare_u_i32_values) {
+    const auto v_a = score::make(std::uint32_t{42});
+    const auto v_b = score::make(std::uint32_t{99});
+
+    EXPECT_LT(v_a, v_b);
+    EXPECT_GT(v_b, v_a);
+}
+
+TEST(score_test, compare_u_i64_values) {
+    const auto v_a = score::make(std::uint64_t{42});
+    const auto v_b = score::make(std::uint64_t{99});
+
+    EXPECT_LT(v_a, v_b);
+    EXPECT_GT(v_b, v_a);
+}
+
+TEST(score_test, cross_type_not_equal_u_i32) {
+    const auto v_ui32 = score::make(std::uint32_t{100});
+    const auto v_i32 = score::make(std::int32_t{100});
+
+    EXPECT_NE(v_ui32, v_i32);
+}
+
+TEST(score_test, cross_type_not_equal_u_i64) {
+    const auto v_ui32 = score::make(std::uint64_t{100});
+    const auto v_i32 = score::make(std::int64_t{100});
+
+    EXPECT_NE(v_ui32, v_i32);
+}
+
+TEST(score_test, cross_type_not_equal_u_i32_and_u_i64) {
+    const auto v_ui32 = score::make(std::uint32_t{100});
+    const auto v_ui64 = score::make(std::uint64_t{100});
+
+    EXPECT_NE(v_ui32, v_ui64);
+}

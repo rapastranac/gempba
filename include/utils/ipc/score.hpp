@@ -36,11 +36,11 @@
 #include <stdexcept>
 #include <type_traits>
 
-// Compatible with C++20 and laters
+// Compatible with C++23 and laters
 
 namespace gempba {
 
-    enum class score_type : std::uint8_t { I32, I64, F32, F64, F128 };
+    enum class score_type : std::uint8_t { I32, U_I32, I64, U_I64, F32, F64, F128 };
 
     /**
      * @brief Represents a fixed-size, type-safe numeric value container.
@@ -88,16 +88,20 @@ namespace gempba {
         static constexpr score make(T p_value) noexcept {
             using U = std::remove_cvref_t<T>;
 
-            if constexpr (std::is_integral_v<U> && sizeof(U) == 4) {
+            if constexpr (std::is_integral_v<U> && sizeof(U) == 4 && std::is_signed_v<U>) {
                 return make_raw<std::int32_t>(static_cast<std::int32_t>(p_value));
-            } else if constexpr (std::is_integral_v<U> && sizeof(U) == 8) {
+            } else if constexpr (std::is_integral_v<U> && sizeof(U) == 4 && std::is_unsigned_v<U>) {
+                return make_raw<std::uint32_t>(static_cast<std::uint32_t>(p_value));
+            } else if constexpr (std::is_integral_v<U> && sizeof(U) == 8 && std::is_signed_v<U>) {
                 return make_raw<std::int64_t>(static_cast<std::int64_t>(p_value));
+            } else if constexpr (std::is_integral_v<U> && sizeof(U) == 8 && std::is_unsigned_v<U>) {
+                return make_raw<std::uint64_t>(static_cast<std::uint64_t>(p_value));
             } else if constexpr (std::same_as<U, float> || std::same_as<U, double> || std::same_as<U, long double>) {
                 return make_raw<U>(p_value);
             } else {
                 static_assert(IS_SUPPORTED<U>, "unsupported score type");
             }
-            std::abort(); // std::unreachable in C++23
+            std::unreachable();
         }
 
         // Strong ordering
@@ -106,7 +110,7 @@ namespace gempba {
         }
 
         friend constexpr bool operator==(const score &p_lhs, const score &p_rhs) noexcept {
-            return to_long_double(p_lhs) == to_long_double(p_rhs);
+            return p_lhs.m_kind == p_rhs.m_kind && to_long_double(p_lhs) == to_long_double(p_rhs);
         }
 
         /**
@@ -160,8 +164,26 @@ namespace gempba {
                         return static_cast<T>(static_cast<long double>(v_value));
                     }
                 }
+                case score_type::U_I32: {
+                    uint32_t v_value{};
+                    std::memcpy(&v_value, m_payload.data(), sizeof(v_value));
+                    if constexpr (std::is_integral_v<T>) {
+                        return static_cast<T>(v_value);
+                    } else {
+                        return static_cast<T>(static_cast<long double>(v_value));
+                    }
+                }
                 case score_type::I64: {
                     int64_t v_value{};
+                    std::memcpy(&v_value, m_payload.data(), sizeof(v_value));
+                    if constexpr (std::is_integral_v<T>) {
+                        return static_cast<T>(v_value);
+                    } else {
+                        return static_cast<T>(static_cast<long double>(v_value));
+                    }
+                }
+                case score_type::U_I64: {
+                    uint64_t v_value{};
                     std::memcpy(&v_value, m_payload.data(), sizeof(v_value));
                     if constexpr (std::is_integral_v<T>) {
                         return static_cast<T>(v_value);
@@ -195,8 +217,16 @@ namespace gempba {
                     oss << get_loose<int32_t>();
                     break;
                 }
+                case score_type::U_I32: {
+                    oss << get_loose<uint32_t>();
+                    break;
+                }
                 case score_type::I64: {
                     oss << get_loose<int64_t>();
+                    break;
+                }
+                case score_type::U_I64: {
+                    oss << get_loose<uint64_t>();
                     break;
                 }
                 case score_type::F32: {
@@ -207,9 +237,10 @@ namespace gempba {
                     oss << std::setprecision(std::numeric_limits<double>::max_digits10) << get_loose<double>();
                     break;
                 }
-                case score_type::F128:
+                case score_type::F128: {
                     oss << std::setprecision(std::numeric_limits<long double>::max_digits10) << get_loose<long double>();
                     break;
+                }
 
             }
             return oss.str();
@@ -220,6 +251,8 @@ namespace gempba {
         static constexpr bool IS_SUPPORTED =
                 std::same_as<std::remove_cvref_t<T>, std::int32_t> ||
                 std::same_as<std::remove_cvref_t<T>, std::int64_t> ||
+                std::same_as<std::remove_cvref_t<T>, std::uint32_t> ||
+                std::same_as<std::remove_cvref_t<T>, std::uint64_t> ||
                 std::same_as<std::remove_cvref_t<T>, float> ||
                 std::same_as<std::remove_cvref_t<T>, double> ||
                 std::same_as<std::remove_cvref_t<T>, long double>;
@@ -228,8 +261,12 @@ namespace gempba {
         static constexpr score_type TYPE_OF =
                 std::same_as<std::remove_cvref_t<T>, std::int32_t>
                     ? score_type::I32
+                    : std::same_as<std::remove_cvref_t<T>, std::uint32_t>
+                    ? score_type::U_I32
                     : std::same_as<std::remove_cvref_t<T>, std::int64_t>
                     ? score_type::I64
+                    : std::same_as<std::remove_cvref_t<T>, std::uint64_t>
+                    ? score_type::U_I64
                     : std::same_as<std::remove_cvref_t<T>, float>
                     ? score_type::F32
                     : std::same_as<std::remove_cvref_t<T>, double>
@@ -243,8 +280,18 @@ namespace gempba {
                     std::memcpy(&v_value, p_score.m_payload.data(), sizeof(v_value));
                     return static_cast<long double>(v_value);
                 }
+                case score_type::U_I32: {
+                    std::uint32_t v_value{};
+                    std::memcpy(&v_value, p_score.m_payload.data(), sizeof(v_value));
+                    return static_cast<long double>(v_value);
+                }
                 case score_type::I64: {
                     std::int64_t v_value{};
+                    std::memcpy(&v_value, p_score.m_payload.data(), sizeof(v_value));
+                    return static_cast<long double>(v_value);
+                }
+                case score_type::U_I64: {
+                    uint64_t v_value{};
                     std::memcpy(&v_value, p_score.m_payload.data(), sizeof(v_value));
                     return static_cast<long double>(v_value);
                 }
