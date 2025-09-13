@@ -210,3 +210,53 @@ TEST(task_packet_test, empty_static_instance) {
     // EMPTY should be equal to itself
     EXPECT_TRUE(v_empty1 == v_empty1);
 }
+
+TEST(task_packet_test, spaceship_operator_comparison_and_set_uniqueness) {
+    const gempba::task_packet v_packet1("hello", 5);
+    const gempba::task_packet v_packet2("hello", 5);
+    const gempba::task_packet v_packet3("world", 5);
+    const gempba::task_packet v_packet4("hi", 2);
+    const gempba::task_packet v_packet5("hello world", 11);
+
+    // Test equality
+    EXPECT_TRUE(v_packet1 == v_packet2);
+    EXPECT_FALSE(v_packet1 == v_packet3);
+    EXPECT_FALSE(v_packet1 != v_packet2);
+    EXPECT_TRUE(v_packet1 != v_packet3);
+
+    // Test ordering (size first, then lexicographic)
+    EXPECT_TRUE(v_packet4 < v_packet1); // "hi" (2) < "hello" (5) by size
+    EXPECT_TRUE(v_packet1 < v_packet5); // "hello" (5) < "hello world" (11) by size
+    EXPECT_TRUE(v_packet1 < v_packet3); // "hello" < "world" lexicographically (same size)
+    EXPECT_FALSE(v_packet3 < v_packet1); // "world" > "hello"
+
+    // Test set uniqueness - no collisions should occur
+    std::set<gempba::task_packet> v_packet_set;
+
+    const auto [v_iter1, v_inserted1] = v_packet_set.insert(v_packet1);
+    EXPECT_TRUE(v_inserted1);
+
+    const auto [v_iter2, v_inserted2] = v_packet_set.insert(v_packet2);
+    EXPECT_FALSE(v_inserted2); // Should not insert duplicate
+
+    const auto [v_iter3, v_inserted3] = v_packet_set.insert(v_packet3);
+    EXPECT_TRUE(v_inserted3);
+
+    const auto [v_iter4, v_inserted4] = v_packet_set.insert(v_packet4);
+    EXPECT_TRUE(v_inserted4);
+
+    const auto [v_iter5, v_inserted5] = v_packet_set.insert(v_packet5);
+    EXPECT_TRUE(v_inserted5);
+
+    EXPECT_EQ(v_packet_set.size(), 4u); // v_packet1 and v_packet2 are identical
+
+    // Verify ordering in set (should be: v_packet4, v_packet1, v_packet3, v_packet5)
+    auto v_it = v_packet_set.begin();
+    EXPECT_TRUE(*v_it == v_packet4); // smallest size (2)
+    ++v_it;
+    EXPECT_TRUE(*v_it == v_packet1); // size 5, "hello"
+    ++v_it;
+    EXPECT_TRUE(*v_it == v_packet3); // size 5, "world"
+    ++v_it;
+    EXPECT_TRUE(*v_it == v_packet5); // largest size (11)
+}

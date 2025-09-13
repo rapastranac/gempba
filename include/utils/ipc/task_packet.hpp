@@ -25,6 +25,7 @@
 #ifndef TASK_PACKET_HPP
 #define TASK_PACKET_HPP
 
+#include <compare>
 #include <cstddef>
 #include <cstring>
 #include <stdexcept>
@@ -102,6 +103,15 @@ namespace gempba {
 
         bool operator!=(const task_packet &p_other) const {
             return !(*this == p_other);
+        }
+
+        std::strong_ordering operator<=>(const task_packet &p_other) const {
+            // First compare sizes
+            if (const auto v_size_cmp = m_data.size() <=> p_other.m_data.size(); v_size_cmp != 0) {
+                return v_size_cmp;
+            }
+            // Then lexicographically compare contents
+            return m_data <=> p_other.m_data;
         }
 
         // Singleton EMPTY instance
