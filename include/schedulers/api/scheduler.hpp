@@ -4,11 +4,12 @@
 #include <functional>
 #include <memory>
 #include <mpi.h>
+#include <schedulers/api/stats.hpp>
+#include <utils/gempba_utils.hpp>
+#include <utils/tree.hpp>
 #include <utils/ipc/result.hpp>
 #include <utils/ipc/score.hpp>
 #include <utils/ipc/task_packet.hpp>
-#include <utils/tree.hpp>
-#include <utils/gempba_utils.hpp>
 
 namespace gempba {
 
@@ -62,6 +63,13 @@ namespace gempba {
         [[nodiscard]] virtual size_t get_total_requests() const = 0;
 
         virtual void set_custom_initial_topology(tree &&p_tree) = 0;
+
+        /**
+         * Get the statistics of the scheduler at the current process as a unique pointer.
+         *
+         * @return A unique pointer to the stats object.
+         */
+        [[nodiscard]] virtual std::unique_ptr<stats> get_stats() const = 0;
 
     };
 }

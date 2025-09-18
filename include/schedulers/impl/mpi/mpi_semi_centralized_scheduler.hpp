@@ -16,6 +16,7 @@
 
 #include <result_holder/result_holder_parent.hpp>
 #include <schedulers/api/scheduler.hpp>
+#include <schedulers/impl/mpi/default_mpi_stats.hpp>
 #include <spdlog/spdlog.h>
 #include <utils/Queue.hpp>
 #include <utils/gempba_utils.hpp>
@@ -84,6 +85,9 @@ namespace gempba {
             return m_best_results;
         }
 
+        [[nodiscard]] std::unique_ptr<stats> get_stats() const override {
+            return std::make_unique<default_mpi_stats>(m_stats);
+        }
 
         void print_stats() override {
             spdlog::debug("\n \n \n");
@@ -761,6 +765,7 @@ namespace gempba {
         size_t m_threads_per_process = std::thread::hardware_concurrency(); // detects the number of logical processors in machine
 
         const double m_timeout; // seconds
+        default_mpi_stats m_stats{-1};
 
         /* singleton*/
         explicit mpi_semi_centralized_scheduler(const double p_timeout) :
@@ -770,6 +775,7 @@ namespace gempba {
             }
             init_mpi();
             init_member_variables();
+            m_stats = default_mpi_stats(m_world_rank);
 
             spdlog::info("MPI Scheduler, instantiated!\n");
         }
