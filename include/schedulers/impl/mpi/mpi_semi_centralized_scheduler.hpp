@@ -591,6 +591,7 @@ namespace gempba {
             m_process_state[p_status.MPI_SOURCE] = AVAILABLE_STATE;
             ++m_nodes_available;
             --m_nodes_running;
+            m_total_requests_number++;
             m_stats.m_total_requested_tasks++;
 
             if (m_process_tree[p_status.MPI_SOURCE].is_assigned()) {
@@ -651,6 +652,8 @@ namespace gempba {
             static int success = 0;
             success++;
             spdlog::debug("SUCCESSFUL updates: {}, m_global_score updated to : {} by rank {}\n", success, m_global_score.to_string(), p_status.MPI_SOURCE);
+            m_total_requests_number++;
+            m_stats.m_total_requested_tasks++;
         }
 
         /*	each node has an array containing its children were it is going to send tasks,
@@ -739,6 +742,10 @@ namespace gempba {
                 spdlog::debug("buffer failed to send! \n");
 
             spdlog::debug("Seed sent \n");
+            m_sent_tasks++;
+            m_total_requests_number++;
+            m_stats.m_sent_task_count++;
+            m_stats.m_total_requested_tasks++;
         }
 
     private:

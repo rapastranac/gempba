@@ -457,6 +457,11 @@ namespace gempba {
                     MPI_Send(v_msg.data(), static_cast<int>(v_msg.size()), MPI_BYTE, rank, TASK_FROM_CENTER, m_world_communicator);
                     m_process_state[rank] = ASSIGNED_STATE;
 
+                    m_sent_tasks++;
+                    m_total_requests_number++;
+                    m_stats.m_sent_task_count++;
+                    m_stats.m_total_requested_tasks++;
+
                     if (m_center_queue.empty())
                         return;
                 }
@@ -633,6 +638,9 @@ namespace gempba {
             static int success = 0;
             success++;
             spdlog::debug("SUCCESSFUL updates: {}, m_global_score updated to : {} by rank {}\n", success, m_global_score.to_string(), p_status.MPI_SOURCE);
+
+            m_total_requests_number++;
+            m_stats.m_total_requested_tasks++;
         }
 
         void process_task_for_center(MPI_Status p_status) {
@@ -651,7 +659,9 @@ namespace gempba {
             }
 
             m_total_requests_number++;
+            m_received_tasks++;
             m_stats.m_total_requested_tasks++;
+            m_stats.m_received_task_count++;
 
 
             if (m_center_queue.size() > 2 * CENTER_NBSTORED_TASKS_PER_PROCESS * m_world_size) {
@@ -759,6 +769,10 @@ namespace gempba {
                 spdlog::debug("buffer failed to send! \n");
 
             spdlog::debug("Seed sent \n");
+            m_sent_tasks++;
+            m_total_requests_number++;
+            m_stats.m_sent_task_count++;
+            m_stats.m_total_requested_tasks++;
         }
 
     private:
