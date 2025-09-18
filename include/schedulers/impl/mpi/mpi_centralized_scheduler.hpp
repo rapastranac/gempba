@@ -143,8 +143,9 @@ namespace gempba {
         }
 
         void barrier() override {
-            if (m_world_communicator != MPI_COMM_NULL)
+            if (m_world_communicator != MPI_COMM_NULL) {
                 MPI_Barrier(m_world_communicator);
+            }
         }
 
         bool try_open_transmission_channel() override {
@@ -176,6 +177,7 @@ namespace gempba {
         void run_node(branch_handler &p_branch_handler, std::function<std::shared_ptr<result_holder_parent>(task_packet)> &p_buffer_decoder,
                       std::function<result()> &p_result_fetcher) override {
             MPI_Barrier(m_world_communicator);
+            m_start_time = MPI_Wtime();
 
             bool v_is_terminated = false;
             while (true) {
@@ -184,6 +186,7 @@ namespace gempba {
                 switch (v_status.MPI_TAG) {
                     case TERMINATION: {
                         process_termination(v_status);
+                        collect_stats_data(p_branch_handler);
                         v_is_terminated = true; // temporary, it should always happen
                         break;
                     }
@@ -218,6 +221,8 @@ namespace gempba {
              */
 
             send_solution(p_result_fetcher);
+            m_end_time = MPI_Wtime();
+            m_stats.m_elapsed_time = m_end_time - m_start_time;
         }
 
         /**
@@ -282,6 +287,8 @@ namespace gempba {
             MPI_Barrier(m_world_communicator);
         }
 
+        void collect_stats_data(const branch_handler &p_branch_handler);
+
         void receive_score_from_center(MPI_Status p_status) {
             utils::print_ipc_debug_comments("rank {}, about to receive global score from Center\n", m_world_rank);
             MPI_Recv(&m_global_score, sizeof(score), MPI_BYTE, CENTER_NODE, SCORE_UPDATE, m_global_score_communicator, &p_status);
@@ -316,6 +323,9 @@ namespace gempba {
             // Here, we have a task to process  -----------------------------------------------------------------------------
             notify_running_state();
             m_received_tasks++;
+            m_total_requests_number++;
+            m_stats.m_received_task_count++;
+            m_stats.m_total_requested_tasks++;
 
             utils::print_ipc_debug_comments("rank {}, pushing buffer to thread pool", m_world_rank, p_status.MPI_SOURCE);
 
@@ -510,6 +520,7 @@ namespace gempba {
             receive_solution();
 
             m_end_time = MPI_Wtime();
+            m_stats.m_elapsed_time = m_end_time - m_start_time - static_cast<double>(m_timeout);
         }
 
     private:
@@ -587,6 +598,7 @@ namespace gempba {
             m_process_state[p_status.MPI_SOURCE] = RUNNING_STATE; // node was assigned, now it's running
             m_nodes_running++;
             m_total_requests_number++;
+            m_stats.m_total_requested_tasks++;
         }
 
         void process_available(const MPI_Status &p_status) {
@@ -595,6 +607,7 @@ namespace gempba {
             m_nodes_available++;
             m_nodes_running--;
             m_total_requests_number++;
+            m_stats.m_total_requested_tasks++;
         }
 
         /**
@@ -638,6 +651,7 @@ namespace gempba {
             }
 
             m_total_requests_number++;
+            m_stats.m_total_requested_tasks++;
 
 
             if (m_center_queue.size() > 2 * CENTER_NBSTORED_TASKS_PER_PROCESS * m_world_size) {

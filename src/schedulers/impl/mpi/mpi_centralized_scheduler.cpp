@@ -2,6 +2,12 @@
 #include <schedulers/impl/mpi/mpi_centralized_scheduler.hpp>
 
 namespace gempba {
+    void mpi_centralized_scheduler::collect_stats_data(const branch_handler &p_branch_handler) {
+        m_idle_time = p_branch_handler.get_pool_idle_time();
+        m_stats.m_idle_time = p_branch_handler.get_pool_idle_time();
+        m_stats.m_total_thread_requests = p_branch_handler.number_thread_requests();
+    }
+
     void mpi_centralized_scheduler::task_funneling(branch_handler &p_branch_handler) {
         task_packet *v_packet = nullptr;
         bool v_is_pop = m_tasks_queue.pop(v_packet);
@@ -13,6 +19,10 @@ namespace gempba {
                 std::scoped_lock v_lock(m_mutex);
                 std::unique_ptr<task_packet> v_unique_pointer(v_packet);
                 m_sent_tasks++;
+                m_total_requests_number++;
+                m_stats.m_sent_task_count++;
+                m_stats.m_total_requested_tasks++;
+
 
                 send_task_to_center(*v_packet);
 
