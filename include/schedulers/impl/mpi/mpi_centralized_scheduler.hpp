@@ -104,6 +104,48 @@ namespace gempba {
             return std::make_unique<default_mpi_stats>(m_stats);
         }
 
+        [[nodiscard]] std::vector<std::unique_ptr<stats> > get_stats_vector() const override {
+            std::vector<std::unique_ptr<stats> > v_stats_vector;
+            for (const auto &v_stats: m_stats_vector) {
+                v_stats_vector.emplace_back(std::make_unique<default_mpi_stats>(v_stats));
+            }
+            return v_stats_vector;
+        }
+
+        void synchronize_stats() override {
+            barrier();
+            constexpr int v_dummy_tag = 999;
+            if (m_world_rank == 0) {
+                m_stats_vector.push_back(m_stats);
+                for (int v_src_rank = 1; v_src_rank < m_world_size; ++v_src_rank) {
+                    MPI_Status v_status;
+                    const int v_probe_err = MPI_Probe(v_src_rank, v_dummy_tag, m_world_communicator, &v_status);
+                    if (v_probe_err != MPI_SUCCESS) {
+                        spdlog::error("rank {} failed to probe message from rank {}\n", m_world_rank, v_src_rank);
+                        continue;
+                    }
+
+                    int v_count{};
+                    MPI_Get_count(&v_status, MPI_BYTE, &v_count);
+                    task_packet v_rank_packet(v_count);
+                    const int v_recv_err = MPI_Recv(v_rank_packet.data(), v_count, MPI_BYTE, v_src_rank, v_dummy_tag, m_world_communicator, &v_status);
+                    if (v_recv_err != MPI_SUCCESS) {
+                        spdlog::error("rank {} failed to receive stats from rank {}\n", m_world_rank, v_src_rank);
+                        continue;
+                    }
+                    default_mpi_stats v_rank_stats = default_mpi_stats::from_packet(v_rank_packet);
+                    m_stats_vector.push_back(std::move(v_rank_stats));
+                }
+            } else {
+                auto v_bytes = m_stats.serialize();
+                const int v_err = MPI_Ssend(v_bytes.data(), static_cast<int>(v_bytes.size()), MPI_BYTE, CENTER_NODE, v_dummy_tag, m_world_communicator);
+                if (v_err != MPI_SUCCESS) {
+                    spdlog::error("rank {} failed to send stats to rank 0\n", m_world_rank);
+                }
+            }
+            barrier();
+        }
+
         void print_stats() override {
             spdlog::debug("\n \n \n");
             spdlog::debug("*****************************************************\n");
@@ -815,6 +857,7 @@ namespace gempba {
 
         const double m_timeout; // seconds
         default_mpi_stats m_stats{-1};
+        std::vector<default_mpi_stats> m_stats_vector;
 
         /* singleton*/
         explicit mpi_centralized_scheduler(const double p_timeout) :
@@ -825,6 +868,7 @@ namespace gempba {
             init_mpi();
             init_member_variables();
             m_stats = default_mpi_stats(m_world_rank);
+            m_stats_vector.reserve(m_world_size);
 
             spdlog::info("MPI Scheduler, instantiated!\n");
         }

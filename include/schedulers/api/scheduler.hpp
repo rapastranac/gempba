@@ -71,6 +71,21 @@ namespace gempba {
          */
         [[nodiscard]] virtual std::unique_ptr<stats> get_stats() const = 0;
 
+        /**
+         * Get the statistics of all processes as a vector of unique pointers. This is useful for gathering stats from all processes.
+         *
+         * @attention this method should be called only after synchronize_stats() to ensure that the stats are up-to-date, and should be called only by the root process (rank 0).
+         * @return A vector of unique pointers to the stats objects of all processes.
+         */
+        [[nodiscard]] virtual std::vector<std::unique_ptr<stats> > get_stats_vector() const = 0;
+
+        /**
+         * Synchronize the statistics across all processes. This method should be called to ensure that the stats are up-to-date.
+         *
+         * @attention This function should be called by all processes.
+         */
+        virtual void synchronize_stats() = 0;
+
     };
 }
 
