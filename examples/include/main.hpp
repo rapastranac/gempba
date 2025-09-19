@@ -115,10 +115,10 @@ std::string create_directory(std::string root, std::string folder, T... dir) {
 }
 
 inline void print_to_summary_file(const int p_job_id, const int p_nodes, const int p_ntasks_per_node, const int p_ntasks_per_socket, const int p_cpus_per_task,
-                                  const std::string &p_filename_directory, const gempba::scheduler &p_mpi_scheduler, const int p_gsize,
+                                  const std::string &p_filename_directory, const double p_elapsed_time, const int p_gsize,
                                   const int p_world_size, const std::vector<size_t> &p_total_thread_requests, const std::vector<size_t> &p_received_tasks,
                                   const std::vector<size_t> &p_sent_tasks, const int p_sol_size, const double p_global_cpu_idle_time,
-                                  const size_t p_global_thread_request) {
+                                  const size_t p_global_thread_request, const size_t p_total_requests_at_center) {
     const std::string v_file_name = p_filename_directory.substr(p_filename_directory.find_last_of("/\\") + 1);
     const std::string v_target_dir = create_directory("results", std::to_string(p_gsize), std::to_string(p_nodes));
 
@@ -131,9 +131,9 @@ inline void print_to_summary_file(const int p_job_id, const int p_nodes, const i
     v_target_file << "cpus-per-task:\t" << p_cpus_per_task << std::endl;
     v_target_file << "graph size:\t\t" << p_gsize << std::endl;
     v_target_file << "cover size:\t\t" << p_sol_size << std::endl;
-    v_target_file << "process requests:\t\t" << p_mpi_scheduler.get_total_requests() << std::endl;
+    v_target_file << "process requests (rank 0):\t\t" << p_total_requests_at_center << std::endl;
     v_target_file << "thread requests:\t\t" << p_global_thread_request << std::endl;
-    v_target_file << "elapsed time:\t\t" << p_mpi_scheduler.elapsed_time() << std::endl;
+    v_target_file << "elapsed time:\t\t" << p_elapsed_time << std::endl;
     v_target_file << "cpu idle time (global):\t" << p_global_cpu_idle_time << std::endl;
     v_target_file << "wall idle time (global):\t" << p_global_cpu_idle_time / (p_world_size - 1) << std::endl;
 

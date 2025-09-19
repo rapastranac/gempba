@@ -132,6 +132,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
 
         double v_global_cpu_idle_time = 0;
         size_t v_global_thread_request = 0;
+        size_t v_total_requests_at_center = v_total_requests[0];
         for (int v_rank = 0; v_rank < v_world_size; ++v_rank) {
             spdlog::info("rank {}", v_rank);
             spdlog::info("  received_task_count: {}", v_received_tasks[v_rank]);
@@ -147,8 +148,9 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
 
         // print stats to a file ***********
         print_to_summary_file(job_id, nodes, ntasks_per_node, ntasks_per_socket, threads_per_task, filename_directory,
-                              mpiScheduler, gsize, v_world_size, v_total_thread_requests, v_received_tasks,
-                              v_sent_tasks, v_solution_size, v_global_cpu_idle_time, v_global_thread_request);
+                              mpiScheduler.elapsed_time(), gsize, v_world_size, v_total_thread_requests, v_received_tasks,
+                              v_sent_tasks, v_solution_size, v_global_cpu_idle_time, v_global_thread_request,
+                              v_total_requests_at_center);
         // **************************************************************************
     }
     return 0;
