@@ -146,15 +146,6 @@ namespace gempba {
             barrier();
         }
 
-        void print_stats() override {
-            spdlog::debug("\n \n \n");
-            spdlog::debug("*****************************************************\n");
-            spdlog::debug("Elapsed time : {:4.3f} \n", elapsed_time());
-            spdlog::debug("Total number of requests : {} \n", m_total_requests_number);
-            spdlog::debug("*****************************************************\n");
-            spdlog::debug("\n \n \n");
-        }
-
         [[nodiscard]] double elapsed_time() const override {
             return (m_end_time - m_start_time) - static_cast<double>(m_timeout);
         }
@@ -163,25 +154,8 @@ namespace gempba {
             return 0;
         }
 
-        void allgather(void *p_recvbuf, void *p_sendbuf, MPI_Datatype p_mpi_datatype) override {
-            MPI_Allgather(p_sendbuf, 1, p_mpi_datatype, p_recvbuf, 1, p_mpi_datatype, m_world_communicator);
-            MPI_Barrier(m_world_communicator);
-        }
-
-        void gather(void *p_sendbuf, int p_sendcount, MPI_Datatype p_sendtype, void *p_recvbuf, int p_recvcount, MPI_Datatype p_recvtype, int p_root) override {
-            MPI_Gather(p_sendbuf, p_sendcount, p_sendtype, p_recvbuf, p_recvcount, p_recvtype, p_root, m_world_communicator);
-        }
-
         [[nodiscard]] int get_world_size() const override {
             return m_world_size;
-        }
-
-        [[nodiscard]] int tasks_recvd() const override {
-            return m_received_tasks;
-        }
-
-        [[nodiscard]] int tasks_sent() const override {
-            return m_sent_tasks;
         }
 
         void barrier() override {

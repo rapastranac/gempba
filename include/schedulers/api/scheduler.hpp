@@ -29,19 +29,9 @@ namespace gempba {
 
         virtual std::vector<result> fetch_result_vector() = 0;
 
-        virtual void print_stats() = 0;
-
         [[nodiscard]] virtual double elapsed_time() const = 0;
 
-        virtual void allgather(void *p_recvbuf, void *p_sendbuf, MPI_Datatype p_mpi_datatype) = 0;
-
-        virtual void gather(void *p_sendbuf, int p_sendcount, MPI_Datatype p_sendtype, void *p_recvbuf, int p_recvcount, MPI_Datatype p_recvtype, int p_root) = 0;
-
         [[nodiscard]] virtual int get_world_size() const = 0;
-
-        [[nodiscard]] virtual int tasks_recvd() const = 0;
-
-        [[nodiscard]] virtual int tasks_sent() const = 0;
 
         virtual void barrier() = 0;
 
