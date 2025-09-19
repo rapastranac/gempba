@@ -63,10 +63,6 @@ namespace gempba {
             return m_world_rank;
         }
 
-        [[nodiscard]] size_t get_total_requests() const override {
-            return m_total_requests_number;
-        }
-
         void set_custom_initial_topology(tree &&p_tree) override {
             m_process_tree = std::move(p_tree);
             m_custom_initial_topology = true;

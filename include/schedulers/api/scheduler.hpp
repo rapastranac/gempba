@@ -50,8 +50,6 @@ namespace gempba {
 
         virtual void run_center(task_packet &p_seed) = 0;
 
-        [[nodiscard]] virtual size_t get_total_requests() const = 0;
-
         virtual void set_custom_initial_topology(tree &&p_tree) = 0;
 
         /**
