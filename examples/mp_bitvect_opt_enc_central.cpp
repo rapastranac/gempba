@@ -1,15 +1,16 @@
-#include "include/mp_bitvec_opt_enc.hpp"
-#include "schedulers/impl/mpi/mpi_centralized_scheduler.hpp"
-#include "include/main.hpp"
-
 #include <filesystem>
 #include <iostream>
 #include <istream>
 #include <sstream>
 #include <string>
-#include <spdlog/spdlog.h>
-#include <vector>
 #include <unistd.h>
+#include <vector>
+#include <spdlog/spdlog.h>
+
+#include <schedulers/impl/mpi/default_mpi_stats_visitor.hpp>
+#include <schedulers/impl/mpi/mpi_centralized_scheduler.hpp>
+#include "include/main.hpp"
+#include "include/mp_bitvec_opt_enc.hpp"
 
 using namespace std::placeholders;
 
@@ -88,84 +89,65 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
     }
     mpiScheduler.barrier();
     // *****************************************************************************************
-    // this is a generic way of getting information from all the other processes after execution retuns
-    auto world_size = mpiScheduler.get_world_size();
-    std::vector<double> idleTime(world_size);
-    std::vector<size_t> threadRequests(world_size);
-    std::vector<int> nTasksRecvd(world_size);
-    std::vector<int> nTasksSent(world_size);
 
-    double idl_tm = 0;
-    size_t rqst = 0;
-    int taskRecvd;
-    int taskSent;
+    auto v_world_size = mpiScheduler.get_world_size();
 
-    if (rank != 0) {
-        // rank 0 does not run the main function
-        idl_tm = branchHandler.get_pool_idle_time();
-        rqst = branchHandler.number_thread_requests();
-
-        taskRecvd = mpiScheduler.tasks_recvd();
-        taskSent = mpiScheduler.tasks_sent();
-    }
-
-    // here below, idl_tm is the idle time of the other ranks, which is gathered by .allgather() and stored in
-    // a contiguos array
-    mpiScheduler.allgather(idleTime.data(), &idl_tm, MPI_DOUBLE);
-    mpiScheduler.allgather(threadRequests.data(), &rqst, MPI_UNSIGNED_LONG_LONG);
-
-    mpiScheduler.gather(&taskRecvd, 1, MPI_INT, nTasksRecvd.data(), 1, MPI_INT, 0);
-    mpiScheduler.gather(&taskSent, 1, MPI_INT, nTasksSent.data(), 1, MPI_INT, 0);
-
-    // *****************************************************************************************
+    // Synchronize stats across all processes
+    mpiScheduler.synchronize_stats();
 
     if (rank == 0) {
-        std::vector<gempba::result> solutions = mpiScheduler.fetch_result_vector();
+        // Retrieve solution
+        gempba::task_packet v_packet = mpiScheduler.fetch_solution();
+        std::stringstream v_ss;
+        v_ss.write(reinterpret_cast<const char *>(v_packet.data()), static_cast<int>(v_packet.size()));
 
-        mpiScheduler.print_stats();
-
-        // print sumation of refValGlobal
-        int solsize;
-        std::stringstream ss;
-        gempba::task_packet packet = mpiScheduler.fetch_solution(); // returns a std::stringstream
-
-        ss.write(reinterpret_cast<const char *>(packet.data()), static_cast<int>(packet.size()));
-
-        deserializer(ss, solsize);
-        spdlog::debug("Cover size : {} \n", solsize);
-
-        double global_cpu_idle_time = 0;
-        for (int i = 1; i < world_size; i++) {
-            global_cpu_idle_time += idleTime[i];
-        }
-        spdlog::debug("\nGlobal cpu idle time: {0:.6f} seconds\n\n\n", global_cpu_idle_time);
-
-        // **************************************************************************
-
-        for (int rank = 1; rank < world_size; rank++) {
-            spdlog::debug("tasks sent by rank {} = {} \n", rank, nTasksSent[rank]);
-        }
-        spdlog::debug("\n");
-
-        for (int rank = 1; rank < world_size; rank++) {
-            spdlog::debug("tasks received by rank {} = {} \n", rank, nTasksRecvd[rank]);
-        }
-        spdlog::debug("\n");
-        size_t totalThreadRequests = 0;
-        for (int rank = 1; rank < world_size; rank++) {
-            size_t rank_thread_requests = threadRequests[rank];
-            totalThreadRequests += rank_thread_requests;
-
-            spdlog::debug("rank {}, thread requests: {} \n", rank, rank_thread_requests);
-        }
-
+        int v_solution_size;
+        deserializer(v_ss, v_solution_size);
+        spdlog::debug("Cover size : {} \n", v_solution_size);
         spdlog::debug("\n\n\n");
 
+        // Collect and print stats to console ***********
+        std::vector<std::unique_ptr<gempba::stats> > v_stats_vector = mpiScheduler.get_stats_vector();
+        std::vector<std::size_t> v_received_tasks(v_world_size);
+        std::vector<std::size_t> v_sent_tasks(v_world_size);
+        std::vector<std::size_t> v_total_requests(v_world_size);
+        std::vector<std::size_t> v_total_thread_requests(v_world_size);
+        std::vector<double> v_idle_times(v_world_size);
+        std::vector<double> v_elapsed_times(v_world_size);
+
+        for (int v_rank = 0; v_rank < v_stats_vector.size(); ++v_rank) {
+            std::unique_ptr<gempba::stats> &v_stats = v_stats_vector[v_rank];
+
+            std::unique_ptr<gempba::default_mpi_stats_visitor> v_visitor = gempba::create_default_mpi_stats_visitor();
+            v_stats->visit(v_visitor.get());
+
+            v_received_tasks[v_rank] = v_visitor->m_received_task_count;
+            v_sent_tasks[v_rank] = v_visitor->m_sent_task_count;
+            v_total_requests[v_rank] = v_visitor->m_total_requested_tasks;
+            v_total_thread_requests[v_rank] = v_visitor->m_total_thread_requests;
+            v_idle_times[v_rank] = v_visitor->m_idle_time;
+            v_elapsed_times[v_rank] = v_visitor->m_elapsed_time;
+        }
+
+        double v_global_cpu_idle_time = 0;
+        size_t v_global_thread_request = 0;
+        for (int v_rank = 0; v_rank < v_world_size; ++v_rank) {
+            spdlog::info("rank {}", v_rank);
+            spdlog::info("  received_task_count: {}", v_received_tasks[v_rank]);
+            spdlog::info("  sent_task_count: {}", v_sent_tasks[v_rank]);
+            spdlog::info("  total_requested_tasks: {}", v_total_requests[v_rank]);
+            spdlog::info("  total_thread_requests: {}", v_total_thread_requests[v_rank]);
+            spdlog::info("  idle_time: {}", v_idle_times[v_rank]);
+            spdlog::info("  elapsed_time: {}", v_elapsed_times[v_rank]);
+
+            v_global_cpu_idle_time += v_idle_times[v_rank];
+            v_global_thread_request += v_total_thread_requests[v_rank];
+        }
+
         // print stats to a file ***********
-        printToSummaryFile(job_id, nodes, ntasks_per_node, ntasks_per_socket, threads_per_task, filename_directory,
-                           mpiScheduler, gsize,
-                           world_size, threadRequests, nTasksRecvd, nTasksSent, solsize, global_cpu_idle_time,
-                           totalThreadRequests);
+        print_to_summary_file(job_id, nodes, ntasks_per_node, ntasks_per_socket, threads_per_task, filename_directory,
+                              mpiScheduler, gsize, v_world_size, v_total_thread_requests, v_received_tasks,
+                              v_sent_tasks, v_solution_size, v_global_cpu_idle_time, v_global_thread_request);
         // **************************************************************************
     }
     return 0;

@@ -23,7 +23,7 @@ struct Params {
     std::string filename;
 };
 
-Params parse(int argc, char *argv[]) {
+inline Params parse(int argc, char *argv[]) {
 
     argparse::ArgumentParser program("main");
 
@@ -92,14 +92,14 @@ Params parse(int argc, char *argv[]) {
     return Params{job_id, nodes, ntasks_per_node, ntasks_per_socket, cpus_per_task, prob, filename};
 }
 
-std::string create_directory(std::string root) {
+inline std::string create_directory(std::string root) {
     if (!fs::is_directory(root) || !fs::exists(root)) {
         fs::create_directory(root);
     }
     return root;
 }
 
-std::string create_directory(std::string root, std::string folder) {
+inline std::string create_directory(std::string root, std::string folder) {
     if (!fs::is_directory(root) || !fs::exists(root)) {
         fs::create_directory(root);
     }
@@ -114,45 +114,45 @@ std::string create_directory(std::string root, std::string folder, T... dir) {
     return create_directory(root + "/" + folder, dir...);
 }
 
-void printToSummaryFile(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int cpus_per_task,
-                        const std::string &filename_directory, gempba::scheduler &mpiScheduler, int gsize,
-                        int world_size, const std::vector<size_t> &threadRequests, const std::vector<int> &nTasksRecvd,
-                        const std::vector<int> &nTasksSent, int solSize, double global_cpu_idle_time,
-                        size_t totalThreadRequests) {
-    std::string file_name = filename_directory.substr(filename_directory.find_last_of("/\\") + 1);
-    const std::string targetDir = create_directory("results", std::to_string(gsize), std::to_string(nodes));
+inline void print_to_summary_file(const int p_job_id, const int p_nodes, const int p_ntasks_per_node, const int p_ntasks_per_socket, const int p_cpus_per_task,
+                                  const std::string &p_filename_directory, const gempba::scheduler &p_mpi_scheduler, const int p_gsize,
+                                  const int p_world_size, const std::vector<size_t> &p_total_thread_requests, const std::vector<size_t> &p_received_tasks,
+                                  const std::vector<size_t> &p_sent_tasks, const int p_sol_size, const double p_global_cpu_idle_time,
+                                  const size_t p_global_thread_request) {
+    const std::string v_file_name = p_filename_directory.substr(p_filename_directory.find_last_of("/\\") + 1);
+    const std::string v_target_dir = create_directory("results", std::to_string(p_gsize), std::to_string(p_nodes));
 
-    ofstream myfile;
-    myfile.open(targetDir + file_name);
-    myfile << "job id:\t" << job_id << std::endl;
-    myfile << "nodes:\t" << nodes << std::endl;
-    myfile << "ntasks-per-node:\t" << ntasks_per_node << std::endl;
-    myfile << "ntasks-per-socket:\t" << ntasks_per_socket << std::endl;
-    myfile << "cpus-per-task:\t" << cpus_per_task << std::endl;
-    myfile << "graph size:\t\t" << gsize << std::endl;
-    myfile << "cover size:\t\t" << solSize << std::endl;
-    myfile << "process requests:\t\t" << mpiScheduler.get_total_requests() << std::endl;
-    myfile << "thread requests:\t\t" << totalThreadRequests << std::endl;
-    myfile << "elapsed time:\t\t" << mpiScheduler.elapsed_time() << std::endl;
-    myfile << "cpu idle time (global):\t" << global_cpu_idle_time << std::endl;
-    myfile << "wall idle time (global):\t" << global_cpu_idle_time / (world_size - 1) << std::endl;
+    ofstream v_target_file;
+    v_target_file.open(v_target_dir + v_file_name);
+    v_target_file << "job id:\t" << p_job_id << std::endl;
+    v_target_file << "nodes:\t" << p_nodes << std::endl;
+    v_target_file << "ntasks-per-node:\t" << p_ntasks_per_node << std::endl;
+    v_target_file << "ntasks-per-socket:\t" << p_ntasks_per_socket << std::endl;
+    v_target_file << "cpus-per-task:\t" << p_cpus_per_task << std::endl;
+    v_target_file << "graph size:\t\t" << p_gsize << std::endl;
+    v_target_file << "cover size:\t\t" << p_sol_size << std::endl;
+    v_target_file << "process requests:\t\t" << p_mpi_scheduler.get_total_requests() << std::endl;
+    v_target_file << "thread requests:\t\t" << p_global_thread_request << std::endl;
+    v_target_file << "elapsed time:\t\t" << p_mpi_scheduler.elapsed_time() << std::endl;
+    v_target_file << "cpu idle time (global):\t" << p_global_cpu_idle_time << std::endl;
+    v_target_file << "wall idle time (global):\t" << p_global_cpu_idle_time / (p_world_size - 1) << std::endl;
 
-    myfile << std::endl;
+    v_target_file << std::endl;
 
-    for (int rank = 1; rank < world_size; rank++) {
-        myfile << "tasks sent by rank " << rank << ":\t" << nTasksSent[rank] << std::endl;
+    for (int v_rank = 1; v_rank < p_world_size; v_rank++) {
+        v_target_file << "tasks received by rank " << v_rank << ":\t" << p_received_tasks[v_rank] << std::endl;
     }
-    myfile << std::endl;
+    v_target_file << std::endl;
 
-    for (int rank = 1; rank < world_size; rank++) {
-        myfile << "tasks received by rank " << rank << ":\t" << nTasksRecvd[rank] << std::endl;
+    for (int v_rank = 1; v_rank < p_world_size; v_rank++) {
+        v_target_file << "tasks sent by rank " << v_rank << ":\t" << p_sent_tasks[v_rank] << std::endl;
     }
-    myfile << std::endl;
+    v_target_file << std::endl;
 
-    for (int rank = 1; rank < world_size; rank++) {
-        myfile << "rank " << rank << ", thread requests:\t" << threadRequests[rank] << std::endl;
+    for (int v_rank = 1; v_rank < p_world_size; v_rank++) {
+        v_target_file << "rank " << v_rank << ", thread requests:\t" << p_total_thread_requests[v_rank] << std::endl;
     }
-    myfile.close();
+    v_target_file.close();
 }
 
 #endif //GEMPBA_MAIN_HPP
