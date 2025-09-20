@@ -1,6 +1,8 @@
 #ifndef NONVOIDINTERMEDIATE_HPP
 #define NONVOIDINTERMEDIATE_HPP
 
+#include <mpi.h>
+
 /*
  * Created by Andres Pastrana on 2019
  * pasr1602@usherbrooke.ca

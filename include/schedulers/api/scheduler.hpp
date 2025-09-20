@@ -3,7 +3,6 @@
 
 #include <functional>
 #include <memory>
-#include <mpi.h>
 #include <schedulers/api/stats.hpp>
 #include <utils/gempba_utils.hpp>
 #include <utils/tree.hpp>
