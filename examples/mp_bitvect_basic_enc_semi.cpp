@@ -91,7 +91,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
     mpiScheduler.barrier();
     // *****************************************************************************************
 
-    auto v_world_size = mpiScheduler.get_world_size();
+    auto v_world_size = mpiScheduler.world_size();
 
     // Synchronize stats across all processes
     mpiScheduler.synchronize_stats();

@@ -150,7 +150,7 @@ namespace gempba {
             return 0;
         }
 
-        [[nodiscard]] int get_world_size() const override {
+        [[nodiscard]] int world_size() const override {
             return m_world_size;
         }
 

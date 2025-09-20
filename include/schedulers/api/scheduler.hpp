@@ -3,7 +3,7 @@
 
 #include <functional>
 #include <memory>
-#include <schedulers/api/stats.hpp>
+#include <schedulers/api/scheduler_traits.hpp>
 #include <utils/gempba_utils.hpp>
 #include <utils/tree.hpp>
 #include <utils/ipc/result.hpp>
@@ -16,23 +16,17 @@ namespace gempba {
 
     class branch_handler;
 
-    class scheduler {
+    class scheduler : public scheduler_traits {
     public:
         scheduler() = default;
 
-        virtual ~scheduler() = default;
-
-        [[nodiscard]] virtual int rank_me() const = 0;
+        ~scheduler() override = default;
 
         virtual task_packet fetch_solution() = 0;
 
         virtual std::vector<result> fetch_result_vector() = 0;
 
         [[nodiscard]] virtual double elapsed_time() const = 0;
-
-        [[nodiscard]] virtual int get_world_size() const = 0;
-
-        virtual void barrier() = 0;
 
         virtual bool try_open_transmission_channel() = 0;
 
@@ -50,13 +44,6 @@ namespace gempba {
         virtual void run_center(task_packet &p_seed) = 0;
 
         virtual void set_custom_initial_topology(tree &&p_tree) = 0;
-
-        /**
-         * Get the statistics of the scheduler at the current process as a unique pointer.
-         *
-         * @return A unique pointer to the stats object.
-         */
-        [[nodiscard]] virtual std::unique_ptr<stats> get_stats() const = 0;
 
         /**
          * Get the statistics of all processes as a vector of unique pointers. This is useful for gathering stats from all processes.
