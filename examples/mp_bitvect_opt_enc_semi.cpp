@@ -154,7 +154,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
 
         // print stats to a file ***********
         print_to_summary_file(job_id, nodes, ntasks_per_node, ntasks_per_socket, threads_per_task, filename_directory,
-                              mpiScheduler.elapsed_time(), gsize, v_world_size, v_total_thread_requests, v_received_tasks,
+                              v_elapsed_times[0], gsize, v_world_size, v_total_thread_requests, v_received_tasks,
                               v_sent_tasks, v_solution_size, v_global_cpu_idle_time, v_global_thread_request,
                               v_total_requests_at_center);
         // **************************************************************************
