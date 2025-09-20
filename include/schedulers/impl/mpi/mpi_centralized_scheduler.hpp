@@ -928,6 +928,16 @@ namespace gempba {
             return new_max_is_better || new_min_is_better;
         }
 
+    public:
+        // ————————— ↓↓↓↓  New development ↓↓↓↓ ——————————
+        center &center_view() override {
+            throw std::runtime_error("Not implemented yet");
+        }
+
+        worker &worker_view() override {
+            throw std::runtime_error("Not implemented yet");
+        }
+
     };
 
 }

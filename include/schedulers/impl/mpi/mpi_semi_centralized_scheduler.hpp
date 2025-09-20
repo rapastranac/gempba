@@ -902,6 +902,16 @@ namespace gempba {
             const bool new_min_is_better = p_goal == MINIMISE && p_new_value < p_old_value;
             return new_max_is_better || new_min_is_better;
         }
+
+    public:
+        // ————————— ↓↓↓↓  New development ↓↓↓↓ ——————————
+        center &center_view() override {
+            throw std::runtime_error("Not implemented yet");
+        }
+
+        worker &worker_view() override {
+            throw std::runtime_error("Not implemented yet");
+        }
     };
 
 }
