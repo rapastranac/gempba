@@ -146,7 +146,8 @@ namespace gempba {
             }
         }
 
-        bool try_open_transmission_channel() override {
+    private:
+        bool try_open_transmission_channel() {
             // acquires mutex
             if (m_mutex.try_lock()) {
                 // check if transmission in progress
@@ -163,10 +164,11 @@ namespace gempba {
         }
 
         /* this should be invoked only if channel is open*/
-        void close_transmission_channel() override {
+        void close_transmission_channel() {
             m_mutex.unlock();
         }
 
+    public:
         void set_goal(const goal p_goal, const score_type p_type) override {
             this->m_goal = p_goal;
             this->m_global_score = utils::get_default_score(p_goal, p_type);

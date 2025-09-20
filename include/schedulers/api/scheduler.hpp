@@ -28,10 +28,6 @@ namespace gempba {
 
         [[nodiscard]] virtual double elapsed_time() const = 0;
 
-        virtual bool try_open_transmission_channel() = 0;
-
-        virtual void close_transmission_channel() = 0;
-
         [[nodiscard]] virtual int next_process() const = 0;
 
         virtual void set_goal(goal p_goal, score_type p_type) = 0;
