@@ -68,7 +68,8 @@ namespace gempba {
             m_custom_initial_topology = true;
         }
 
-        task_packet fetch_solution() override {
+    private:
+        task_packet fetch_solution() {
             for (int v_rank = 1; v_rank < m_world_size; v_rank++) {
                 if (m_best_results[v_rank].get_score() == m_global_score) {
                     return m_best_results[v_rank].get_task_packet();
@@ -77,10 +78,11 @@ namespace gempba {
             return task_packet::EMPTY; // no solution found
         }
 
-        std::vector<result> fetch_result_vector() override {
+        std::vector<result> fetch_result_vector() {
             return m_best_results;
         }
 
+    public:
         [[nodiscard]] std::unique_ptr<stats> get_stats() const override {
             return std::make_unique<default_mpi_stats>(m_stats);
         }

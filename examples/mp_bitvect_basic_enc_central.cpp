@@ -102,7 +102,8 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
 
     if (rank == 0) {
         // Retrieve solution
-        gempba::task_packet v_packet = mpiScheduler.fetch_solution();
+        auto && v_center_view = mpiScheduler.center_view();
+        gempba::task_packet v_packet = v_center_view.get_result();
         std::stringstream v_ss;
         v_ss.write(reinterpret_cast<const char *>(v_packet.data()), static_cast<int>(v_packet.size()));
 

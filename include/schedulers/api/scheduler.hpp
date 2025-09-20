@@ -22,10 +22,6 @@ namespace gempba {
 
         ~scheduler() override = default;
 
-        virtual task_packet fetch_solution() = 0;
-
-        virtual std::vector<result> fetch_result_vector() = 0;
-
         [[nodiscard]] virtual double elapsed_time() const = 0;
 
         virtual void set_goal(goal p_goal, score_type p_type) = 0;
