@@ -68,6 +68,10 @@ namespace gempba {
             m_processor_count = std::thread::hardware_concurrency();
             m_idle_time = 0;
             m_thread_requests = 0;
+            if (m_scheduler) {
+                m_world_rank = m_scheduler->rank_me();
+                m_world_size = m_scheduler->world_size();
+            }
         }
 
         // Singleton instance
