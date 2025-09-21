@@ -928,14 +928,113 @@ namespace gempba {
             return new_max_is_better || new_min_is_better;
         }
 
+
+        class center_view final : public center {
+
+            mpi_centralized_scheduler &m_parent;
+
+        public:
+            explicit center_view(mpi_centralized_scheduler &p_parent) :
+                m_parent(p_parent) {
+            }
+
+            ~center_view() override = default;
+
+            void barrier() override {
+                m_parent.barrier();
+            }
+
+            [[nodiscard]] int rank_me() const override {
+                return m_parent.rank_me();
+            }
+
+            [[nodiscard]] int world_size() const override {
+                return m_parent.world_size();
+            }
+
+            [[nodiscard]] std::unique_ptr<stats> get_stats() const override {
+                return m_parent.get_stats();
+            }
+
+            void run(task_packet p_task) override {
+                m_parent.run_center(p_task);
+            }
+
+            task_packet get_result() override {
+                return m_parent.fetch_solution();
+            }
+
+            std::vector<result> get_all_results() override {
+                return m_parent.fetch_result_vector();
+            }
+        };
+
+        class worker_view final : public worker {
+            mpi_centralized_scheduler &m_parent;
+
+        public:
+            explicit worker_view(mpi_centralized_scheduler &p_parent) :
+                m_parent(p_parent) {
+            }
+
+            ~worker_view() override = default;
+
+            void barrier() override {
+                m_parent.barrier();
+            }
+
+            [[nodiscard]] int rank_me() const override {
+                return m_parent.rank_me();
+            }
+
+            [[nodiscard]] int world_size() const override {
+                return m_parent.world_size();
+            }
+
+            [[nodiscard]] std::unique_ptr<stats> get_stats() const override {
+                return m_parent.get_stats();
+            }
+
+            void run(branch_handler &p_branch_handler, std::function<std::shared_ptr<result_holder_parent>(task_packet)> &p_buffer_decoder,
+                     std::function<result()> &p_result_fetcher) override {
+                m_parent.run_node(p_branch_handler, p_buffer_decoder, p_result_fetcher);
+            }
+
+            void push(task_packet &&p_task) override {
+                m_parent.push(std::move(p_task));
+            }
+
+            [[nodiscard]] unsigned int next_process() const override {
+                return m_parent.next_process();
+            }
+
+            bool try_open_transmission_channel() override {
+                return m_parent.try_open_transmission_channel();
+            }
+
+            void close_transmission_channel() override {
+                m_parent.close_transmission_channel();
+            }
+        };
+
+        // scheduler views
+        center_view m_center_view{*this};
+        worker_view m_worker_view{*this};
+
     public:
         // ————————— ↓↓↓↓  New development ↓↓↓↓ ——————————
         center &center_view() override {
-            throw std::runtime_error("Not implemented yet");
+            if (m_world_rank != 0) {
+                spdlog::throw_spdlog_ex("Only rank 0 can access center_view()");
+            }
+            return m_center_view;
         }
 
         worker &worker_view() override {
-            throw std::runtime_error("Not implemented yet");
+            if (m_world_rank == 0) {
+                spdlog::throw_spdlog_ex("Rank 0 cannot access worker_view()");
+            }
+            return m_worker_view;
         }
 
     };
