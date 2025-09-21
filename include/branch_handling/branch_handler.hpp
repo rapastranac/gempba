@@ -495,7 +495,6 @@ namespace gempba {
                     } else {
                         v_upper_holder->setDiscard();
                         // WARNING, ATTENTION, CUIDADO! holder discarded, flagged as sent but not really sent, then sendingChannel should be released!!!!
-                        m_scheduler->close_transmission_channel();
                     }
                     return true; // top holder found whether discarded or pushed
                 }
@@ -529,9 +528,9 @@ namespace gempba {
                 if (!v_lock.try_lock()) {
                     return false;
                 }
-                bool v_transmission_channel_open = m_scheduler->try_open_transmission_channel();
+                const std::optional<transmission_guard> v_opt = m_scheduler->try_open_transmission_channel();
                 // if mutex acquired, other threads will jump this section
-                if (!v_transmission_channel_open) {
+                if (!v_opt) {
                     return false;
                 }
 

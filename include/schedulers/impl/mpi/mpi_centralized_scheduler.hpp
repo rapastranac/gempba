@@ -165,27 +165,21 @@ namespace gempba {
         }
 
     private:
-        bool try_open_transmission_channel() {
+        std::optional<transmission_guard> try_open_transmission_channel() {
+            std::unique_lock v_lock(m_mutex, std::try_to_lock);
             // acquires mutex
-            if (!m_mutex.try_lock()) {
-                return false;
+            if (!v_lock.owns_lock()) {
+                return std::nullopt;
             }
             // check if transmission in progress
             if (m_transmitting.load()) {
-                m_mutex.unlock();
-                return false;
+                return std::nullopt;
             }
             // check if center is actually waiting for a task
             if (!m_is_center_full) {
-                return true; // priority acquired "mutex is meant to be released in close_transmission_channel() "
+                return transmission_guard(std::move(v_lock));
             }
-            m_mutex.unlock();
-            return false;
-        }
-
-        /* this should be invoked only if channel is open*/
-        void close_transmission_channel() {
-            m_mutex.unlock();
+            return std::nullopt;
         }
 
     public:
@@ -265,8 +259,6 @@ namespace gempba {
             }
 
             m_tasks_queue.push(v_message);
-
-            close_transmission_channel();
         }
 
         MPI_Status probe_communicators_at_worker() {
@@ -1014,12 +1006,8 @@ namespace gempba {
                 return m_parent.next_process();
             }
 
-            bool try_open_transmission_channel() override {
+            std::optional<transmission_guard> try_open_transmission_channel() override {
                 return m_parent.try_open_transmission_channel();
-            }
-
-            void close_transmission_channel() override {
-                m_parent.close_transmission_channel();
             }
         };
 

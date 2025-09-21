@@ -5,6 +5,7 @@
 #include <memory>
 #include <schedulers/api/scheduler_traits.hpp>
 #include <utils/gempba_utils.hpp>
+#include <utils/transmission_guard.hpp>
 #include <utils/tree.hpp>
 #include <utils/ipc/result.hpp>
 #include <utils/ipc/score.hpp>
@@ -94,7 +95,7 @@ namespace gempba {
 
             /**
             * Pushes a message to the next assigned process. This method is not thread-safe. Sending channel must be opened before calling this
-            * and closed after calling it. Use try_open_transmission_channel() and close_transmission_channel() to manage the sending channel.
+            * and closed after calling it. Use try_open_transmission_channel() to manage the sending channel.
             * Use judiciously. So far, this is only called within the node_manager. It is public just to avoid making the node_manager a friend class.
             *
             * @param p_task The serialized message to be sent.
@@ -115,26 +116,7 @@ namespace gempba {
              *          ensure that the resource is properly managed, especially if multiple threads
              *          might interact with the transmission channel concurrently.
              */
-            virtual bool try_open_transmission_channel() = 0;
-
-            /**
-             * @brief Closes the transmission channel. WIP - perhaps it can be removed
-             *
-             * This method is used to close the transmission channel. The implementation must
-             * ensure that any resources associated with the channel, including mutexes, are
-             * released or unlocked as appropriate.
-             *
-             * @contract The method must adhere to the following contract:
-             * - If a mutex or other synchronization mechanism is used, it should be unlocked
-             *   only if it is currently owned by the thread calling this method.
-             * - The method must not leave the channel in an inconsistent state.
-             *
-             * @warning Attempting to unlock a mutex that is not owned by the current thread, or
-             * performing other unsafe operations, may lead to undefined behavior. Ensure
-             * that the implementation follows proper synchronization practices.
-             *
-             */
-            virtual void close_transmission_channel() = 0;
+            virtual std::optional<transmission_guard> try_open_transmission_channel() = 0;
         };
 
         virtual center &center_view() = 0;
