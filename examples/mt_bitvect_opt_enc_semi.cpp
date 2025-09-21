@@ -15,7 +15,7 @@
 int run(int numThreads, int prob, std::string &filename) {
     using HolderType = gempba::result_holder<void, int, gbitset, int>;
 
-    auto &branchHandler = gempba::branch_handler::get_instance(); // parallel library
+    auto &branchHandler = gempba::branch_handler::create(); // parallel library
     auto &dlb = gempba::dynamic_load_balancer_handler::getInstance();
 
     cout << "NUMTHREADS= " << numThreads << endl;

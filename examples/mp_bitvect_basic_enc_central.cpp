@@ -20,16 +20,20 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
     std::cout << "USING LARGE ENCODING" << std::endl;
     std::cout << "USING CENTRALIZED STRATEGY" << std::endl;
 
-
-    auto &branchHandler = gempba::branch_handler::get_instance(); // parallel library
-
     // NOTE: instantiated object depends on SCHEDULER_CENTRALIZED macro
     auto &mpiScheduler = gempba::mpi_centralized_scheduler::get_instance();
+    mpiScheduler.set_goal(gempba::MINIMISE, gempba::score_type::I32);
 
     int rank = mpiScheduler.rank_me();
-    branchHandler.pass_scheduler(&mpiScheduler);
 
     std::cout << "NUMTHREADS= " << threads_per_task << std::endl;
+    if (rank == 0) {
+        // only because VertexCover is instantiated also in the center, but branch_handler is not used in the center
+        gempba::branch_handler::create();
+    } else {
+        gempba::branch_handler::create(&mpiScheduler.worker_view());
+    }
+    auto &branchHandler = gempba::branch_handler::get_instance(); // parallel library
 
     VC_void_MPI_bitvec_enc2 cover;
     auto function = std::bind(&VC_void_MPI_bitvec_enc2::mvcbitset, &cover, _1, _2, _3, _4, _5); // target algorithm [all arguments]
@@ -62,7 +66,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
     bg.bits_in_graph = allones;
     gempba::task_packet v_buffer = serializer(zero, bg, zero);
 
-    std::cout << "Starting MPI node " << branchHandler.rank_me() << std::endl;
+    std::cout << "Starting MPI node " << mpiScheduler.rank_me() << std::endl;
 
     mpiScheduler.barrier();
 

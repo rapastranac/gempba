@@ -20,16 +20,20 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
     std::cout << "USING OPTIMIZED ENCODING" << std::endl;
     std::cout << "USING SEMI-CENTRALIZED STRATEGY" << std::endl;
 
-
-    gempba::branch_handler &branchHandler = gempba::branch_handler::get_instance(); // parallel library
-
     // NOTE: instantiated object depends on SCHEDULER_CENTRALIZED macro
     auto &mpiScheduler = gempba::mpi_semi_centralized_scheduler::get_instance();
-
     int rank = mpiScheduler.rank_me();
-    branchHandler.pass_scheduler(&mpiScheduler);
+    mpiScheduler.set_goal(gempba::MINIMISE, gempba::score_type::I32);
 
     std::cout << "NUMTHREADS= " << threads_per_task << std::endl;
+
+    if (rank == 0) {
+        // only because VertexCover is instantiated also in the center, but branch_handler is not used in the center
+        gempba::branch_handler::create();
+    } else {
+        gempba::branch_handler::create(&mpiScheduler.worker_view());
+    }
+    auto &branchHandler = gempba::branch_handler::get_instance(); // parallel library
 
     VC_void_MPI_bitvec cover;
     auto function = std::bind(&VC_void_MPI_bitvec::mvcbitset, &cover, _1, _2, _3, _4, _5); // target algorithm [all arguments]
@@ -60,8 +64,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
 
     gempba::task_packet v_buffer = serializer(zero, allones, zero);
 
-
-    std::cout << "Starting MPI node " << branchHandler.rank_me() << std::endl;
+    std::cout << "Starting MPI node " << mpiScheduler.rank_me() << std::endl;
 
     mpiScheduler.barrier();
 
@@ -71,19 +74,21 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
     mpiScheduler.barrier();
 
     if (rank == 0) {
-        gempba::scheduler::center & v_center_view = mpiScheduler.center_view();
+        gempba::scheduler::center &v_center_view = mpiScheduler.center_view();
         // center process
         gempba::task_packet v_seed(v_buffer);
         v_center_view.run(v_seed);
     } else {
-        gempba::scheduler::worker & v_worker_view = mpiScheduler.worker_view();
+        gempba::scheduler::worker &v_worker_view = mpiScheduler.worker_view();
+
         /*	worker process
             main thread will take care of Inter-process communication (IPC), dedicated core
             numThreads could be the number of physical cores managed by this process - 1
         */
         branchHandler.init_thread_pool(threads_per_task);
 
-        std::function<std::shared_ptr<gempba::result_holder_parent>(gempba::task_packet)> bufferDecoder = branchHandler.construct_buffer_decoder<void, int, gbitset, int>(function, deserializer);
+        std::function<std::shared_ptr<gempba::result_holder_parent>(gempba::task_packet)> bufferDecoder = branchHandler.construct_buffer_decoder<void, int, gbitset, int>(
+                function, deserializer);
         utils::print_ipc_debug_comments("Buffer decoded fetched successfully!\n");
         std::function<gempba::result()> resultFetcher = branchHandler.construct_result_fetcher();
         v_worker_view.run(branchHandler, bufferDecoder, resultFetcher);

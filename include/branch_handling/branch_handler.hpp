@@ -5,6 +5,7 @@
 #include <atomic>
 #include <climits>
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <thread>
 #include <tuple>
@@ -61,19 +62,31 @@ namespace gempba {
         std::unique_ptr<thread_pool::Pool> m_thread_pool;
 
 
-        branch_handler() :
-            m_best_result_serialized(result::EMPTY) {
+        explicit branch_handler(scheduler::worker *p_scheduler) :
+            m_best_result_serialized(result::EMPTY), m_scheduler(p_scheduler) {
 
             m_processor_count = std::thread::hardware_concurrency();
             m_idle_time = 0;
             m_thread_requests = 0;
         }
 
+        // Singleton instance
+        static std::unique_ptr<branch_handler> m_instance;
+
     public:
         //<editor-fold desc="Construction/Destruction">
+        static branch_handler &create(scheduler::worker *p_worker = nullptr) {
+            if (!m_instance) {
+                m_instance = std::unique_ptr<branch_handler>(new branch_handler(p_worker));
+            }
+            return *m_instance;
+        }
+
         static branch_handler &get_instance() {
-            static branch_handler instance;
-            return instance;
+            if (!m_instance) {
+                spdlog::throw_spdlog_ex("Instance not created yet. Call create() first.");
+            }
+            return *m_instance;
         }
 
         ~branch_handler() = default;
@@ -188,10 +201,6 @@ namespace gempba {
         void set_goal(const goal p_goal, const score_type p_type) {
             m_goal = p_goal;
             m_score = utils::get_default_score(p_goal, p_type);
-            // set the goal in the scheduler if multiprocessing is enabled
-            #if GEMPBA_MULTIPROCESSING
-            m_scheduler->set_goal(p_goal, p_type);
-            #endif
         }
 
         // get number for this rank
@@ -495,8 +504,8 @@ namespace gempba {
 
         //——————— IPC related attributes and member functions ———————//
     private:
+        scheduler::worker *m_scheduler;
         #if GEMPBA_MULTIPROCESSING
-        scheduler *m_scheduler = nullptr;
         std::mutex m_ipc_mutex; // mutex to ensure funnel access to IPC
         int m_world_rank = -1; // get the rank of the process
         int m_world_size = -1; // get the number of processes/nodes
@@ -546,12 +555,6 @@ namespace gempba {
         }
 
     public:
-        // if multiprocessing, BranchHandler should have access to the scheduler
-        void pass_scheduler(scheduler *p_scheduler) {
-            this->m_scheduler = p_scheduler;
-            this->m_world_rank = this->m_scheduler->rank_me();
-        }
-
         /*
             Types must be passed through the brackets construct_buffer_decoder<Ret, Args...>(..), so it is
             known at compile time.

@@ -3,6 +3,8 @@
 #include "include/Graph.hpp"
 
 int run(int job_id, int ntasks_per_node, int prob, string &filename) {
+    gempba::branch_handler::create();
+
     Graph graph;
     Graph oGraph;
     MTGraphOptimizedEncodingSemiCentralized cover;

@@ -4,7 +4,7 @@
 #include <string>
 
 int run(int numThreads, int prob, std::string &filename) {
-    auto &handler = gempba::branch_handler::get_instance(); // parallel GemPBA
+    gempba::branch_handler::create(); // parallel GemPBA
 
     Graph graph;
     Graph oGraph;
