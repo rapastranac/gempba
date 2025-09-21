@@ -44,12 +44,12 @@
 /**
   Return number of bits that are set to 1
 **/
-inline int getNbSetBits(char c) {
+inline int getNbSetBits(const char c) {
     //all credits to https://stackoverflow.com/questions/697978/c-code-to-count-the-number-of-1-bits-in-an-unsigned-char
     return (c * 01001001001ULL & 042104210421ULL) % 017;
 }
 
-inline int getNbSetBits(gempba::task_packet task) {
+inline int getNbSetBits(const gempba::task_packet &task) {
     int nb = 0;
     for (const std::byte &v_byte: task) {
         nb += getNbSetBits(static_cast<char>(v_byte));
@@ -59,10 +59,10 @@ inline int getNbSetBits(gempba::task_packet task) {
 
 class TaskComparator {
 public:
-    bool operator()(gempba::task_packet t1, gempba::task_packet t2) {
+    bool operator()(const gempba::task_packet &t1, const gempba::task_packet &t2) const {
 
-        int n1 = getNbSetBits(t1);
-        int n2 = getNbSetBits(t2);
+        const int n1 = getNbSetBits(t1);
+        const int n2 = getNbSetBits(t2);
 
         return (n1 <= n2);
     }
