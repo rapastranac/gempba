@@ -100,6 +100,13 @@ namespace gempba {
             return *m_instance;
         }
 
+        /**
+         * Resets the singleton instance.
+         */
+        static void reset_instance() {
+            m_instance.reset();
+        }
+
         ~branch_handler() = default;
 
         branch_handler(const branch_handler &) = delete;
