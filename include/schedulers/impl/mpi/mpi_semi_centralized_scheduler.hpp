@@ -152,17 +152,19 @@ namespace gempba {
     private:
         bool try_open_transmission_channel() {
             // acquires mutex
-            if (m_mutex.try_lock()) {
-                // check if transmission in progress
-                if (!m_transmitting.load()) {
-                    const int v_next = next_process();
-                    // check if there is another process in the list
-                    if (v_next > 0) {
-                        return true; // priority acquired "mutex is meant to be released in releasePriority() "
-                    }
-                }
-                m_mutex.unlock();
+            if (!m_mutex.try_lock()) {
+                return false;
             }
+            // check if transmission in progress
+            if (m_transmitting.load()) {
+                m_mutex.unlock();
+                return false;
+            }
+            // check if there is another process in the list
+            if (next_process() > 0) {
+                return true; // priority acquired "mutex is meant to be released in releasePriority() "
+            }
+            m_mutex.unlock();
             return false;
         }
 

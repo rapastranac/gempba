@@ -167,16 +167,19 @@ namespace gempba {
     private:
         bool try_open_transmission_channel() {
             // acquires mutex
-            if (m_mutex.try_lock()) {
-                // check if transmission in progress
-                if (!m_transmitting.load()) {
-                    // check if center is actually waiting for a task
-                    if (!m_is_center_full) {
-                        return true; // priority acquired "mutex is meant to be released in releasePriority() "
-                    }
-                }
-                m_mutex.unlock();
+            if (!m_mutex.try_lock()) {
+                return false;
             }
+            // check if transmission in progress
+            if (m_transmitting.load()) {
+                m_mutex.unlock();
+                return false;
+            }
+            // check if center is actually waiting for a task
+            if (!m_is_center_full) {
+                return true; // priority acquired "mutex is meant to be released in close_transmission_channel() "
+            }
+            m_mutex.unlock();
             return false;
         }
 
