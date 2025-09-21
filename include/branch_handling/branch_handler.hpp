@@ -8,6 +8,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <thread>
 #include <tuple>
 #include <type_traits>
@@ -270,6 +271,20 @@ namespace gempba {
         }
 
         //</editor-fold>
+
+        template<typename T>
+        std::optional<T> get_result() {
+            std::unique_lock v_lock(m_mutex);
+            if (!std::holds_alternative<std::any>(m_result)) {
+                spdlog::error("Attempt to get a result of type {} but the result is not set", typeid(T).name());
+                return std::nullopt;
+            }
+
+            if (auto v_any = std::get<std::any>(m_result); v_any.has_value()) {
+                return std::any_cast<T>(v_any);
+            }
+            return std::nullopt;
+        }
 
         /**
          * if multiprocessing is used, then every process should call this method before starting
