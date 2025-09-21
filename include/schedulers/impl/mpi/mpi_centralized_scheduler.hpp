@@ -146,10 +146,12 @@ namespace gempba {
             return (m_end_time - m_start_time) - static_cast<double>(m_timeout);
         }
 
-        [[nodiscard]] int next_process() const override {
+    private:
+        [[nodiscard]] int next_process() const {
             return 0;
         }
 
+    public:
         [[nodiscard]] int world_size() const override {
             return m_world_size;
         }

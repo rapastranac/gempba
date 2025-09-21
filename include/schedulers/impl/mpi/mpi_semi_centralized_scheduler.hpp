@@ -131,11 +131,12 @@ namespace gempba {
             return (m_end_time - m_start_time) - static_cast<double>(m_timeout);
         }
 
-        // returns the process rank assigned to receive a task from this process
-        [[nodiscard]] int next_process() const override {
+    private:
+        [[nodiscard]] int next_process() const {
             return this->m_next_process;
         }
 
+    public:
         [[nodiscard]] int world_size() const override {
             return m_world_size;
         }
