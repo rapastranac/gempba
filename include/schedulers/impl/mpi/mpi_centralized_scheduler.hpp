@@ -239,12 +239,11 @@ namespace gempba {
             m_stats.m_elapsed_time = m_end_time - m_start_time;
         }
 
-    public:
         /**
          * Forces pushing a task packet to the next assigned process. This method is not thread-safe.
          * @param p_task_packet The serialized message to be sent.
          */
-        void push(task_packet &&p_task_packet) override {
+        void push(task_packet &&p_task_packet) {
             if (p_task_packet.empty()) {
                 throw std::runtime_error(fmt::format("rank {}, attempted to send empty buffer \n", m_world_rank));
             }
@@ -263,7 +262,6 @@ namespace gempba {
             close_transmission_channel();
         }
 
-    private:
         MPI_Status probe_communicators_at_worker() {
             static int branch = 0;
 

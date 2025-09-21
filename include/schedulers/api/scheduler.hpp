@@ -32,8 +32,6 @@ namespace gempba {
 
         virtual void set_goal(goal p_goal, score_type p_type) = 0;
 
-        virtual void push(task_packet &&p_task_packet) = 0;
-
         virtual void set_custom_initial_topology(tree &&p_tree) = 0;
 
         /**
