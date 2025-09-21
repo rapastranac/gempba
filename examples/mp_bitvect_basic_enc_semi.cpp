@@ -73,10 +73,12 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
     mpiScheduler.barrier();
 
     if (rank == 0) {
+        gempba::scheduler::center & v_center_view = mpiScheduler.center_view();
         // center process
         gempba::task_packet v_seed(v_buffer);
-        mpiScheduler.run_center(v_seed);
+        v_center_view.run(v_seed);
     } else {
+        gempba::scheduler::worker & v_worker_view = mpiScheduler.worker_view();
         /*	worker process
             main thread will take care of Inter-process communication (IPC), dedicated core
             numThreads could be the number of physical cores managed by this process - 1
@@ -86,7 +88,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
         std::function<std::shared_ptr<gempba::result_holder_parent>(gempba::task_packet)> bufferDecoder = branchHandler.construct_buffer_decoder<void, int, BitGraph, int>(
                 function, deserializer);
         std::function<gempba::result()> resultFetcher = branchHandler.construct_result_fetcher();
-        mpiScheduler.run_node(branchHandler, bufferDecoder, resultFetcher);
+        v_worker_view.run(branchHandler, bufferDecoder, resultFetcher);
     }
     mpiScheduler.barrier();
     // *****************************************************************************************

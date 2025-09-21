@@ -172,9 +172,9 @@ namespace gempba {
             this->m_global_score = utils::get_default_score(p_goal, p_type);
         }
 
-
+    private:
         void run_node(branch_handler &p_branch_handler, std::function<std::shared_ptr<result_holder_parent>(task_packet)> &p_buffer_decoder,
-                      std::function<result()> &p_result_fetcher) override {
+                      std::function<result()> &p_result_fetcher) {
             MPI_Barrier(m_world_communicator);
             m_start_time = MPI_Wtime();
 
@@ -220,6 +220,7 @@ namespace gempba {
             m_stats.m_elapsed_time = m_end_time - m_start_time;
         }
 
+    public:
         /**
          * Forces pushing a task packet to the next assigned process. This method is not thread-safe.
          * @param p_task_packet The serialized message to be sent.
@@ -454,9 +455,8 @@ namespace gempba {
             return v_score;
         }
 
-    public:
         /*	run the center node */
-        void run_center(task_packet &p_seed) override {
+        void run_center(task_packet &p_seed) {
             task_packet v_task_packet = p_seed;
             MPI_Barrier(m_world_communicator);
             m_start_time = MPI_Wtime();
@@ -508,7 +508,6 @@ namespace gempba {
             m_stats.m_elapsed_time = m_end_time - m_start_time - static_cast<double>(m_timeout);
         }
 
-    private:
         /**
          * Only returns when a message is received from any of the communicators.
          * @return MPI_Status of the received message, or std::nullopt only when all processes have finished or a timeout occurs.
