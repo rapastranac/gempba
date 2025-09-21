@@ -4,6 +4,7 @@
 #include <any>
 #include <atomic>
 #include <climits>
+#include <config.h>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -11,11 +12,11 @@
 #include <tuple>
 #include <type_traits>
 #include <utility>
+#include <variant>
 #include <bits/stdc++.h>
-
-#include <config.h>
 #include <dynamic_load_balancer/dynamic_load_balancer_handler.hpp>
 #include <schedulers/api/scheduler.hpp>
+#include <spdlog/spdlog.h>
 #include <utils/args_handler.hpp>
 #include <utils/gempba_utils.hpp>
 #include <utils/thread_pool.hpp>
@@ -43,8 +44,8 @@ namespace gempba {
         std::atomic<size_t> m_thread_requests;
         /*This section refers to the strategy wrapping a function
             then pruning data to be used by the wrapped function<<---*/
-        std::any m_best_result;
-        result m_best_result_serialized;
+
+        std::variant<std::any, task_packet> m_result{};
 
         dynamic_load_balancer_handler &m_load_balancer = dynamic_load_balancer_handler::getInstance();
         balancing_policy m_balancing_policy = QUASI_HORIZONTAL;
@@ -63,7 +64,7 @@ namespace gempba {
 
 
         explicit branch_handler(scheduler::worker *p_scheduler) :
-            m_best_result_serialized(result::EMPTY), m_scheduler(p_scheduler) {
+            m_scheduler(p_scheduler) {
 
             m_processor_count = std::thread::hardware_concurrency();
             m_idle_time = 0;
@@ -146,7 +147,7 @@ namespace gempba {
                 return false;
             }
 
-            this->m_best_result = std::make_any<decltype(p_new_result)>(p_new_result);
+            this->m_result = std::make_any<decltype(p_new_result)>(p_new_result);
             this->m_score = p_new_score;
             return true;
         }
@@ -170,7 +171,7 @@ namespace gempba {
             }
 
             const auto v_packet = static_cast<task_packet>(p_serializer(p_new_result));
-            this->m_best_result_serialized = {p_new_score, v_packet};
+            this->m_result = v_packet;
             this->m_score = p_new_score;
 
             return true;
@@ -189,8 +190,7 @@ namespace gempba {
 
             if (should_update_result(p_new_score)) {
                 m_score = p_new_score;
-                m_best_result.reset();
-                m_best_result_serialized = result::EMPTY;
+                m_result = task_packet::EMPTY;
                 return true;
             }
 
@@ -232,8 +232,8 @@ namespace gempba {
             return utils::wall_time();
         }
 
-        [[nodiscard]] bool has_result() const {
-            return m_best_result.has_value();
+        [[deprecated]] [[nodiscard]] bool has_result() const {
+            throw std::logic_error("Not implemented yet!");
         }
 
         [[nodiscard]] bool is_done() const {
@@ -243,18 +243,33 @@ namespace gempba {
 
         /**
          * if running in multithreading mode, the best solution can directly fetch without any deserialization
-         * @tparam SolutionType
+         * @tparam Ret
          */
-        template<typename SolutionType>
-        [[nodiscard]] auto fetch_result() -> SolutionType {
-            // fetching results caught by the library=
-
-            return std::any_cast<SolutionType>(m_best_result);
+        template<typename Ret>
+        [[nodiscard]] auto fetch_result() -> Ret {
+            std::unique_lock v_lock(m_mutex);
+            if (!std::holds_alternative<std::any>(m_result)) {
+                spdlog::throw_spdlog_ex(std::format("Attempt to fetch a result of type {} but the result is not set", typeid(Ret).name()));
+            }
+            if (auto v_any = std::get<std::any>(m_result); v_any.has_value()) {
+                return std::any_cast<Ret>(v_any);
+            }
+            spdlog::throw_spdlog_ex(std::format("Attempt to fetch a result of type {} but the result is not set", typeid(Ret).name()));
         }
 
         [[nodiscard]] score get_score() const {
             return m_score;
         }
+
+        std::optional<result> get_result_bytes() {
+            std::unique_lock v_lock(m_mutex);
+            if (!std::holds_alternative<task_packet>(m_result)) {
+                return std::nullopt;
+            }
+            return result(m_score, std::get<task_packet>(m_result));
+        }
+
+        //</editor-fold>
 
         /**
          * if multiprocessing is used, then every process should call this method before starting
@@ -600,11 +615,11 @@ namespace gempba {
         // this returns a lambda function which returns the best results as raw data
         [[nodiscard]] std::function<result()> construct_result_fetcher() {
             return [this]() {
-                if (m_best_result_serialized.get_score_as_integer() == -1) {
-                    return result::EMPTY;
-                } else {
-                    return m_best_result_serialized;
+                const std::optional<result> v_bytes = get_result_bytes();
+                if (v_bytes.has_value()) {
+                    return v_bytes.value();
                 }
+                return result::EMPTY;
             };
         }
         #endif
