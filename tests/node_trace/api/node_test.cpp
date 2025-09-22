@@ -21,14 +21,16 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
 #include <memory>
 #include <string>
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
 
-
+#include <branch_handling/branch_handler.hpp>
+#include <load_balancing/impl/quasi_horizontal_load_balancer.hpp>
 #include <node_trace/api/node.hpp>
 #include <node_trace/api/node_core.hpp>
+#include <node_trace/factory/node_factory.hpp>
 
 
 class node_core_mock final : public gempba::node_core {
@@ -433,4 +435,40 @@ TEST_F(node_operator_test, edge_cases) {
     EXPECT_TRUE(v_chain2 == v_chain3);
     EXPECT_TRUE(v_chain1 == v_chain3);
     EXPECT_TRUE(v_chain3 == m_node1);
+}
+
+
+/**
+ * @attention this is a very special test, the node instance could die before it gets executed by the internal
+ * thread pool in the node manager, so we need to mimic a short lifespan of a node
+ */
+TEST_F(node_test, delegate_locally_test) {
+    auto v_load_balancer = gempba::quasi_horizontal_load_balancer(nullptr);
+    v_load_balancer.set_thread_pool_size(1); // fewer threads on the pipeline runner (GitHub)
+    v_load_balancer.wait(); // it guarantees that the threads in the threadpool reach the condition_variable (GitHub runner limitation)
+    gempba::branch_handler::reset_instance();
+    gempba::branch_handler &v_manager = gempba::branch_handler::create(&v_load_balancer);
+
+    int v_value = 0;
+
+    {
+        auto v_dummy_function = [&v_value](std::thread::id, const int p_int, const double p_double, gempba::node p_parent) {
+            ASSERT_EQ(7, p_int);
+            ASSERT_EQ(6.0, p_double);
+            ASSERT_TRUE(p_parent == nullptr);
+            v_value = p_int * static_cast<int>(p_double);
+        };
+
+        const std::function<std::tuple<int, double>()> v_args_initializer = [] {
+            return std::make_tuple(7, 6.0);
+        };
+        auto v_explicit_node = gempba::node_factory::create_seed_node<void>(v_load_balancer, v_dummy_function, v_args_initializer);
+
+        const bool v_submitted = v_manager.try_local_submit(v_explicit_node);
+        ASSERT_TRUE(v_submitted);
+    }
+
+    v_manager.wait2();
+
+    ASSERT_EQ(42, v_value); // 7 * 6 = 42
 }
