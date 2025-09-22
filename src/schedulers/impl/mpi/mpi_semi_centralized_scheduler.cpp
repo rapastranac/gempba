@@ -78,4 +78,24 @@ namespace gempba {
             MPI_Ssend(&v_local_score_temp, sizeof(score), MPI_BYTE, CENTER_NODE, SCORE_PROPOSAL, m_global_score_communicator);
         }
     }
+
+    void mpi_semi_centralized_scheduler::send_solution(branch_handler &p_branch_handler) const {
+        const std::optional<result> &v_result_bytes_opt = p_branch_handler.get_result_bytes();
+        if (!v_result_bytes_opt.has_value()) {
+            MPI_Ssend(nullptr, 0, MPI_BYTE, CENTER_NODE, NO_RESULT, m_world_communicator);
+            return;
+        }
+
+        const result v_result = v_result_bytes_opt.value();
+        const score v_score = v_result.get_score();
+        task_packet v_task_packet = v_result.get_task_packet();
+
+        if (v_task_packet == task_packet::EMPTY) {
+            MPI_Ssend(nullptr, 0, MPI_BYTE, CENTER_NODE, NO_RESULT, m_world_communicator);
+        } else {
+            MPI_Ssend(v_task_packet.data(), static_cast<int>(v_task_packet.size()), MPI_BYTE, CENTER_NODE, HAS_RESULT, m_world_communicator);
+            MPI_Ssend(&v_score, sizeof(score), MPI_BYTE, CENTER_NODE, HAS_RESULT, m_world_communicator);
+        }
+    }
+
 }

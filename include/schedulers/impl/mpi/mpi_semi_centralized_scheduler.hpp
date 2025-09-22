@@ -176,8 +176,7 @@ namespace gempba {
         }
 
     private:
-        void run_node(branch_handler &p_branch_handler, std::function<std::shared_ptr<result_holder_parent>(task_packet)> &p_buffer_decoder,
-                      std::function<result()> &p_result_fetcher) {
+        void run_node(branch_handler &p_branch_handler, std::function<std::shared_ptr<result_holder_parent>(task_packet)> &p_buffer_decoder) {
             MPI_Barrier(m_world_communicator);
             m_start_time = MPI_Wtime();
 
@@ -218,7 +217,7 @@ namespace gempba {
              * this applies only when parallelising non-void functions
              */
 
-            send_solution(p_result_fetcher);
+            send_solution(p_branch_handler);
             m_end_time = MPI_Wtime();
             m_stats.m_elapsed_time = m_end_time - m_start_time;
         }
@@ -430,18 +429,7 @@ namespace gempba {
     public:
     private:
         /*	send solution attained from node to the center node */
-        void send_solution(const std::function<result()> &p_result_fetcher) {
-            const result v_result = p_result_fetcher();
-            const score v_score = v_result.get_score();
-            task_packet v_task_packet = v_result.get_task_packet();
-
-            if (v_result == result::EMPTY) {
-                MPI_Send(nullptr, 0, MPI_BYTE, CENTER_NODE, NO_RESULT, m_world_communicator);
-            } else {
-                MPI_Send(v_task_packet.data(), static_cast<int>(v_task_packet.size()), MPI_BYTE, CENTER_NODE, HAS_RESULT, m_world_communicator);
-                MPI_Send(&v_score, sizeof(score), MPI_BYTE, CENTER_NODE, HAS_RESULT, m_world_communicator);
-            }
-        }
+        void send_solution(branch_handler &p_branch_handler) const;
 
         static int consume_int_flag(MPI_Status p_status, const MPI_Comm &p_communicator) {
             int v_buffer;
@@ -719,13 +707,11 @@ namespace gempba {
                 MPI_Get_count(&status, MPI_BYTE, &count); // receives total number of datatype elements of the message
                 //***************************************************************************************************
 
-                task_packet v_task_packet(count);
-                MPI_Recv(v_task_packet.data(), count, MPI_BYTE, rank, MPI_ANY_TAG, m_world_communicator, &status);
-
-                utils::print_ipc_debug_comments("fetching result from rank {} \n", rank);
-
                 switch (status.MPI_TAG) {
                     case HAS_RESULT: {
+                        task_packet v_task_packet(count);
+                        MPI_Recv(v_task_packet.data(), count, MPI_BYTE, rank, HAS_RESULT, m_world_communicator, &status);
+
                         score v_score{};
                         MPI_Recv(&v_score, sizeof(score), MPI_BYTE, rank, HAS_RESULT, m_world_communicator, &status);
 
@@ -734,9 +720,14 @@ namespace gempba {
                         break;
                     }
                     case NO_RESULT: {
+                        //consumes the empty message
+                        MPI_Recv(nullptr, 0, MPI_BYTE, rank, NO_RESULT, m_world_communicator, &status);
                         spdlog::debug("solution NOT received from rank {}\n", rank);
                         break;
                     }
+                    default: {
+                        spdlog::throw_spdlog_ex(std::format("rank {} received unknown tag {} from rank {} in receive_solution()", m_world_rank, status.MPI_TAG, rank));
+                    };
                 }
             }
         }
@@ -968,9 +959,8 @@ namespace gempba {
                 return m_parent.get_stats();
             }
 
-            void run(branch_handler &p_branch_handler, std::function<std::shared_ptr<result_holder_parent>(task_packet)> &p_buffer_decoder,
-                     std::function<result()> &p_result_fetcher) override {
-                m_parent.run_node(p_branch_handler, p_buffer_decoder, p_result_fetcher);
+            void run(branch_handler &p_branch_handler, std::function<std::shared_ptr<result_holder_parent>(task_packet)> &p_buffer_decoder) override {
+                m_parent.run_node(p_branch_handler, p_buffer_decoder);
             }
 
             void push(task_packet &&p_task) override {

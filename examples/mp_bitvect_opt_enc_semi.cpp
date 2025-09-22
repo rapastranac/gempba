@@ -90,8 +90,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
         std::function<std::shared_ptr<gempba::result_holder_parent>(gempba::task_packet)> bufferDecoder = branchHandler.construct_buffer_decoder<void, int, gbitset, int>(
                 function, deserializer);
         utils::print_ipc_debug_comments("Buffer decoded fetched successfully!\n");
-        std::function<gempba::result()> resultFetcher = branchHandler.construct_result_fetcher();
-        v_worker_view.run(branchHandler, bufferDecoder, resultFetcher);
+        v_worker_view.run(branchHandler, bufferDecoder);
     }
     mpiScheduler.barrier();
     // *****************************************************************************************

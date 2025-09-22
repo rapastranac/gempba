@@ -88,10 +88,8 @@ namespace gempba {
             *
             * @param p_branch_handler Reference to the branch handler that manages task distribution and result collection.
             * @param p_buffer_decoder Function to decode incoming task packets into result holders.
-            * @param p_result_fetcher Function to fetch results after task execution.
             */
-            virtual void run(branch_handler &p_branch_handler, std::function<std::shared_ptr<result_holder_parent>(task_packet)> &p_buffer_decoder,
-                             std::function<result()> &p_result_fetcher) = 0;
+            virtual void run(branch_handler &p_branch_handler, std::function<std::shared_ptr<result_holder_parent>(task_packet)> &p_buffer_decoder) = 0;
 
             /**
             * Pushes a message to the next assigned process. This method is not thread-safe. Sending channel must be opened before calling this
