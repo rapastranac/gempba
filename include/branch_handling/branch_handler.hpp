@@ -116,7 +116,7 @@ namespace gempba {
             this->m_balancing_policy = p_strategy;
         };
 
-        [[nodiscard]] balancing_policy get_balancing_policy() const {
+        [[deprecated]] [[nodiscard]] balancing_policy get_balancing_policy() const {
             return m_balancing_policy;
         }
 
@@ -134,7 +134,7 @@ namespace gempba {
         }
 
         // seconds
-        [[nodiscard]] double idle_time() const {
+        [[deprecated]] [[nodiscard]] double idle_time() const {
             const double v_nanoseconds = static_cast<double>(m_idle_time) / (static_cast<double>(m_processor_count) + 1.0);
             return v_nanoseconds * 1.0e-9; // convert to seconds
         }
@@ -228,7 +228,7 @@ namespace gempba {
         * Blocks the current thread until all tasks finish.
         * Provides synchronization with the main thread.
         */
-        void wait() const {
+        [[deprecated]] void wait() const {
             utils::print_ipc_debug_comments("Main thread waiting results \n");
             this->m_thread_pool->wait();
         }
@@ -242,7 +242,7 @@ namespace gempba {
             throw std::logic_error("Not implemented yet!");
         }
 
-        [[nodiscard]] bool is_done() const {
+        [[deprecated]] bool is_done() const {
             return m_thread_pool->hasFinished();
         }
 
@@ -311,7 +311,7 @@ namespace gempba {
          * @param p_holder ResultHolder instance that wraps the function arguments and potential result
          */
         template<typename Ret, typename F, typename HolderType>
-        void force_local_submit(F &p_function, int p_thread_id, HolderType &p_holder) requires (!std::is_void_v<Ret>) {
+        [[deprecated]] void force_local_submit(F &p_function, int p_thread_id, HolderType &p_holder) requires (!std::is_void_v<Ret>) {
             p_holder.setPushStatus();
             m_load_balancer.prune(&p_holder);
             args_handler::unpack_and_forward_non_void(p_function, p_thread_id, p_holder.getArgs(), p_holder);
@@ -328,7 +328,7 @@ namespace gempba {
          * @param p_holder ResultHolder instance that wraps the function arguments and potential result
          */
         template<typename Ret, typename F, typename HolderType>
-        void forward(F &p_function, int p_thread_id, HolderType &p_holder) {
+        [[deprecated]] void forward(F &p_function, int p_thread_id, HolderType &p_holder) {
             forward_helper<Ret>(p_function, p_thread_id, p_holder);
         }
 
@@ -341,7 +341,7 @@ namespace gempba {
          * @param p_holder ResultHolder instance that wraps the function arguments and potential result
          */
         template<typename Ret, typename F, typename HolderType>
-        void force_local_submit(F &p_function, [[maybe_unused]] int p_thread_id, HolderType &p_holder) requires (std::is_void_v<Ret>) {
+        [[deprecated]] void force_local_submit(F &p_function, [[maybe_unused]] int p_thread_id, HolderType &p_holder) requires (std::is_void_v<Ret>) {
             p_holder.setPushStatus();
             m_load_balancer.prune(&p_holder);
             args_handler::unpack_and_push_void(*m_thread_pool, p_function, p_holder.getArgs());
@@ -358,7 +358,7 @@ namespace gempba {
          * @return
          */
         template<typename Ret, typename F, typename HolderType>
-        bool try_local_submit(F &&p_function, int p_thread_id, HolderType &p_holder) {
+        [[deprecated]] bool try_local_submit(F &&p_function, int p_thread_id, HolderType &p_holder) {
             if (send<Ret>(p_function, p_thread_id, p_holder)) {
                 return true;
             }
@@ -377,13 +377,55 @@ namespace gempba {
          * @return
          */
         template<typename Ret, typename F, typename HolderType, typename Serializer>
-        bool try_remote_submit(F &p_function, int p_thread_id, HolderType &p_holder, Serializer &&p_serializer) {
+        [[deprecated]] bool try_remote_submit(F &p_function, int p_thread_id, HolderType &p_holder, Serializer &&p_serializer) {
             if (send(p_thread_id, p_holder, p_serializer)) {
                 return true;
             }
             return try_local_submit<Ret>(p_function, p_thread_id, p_holder);
         }
         #endif
+
+        void set_thread_pool_size(const unsigned int p_size) const {
+            m_balancer->set_thread_pool_size(p_size);
+        }
+
+        [[nodiscard]] balancing_policy get_balancing_policy2() const {
+            return m_balancer->get_balancing_policy();
+        }
+
+        [[nodiscard]] unsigned int generate_unique_id() const {
+            return m_balancer->generate_unique_id();
+        }
+
+        std::future<std::any> force_local_submit(std::function<std::any()> &&p_function) const {
+            return m_balancer->force_local_submit(std::move(p_function));
+        }
+
+        void forward(node &p_node) const {
+            m_balancer->forward(p_node);
+        }
+
+        bool try_local_submit(node &p_node) const {
+            return m_balancer->try_local_submit(p_node);
+        }
+
+        bool try_remote_submit(node &p_node, const int p_runnable_id) const {
+            return m_balancer->try_remote_submit(p_node, p_runnable_id);
+        }
+
+        [[nodiscard]] double get_idle_time() const {
+            return m_balancer->get_idle_time();
+        }
+
+        void wait2() const {
+            // TODO ... to be renamed
+            m_balancer->wait();
+        }
+
+        [[nodiscard]] bool is_done2() const {
+            // TODO ... to be renamed
+            return m_balancer->is_done();
+        }
 
     private:
         /**
