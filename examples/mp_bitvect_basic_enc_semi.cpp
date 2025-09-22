@@ -30,9 +30,9 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
 
     if (rank == 0) {
         // only because VertexCover is instantiated also in the center, but branch_handler is not used in the center
-        gempba::branch_handler::create();
+        gempba::branch_handler::create(nullptr);
     } else {
-        gempba::branch_handler::create(&mpiScheduler.worker_view());
+        gempba::branch_handler::create(nullptr, &mpiScheduler.worker_view());
     }
     auto &branchHandler = gempba::branch_handler::get_instance(); // parallel library
 

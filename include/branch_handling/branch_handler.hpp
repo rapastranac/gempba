@@ -16,6 +16,7 @@
 #include <variant>
 #include <bits/stdc++.h>
 #include <dynamic_load_balancer/dynamic_load_balancer_handler.hpp>
+#include <load_balancing/api/load_balancer.hpp>
 #include <schedulers/api/scheduler.hpp>
 #include <spdlog/spdlog.h>
 #include <utils/args_handler.hpp>
@@ -62,10 +63,11 @@ namespace gempba {
         std::atomic<long long> m_idle_time;
         std::mutex m_mutex; // local mutex
         std::unique_ptr<thread_pool::Pool> m_thread_pool;
+        load_balancer *const m_balancer;
 
 
-        explicit branch_handler(scheduler::worker *p_scheduler) :
-            m_scheduler(p_scheduler) {
+        explicit branch_handler(load_balancer *p_load_balancer, scheduler::worker *p_scheduler) :
+            m_balancer(p_load_balancer), m_scheduler(p_scheduler) {
 
             m_processor_count = std::thread::hardware_concurrency();
             m_idle_time = 0;
@@ -81,9 +83,12 @@ namespace gempba {
 
     public:
         //<editor-fold desc="Construction/Destruction">
-        static branch_handler &create(scheduler::worker *p_worker = nullptr) {
+        static branch_handler &create(load_balancer *p_load_balancer, scheduler::worker *p_worker = nullptr) {
             if (!m_instance) {
-                m_instance = std::unique_ptr<branch_handler>(new branch_handler(p_worker));
+                if (!p_load_balancer) {
+                    // TODO... to be enforced
+                }
+                m_instance = std::unique_ptr<branch_handler>(new branch_handler(p_load_balancer, p_worker));
             }
             return *m_instance;
         }
