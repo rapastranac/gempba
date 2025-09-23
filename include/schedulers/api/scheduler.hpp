@@ -60,7 +60,7 @@ namespace gempba {
              *
              * @param p_task task to be broadcast to the first available worker node
              */
-            virtual void run(task_packet p_task) = 0;
+            [[deprecated]] virtual void run(task_packet p_task) = 0;
 
             virtual void run(task_packet p_task, int p_runnable_id) = 0;
 

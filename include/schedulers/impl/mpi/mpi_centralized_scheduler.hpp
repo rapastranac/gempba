@@ -27,6 +27,8 @@
 #include <utils/ipc/result.hpp>
 #include <utils/ipc/task_packet.hpp>
 
+#include "utils/ipc/task_bundle.hpp"
+
 // max memory is in mb, e.g. 1024 * 10 = 10 GB
 #define MAX_MEMORY_MB (1024 * 10)
 #define CENTER_NBSTORED_TASKS_PER_PROCESS 1000
@@ -54,9 +56,11 @@ namespace gempba {
             TASK_FOR_CENTER = 11,
             CENTER_IS_FULL = 12,
             CENTER_IS_FREE = 13,
+            RUNNABLE_ID = 14,
         };
 
         std::priority_queue<task_packet, std::vector<task_packet>, TaskComparator> m_center_queue; //message, size
+        std::priority_queue<task_bundle, std::vector<task_bundle>, task_bundle_comparator> m_center_bundle_queue; //message, size
 
         int m_max_queue_size;
         bool m_center_last_full_status = false;
@@ -239,9 +243,59 @@ namespace gempba {
             m_stats.m_elapsed_time = m_end_time - m_start_time;
         }
 
+
         void run(branch_handler &p_branch_handler, std::map<int, std::shared_ptr<serial_runnable> > p_runnables) {
-            throw std::runtime_error("Not implemented yet");
+            MPI_Barrier(m_world_communicator);
+            m_start_time = MPI_Wtime();
+
+            bool v_is_terminated = false;
+            while (true) {
+                MPI_Status v_status = probe_communicators_at_worker();
+
+                switch (v_status.MPI_TAG) {
+                    case TERMINATION: {
+                        process_termination(v_status);
+                        collect_stats_data2(p_branch_handler);
+                        v_is_terminated = true; // temporary, it should always happen
+                        spdlog::debug("rank {} received termination", m_world_rank);
+                        break;
+                    }
+                    case SCORE_UPDATE: {
+                        receive_score_from_center(v_status);
+                        break;
+                    }
+                    case CENTER_IS_FULL: {
+                        consume_center_is_full_tag(v_status);
+                        break;
+                    }
+                    case CENTER_IS_FREE: {
+                        consume_center_is_free_tag(v_status);
+                        break;
+                    }
+                    case TASK_FROM_CENTER: {
+                        process_message(v_status, p_branch_handler, p_runnables);
+                        break;
+                    }
+                    default: {
+                        // nothing
+                    };
+                }
+
+                if (v_is_terminated) {
+                    break; // exit loop
+                }
+            }
+            /**
+             * TODO.. send results back to the rank from which the task was sent.
+             * this applies only when parallelising non-void functions
+             */
+
+            send_final_solution_to_center(p_branch_handler);
+            m_end_time = MPI_Wtime();
+            m_stats.m_elapsed_time = m_end_time - m_start_time;
         }
+
+        void send_final_solution_to_center(branch_handler &p_branch_handler) const;
 
         /**
          * Forces pushing a task packet to the next assigned process. This method is not thread-safe.
@@ -264,8 +318,22 @@ namespace gempba {
             m_tasks_queue.push(v_message);
         }
 
-        unsigned int force_push(task_packet &&p_task, int p_function_id) {
-            throw std::runtime_error("Not implemented yet");
+        unsigned int force_push(task_packet &&p_task_packet, const int p_function_id) {
+            if (p_task_packet.empty()) {
+                throw std::runtime_error(fmt::format("rank {}, attempted to send empty buffer \n", m_world_rank));
+            }
+
+            m_transmitting = true;
+            utils::print_ipc_debug_comments("rank {} entered MPI_Scheduler::push(..) for the node {}\n", m_world_rank, m_destination_rank);
+
+            const auto v_bundle = std::make_shared<task_bundle>(p_task_packet, static_cast<unsigned int>(p_function_id));
+
+            if (!m_tasks_bundle_queue.empty()) {
+                throw std::runtime_error("ERROR: q is not empty !!!!\n");
+            }
+
+            m_tasks_bundle_queue.push(v_bundle);
+            return 0;
         }
 
         MPI_Status probe_communicators_at_worker() {
@@ -306,7 +374,9 @@ namespace gempba {
             MPI_Barrier(m_world_communicator);
         }
 
-        void collect_stats_data(const branch_handler &p_branch_handler);
+        [[deprecated]] void collect_stats_data(const branch_handler &p_branch_handler);
+
+        void collect_stats_data2(const branch_handler &p_branch_handler);
 
         void receive_score_from_center(MPI_Status p_status) {
             utils::print_ipc_debug_comments("rank {}, about to receive global score from Center\n", m_world_rank);
@@ -357,8 +427,43 @@ namespace gempba {
             notify_available_state();
         }
 
+        void process_message(MPI_Status &p_status, branch_handler &p_branch_handler, std::map<int, std::shared_ptr<serial_runnable> > &p_runnables) {
+            // Receives the task  -------------------------------------------------------------------------------------------
+            int v_count; // count to be received
+            MPI_Get_count(&p_status, MPI_BYTE, &v_count); // receives total number of datatype elements of the message
+
+            utils::print_ipc_debug_comments("rank {}, received message from rank {}, count : {}\n", m_world_rank, p_status.MPI_SOURCE, v_count);
+            task_packet v_task_packet(v_count);
+            MPI_Recv(v_task_packet.data(), v_count, MPI_BYTE, p_status.MPI_SOURCE, p_status.MPI_TAG, m_world_communicator, &p_status);
+
+            utils::print_ipc_debug_comments("rank {}, received message from rank {}, tag {}, count : {}\n", m_world_rank, p_status.MPI_SOURCE, p_status.MPI_TAG, v_count);
+
+            // receives function id
+            MPI_Status v_status;
+            int v_function_id;
+            MPI_Recv(&v_function_id, 1, MPI_INT, p_status.MPI_SOURCE, RUNNABLE_ID, m_world_communicator, &v_status);
+
+            // Here, we have a task to process  -----------------------------------------------------------------------------
+            notify_running_state();
+            m_received_tasks++;
+            m_total_requests_number++;
+            m_stats.m_received_task_count++;
+            m_stats.m_total_requested_tasks++;
+
+            //  Delegates the processing of the incoming buffer to the node manager and stores the potential returned value in _returned_value_future.
+            const auto v_runnable = p_runnables[v_function_id];
+            auto v_returned_value = (*v_runnable)(p_branch_handler, v_task_packet);
+            utils::print_ipc_debug_comments("rank {}, pushed buffer to thread pool \n", m_world_rank, p_status.MPI_SOURCE);
+            // **********************************************************************************************
+
+            task_funneling2(p_branch_handler);
+            notify_available_state();
+        }
+
         // when a node is working, it loops through here
         void task_funneling(branch_handler &p_branch_handler);
+
+        void task_funneling2(branch_handler &p_branch_handler);
 
         std::optional<MPI_Status> probe_score_comm_at_node() {
             int v_is_message_received = 0; // logical
@@ -430,8 +535,16 @@ namespace gempba {
             MPI_Send(&v_buffer, 1, MPI_INT, CENTER_NODE, RUNNING_STATE, m_world_communicator);
         }
 
-        void send_task_to_center(task_packet &p_task_packet) {
+        [[deprecated]] void send_task_to_center(task_packet &p_task_packet) {
             MPI_Send(p_task_packet.data(), static_cast<int>(p_task_packet.size()), MPI_BYTE, CENTER_NODE, TASK_FOR_CENTER, m_world_communicator);
+        }
+
+        void send_task_to_center(task_bundle &p_bundle) {
+            task_packet v_packet = p_bundle.get_task_packet();
+            const int function_id = p_bundle.get_runnable_id();
+
+            MPI_Send(v_packet.data(), static_cast<int>(v_packet.size()), MPI_BYTE, CENTER_NODE, TASK_FOR_CENTER, m_world_communicator);
+            MPI_Send(&function_id, 1, MPI_INT, CENTER_NODE, RUNNABLE_ID, m_world_communicator);
         }
 
     public:
@@ -451,7 +564,7 @@ namespace gempba {
             return v_score;
         }
 
-        void clear_buffer() {
+        [[deprecated]] void clear_buffer() {
             if (m_center_queue.empty())
                 return;
 
@@ -476,8 +589,37 @@ namespace gempba {
             }
         }
 
+        void clear_buffer2() {
+            if (m_center_bundle_queue.empty())
+                return;
+
+            for (int rank = 1; rank < m_world_size; rank++) {
+                if (m_process_state[rank] == AVAILABLE_STATE) {
+
+                    task_bundle v_bundle = m_center_bundle_queue.top();
+                    m_center_bundle_queue.pop();
+                    const task_packet v_bytes = v_bundle.get_task_packet();
+                    const int &v_runnable_id = v_bundle.get_runnable_id();
+
+                    MPI_Send(v_bytes.data(), static_cast<int>(v_bytes.size()), MPI_BYTE, rank, TASK_FROM_CENTER, m_world_communicator);
+                    MPI_Send(&v_runnable_id, 1, MPI_INT, rank, RUNNABLE_ID, m_world_communicator);
+
+                    m_process_state[rank] = ASSIGNED_STATE;
+
+                    m_sent_tasks++;
+                    m_total_requests_number++;
+                    m_stats.m_sent_task_count++;
+                    m_stats.m_total_requested_tasks++;
+
+                    if (m_center_queue.empty()) {
+                        return;
+                    }
+                }
+            }
+        }
+
         /*	run the center node */
-        void run_center(task_packet &p_seed) {
+        [[deprecated]] void run_center(task_packet &p_seed) {
             task_packet v_task_packet = p_seed;
             MPI_Barrier(m_world_communicator);
             m_start_time = MPI_Wtime();
@@ -535,15 +677,68 @@ namespace gempba {
             m_stats.m_elapsed_time = m_end_time - m_start_time - static_cast<double>(m_timeout);
         }
 
-        void run(task_packet p_task, int p_runnable_id) {
-            throw std::runtime_error("Not implemented yet");
+        void run(const task_packet &p_seed, const int p_runnable_id) {
+            MPI_Barrier(m_world_communicator);
+            m_start_time = MPI_Wtime();
+
+            send_seed(p_seed, p_runnable_id);
+
+            while (true) {
+                auto v_status_opt = probe_communicators_at_center2();
+                if (!v_status_opt.has_value()) {
+                    spdlog::info("rank {}: probe_communicators_center received TIMEOUT, exiting center run", m_world_rank);
+                    break;
+                }
+                MPI_Status v_status = v_status_opt.value();
+
+                switch (v_status.MPI_TAG) {
+                    case RUNNING_STATE: {
+                        // received if and only if a worker receives from other but center
+                        consume_int_flag(v_status, m_world_communicator);
+                        process_running(v_status);
+                        break;
+                    }
+                    case AVAILABLE_STATE: {
+                        consume_int_flag(v_status, m_world_communicator);
+                        process_available(v_status);
+                        break;
+                    }
+                    case SCORE_PROPOSAL: {
+                        score v_candidate_global_score = consume_score_flag(v_status);
+                        maybe_broadcast_global_score(v_candidate_global_score, v_status);
+                        break;
+                    }
+                    case TASK_FOR_CENTER: {
+                        process_task_for_center2(v_status);
+                    }
+                    break;
+                }
+
+                clear_buffer2();
+                monitor_and_notify_center_status2();
+            }
+
+            spdlog::debug("CENTER HAS TERMINATED");
+            spdlog::debug("Max queue size = {},   Peak memory (MB) = {} \n", m_max_queue_size, getPeakRSS() / (1024 * 1024));
+
+            /*
+            after breaking the previous loop, all jobs are finished and the only remaining step
+            is notifying exit and fetching results
+            */
+            notify_termination();
+
+            // receive solution from other processes
+            receive_solution();
+
+            m_end_time = MPI_Wtime();
+            m_stats.m_elapsed_time = m_end_time - m_start_time - static_cast<double>(m_timeout);
         }
 
         /**
          * Only returns when a message is received from any of the communicators.
          * @return MPI_Status of the received message, or std::nullopt only when all processes have finished or a timeout occurs.
          */
-        std::optional<MPI_Status> probe_communicators_at_center() {
+        [[deprecated]] std::optional<MPI_Status> probe_communicators_at_center() {
             long v_cycles = 0;
             static int branch = 0;
             while (true) {
@@ -557,6 +752,52 @@ namespace gempba {
                             // if no message received, check for center fullness
                             clear_buffer();
                             monitor_and_notify_center_status();
+                            break;
+                        }
+                        case 1: {
+                            if (auto v_optional = probe_score_comm_at_center(); v_optional.has_value()) {
+                                return v_optional;
+                            }
+                            break;
+                        }
+                    }
+                    if (++branch > INT_MAX - 1000) {
+                        branch = 0;
+                    }
+                    ++v_cycles;
+                    double v_elapsed = utils::diff_time(v_wall_time0, MPI_Wtime());
+                    if (v_elapsed > m_timeout) {
+                        spdlog::debug("rank {}: no messages received in {} seconds, cycles: {}", m_world_rank, v_elapsed, v_cycles);
+                        break;
+                    }
+                }
+
+                if (m_nodes_running < 0) {
+                    spdlog::throw_spdlog_ex("rank {}: m_nodes_running is negative, this should not happen", m_world_rank);
+                }
+
+                // Timeout or termination condition
+                if (m_nodes_running == 0) {
+                    spdlog::debug("rank {}: probe_communicators_center received TIMEOUT", m_world_rank);
+                    return std::nullopt;
+                }
+            }
+        }
+
+        std::optional<MPI_Status> probe_communicators_at_center2() {
+            long v_cycles = 0;
+            static int branch = 0;
+            while (true) {
+                const double v_wall_time0 = MPI_Wtime();
+                while (true) {
+                    switch (branch % 2) {
+                        case 0: {
+                            if (const auto v_optional = probe_world_comm_center(); v_optional.has_value()) {
+                                return v_optional;
+                            }
+                            // if no message received, check for center fullness
+                            clear_buffer2();
+                            monitor_and_notify_center_status2();
                             break;
                         }
                         case 1: {
@@ -653,7 +894,7 @@ namespace gempba {
             m_stats.m_total_requested_tasks++;
         }
 
-        void process_task_for_center(MPI_Status p_status) {
+        [[deprecated]] void process_task_for_center(MPI_Status p_status) {
             int v_buffer_char_count;
             MPI_Get_count(&p_status, MPI_BYTE, &v_buffer_char_count);
             task_packet v_task(v_buffer_char_count);
@@ -684,7 +925,44 @@ namespace gempba {
             utils::print_ipc_debug_comments("center received task from {}, current queue size is {}\n", p_status.MPI_SOURCE, m_center_queue.size());
         }
 
-        void monitor_and_notify_center_status() {
+        void process_task_for_center2(MPI_Status p_status) {
+            int v_buffer_char_count;
+            MPI_Get_count(&p_status, MPI_BYTE, &v_buffer_char_count);
+            task_packet v_task(v_buffer_char_count);
+            MPI_Recv(v_task.data(), v_buffer_char_count, MPI_BYTE, p_status.MPI_SOURCE, TASK_FOR_CENTER, m_world_communicator, &p_status);
+
+            int v_runnable_id;
+            MPI_Status v_status;
+            MPI_Recv(&v_runnable_id, 1, MPI_INT, p_status.MPI_SOURCE, RUNNABLE_ID, m_world_communicator, &v_status);
+            const task_bundle v_task_bundle(v_task, v_runnable_id);
+
+            m_center_bundle_queue.push(v_task_bundle);
+
+            if (m_center_bundle_queue.size() > m_max_queue_size) {
+                if (m_center_bundle_queue.size() % 10000 == 0) {
+                    spdlog::debug("CENTER queue size reached {}\n", m_center_bundle_queue.size());
+                }
+                m_max_queue_size = m_center_bundle_queue.size();
+            }
+
+            m_total_requests_number++;
+            m_received_tasks++;
+            m_stats.m_total_requested_tasks++;
+            m_stats.m_received_task_count++;
+
+
+            if (m_center_bundle_queue.size() > 2 * CENTER_NBSTORED_TASKS_PER_PROCESS * m_world_size) {
+                if (utils::diff_time(m_time_centerfull_sent, MPI_Wtime() > 1)) {
+                    spdlog::debug("Center queue size is twice the limit.  Contacting workers to let them know.\n");
+                    m_center_last_full_status = false; //handleFullMessaging will see this and recontact workers
+                }
+            }
+
+            utils::print_ipc_debug_comments("center received task from {}, current queue size is {}\n", p_status.MPI_SOURCE, m_center_queue.size());
+        }
+
+
+        [[deprecated]] void monitor_and_notify_center_status() {
             const size_t v_current_memory = getCurrentRSS() / (1024 * 1024); // ram usage in megabytes
 
             if (m_center_last_full_status) {
@@ -694,7 +972,17 @@ namespace gempba {
             }
         }
 
-        void notify_center_full(const size_t v_current_memory) {
+        void monitor_and_notify_center_status2() {
+            const size_t v_current_memory = getCurrentRSS() / (1024 * 1024); // ram usage in megabytes
+
+            if (m_center_last_full_status) {
+                notify_center_free2(v_current_memory);
+            } else {
+                notify_center_full2(v_current_memory);
+            }
+        }
+
+        [[deprecated]] void notify_center_full(const size_t v_current_memory) {
             // last iter, center wasn't full but now it is => warn nodes to stop sending
             if (v_current_memory > MAX_MEMORY_MB || m_center_queue.size() > CENTER_NBSTORED_TASKS_PER_PROCESS * m_world_size) {
                 for (int rank = 1; rank < m_world_size; rank++) {
@@ -707,9 +995,34 @@ namespace gempba {
             }
         }
 
-        void notify_center_free(const size_t v_current_memory) {
+        void notify_center_full2(const size_t v_current_memory) {
+            // last iter, center wasn't full but now it is => warn nodes to stop sending
+            if (v_current_memory > MAX_MEMORY_MB || m_center_bundle_queue.size() > CENTER_NBSTORED_TASKS_PER_PROCESS * m_world_size) {
+                for (int rank = 1; rank < m_world_size; rank++) {
+                    MPI_Send(nullptr, 0, MPI_BYTE, rank, CENTER_IS_FULL, m_center_fullness_communicator);
+                }
+                m_center_last_full_status = true;
+                m_time_centerfull_sent = MPI_Wtime();
+
+                //cout << "CENTER IS FULL" << endl;
+            }
+        }
+
+        [[deprecated]] void notify_center_free(const size_t v_current_memory) {
             // last iter, center was full but now it has space => warn others it's ok
             if (v_current_memory <= 0.9 * MAX_MEMORY_MB && m_center_queue.size() < CENTER_NBSTORED_TASKS_PER_PROCESS * m_world_size * 0.8) {
+                for (int rank = 1; rank < m_world_size; rank++) {
+                    MPI_Send(nullptr, 0, MPI_BYTE, rank, CENTER_IS_FREE, m_center_fullness_communicator);
+                }
+                m_center_last_full_status = false;
+
+                //cout << "CENTER IS NOT FULL ANYMORE" << endl;
+            }
+        }
+
+        void notify_center_free2(const size_t v_current_memory) {
+            // last iter, center was full but now it has space => warn others it's ok
+            if (v_current_memory <= 0.9 * MAX_MEMORY_MB && m_center_bundle_queue.size() < CENTER_NBSTORED_TASKS_PER_PROCESS * m_world_size * 0.8) {
                 for (int rank = 1; rank < m_world_size; rank++) {
                     MPI_Send(nullptr, 0, MPI_BYTE, rank, CENTER_IS_FREE, m_center_fullness_communicator);
                 }
@@ -788,6 +1101,29 @@ namespace gempba {
             m_stats.m_total_requested_tasks++;
         }
 
+        void send_seed(const task_packet &p_packet, const int p_runnable_id) {
+            constexpr int v_dest = 1;
+            // global synchronisation **********************
+            --m_nodes_available;
+            m_process_state[v_dest] = RUNNING_STATE;
+            // *********************************************
+
+            const int err1 = MPI_Ssend(p_packet.data(), static_cast<int>(p_packet.size()), MPI_BYTE, v_dest, TASK_FROM_CENTER, m_world_communicator); // send buffer
+            if (err1 != MPI_SUCCESS) {
+                spdlog::debug("buffer failed to send! \n");
+            }
+            const int err2 = MPI_Ssend(&p_runnable_id, 1, MPI_INT, v_dest, RUNNABLE_ID, m_world_communicator);
+            if (err2 != MPI_SUCCESS) {
+                spdlog::debug("runnable id failed to send! \n");
+            }
+
+            spdlog::debug("Seed sent \n");
+            m_sent_tasks++;
+            m_total_requests_number++;
+            m_stats.m_sent_task_count++;
+            m_stats.m_total_requested_tasks++;
+        }
+
     private:
         int m_received_tasks = 0;
         int m_sent_tasks = 0;
@@ -811,6 +1147,7 @@ namespace gempba {
         int m_destination_rank = -1;
 
         Queue<task_packet *> m_tasks_queue;
+        Queue<std::shared_ptr<task_bundle> > m_tasks_bundle_queue;
 
         MPI_Comm m_global_score_communicator; // BIDIRECTIONAL
         MPI_Comm m_center_fullness_communicator; // CENTER TO WORKER (ONLY)
@@ -957,7 +1294,7 @@ namespace gempba {
                 return m_parent.get_stats();
             }
 
-            void run(task_packet p_task) override {
+            [[deprecated]] void run(task_packet p_task) override {
                 m_parent.run_center(p_task);
             }
 
