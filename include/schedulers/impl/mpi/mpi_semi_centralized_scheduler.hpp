@@ -504,6 +504,10 @@ namespace gempba {
             m_stats.m_elapsed_time = m_end_time - m_start_time - static_cast<double>(m_timeout);
         }
 
+        void run(task_packet p_task, int p_runnable_id) {
+            throw std::runtime_error("Not implemented yet");
+        }
+
         /**
          * Only returns when a message is received from any of the communicators.
          * @return MPI_Status of the received message, or std::nullopt only when all processes have finished or a timeout occurs.
@@ -930,6 +934,10 @@ namespace gempba {
 
             void run(task_packet p_task) override {
                 m_parent.run_center(p_task);
+            }
+
+            void run(const task_packet p_task, const int p_runnable_id) override {
+                m_parent.run(p_task, p_runnable_id);
             }
 
             task_packet get_result() override {

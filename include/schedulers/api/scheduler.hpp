@@ -62,6 +62,8 @@ namespace gempba {
              */
             virtual void run(task_packet p_task) = 0;
 
+            virtual void run(task_packet p_task, int p_runnable_id) = 0;
+
             /**
              *
              * @return the best result found across all worker nodes
