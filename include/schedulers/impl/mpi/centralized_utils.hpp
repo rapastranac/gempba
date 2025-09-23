@@ -1,5 +1,6 @@
 #ifndef GEMPBA_CENTRALIZED_UTILS_HPP
 #define GEMPBA_CENTRALIZED_UTILS_HPP
+#include <utils/ipc/task_bundle.hpp>
 #include <utils/ipc/task_packet.hpp>
 
 /*
@@ -68,6 +69,26 @@ public:
     }
 };
 
+inline int get_nb_set_bits(const gempba::task_bundle &p_bundle) {
+    const gempba::task_packet &v_packet = p_bundle.get_task_packet();
+    const int v_nb_set_bits = getNbSetBits(v_packet);
+
+    const int v_runnable_id = p_bundle.get_runnable_id();
+    const int v_nb = v_nb_set_bits + getNbSetBits(static_cast<char>(v_runnable_id));
+
+    return v_nb;
+}
+
+class task_bundle_comparator {
+public:
+    bool operator()(const gempba::task_bundle &p_bundle1, const gempba::task_bundle &p_bundle2) const {
+
+        const int v_n1 = get_nb_set_bits(p_bundle1);
+        const int v_n2 = get_nb_set_bits(p_bundle2);
+
+        return (v_n1 <= v_n2);
+    }
+};
 
 /**
  * Returns the peak (maximum so far) resident set size (physical
