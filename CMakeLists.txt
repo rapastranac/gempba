@@ -69,7 +69,7 @@ file(GLOB_RECURSE Sources "src/*.cpp" "GemPBA/*.cpp")
 add_library(gempba STATIC ${Sources})
 
 # 🔧️ Add macros for the library
-target_compile_definitions(gempba PUBLIC
+target_compile_definitions(gempba PRIVATE
         $<$<BOOL:${GEMPBA_DEV_MODE}>:GEMPBA_DEV_MODE>
         $<$<BOOL:${GEMPBA_MULTIPROCESSING}>:GEMPBA_MULTIPROCESSING>
         $<$<BOOL:${GEMPBA_DEBUG_COMMENTS}>:GEMPBA_DEBUG_COMMENTS>
