@@ -26,6 +26,7 @@ List of dependencies:
 
 ## Platforms
 - Linux
+- Windows
 
 # Installation:
 ## How to include the GemPBA library in your project
