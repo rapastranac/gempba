@@ -35,8 +35,6 @@ namespace gempba {
     template<typename Ret, typename... Args>
     class result_holder;
 
-    class scheduler;
-
     class branch_handler {
 
         template<typename Ret, typename... Args>
@@ -127,7 +125,7 @@ namespace gempba {
             return m_balancing_policy;
         }
 
-        [[nodiscard]] double get_pool_idle_time() const {
+        [[deprecated]][[nodiscard]] double get_pool_idle_time() const {
             return m_thread_pool->idle_time() / static_cast<double>(m_processor_count);
         }
 
@@ -211,8 +209,12 @@ namespace gempba {
         }
 
         // get number of successful thread requests
-        [[nodiscard]] size_t number_thread_requests() const {
+        [[deprecated]] [[nodiscard]] size_t number_thread_requests() const {
             return m_thread_requests.load();
+        }
+
+        [[nodiscard]] size_t get_thread_request_count() const {
+            return m_balancer->get_thread_request_count();
         }
 
         void set_goal(const goal p_goal, const score_type p_type) {
@@ -222,11 +224,10 @@ namespace gempba {
 
         // get number for this rank
         [[nodiscard]] int rank_me() const {
-            #if GEMPBA_MULTIPROCESSING
-            return m_scheduler->rank_me();
-            #else
-            return -1; // no multiprocessing enabled
-            #endif
+            if (m_scheduler) {
+                return m_scheduler->rank_me();
+            }
+            return -1;
         }
 
         /**
@@ -592,7 +593,6 @@ namespace gempba {
         //——————— IPC related attributes and member functions ———————//
     private:
         scheduler::worker *m_scheduler;
-        #if GEMPBA_MULTIPROCESSING
         std::mutex m_ipc_mutex; // mutex to ensure funnel access to IPC
         int m_world_rank = -1; // get the rank of the process
         int m_world_size = -1; // get the number of processes/nodes
@@ -691,7 +691,6 @@ namespace gempba {
                 return result::EMPTY;
             };
         }
-        #endif
 
     private:
         template<typename Ret, typename F, typename HolderType>
