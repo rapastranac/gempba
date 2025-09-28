@@ -48,30 +48,27 @@ int run(int numThreads, int prob, std::string &filename) {
     HolderType holder(dlb, -1);
     holder.holdArgs(zero, allones, zero);
 
-    double start = branchHandler.get_wall_time();
     branchHandler.init_thread_pool(numThreads);
+    const double start = branchHandler.get_wall_time();
     branchHandler.force_local_submit<void>(function, -1, holder);
     branchHandler.wait();
-    double end = branchHandler.get_wall_time();
+    const double end = branchHandler.get_wall_time();
 
-    double idl_tm = branchHandler.get_pool_idle_time();
-    size_t rqst = branchHandler.number_thread_requests();
-
-    int solution = branchHandler.fetch_result<int>();
-    spdlog::debug("\n\n\nCover size : {} \n", solution);
-
-    spdlog::debug("Global pool idle time: {0:.6f} seconds\n\n\n", idl_tm);
-    spdlog::debug("Elapsed time: {}\n", end - start);
+    int v_solution = branchHandler.fetch_result<int>();
+    double v_global_idle_time = branchHandler.get_pool_idle_time();
+    double v_elapsed_time = end - start;
+    size_t v_number_thread_requests = branchHandler.number_thread_requests();
 
     // **************************************************************************
-
-    spdlog::debug("thread requests: {} \n", rqst);
-
-    spdlog::debug("\n\n\n");
-
+    std::cout << "\n\n\n";
+    spdlog::info("cover size: {}", v_solution);
+    spdlog::info("global pool idle time: {0:.6f} seconds", v_global_idle_time);
+    spdlog::info("elapsed time: {}", v_elapsed_time);
+    spdlog::info("thread requests: {}", v_number_thread_requests);
+    std::cout << "\n\n\n";
     // **************************************************************************
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 
