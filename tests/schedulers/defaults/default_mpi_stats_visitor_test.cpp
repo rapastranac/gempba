@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
+#include <schedulers/defaults/default_mpi_stats_visitor.hpp>
 #include <schedulers/impl/mpi/default_mpi_stats.hpp>
-#include <schedulers/impl/mpi/default_mpi_stats_visitor.hpp>
 
 TEST(default_mpi_stats_visitor_test, collects_expected_fields) {
     gempba::default_mpi_stats v_stats(42);

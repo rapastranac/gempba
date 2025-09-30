@@ -7,7 +7,7 @@
 #include <vector>
 #include <spdlog/spdlog.h>
 
-#include <schedulers/impl/mpi/default_mpi_stats_visitor.hpp>
+#include <schedulers/defaults/default_mpi_stats_visitor.hpp>
 #include <schedulers/impl/mpi/mpi_centralized_scheduler.hpp>
 #include "include/main.hpp"
 #include "include/mp_bitvect_basic_enc.hpp"
