@@ -20,8 +20,10 @@ namespace gempba {
     class branch_handler;
 
     class scheduler : public scheduler_traits {
-    public:
+    protected:
         scheduler() = default;
+
+    public:
 
         ~scheduler() override = default;
 
