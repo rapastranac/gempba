@@ -24,18 +24,14 @@
 #ifndef GEMPBA_DEFAULT_MPI_STATS_VISITOR_HPP
 #define GEMPBA_DEFAULT_MPI_STATS_VISITOR_HPP
 #include <cstddef>
-#include <memory>
 #include <schedulers/api/stats.hpp>
 #include <schedulers/api/stats_visitor.hpp>
 
 namespace gempba {
     class default_mpi_stats_visitor final : public stats_visitor {
-
+    public:
         default_mpi_stats_visitor() = default;
 
-        friend std::unique_ptr<default_mpi_stats_visitor> create_default_mpi_stats_visitor();
-
-    public:
         ~default_mpi_stats_visitor() override = default;
 
         std::size_t m_received_task_count{};
@@ -64,11 +60,6 @@ namespace gempba {
             });
         }
     };
-
-    inline std::unique_ptr<default_mpi_stats_visitor> create_default_mpi_stats_visitor() {
-        return std::unique_ptr<default_mpi_stats_visitor>(new default_mpi_stats_visitor());
-    }
-
 }
 
 #endif //GEMPBA_DEFAULT_MPI_STATS_VISITOR_HPP

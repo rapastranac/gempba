@@ -11,6 +11,8 @@
 #include <boost/container/set.hpp>
 #include <boost/unordered_set.hpp>
 
+#include "result_holder/result_holder.hpp"
+
 using namespace boost;
 
 #define gbitset dynamic_bitset<>

@@ -1,6 +1,8 @@
 #ifndef GEMPBA_MT_GRAPH_OPT_ENC_SEMI_NON_VOID_HPP
 #define GEMPBA_MT_GRAPH_OPT_ENC_SEMI_NON_VOID_HPP
 
+#include <gempba/gempba.hpp>
+#include <result_holder/result_holder.hpp>
 #include "dynamic_load_balancer/dynamic_load_balancer_handler.hpp"
 #include "VertexCover.hpp"
 

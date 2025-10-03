@@ -7,8 +7,7 @@
 #include <vector>
 #include <spdlog/spdlog.h>
 
-#include <schedulers/defaults/default_mpi_stats_visitor.hpp>
-#include <schedulers/impl/mpi/mpi_semi_centralized_scheduler.hpp>
+#include <gempba/gempba.hpp>
 #include "include/main.hpp"
 #include "include/mp_bitvec_opt_enc.hpp"
 
@@ -21,7 +20,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
     std::cout << "USING SEMI-CENTRALIZED STRATEGY" << std::endl;
 
     // NOTE: instantiated object depends on SCHEDULER_CENTRALIZED macro
-    auto &mpiScheduler = gempba::mpi_semi_centralized_scheduler::get_instance();
+    auto &mpiScheduler = *gempba::mp::create_scheduler(gempba::mp::scheduler_topology::SEMI_CENTRALIZED);
     int rank = mpiScheduler.rank_me();
     mpiScheduler.set_goal(gempba::MINIMISE, gempba::score_type::I32);
 
@@ -29,11 +28,11 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
 
     if (rank == 0) {
         // only because VertexCover is instantiated also in the center, but branch_handler is not used in the center
-        gempba::branch_handler::create(nullptr);
+        gempba::mp::create_branch_handler(nullptr, nullptr);
     } else {
-        gempba::branch_handler::create(nullptr, &mpiScheduler.worker_view());
+        gempba::mp::create_branch_handler(nullptr, &mpiScheduler.worker_view());
     }
-    auto &branchHandler = gempba::branch_handler::get_instance(); // parallel library
+    auto &branchHandler = gempba::get_branch_handler();; // parallel library
 
     VC_void_MPI_bitvec cover;
     auto function = std::bind(&VC_void_MPI_bitvec::mvcbitset, &cover, _1, _2, _3, _4, _5); // target algorithm [all arguments]
@@ -124,7 +123,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
         for (int v_rank = 0; v_rank < v_stats_vector.size(); ++v_rank) {
             std::unique_ptr<gempba::stats> &v_stats = v_stats_vector[v_rank];
 
-            std::unique_ptr<gempba::default_mpi_stats_visitor> v_visitor = gempba::create_default_mpi_stats_visitor();
+            std::unique_ptr<gempba::default_mpi_stats_visitor> v_visitor = gempba::mp::get_default_mpi_stats_visitor();
             v_stats->visit(v_visitor.get());
 
             v_received_tasks[v_rank] = v_visitor->m_received_task_count;

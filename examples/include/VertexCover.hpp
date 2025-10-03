@@ -1,22 +1,20 @@
 #ifndef VERTEXCOVER_HPP
 #define VERTEXCOVER_HPP
 
-#include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
-
-#include "Graph.hpp"
-#include <branch_handling/branch_handler.hpp>
-#include <dynamic_load_balancer/dynamic_load_balancer_handler.hpp>
-#include "result_holder/result_holder.hpp"
-#include "util.hpp"
-#include <format>
+#include <boost/archive/text_oarchive.hpp>
 
 #include <algorithm>
-#include <filesystem>
-#include <iomanip>
-#include <vector>
 #include <chrono>
 #include <ctime>
+#include <filesystem>
+#include <format>
+#include <iomanip>
+#include <vector>
+
+#include <gempba/gempba.hpp>
+#include "Graph.hpp"
+#include "util.hpp"
 
 using namespace std::placeholders;
 
@@ -336,7 +334,7 @@ protected:
 
 protected:
     gempba::dynamic_load_balancer_handler &dlb = gempba::dynamic_load_balancer_handler::getInstance();
-    gempba::branch_handler &branchHandler = gempba::branch_handler::get_instance();
+    gempba::branch_handler &branchHandler = gempba::get_branch_handler();
 
     Graph graph;
     Graph graph_res;

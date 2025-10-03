@@ -1,9 +1,11 @@
 #include "include/mt_graph_opt_enc_semi.hpp"
-#include "include/main.hpp"
+
+#include <gempba/gempba.hpp>
 #include "include/Graph.hpp"
+#include "include/main.hpp"
 
 int run(int job_id, int ntasks_per_node, int prob, string &filename) {
-    gempba::branch_handler::create(nullptr);
+    gempba::mt::create_branch_handler(nullptr);
     Graph graph;
     Graph oGraph;
     MTGraphOptimizedEncodingSemiCentralized cover;

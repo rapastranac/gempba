@@ -1,10 +1,12 @@
 #include "include/mt_graph_opt_enc_semi_non_void.hpp"
-#include "include/main.hpp"
 
 #include <string>
+#include <gempba/gempba.hpp>
+
+#include "include/main.hpp"
 
 int run(int numThreads, int prob, std::string &filename) {
-    gempba::branch_handler::create(nullptr);
+    gempba::mt::create_branch_handler(nullptr);
 
     Graph graph;
     Graph oGraph;

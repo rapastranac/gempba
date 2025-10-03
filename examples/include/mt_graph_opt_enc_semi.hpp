@@ -2,8 +2,12 @@
 #define MT_GRAPH_OPT_ENC_SEMI_HPP
 
 
+#include <gempba/gempba.hpp>
 #include <spdlog/spdlog.h>
 #include "VertexCover.hpp"
+#include <dynamic_load_balancer/dynamic_load_balancer_handler.hpp>
+
+#include "result_holder/result_holder.hpp"
 
 class MTGraphOptimizedEncodingSemiCentralized : public VertexCover {
     using HolderType = gempba::result_holder<void, int, Graph>;

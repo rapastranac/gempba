@@ -56,9 +56,17 @@ namespace gempba {
             spdlog::info("Goodbye from MPI Semi Centralized Scheduler");
         }
 
-        static mpi_semi_centralized_scheduler &get_instance(const double p_timeout = 3.0) {
-            static mpi_semi_centralized_scheduler instance(p_timeout);
-            return instance;
+        explicit mpi_semi_centralized_scheduler(const double p_timeout) :
+            m_timeout(p_timeout) {
+            if (m_timeout <= 1.0) {
+                spdlog::throw_spdlog_ex(fmt::format("Timeout must be greater than 1, got: {:.8f}", m_timeout));
+            }
+            init_mpi();
+            init_member_variables();
+            m_stats = default_mpi_stats(m_world_rank);
+            m_stats_vector.reserve(m_world_size);
+
+            spdlog::info("MPI Scheduler, instantiated!\n");
         }
 
         [[nodiscard]] int rank_me() const override {
@@ -1011,20 +1019,6 @@ namespace gempba {
         const double m_timeout; // seconds
         default_mpi_stats m_stats{-1};
         std::vector<default_mpi_stats> m_stats_vector;
-
-        /* singleton*/
-        explicit mpi_semi_centralized_scheduler(const double p_timeout) :
-            m_timeout(p_timeout) {
-            if (m_timeout <= 0) {
-                spdlog::throw_spdlog_ex(fmt::format("Timeout must be greater than 0, got: {:.8f}", m_timeout));
-            }
-            init_mpi();
-            init_member_variables();
-            m_stats = default_mpi_stats(m_world_rank);
-            m_stats_vector.reserve(m_world_size);
-
-            spdlog::info("MPI Scheduler, instantiated!\n");
-        }
 
         void init_mpi() {
             set_thread_support_level();

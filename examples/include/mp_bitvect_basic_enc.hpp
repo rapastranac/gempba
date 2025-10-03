@@ -14,6 +14,7 @@
 
 #include <utils/ipc/task_packet.hpp>
 #include "VertexCover.hpp"
+#include "result_holder/result_holder.hpp"
 
 using namespace boost;
 

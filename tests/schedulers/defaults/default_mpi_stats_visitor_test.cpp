@@ -11,7 +11,7 @@ TEST(default_mpi_stats_visitor_test, collects_expected_fields) {
     v_stats.m_idle_time = 1.5;
     v_stats.m_elapsed_time = 2.5;
 
-    const auto v_visitor = gempba::create_default_mpi_stats_visitor();
+    const auto v_visitor = std::make_unique<gempba::default_mpi_stats_visitor>();
     v_stats.visit(v_visitor.get());
 
     EXPECT_EQ(10u, v_visitor->m_received_task_count);
@@ -25,7 +25,7 @@ TEST(default_mpi_stats_visitor_test, collects_expected_fields) {
 TEST(default_mpi_stats_visitor_test, handles_default_constructed_stats) {
     const gempba::default_mpi_stats v_stats(7); // all other fields default
 
-    const auto v_visitor = gempba::create_default_mpi_stats_visitor();
+    const auto v_visitor = std::make_unique<gempba::default_mpi_stats_visitor>();
     v_stats.visit(v_visitor.get());
 
     EXPECT_EQ(0u, v_visitor->m_received_task_count);
@@ -45,7 +45,7 @@ TEST(default_mpi_stats_visitor_test, consistent_with_multiple_visits) {
     v_stats.m_idle_time = 0.5;
     v_stats.m_elapsed_time = 1.5;
 
-    const auto v_visitor = gempba::create_default_mpi_stats_visitor();
+    const auto v_visitor = std::make_unique<gempba::default_mpi_stats_visitor>();
 
     // first visit
     v_stats.visit(v_visitor.get());

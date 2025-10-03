@@ -446,8 +446,7 @@ TEST_F(node_test, delegate_locally_test) {
     auto v_load_balancer = gempba::quasi_horizontal_load_balancer(nullptr);
     v_load_balancer.set_thread_pool_size(1); // fewer threads on the pipeline runner (GitHub)
     v_load_balancer.wait(); // it guarantees that the threads in the threadpool reach the condition_variable (GitHub runner limitation)
-    gempba::branch_handler::reset_instance();
-    gempba::branch_handler &v_manager = gempba::branch_handler::create(&v_load_balancer);
+    const gempba::branch_handler v_manager(&v_load_balancer, nullptr);
 
     int v_value = 0;
 

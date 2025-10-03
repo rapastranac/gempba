@@ -63,8 +63,10 @@ namespace gempba {
         std::unique_ptr<thread_pool::Pool> m_thread_pool;
         load_balancer *const m_balancer;
 
+    public:
+        //<editor-fold desc="Construction/Destruction">
 
-        explicit branch_handler(load_balancer *p_load_balancer, scheduler::worker *p_scheduler) :
+        explicit branch_handler(load_balancer *const p_load_balancer, scheduler::worker *p_scheduler) :
             m_balancer(p_load_balancer), m_scheduler(p_scheduler) {
 
             m_processor_count = std::thread::hardware_concurrency();
@@ -74,35 +76,6 @@ namespace gempba {
                 m_world_rank = m_scheduler->rank_me();
                 m_world_size = m_scheduler->world_size();
             }
-        }
-
-        // Singleton instance
-        static std::unique_ptr<branch_handler> m_instance;
-
-    public:
-        //<editor-fold desc="Construction/Destruction">
-        static branch_handler &create(load_balancer *p_load_balancer, scheduler::worker *p_worker = nullptr) {
-            if (!m_instance) {
-                if (!p_load_balancer) {
-                    // TODO... to be enforced
-                }
-                m_instance = std::unique_ptr<branch_handler>(new branch_handler(p_load_balancer, p_worker));
-            }
-            return *m_instance;
-        }
-
-        static branch_handler &get_instance() {
-            if (!m_instance) {
-                spdlog::throw_spdlog_ex("Instance not created yet. Call create() first.");
-            }
-            return *m_instance;
-        }
-
-        /**
-         * Resets the singleton instance.
-         */
-        static void reset_instance() {
-            m_instance.reset();
         }
 
         ~branch_handler() = default;
