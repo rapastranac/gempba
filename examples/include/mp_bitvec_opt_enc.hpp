@@ -11,116 +11,20 @@
 #include <utils/ipc/task_packet.hpp>
 #include "VertexCover.hpp"
 #include "result_holder/result_holder.hpp"
-
-using namespace boost;
-
-#define gbitset dynamic_bitset<>
-
-namespace boost {
-    namespace serialization {
-
-        template<typename Ar, typename Block, typename Alloc>
-        void save(Ar &ar, dynamic_bitset<Block, Alloc> const &bs, unsigned) {
-
-
-            /*dynamic_bitset<Block, Alloc> dummy(bs);
-            dummy.resize( bs.size() * 100 );
-
-            size_t num_bits = dummy.size();
-                std::vector<Block> blocks(dummy.num_blocks());
-                to_block_range(dummy, blocks.begin());
-                ar &num_bits &blocks;*/
-
-            size_t num_bits = bs.size();
-            std::vector<Block> blocks(bs.num_blocks());
-            to_block_range(bs, blocks.begin());
-            ar & num_bits & blocks;
-        }
-
-        template<typename Ar, typename Block, typename Alloc>
-        void load(Ar &ar, dynamic_bitset<Block, Alloc> &bs, unsigned) {
-            size_t num_bits;
-            std::vector<Block> blocks;
-            ar & num_bits & blocks;
-
-            bs.resize(num_bits);
-            from_block_range(blocks.begin(), blocks.end(), bs);
-
-            bs.resize(num_bits);
-            //bs.resize(num_bits / 100);
-        }
-
-        template<typename Ar, typename Block, typename Alloc>
-        void serialize(Ar &ar, dynamic_bitset<Block, Alloc> &bs, unsigned version) {
-            split_free(ar, bs, version);
-        }
-
-    }
-}
-
-void helper_ser(auto &archive, auto &first) {
-    archive << first;
-}
-
-void helper_ser(auto &archive, auto &first, auto &... args) {
-    archive << first;
-    helper_ser(archive, args...);
-}
-
-auto serializer = [](auto &&... args) {
-    /* here inside, user can implement its favourite serialization method given the
-	arguments pack and it must return a std::string */
-    std::stringstream ss;
-    //cereal::BinaryOutputArchive archive(ss);
-    //archive(args...);
-    boost::archive::text_oarchive archive(ss);
-    helper_ser(archive, args...);
-    return gempba::task_packet(ss.str());
-};
-
-template<typename T>
-std::function<gempba::task_packet(T&)> make_single_serializer() {
-    return [&](T &p_arg) {
-        auto v_ser = serializer(p_arg);
-        return v_ser;
-    };
-}
-
-
-void helper_dser(auto &archive, auto &first) {
-    archive >> first;
-}
-
-void helper_dser(auto &archive, auto &first, auto &... args) {
-    archive >> first;
-    helper_dser(archive, args...);
-}
-
-auto deserializer = [](std::stringstream &ss, auto &... args) {
-    /* here inside, the user can implement its favourite deserialization method given buffer
-	and the arguments pack*/
-    //cereal::BinaryInputArchive archive(ss);
-    boost::archive::text_iarchive archive(ss);
-
-    helper_dser(archive, args...);
-    //archive(args...);
-};
+#include "optimized_encoding_utils.hpp"
 
 class VC_void_MPI_bitvec : public VertexCover {
-    //using HolderType = gempba::ResultHolder<void, int, gbitset, int, std::vector<int>>;
-    using HolderType = gempba::result_holder<void, int, gbitset, int>;
+    using HolderType = gempba::result_holder<void, int, G_BITSET, int>;
 
-private:
-    std::function<void(int, int, gbitset &, int, void *)> _f;
-    //std::function<void(int, int, gbitset &, int, std::vector<int>, void *)> _f;
+    std::function<void(int, int, G_BITSET &, int, void *)> _f;
 
 public:
-    //vector<boost::unordered_set<pair<gbitset,int>>> seen;
+    //vector<boost::unordered_set<pair<G_BITSET,int>>> seen;
     long is_skips;
     long deglb_skips;
     long seen_skips;
 
-    unordered_map<int, gbitset > graphbits;
+    unordered_map<int, G_BITSET > graphbits;
     std::atomic<size_t> passes;
     std::mutex mtx;
 
@@ -140,7 +44,7 @@ public:
 
         /*for (int i = 0; i <= numThreads; i++)
 		{
-			seen.push_back(boost::unordered_set<pair<gbitset,int>>());
+			seen.push_back(boost::unordered_set<pair<G_BITSET,int>>());
 		}*/
 
         passes = 0;
@@ -171,7 +75,7 @@ public:
         for (auto it = adj2.begin(); it != adj2.end(); ++it) {
             int v = it->first;
 
-            gbitset vnbrs(gsize);
+            G_BITSET vnbrs(gsize);
 
             for (int i: it->second) {
                 vnbrs[i] = true;
@@ -182,14 +86,14 @@ public:
         //check for evil degree 0 vertices
         for (int i = 0; i < gsize; ++i) {
             if (!graphbits.contains(i)) {
-                graphbits[i] = gbitset(gsize);
+                graphbits[i] = G_BITSET(gsize);
             }
         }
     }
 
 
-    //void mvcbitset(int id, int depth, gbitset &bits_in_graph, int solsize, std::vector<int> dummy, void *parent)
-    void mvcbitset(int id, int depth, gbitset &bits_in_graph, int solsize, void *parent = nullptr) {
+    //void mvcbitset(int id, int depth, G_BITSET &bits_in_graph, int solsize, std::vector<int> dummy, void *parent)
+    void mvcbitset(int id, int depth, G_BITSET &bits_in_graph, int solsize, void *parent = nullptr) {
 
         //{                                                   // 1 MB, emulates heavy messaging
         //    std::random_device rd;                          // Will be used to obtain a seed for the random number engine
@@ -242,7 +146,7 @@ public:
 
         /*if (bits_in_graph.count() <= 90 && bits_in_graph.count() >= 120 )
 		{
-			pair<gbitset, int> instance_key = make_pair(bits_in_graph, cursol_size);
+			pair<G_BITSET, int> instance_key = make_pair(bits_in_graph, cursol_size);
 			if (seen[id].find(instance_key) != seen[id].end())
 			{
 				seen_skips++;
@@ -269,9 +173,9 @@ public:
             maxdeg_v = 0;
             someRuleApplies = false;
 
-            for (size_t i = bits_in_graph.find_first(); i != gbitset::npos; i = bits_in_graph.find_next(i)) {
+            for (size_t i = bits_in_graph.find_first(); i != G_BITSET::npos; i = bits_in_graph.find_next(i)) {
 
-                gbitset nbrs = (graphbits[i] & bits_in_graph);
+                G_BITSET nbrs = (graphbits[i] & bits_in_graph);
 
                 int cnt = nbrs.count();
                 if (cnt == 0) {
@@ -303,9 +207,9 @@ public:
                     }
                     /*
 					{
-						for (int j = nbrs.find_first(); j != gbitset::npos; j = nbrs.find_next(j))
+						for (int j = nbrs.find_first(); j != G_BITSET::npos; j = nbrs.find_next(j))
 						{
-							gbitset nbrs_of_j = (graphbits[j] & bits_in_graph);
+							G_BITSET nbrs_of_j = (graphbits[j] & bits_in_graph);
 							nbrs_of_j.set(i, false);
 							nbrs_of_j.set(j, true);
 							if ((nbrs_of_j & nbrs) == nbrs)
@@ -369,13 +273,13 @@ public:
 
         hol_l.bind_branch_checkIn([&] {
             int bestVal = branchHandler.get_score().get<int>();
-            gbitset ingraph1 = bits_in_graph;
+            G_BITSET ingraph1 = bits_in_graph;
 
             if (!ingraph1[maxdeg_v]) {
                 cout << "ERROR : maxdeg_v already gone" << endl;
             }
             ingraph1.set(maxdeg_v, false);
-            //gbitset sol1 = cur_sol;
+            //G_BITSET sol1 = cur_sol;
             //sol1.set(maxdeg_v, true);
             int solsize1 = cursol_size + 1;
 
@@ -391,11 +295,11 @@ public:
         hol_r.bind_branch_checkIn([&] {
             int bestVal = branchHandler.get_score().get<int>();
             //right branch = take out v nbrs
-            gbitset ingraph2 = bits_in_graph;
+            G_BITSET ingraph2 = bits_in_graph;
 
             ingraph2 = bits_in_graph & (~graphbits[maxdeg_v]);
-            gbitset nbrs = (graphbits[maxdeg_v] & bits_in_graph);
-            //gbitset sol2 = cur_sol | nbrs;	//add all nbrs to solution
+            G_BITSET nbrs = (graphbits[maxdeg_v] & bits_in_graph);
+            //G_BITSET sol2 = cur_sol | nbrs;	//add all nbrs to solution
             int solsize2 = cursol_size + nbrs.count();
 
             if (solsize2 < bestVal) {

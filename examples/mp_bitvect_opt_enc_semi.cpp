@@ -50,8 +50,8 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
     cover.setGraph(graph);
 
     int gsize = graph.adj.size() + 1; //+1 cuz some files use node ids from 1 to n (instead of 0 to n - 1)
-    gbitset allzeros(gsize);
-    gbitset allones = ~allzeros;
+    G_BITSET allzeros(gsize);
+    G_BITSET allones = ~allzeros;
 
     branchHandler.set_score(gempba::score::make(gsize)); // thus, all processes know the best value so far
     branchHandler.set_goal(gempba::MINIMISE, gempba::score_type::I32);
@@ -86,7 +86,7 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
         */
         branchHandler.init_thread_pool(threads_per_task);
 
-        std::function<std::shared_ptr<gempba::result_holder_parent>(gempba::task_packet)> bufferDecoder = branchHandler.construct_buffer_decoder<void, int, gbitset, int>(
+        std::function<std::shared_ptr<gempba::result_holder_parent>(gempba::task_packet)> bufferDecoder = branchHandler.construct_buffer_decoder<void, int, G_BITSET, int>(
                 function, deserializer);
         utils::print_ipc_debug_comments("Buffer decoded fetched successfully!\n");
         v_worker_view.run(branchHandler, bufferDecoder);
