@@ -15,20 +15,20 @@
 
 using namespace boost;
 
-#define gbitset dynamic_bitset<>
+#define G_BITSET dynamic_bitset<>
 
 class VC_void_bitvec : public VertexCover {
-    using HolderType = gempba::result_holder<void, int, gbitset, int>;
+    using HolderType = gempba::result_holder<void, int, G_BITSET, int>;
 
 private:
-    std::function<void(int, int, gbitset &, int, void *)> _f;
+    std::function<void(int, int, G_BITSET &, int, void *)> _f;
 
 public:
     long is_skips;
     long deglb_skips;
     long seen_skips;
 
-    unordered_map<int, gbitset > graphbits;
+    unordered_map<int, G_BITSET > graphbits;
     std::atomic<size_t> passes;
     std::mutex mtx;
 
@@ -69,7 +69,7 @@ public:
         for (auto it = adj2.begin(); it != adj2.end(); ++it) {
             int v = it->first;
 
-            gbitset vnbrs(gsize);
+            G_BITSET vnbrs(gsize);
 
             for (int i: it->second) {
                 vnbrs[i] = true;
@@ -80,12 +80,12 @@ public:
         //check for evil degree 0 vertices
         for (int i = 0; i < gsize; ++i) {
             if (!graphbits.contains(i)) {
-                graphbits[i] = gbitset(gsize);
+                graphbits[i] = G_BITSET(gsize);
             }
         }
     }
 
-    void mvcbitset(int id, int depth, gbitset &bits_in_graph, int solsize, void *parent) {
+    void mvcbitset(int id, int depth, G_BITSET &bits_in_graph, int solsize, void *parent) {
 
         //{                                                   // 1 MB, emulates heavy messaging
         //    std::random_device rd;                          // Will be used to obtain a seed for the random number engine
@@ -149,9 +149,9 @@ public:
             maxdeg_v = 0;
             someRuleApplies = false;
 
-            for (int i = bits_in_graph.find_first(); i != gbitset::npos; i = bits_in_graph.find_next(i)) {
+            for (int i = bits_in_graph.find_first(); i != G_BITSET::npos; i = bits_in_graph.find_next(i)) {
 
-                gbitset nbrs = (graphbits[i] & bits_in_graph);
+                G_BITSET nbrs = (graphbits[i] & bits_in_graph);
 
                 int cnt = nbrs.count();
                 if (cnt == 0) {
@@ -228,7 +228,7 @@ public:
 
         hol_l.bind_branch_checkIn([&] {
             int bestVal = branchHandler.get_score().get<int>();
-            gbitset ingraph1 = bits_in_graph;
+            G_BITSET ingraph1 = bits_in_graph;
             ingraph1.set(maxdeg_v, false);
             int solsize1 = cursol_size + 1;
 
@@ -244,10 +244,10 @@ public:
         hol_r.bind_branch_checkIn([&] {
             int bestVal = branchHandler.get_score().get<int>();
             //right branch = take out v nbrs
-            gbitset ingraph2 = bits_in_graph;
+            G_BITSET ingraph2 = bits_in_graph;
 
             ingraph2 = bits_in_graph & (~graphbits[maxdeg_v]);
-            gbitset nbrs = (graphbits[maxdeg_v] & bits_in_graph);
+            G_BITSET nbrs = (graphbits[maxdeg_v] & bits_in_graph);
             int solsize2 = cursol_size + nbrs.count();
 
             if (solsize2 < bestVal) {

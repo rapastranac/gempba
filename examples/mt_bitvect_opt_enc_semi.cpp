@@ -10,7 +10,7 @@
 
 
 int run(int numThreads, int prob, std::string &filename) {
-    using HolderType = gempba::result_holder<void, int, gbitset, int>;
+    using HolderType = gempba::result_holder<void, int, G_BITSET, int>;
 
     auto &branchHandler = gempba::mt::create_branch_handler(nullptr); // parallel library
     auto &dlb = gempba::dynamic_load_balancer_handler::getInstance();
@@ -29,8 +29,8 @@ int run(int numThreads, int prob, std::string &filename) {
     cover.setGraph(graph);
 
     int gsize = graph.adj.size() + 1; //+1 cuz some files use node ids from 1 to n (instead of 0 to n - 1)
-    gbitset allzeros(gsize);
-    gbitset allones = ~allzeros;
+    G_BITSET allzeros(gsize);
+    G_BITSET allones = ~allzeros;
 
     branchHandler.set_score(gempba::score::make(gsize));
     branchHandler.set_goal(gempba::MINIMISE, gempba::score_type::I32);
