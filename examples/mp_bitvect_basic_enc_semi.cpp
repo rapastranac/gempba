@@ -51,8 +51,8 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
     cover.setGraph(graph);
 
     int gsize = graph.adj.size() + 1; //+1 cuz some files use node ids from 1 to n (instead of 0 to n - 1)
-    gbitset allzeros(gsize);
-    gbitset allones = ~allzeros;
+    G_BITSET allzeros(gsize);
+    G_BITSET allones = ~allzeros;
 
     branchHandler.set_score(gempba::score::make(gsize)); // thus, all processes know the best value so far
     branchHandler.set_goal(gempba::MINIMISE, gempba::score_type::I32);
