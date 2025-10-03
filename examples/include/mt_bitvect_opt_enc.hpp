@@ -24,7 +24,6 @@ private:
     std::function<void(int, int, gbitset &, int, void *)> _f;
 
 public:
-    //vector<boost::unordered_set<pair<gbitset,int>>> seen;
     long is_skips;
     long deglb_skips;
     long seen_skips;
@@ -41,12 +40,6 @@ public:
         is_skips = 0;
         deglb_skips = 0;
         seen_skips = 0;
-        //this->branchHandler.setMaxThreads(numThreads);
-
-        /*for (int i = 0; i <= numThreads; i++)
-        {
-            seen.push_back(boost::unordered_set<pair<gbitset,int>>());
-        }*/
 
         passes = 0;
         int gsize = graph.adj.size() + 1; //+1 cuz some files use node ids from 1 to n (instead of 0 to n - 1)
@@ -142,21 +135,6 @@ public:
             return;
         }
 
-        /*if (bits_in_graph.count() <= 90 && bits_in_graph.count() >= 120 )
-        {
-            pair<gbitset, int> instance_key = make_pair(bits_in_graph, cursol_size);
-            if (seen[id].find(instance_key) != seen[id].end())
-            {
-                seen_skips++;
-                return;
-            }
-
-            if (seen[id].size() <= 4000000)
-            {
-                seen[id].insert(instance_key);
-            }
-        }*/
-
         //max degree dude
         int maxdeg = 0;
         int maxdeg_v = 0;
@@ -203,27 +181,6 @@ public:
                             someRuleApplies = true;
                         }
                     }
-                    /*
-                    {
-                        for (int j = nbrs.find_first(); j != gbitset::npos; j = nbrs.find_next(j))
-                        {
-                            gbitset nbrs_of_j = (graphbits[j] & bits_in_graph);
-                            nbrs_of_j.set(i, false);
-                            nbrs_of_j.set(j, true);
-                            if ((nbrs_of_j & nbrs) == nbrs)
-                            {
-                                //cout<<"we have twins at (i, j)="<<i<<","<<j<<endl<<
-                                //	nbrs<<endl<<(graphbits[j] & bits_in_graph)<<endl<<(nbrs_of_j & nbrs)<<endl;
-                                cur_sol[j] = true;
-                                cursol_size++;
-                                //bits_in_graph[i] = false;
-                                bits_in_graph[j] = false;
-                                someRuleApplies = true;
-                                break;
-                            }
-
-                        }
-                    }*/
                 }
                 nbEdgesDoubleCounted += cnt;
             }
@@ -273,8 +230,6 @@ public:
             int bestVal = branchHandler.get_score().get<int>();
             gbitset ingraph1 = bits_in_graph;
             ingraph1.set(maxdeg_v, false);
-            //gbitset sol1 = cur_sol;
-            //sol1.set(maxdeg_v, true);
             int solsize1 = cursol_size + 1;
 
             if (solsize1 < bestVal) {
@@ -293,13 +248,10 @@ public:
 
             ingraph2 = bits_in_graph & (~graphbits[maxdeg_v]);
             gbitset nbrs = (graphbits[maxdeg_v] & bits_in_graph);
-            //gbitset sol2 = cur_sol | nbrs;	//add all nbrs to solution
             int solsize2 = cursol_size + nbrs.count();
 
             if (solsize2 < bestVal) {
                 hol_r.holdArgs(newDepth, ingraph2, solsize2);
-                //auto cpy = dummy;
-                //hol_r.holdArgs(newDepth, ingraph2, solsize2, cpy);
                 return true;
             } else
                 return false;
