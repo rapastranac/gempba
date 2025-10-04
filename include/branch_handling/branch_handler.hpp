@@ -234,7 +234,7 @@ namespace gempba {
             m_balancer->set_thread_pool_size(p_size);
         }
 
-        [[nodiscard]] balancing_policy get_balancing_policy2() const {
+        [[nodiscard]] balancing_policy get_balancing_policy() const {
             return m_balancer->get_balancing_policy();
         }
 
