@@ -14,7 +14,6 @@
 
 
 class mp_bitvector_basic_encoding final : public VertexCover {
-    using HolderType = gempba::result_holder<void, int, BitGraph, int>;
 
     std::function<void(std::thread::id, int, BitGraph, int, gempba::node)> m_function;
     std::function<gempba::task_packet(int, BitGraph, int)> m_args_serializer;

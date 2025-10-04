@@ -5,12 +5,10 @@
 #include <gempba/gempba.hpp>
 #include <spdlog/spdlog.h>
 #include "VertexCover.hpp"
-#include <dynamic_load_balancer/dynamic_load_balancer_handler.hpp>
 
 #include "node_trace/factory/node_factory.hpp"
 
 class mt_graph_optimized_encoding_semi_centralized final : public VertexCover {
-    using HolderType = gempba::result_holder<void, int, Graph>;
 
     gempba::branch_handler &m_branch_handler;
     gempba::load_balancer &m_load_balancer;

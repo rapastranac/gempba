@@ -8,7 +8,6 @@
 // TODO... The whole algorithm passes by value, which is not efficient. We should pass by reference.
 
 class mt_graph_opt_enc_semi_non_void final : public VertexCover {
-    using HolderType = gempba::result_holder<Graph, int, Graph>;
 
     gempba::branch_handler &m_branch_handler;
     gempba::load_balancer &m_load_balancer;

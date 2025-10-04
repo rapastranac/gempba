@@ -14,7 +14,6 @@
 #include <utility>
 #include <variant>
 #include <bits/stdc++.h>
-#include <dynamic_load_balancer/dynamic_load_balancer_handler.hpp>
 #include <load_balancing/api/load_balancer.hpp>
 #include <schedulers/api/scheduler.hpp>
 #include <spdlog/spdlog.h>
@@ -36,7 +35,6 @@ namespace gempba {
 
         std::variant<std::any, task_packet> m_result{};
 
-        dynamic_load_balancer_handler &m_load_balancer = dynamic_load_balancer_handler::getInstance();
         balancing_policy m_balancing_policy = QUASI_HORIZONTAL;
 
         score m_score = score::make(INT_MIN);
