@@ -8,7 +8,6 @@
 #include <dynamic_load_balancer/dynamic_load_balancer_handler.hpp>
 
 #include "node_trace/factory/node_factory.hpp"
-#include "result_holder/result_holder.hpp"
 
 class mt_graph_optimized_encoding_semi_centralized final : public VertexCover {
     using HolderType = gempba::result_holder<void, int, Graph>;

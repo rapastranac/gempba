@@ -14,7 +14,6 @@
 #include <string>
 #include <thread>
 
-#include <result_holder/result_holder_parent.hpp>
 #include <schedulers/api/scheduler.hpp>
 #include <schedulers/impl/mpi/default_mpi_stats.hpp>
 #include <spdlog/spdlog.h>

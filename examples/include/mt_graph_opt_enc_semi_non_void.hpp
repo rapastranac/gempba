@@ -2,7 +2,6 @@
 #define GEMPBA_MT_GRAPH_OPT_ENC_SEMI_NON_VOID_HPP
 
 #include <gempba/gempba.hpp>
-#include <result_holder/result_holder.hpp>
 #include "VertexCover.hpp"
 #include "node_trace/factory/node_factory.hpp"
 
