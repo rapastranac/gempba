@@ -467,7 +467,7 @@ TEST_F(node_test, delegate_locally_test) {
         ASSERT_TRUE(v_submitted);
     }
 
-    v_manager.wait2();
+    v_manager.wait();
 
     ASSERT_EQ(42, v_value); // 7 * 6 = 42
 }

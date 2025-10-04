@@ -60,7 +60,7 @@ public:
                 m_branch_handler.try_local_submit(seed_node);
             }
             //************************************************
-            m_branch_handler.wait2();
+            m_branch_handler.wait();
             const optional<Graph> v_result_opt = m_branch_handler.get_result<Graph>();
             if (v_result_opt) {
                 graph_res = v_result_opt.value();

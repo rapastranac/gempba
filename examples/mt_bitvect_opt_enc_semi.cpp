@@ -52,7 +52,7 @@ int run(const int p_threads_per_task, const int p_probability, const std::string
     if (!v_submitted) {
         throw std::runtime_error("unable to submit seed node");
     }
-    v_branch_handler.wait2();
+    v_branch_handler.wait();
     const double v_end_time = gempba::branch_handler::get_wall_time();
 
     const gempba::score v_score = v_branch_handler.get_score();

@@ -262,8 +262,7 @@ namespace gempba {
             return m_balancer->get_idle_time();
         }
 
-        void wait2() const {
-            // TODO ... to be renamed
+        void wait() const {
             m_balancer->wait();
         }
 

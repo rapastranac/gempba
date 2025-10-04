@@ -67,5 +67,5 @@ TEST(serial_runnable_void_test, test) {
 
     ASSERT_FALSE(v_optional.has_value());
 
-    v_branch_handler.wait2(); // gives time to the internal thread pool to execute the function
+    v_branch_handler.wait(); // gives time to the internal thread pool to execute the function
 }
