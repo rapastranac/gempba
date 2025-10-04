@@ -49,11 +49,9 @@ public:
     MOCK_METHOD(int, rank_me, (), ( const ,override));
     MOCK_METHOD(int, world_size, (), (const ,override));
     MOCK_METHOD(void, run, (gempba::branch_handler &branch_handler, (std::map<int, std::shared_ptr<gempba::serial_runnable>> p_runnables)), (override));
-    MOCK_METHOD(void, push, (gempba::task_packet &&p_task), (override));
     MOCK_METHOD(unsigned int, force_push, (gempba::task_packet &&p_task, int p_function_id), (override));
     MOCK_METHOD(std::optional<gempba::transmission_guard>, try_open_transmission_channel, (), (override));
     MOCK_METHOD(std::unique_ptr<gempba::stats>, get_stats, (), ( const, override));
-    MOCK_METHOD(void, run, (gempba::branch_handler &p_branch_handler, (std::function<std::shared_ptr<gempba::result_holder_parent>(gempba::task_packet)> &p_buffer_decoder)), ( override));
     MOCK_METHOD(unsigned int, next_process, (), (const, override));
 };
 

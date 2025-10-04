@@ -209,8 +209,8 @@ public:
                 << "\n";
 
         col1 = "Idle time:";
-        col2 = std::to_string(branchHandler.idle_time());
-        string col3 = std::to_string((branchHandler.idle_time() * 100.0 / (elapsed_secs * 1.0e-9))) + "%";
+        col2 = std::to_string(branchHandler.get_idle_time());
+        string col3 = std::to_string((branchHandler.get_idle_time() * 100.0 / (elapsed_secs * 1.0e-9))) + "%";
 
         cout << std::left << std::setw(wide * 0.3)
                 << col1
@@ -228,8 +228,8 @@ public:
                 << "\n";
 
         col1 = "Pool idle time:";
-        col2 = Util::ToString((double) (branchHandler.get_pool_idle_time()));
-        col3 = Util::ToString((double) (branchHandler.get_pool_idle_time() * 100.0 / (elapsed_secs * 1.0e-9))) + "%";
+        col2 = Util::ToString(branchHandler.get_idle_time());
+        col3 = Util::ToString(branchHandler.get_idle_time() * 100.0 / (elapsed_secs * 1.0e-9)) + "%";
 
         cout << std::left << std::setw(wide * 0.3)
                 << col1
@@ -247,7 +247,7 @@ public:
                 << "\n";
 
         col1 = "Successful requests:";
-        col2 = std::to_string(branchHandler.number_thread_requests());
+        col2 = std::to_string(branchHandler.get_thread_request_count());
         cout << std::internal
                 << col1
                 << std::setfill(' ')
@@ -280,8 +280,8 @@ public:
                 << Util::ToString((double) (elapsed_secs * 1.0e-9)) << ","
                 << Util::ToString((int) leaves) << ","
                 << Util::ToString((int) measured_Depth) << ","
-                << Util::ToString((double) (branchHandler.idle_time() * 1.0e-9)) << ","
-                << Util::ToString((double) (branchHandler.get_pool_idle_time())) << "\n";
+                << Util::ToString(branchHandler.get_idle_time() * 1.0e-9) << ","
+                << Util::ToString(branchHandler.get_idle_time()) << "\n";
         output_raw.close();
     }
 

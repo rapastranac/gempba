@@ -57,13 +57,6 @@ namespace gempba {
         public:
             ~center() override = default;
 
-            /**
-             * Runs the scheduler for the center node
-             *
-             * @param p_task task to be broadcast to the first available worker node
-             */
-            [[deprecated]] virtual void run(task_packet p_task) = 0;
-
             virtual void run(task_packet p_task, int p_runnable_id) = 0;
 
             /**
@@ -89,24 +82,7 @@ namespace gempba {
         public:
             ~worker() override = default;
 
-            /**
-            * Runs the scheduler for the worker node
-            *
-            * @param p_branch_handler Reference to the branch handler that manages task distribution and result collection.
-            * @param p_buffer_decoder Function to decode incoming task packets into result holders.
-            */
-            [[deprecated]] virtual void run(branch_handler &p_branch_handler, std::function<std::shared_ptr<result_holder_parent>(task_packet)> &p_buffer_decoder) = 0;
-
             virtual void run(branch_handler &p_branch_handler, std::map<int, std::shared_ptr<serial_runnable> > p_runnables) = 0;
-
-            /**
-            * Pushes a message to the next assigned process. This method is not thread-safe. Sending channel must be opened before calling this
-            * and closed after calling it. Use try_open_transmission_channel() to manage the sending channel.
-            * Use judiciously. So far, this is only called within the node_manager. It is public just to avoid making the node_manager a friend class.
-            *
-            * @param p_task The serialized message to be sent.
-            */
-            [[deprecated]] virtual void push(task_packet &&p_task) = 0;
 
             virtual unsigned int force_push(task_packet &&p_task, int p_function_id) = 0;
 

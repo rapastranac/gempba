@@ -463,7 +463,7 @@ private:
                 << "\n";
 
         v_col1 = "Successful requests:";
-        v_col2 = std::to_string(m_branch_handler.number_thread_requests());
+        v_col2 = std::to_string(m_branch_handler.get_thread_request_count());
         cout << std::internal
                 << v_col1
                 << std::setfill(' ')
