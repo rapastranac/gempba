@@ -211,7 +211,7 @@ namespace gempba {
                 switch (v_status.MPI_TAG) {
                     case TERMINATION: {
                         process_termination(v_status);
-                        collect_stats_data2(p_branch_handler);
+                        collect_stats_data(p_branch_handler);
                         v_is_terminated = true; // temporary, it should always happen
                         spdlog::debug("rank {} received termination", m_world_rank);
                         break;
@@ -309,7 +309,7 @@ namespace gempba {
             MPI_Barrier(m_world_communicator);
         }
 
-        void collect_stats_data2(const branch_handler &p_branch_handler);
+        void collect_stats_data(const branch_handler &p_branch_handler);
 
         void receive_score_from_center(MPI_Status p_status) {
             utils::print_ipc_debug_comments("rank {}, about to receive global score from Center\n", m_world_rank);
@@ -360,11 +360,11 @@ namespace gempba {
             utils::print_ipc_debug_comments("rank {}, pushed buffer to thread pool \n", m_world_rank, p_status.MPI_SOURCE);
             // **********************************************************************************************
 
-            task_funneling2(p_branch_handler);
+            task_funneling(p_branch_handler);
             notify_available_state();
         }
 
-        void task_funneling2(branch_handler &p_branch_handler);
+        void task_funneling(branch_handler &p_branch_handler);
 
         std::optional<MPI_Status> probe_score_comm_at_node() {
             int v_is_message_received = 0; // logical
@@ -458,7 +458,7 @@ namespace gempba {
             return v_score;
         }
 
-        void clear_buffer2() {
+        void clear_buffer() {
             if (m_center_bundle_queue.empty())
                 return;
 
@@ -494,7 +494,7 @@ namespace gempba {
             send_seed(p_seed, p_runnable_id);
 
             while (true) {
-                auto v_status_opt = probe_communicators_at_center2();
+                auto v_status_opt = probe_communicators_at_center();
                 if (!v_status_opt.has_value()) {
                     spdlog::info("rank {}: probe_communicators_center received TIMEOUT, exiting center run", m_world_rank);
                     break;
@@ -519,13 +519,13 @@ namespace gempba {
                         break;
                     }
                     case TASK_FOR_CENTER: {
-                        process_task_for_center2(v_status);
+                        process_task_for_center(v_status);
                     }
                     break;
                 }
 
-                clear_buffer2();
-                monitor_and_notify_center_status2();
+                clear_buffer();
+                monitor_and_notify_center_status();
             }
 
             spdlog::debug("CENTER HAS TERMINATED");
@@ -544,7 +544,7 @@ namespace gempba {
             m_stats.m_elapsed_time = m_end_time - m_start_time - static_cast<double>(m_timeout);
         }
 
-        std::optional<MPI_Status> probe_communicators_at_center2() {
+        std::optional<MPI_Status> probe_communicators_at_center() {
             long v_cycles = 0;
             static int branch = 0;
             while (true) {
@@ -556,8 +556,8 @@ namespace gempba {
                                 return v_optional;
                             }
                             // if no message received, check for center fullness
-                            clear_buffer2();
-                            monitor_and_notify_center_status2();
+                            clear_buffer();
+                            monitor_and_notify_center_status();
                             break;
                         }
                         case 1: {
@@ -654,7 +654,7 @@ namespace gempba {
             m_stats.m_total_requested_tasks++;
         }
 
-        void process_task_for_center2(MPI_Status p_status) {
+        void process_task_for_center(MPI_Status p_status) {
             int v_buffer_char_count;
             MPI_Get_count(&p_status, MPI_BYTE, &v_buffer_char_count);
             task_packet v_task(v_buffer_char_count);
@@ -691,17 +691,17 @@ namespace gempba {
         }
 
 
-        void monitor_and_notify_center_status2() {
+        void monitor_and_notify_center_status() {
             const size_t v_current_memory = getCurrentRSS() / (1024 * 1024); // ram usage in megabytes
 
             if (m_center_last_full_status) {
-                notify_center_free2(v_current_memory);
+                notify_center_free(v_current_memory);
             } else {
-                notify_center_full2(v_current_memory);
+                notify_center_full(v_current_memory);
             }
         }
 
-        void notify_center_full2(const size_t v_current_memory) {
+        void notify_center_full(const size_t v_current_memory) {
             // last iter, center wasn't full but now it is => warn nodes to stop sending
             if (v_current_memory > MAX_MEMORY_MB || m_center_bundle_queue.size() > CENTER_NBSTORED_TASKS_PER_PROCESS * m_world_size) {
                 for (int rank = 1; rank < m_world_size; rank++) {
@@ -714,7 +714,7 @@ namespace gempba {
             }
         }
 
-        void notify_center_free2(const size_t v_current_memory) {
+        void notify_center_free(const size_t v_current_memory) {
             // last iter, center was full but now it has space => warn others it's ok
             if (v_current_memory <= 0.9 * MAX_MEMORY_MB && m_center_bundle_queue.size() < CENTER_NBSTORED_TASKS_PER_PROCESS * m_world_size * 0.8) {
                 for (int rank = 1; rank < m_world_size; rank++) {
