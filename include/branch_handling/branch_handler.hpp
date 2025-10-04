@@ -266,8 +266,7 @@ namespace gempba {
             m_balancer->wait();
         }
 
-        [[nodiscard]] bool is_done2() const {
-            // TODO ... to be renamed
+        [[nodiscard]] bool is_done() const {
             return m_balancer->is_done();
         }
 

@@ -66,7 +66,7 @@ namespace gempba {
 
             v_is_pop = m_tasks_bundle_queue.pop(v_bundle);
 
-            if (!v_is_pop && p_branch_handler.is_done2()) {
+            if (!v_is_pop && p_branch_handler.is_done()) {
                 /* by the time this thread realises that the thread pool has no more tasks,
                     another buffer might have been pushed, which should be verified in the next line*/
                 v_is_pop = m_tasks_bundle_queue.pop(v_bundle);
