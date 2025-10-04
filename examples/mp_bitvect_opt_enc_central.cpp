@@ -101,7 +101,7 @@ int run(int p_job_id, int p_nodes, int p_ntasks_per_node, int p_ntasks_per_socke
         v_branch_handler.set_thread_pool_size(p_threads_per_task);
 
         auto v_deser = create_deserializer();
-        auto v_runnable = gempba::serial_runnable_factory::return_none::create(v_runnable_id, v_function, v_deser);
+        auto v_runnable = gempba::mp::runnables::return_none::create(v_runnable_id, v_function, v_deser);
 
         std::map<int, std::shared_ptr<gempba::serial_runnable> > v_runnables;
         v_runnables[v_runnable->get_id()] = v_runnable;

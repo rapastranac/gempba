@@ -12,6 +12,12 @@ namespace {
     inline std::unique_ptr<gempba::branch_handler> g_branch_handler;
 }
 
+void gempba::check_not_null([[maybe_unused]] const node &p_parent) {
+    if (p_parent == nullptr) {
+        spdlog::throw_spdlog_ex("Node creation cannot have a nullptr for a parent");
+    }
+}
+
 gempba::load_balancer *gempba::mt::create_load_balancer(std::unique_ptr<load_balancer> p_your_implementation) {
     if (g_load_balancer != nullptr) {
         throw std::runtime_error("load_balancer already exists!");

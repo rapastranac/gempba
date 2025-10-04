@@ -29,9 +29,9 @@
 #include <vector>
 #include <gtest/gtest.h>
 
+#include <gempba/gempba.hpp>
 #include <load_balancing/impl/work_stealing_load_balancer.hpp>
 #include <node_trace/api/node.hpp>
-#include <runnables/factory/serial_runnable_factory.hpp>
 
 
 TEST(serial_runnable_void_test, test) {
@@ -56,7 +56,7 @@ TEST(serial_runnable_void_test, test) {
     };
     constexpr int v_id = 314;
 
-    const std::shared_ptr<gempba::serial_runnable> v_runnable = gempba::serial_runnable_factory::return_none::create(v_id, v_function, v_args_deserializer);
+    const std::shared_ptr<gempba::serial_runnable> v_runnable = gempba::mp::runnables::return_none::create(v_id, v_function, v_args_deserializer);
 
     ASSERT_EQ(314, v_runnable->get_id());
 
