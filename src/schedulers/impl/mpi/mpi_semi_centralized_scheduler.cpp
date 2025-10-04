@@ -24,13 +24,13 @@ namespace gempba {
         MPI_Send(&v_score, sizeof(score), MPI_BYTE, CENTER_NODE, HAS_RESULT, m_world_communicator);
     }
 
-    void mpi_semi_centralized_scheduler::collect_stats_data2(const branch_handler &p_branch_handler) {
+    void mpi_semi_centralized_scheduler::collect_stats_data(const branch_handler &p_branch_handler) {
         m_idle_time = p_branch_handler.get_idle_time();
         m_stats.m_idle_time = p_branch_handler.get_idle_time();
         m_stats.m_total_thread_requests = p_branch_handler.get_thread_request_count();
     }
 
-    void mpi_semi_centralized_scheduler::task_funneling2(branch_handler &p_branch_handler) {
+    void mpi_semi_centralized_scheduler::task_funneling(branch_handler &p_branch_handler) {
         std::shared_ptr<task_bundle> v_bundle;
         bool v_is_pop = m_tasks_bundle_queue.pop(v_bundle);
 

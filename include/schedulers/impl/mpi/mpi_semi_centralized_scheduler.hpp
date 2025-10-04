@@ -196,7 +196,7 @@ namespace gempba {
                 switch (v_status.MPI_TAG) {
                     case TERMINATION: {
                         process_termination(v_status);
-                        collect_stats_data2(p_branch_handler);
+                        collect_stats_data(p_branch_handler);
                         v_is_terminated = true; // temporary, it should always happen
                         spdlog::debug("rank {} received termination", m_world_rank);
                         break;
@@ -294,7 +294,7 @@ namespace gempba {
             MPI_Barrier(m_world_communicator);
         }
 
-        void collect_stats_data2(const branch_handler &p_branch_handler);
+        void collect_stats_data(const branch_handler &p_branch_handler);
 
         void receive_score_from_center(MPI_Status p_status) {
             utils::print_ipc_debug_comments("rank {}, about to receive global score from Center\n", m_world_rank);
@@ -339,11 +339,11 @@ namespace gempba {
             utils::print_ipc_debug_comments("rank {}, push task to runnable: {} \n", m_world_rank, v_runnable_id);
             // **********************************************************************************************
 
-            task_funneling2(p_branch_handler);
+            task_funneling(p_branch_handler);
             notify_available_state();
         }
 
-        void task_funneling2(branch_handler &p_branch_handler);
+        void task_funneling(branch_handler &p_branch_handler);
 
         std::optional<MPI_Status> probe_score_comm_at_node() {
             int v_is_message_received = 0; // logical
