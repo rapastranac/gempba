@@ -26,7 +26,7 @@ public:
         cout << msg_center;
         outFile(msg_center, "");
 
-        this->m_branch_handler.init_thread_pool(numThreads);
+        this->m_branch_handler.set_thread_pool_size(numThreads);
 
         //size_t _k_mm = maximum_matching(graph);
         //size_t _k_uBound = graph.max_k();

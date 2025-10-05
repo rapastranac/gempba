@@ -18,7 +18,6 @@
 #include <schedulers/api/scheduler.hpp>
 #include <spdlog/spdlog.h>
 #include <utils/gempba_utils.hpp>
-#include <utils/thread_pool.hpp>
 #include <utils/utils.hpp>
 
 /*
@@ -47,7 +46,6 @@ namespace gempba {
         unsigned int m_processor_count;
         std::atomic<long long> m_idle_time;
         std::mutex m_mutex; // local mutex
-        std::unique_ptr<thread_pool::Pool> m_thread_pool;
         load_balancer *const m_balancer;
 
     public:
@@ -80,15 +78,6 @@ namespace gempba {
         void set_balancing_policy(const balancing_policy p_strategy) {
             this->m_balancing_policy = p_strategy;
         };
-
-        [[nodiscard]] int get_pool_size() const {
-            return static_cast<int>(this->m_thread_pool->size());
-        }
-
-        void init_thread_pool(int p_pool_size) {
-            this->m_processor_count = p_pool_size;
-            m_thread_pool = std::make_unique<thread_pool::Pool>(p_pool_size);
-        }
 
         /**
          * Updates the most up-to-date result. This method attempts to update the result, and should be used only in multithreading mode. (Not multiprocessing)
