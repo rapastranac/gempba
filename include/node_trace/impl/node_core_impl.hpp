@@ -25,7 +25,9 @@
 #ifndef GEMPBA_NODE_IMPL_HPP
 #define GEMPBA_NODE_IMPL_HPP
 
+#include <any>
 #include <functional>
+#include <future>
 #include <list>
 #include <memory>
 #include <optional>
@@ -543,11 +545,11 @@ namespace gempba {
                 return std::get<std::any>(m_result);
             }
             if (std::holds_alternative<std::future<std::any> >(m_result)) {
-                auto &future = std::get<std::future<std::any> >(m_result);
-                future.wait();
-                std::any any_result = future.get();
+                auto &v_future = std::get<std::future<std::any> >(m_result);
+                v_future.wait();
+                std::any v_any_result = v_future.get();
                 this->m_state = RETRIEVED;
-                return any_result;
+                return v_any_result;
             }
             spdlog::throw_spdlog_ex("Attempting to get result of node that has not been executed");
         }

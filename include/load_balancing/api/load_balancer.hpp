@@ -25,6 +25,7 @@
 #ifndef GEMPBA_LOAD_BALANCER_HPP
 #define GEMPBA_LOAD_BALANCER_HPP
 
+#include <any>
 #include <future>
 #include <node_trace/api/node.hpp>
 #include <utils/gempba_utils.hpp>

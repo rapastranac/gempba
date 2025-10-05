@@ -47,7 +47,7 @@ namespace utils {
     }
 
     template<typename T>
-    static std::future<std::any> convert_to_any_future(std::future<T> &&p_future) {
+    std::future<std::any> convert_to_any_future(std::future<T> &&p_future) {
         std::future<std::any> any_future = std::async(std::launch::async, [fut = std::move(p_future)]() mutable {
             fut.wait();
             T result = fut.get();

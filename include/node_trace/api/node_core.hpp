@@ -24,6 +24,7 @@
 #ifndef NODE_BLOCK_HPP
 #define NODE_BLOCK_HPP
 
+#include <any>
 #include <memory>
 #include <node_trace/api/node_traits.hpp>
 #include <schedulers/api/scheduler.hpp>
