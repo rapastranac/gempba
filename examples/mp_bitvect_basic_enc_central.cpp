@@ -170,7 +170,7 @@ int run(int p_job_id, int p_nodes, int p_ntasks_per_node, int p_ntasks_per_socke
                               v_total_requests_at_center);
         // **************************************************************************
     }
-    return 0;
+    return gempba::shutdown();
 }
 
 

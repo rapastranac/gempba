@@ -19,7 +19,7 @@ int run(const int p_num_threads, const int p_probability, const std::string &fil
     cover.findCover(1);
     cover.printSolution();
 
-    return 0;
+    return gempba::shutdown();
 }
 
 

@@ -65,7 +65,7 @@ int run(const int p_threads_per_task, const int p_probability, const std::string
     spdlog::info("elapsed time: {0:.6f}", v_elapsed_time);
     spdlog::info("thread requests: {}", v_thread_request_count);
 
-    return EXIT_SUCCESS;
+    return gempba::shutdown();
 }
 
 int main(const int argc, char *argv[]) {
