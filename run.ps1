@@ -48,3 +48,5 @@ mpiexec.exe -n $TASKS_PER_NODE ./bin/mp_bitvect_opt_enc_semi $arguments
 
 #  - Graph Optimized Encoding Semi-Centralized for non-void algorithms
 #./bin/mt_graph_opt_enc_semi_non_void $arguments
+
+Write-Output "Finished run at: $( Get-Date )"
