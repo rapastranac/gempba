@@ -55,6 +55,8 @@ namespace gempba {
 
     void reset_branch_handler();
 
+    int shutdown();
+
     template<typename Ret, typename... Args>
     static node create_seed_node(load_balancer &p_load_balancer, invokable<Ret, Args...> auto &&p_runnable, std::tuple<Args...> p_args) {
         std::shared_ptr<node_core> null;

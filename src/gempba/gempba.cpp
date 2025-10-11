@@ -122,3 +122,10 @@ gempba::branch_handler &gempba::get_branch_handler() {
 void gempba::reset_branch_handler() {
     g_branch_handler.reset();
 }
+
+int gempba::shutdown() {
+    g_scheduler.reset();
+    g_load_balancer.reset();
+    g_branch_handler.reset();
+    return EXIT_SUCCESS;
+}
