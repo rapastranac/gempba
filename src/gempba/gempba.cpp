@@ -12,6 +12,20 @@ namespace {
     inline std::unique_ptr<gempba::branch_handler> g_branch_handler;
 }
 
+#if GEMPBA_DEBUG_COMMENTS
+namespace {
+    struct debug_logger_initializer {
+        debug_logger_initializer() {
+            spdlog::set_level(spdlog::level::debug);
+            spdlog::info("GEMPBA_DEBUG_COMMENTS enabled");
+        }
+    };
+
+    // create one instance that runs at static initialization time
+    inline debug_logger_initializer g_debug_logger_initializer_instance;
+} // namespace
+#endif
+
 void gempba::check_not_null([[maybe_unused]] const node &p_parent) {
     if (p_parent == nullptr) {
         spdlog::throw_spdlog_ex("Node creation cannot have a nullptr for a parent");

@@ -68,7 +68,7 @@ namespace gempba {
         ~mpi_centralized_scheduler() override {
             // MPI specific finalization
             finalize();
-            spdlog::info("Goodbye from MPI Centralized Scheduler");
+            spdlog::debug("Goodbye from MPI Centralized Scheduler");
         }
 
         explicit mpi_centralized_scheduler(const double p_timeout) :
@@ -81,7 +81,7 @@ namespace gempba {
             m_stats = default_mpi_stats(m_world_rank);
             m_stats_vector.reserve(m_world_size);
 
-            spdlog::info("MPI Scheduler, instantiated!\n");
+            spdlog::debug("MPI Scheduler, instantiated!\n");
         }
 
         [[nodiscard]] int rank_me() const override {
@@ -495,7 +495,7 @@ namespace gempba {
             while (true) {
                 auto v_status_opt = probe_communicators_at_center();
                 if (!v_status_opt.has_value()) {
-                    spdlog::info("rank {}: probe_communicators_center received TIMEOUT, exiting center run", m_world_rank);
+                    utils::print_ipc_debug_comments("rank {}: probe_communicators_center received TIMEOUT, exiting center run", m_world_rank);
                     break;
                 }
                 MPI_Status v_status = v_status_opt.value();
@@ -866,7 +866,7 @@ namespace gempba {
 
             int v_name_length;
             MPI_Get_processor_name(m_processor_name, &v_name_length);
-            spdlog::info("Process {} of {} is on {}\n", m_world_rank, m_world_size, m_processor_name);
+            spdlog::debug("Process {} of {} is on {}\n", m_world_rank, m_world_size, m_processor_name);
         }
 
         void set_thread_support_level() {
@@ -877,7 +877,7 @@ namespace gempba {
             MPI_Init_thread(argc, &argv, MPI_THREAD_FUNNELED, &v_provided);
 
             if (v_provided < MPI_THREAD_FUNNELED) {
-                spdlog::info("The threading support level is lesser than that demanded.\n");
+                spdlog::debug("The threading support level is lesser than that demanded.\n");
                 MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
             }
         }
@@ -893,7 +893,7 @@ namespace gempba {
 
             #if !GEMPBA_DEV_MODE
             if (m_world_size < 2) {
-                spdlog::info("At least two processes required !!\n");
+                spdlog::debug("At least two processes required !!\n");
                 MPI_Abort(m_world_communicator, EXIT_FAILURE);
             }
             #endif
