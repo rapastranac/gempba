@@ -11,11 +11,6 @@ if (NOT (EXISTS ${CPM_DOWNLOAD_LOCATION}))
 endif ()
 include(${CPM_DOWNLOAD_LOCATION})
 
-CPMAddPackage(NAME argparse
-        GITHUB_REPOSITORY p-ranav/argparse
-        VERSION 3.0
-        GIT_SHALLOW TRUE          # shallow clone: minimal history
-)
 CPMAddPackage(
         NAME spdlog
         GITHUB_REPOSITORY gabime/spdlog
@@ -39,6 +34,5 @@ add_library(external_libs INTERFACE)
 # Link argparse to 'external_libs'
 target_link_libraries(external_libs
         INTERFACE
-        argparse
         spdlog
         BS_thread_pool)
