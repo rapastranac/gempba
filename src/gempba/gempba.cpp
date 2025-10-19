@@ -1,6 +1,6 @@
 #include <memory>
 #include <gempba/gempba.hpp>
-#include <gempba/branch_handler.hpp>
+#include <gempba/node_manager.hpp>
 #include <impl/load_balancing/quasi_horizontal_load_balancer.hpp>
 #include <impl/load_balancing/work_stealing_load_balancer.hpp>
 #include <impl/schedulers/mpi_centralized_scheduler.hpp>
@@ -9,7 +9,7 @@
 namespace {
     inline std::unique_ptr<gempba::scheduler> g_scheduler;
     inline std::unique_ptr<gempba::load_balancer> g_load_balancer;
-    inline std::unique_ptr<gempba::branch_handler> g_branch_handler;
+    inline std::unique_ptr<gempba::node_manager> g_branch_handler;
 }
 
 #if GEMPBA_DEBUG_COMMENTS
@@ -44,7 +44,7 @@ gempba::load_balancer *gempba::mt::create_load_balancer(const balancing_policy &
     return mp::create_load_balancer(p_policy, nullptr);
 }
 
-gempba::branch_handler &gempba::mt::create_branch_handler(load_balancer *p_load_balancer) {
+gempba::node_manager &gempba::mt::create_branch_handler(load_balancer *p_load_balancer) {
     return mp::create_branch_handler(p_load_balancer, nullptr);
 }
 
@@ -98,11 +98,11 @@ std::unique_ptr<gempba::default_mpi_stats_visitor> gempba::mp::get_default_mpi_s
     return std::make_unique<default_mpi_stats_visitor>();
 }
 
-gempba::branch_handler &gempba::mp::create_branch_handler(load_balancer *p_load_balancer, scheduler::worker *p_worker) {
+gempba::node_manager &gempba::mp::create_branch_handler(load_balancer *p_load_balancer, scheduler::worker *p_worker) {
     if (g_branch_handler != nullptr) {
         throw std::runtime_error("branch_handler already exist!");
     }
-    g_branch_handler = std::make_unique<branch_handler>(p_load_balancer, p_worker);
+    g_branch_handler = std::make_unique<node_manager>(p_load_balancer, p_worker);
     return *g_branch_handler;
 }
 
@@ -125,7 +125,7 @@ void gempba::reset_load_balancer() {
     g_load_balancer.reset();
 }
 
-gempba::branch_handler &gempba::get_branch_handler() {
+gempba::node_manager &gempba::get_branch_handler() {
     if (!g_branch_handler) {
         // Temporarily disabled while I convert all the examples to new development
         throw std::runtime_error("scheduler not yet instantiated!");

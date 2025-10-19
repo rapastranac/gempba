@@ -35,7 +35,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include <gempba/branch_handler.hpp>
+#include <gempba/node_manager.hpp>
 #include <gempba/core/load_balancer.hpp>
 #include <impl/nodes/node_factory.hpp>
 
@@ -477,7 +477,7 @@ TEST_F(node_core_impl_test, remote_result_non_void) {
     v_node.set_result_serializer(v_result_serializer);
     v_node.set_result_deserializer(v_result_deserializer);
 
-    gempba::branch_handler v_branch_handler(&m_balancer_mock, nullptr);
+    gempba::node_manager v_branch_handler(&m_balancer_mock, nullptr);
     ASSERT_EQ(v_node, v_node.get_root());
     ASSERT_EQ(nullptr, v_node.get_parent());
 

@@ -27,10 +27,10 @@ public:
     std::atomic<size_t> passes;
     std::mutex mtx;
 
-    gempba::branch_handler &m_branch_handler;
+    gempba::node_manager &m_branch_handler;
     gempba::load_balancer *m_load_balancer;
 
-    mp_bitvector_basic_encoding(gempba::branch_handler &p_branch_handler, gempba::load_balancer *p_load_balancer) :
+    mp_bitvector_basic_encoding(gempba::node_manager &p_branch_handler, gempba::load_balancer *p_load_balancer) :
         m_branch_handler(p_branch_handler), m_load_balancer(p_load_balancer) {
         this->m_function = std::bind(&mp_bitvector_basic_encoding::mvcbitset, this, _1, _2, _3, _4, _5);
         this->m_args_deserializer = create_deserializer();

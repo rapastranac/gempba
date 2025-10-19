@@ -13,7 +13,7 @@
 
 using namespace std::placeholders;
 
-gempba::branch_handler &initiate_branch_handler(gempba::scheduler *p_scheduler, gempba::load_balancer *p_load_balancer) {
+gempba::node_manager &initiate_branch_handler(gempba::scheduler *p_scheduler, gempba::load_balancer *p_load_balancer) {
     if (p_scheduler->rank_me() == 0) {
         return gempba::mp::create_branch_handler(p_load_balancer, nullptr);
     }
@@ -42,7 +42,7 @@ int run(int p_job_id, int p_nodes, int p_ntasks_per_node, int p_ntasks_per_socke
     std::cout << "NUMTHREADS= " << p_threads_per_task << std::endl;
 
     gempba::load_balancer *v_load_balancer = initiate_load_balancer(v_scheduler, gempba::balancing_policy::QUASI_HORIZONTAL);
-    gempba::branch_handler &v_branch_handler = initiate_branch_handler(v_scheduler, v_load_balancer);
+    gempba::node_manager &v_branch_handler = initiate_branch_handler(v_scheduler, v_load_balancer);
 
     v_branch_handler.set_goal(gempba::MINIMISE, gempba::score_type::I32);
     v_scheduler->set_goal(gempba::MINIMISE, gempba::score_type::I32);

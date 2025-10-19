@@ -339,7 +339,7 @@ protected:
     }
 
 protected:
-    gempba::branch_handler &branchHandler = gempba::get_branch_handler();
+    gempba::node_manager &branchHandler = gempba::get_branch_handler();
 
     Graph graph;
     Graph graph_res;

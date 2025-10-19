@@ -26,7 +26,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include <gempba/branch_handler.hpp>
+#include <gempba/node_manager.hpp>
 #include <gempba/core/node.hpp>
 #include <gempba/core/node_core.hpp>
 #include <impl/load_balancing/quasi_horizontal_load_balancer.hpp>
@@ -446,7 +446,7 @@ TEST_F(node_test, delegate_locally_test) {
     auto v_load_balancer = gempba::quasi_horizontal_load_balancer(nullptr);
     v_load_balancer.set_thread_pool_size(1); // fewer threads on the pipeline runner (GitHub)
     v_load_balancer.wait(); // it guarantees that the threads in the threadpool reach the condition_variable (GitHub runner limitation)
-    const gempba::branch_handler v_manager(&v_load_balancer, nullptr);
+    const gempba::node_manager v_manager(&v_load_balancer, nullptr);
 
     int v_value = 0;
 

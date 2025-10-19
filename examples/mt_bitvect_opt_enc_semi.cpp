@@ -16,7 +16,7 @@ int run(const int p_threads_per_task, const int p_probability, const std::string
     std::cout << "NUMTHREADS= " << p_threads_per_task << std::endl;
 
     gempba::load_balancer *v_load_balancer = gempba::mt::create_load_balancer(gempba::balancing_policy::QUASI_HORIZONTAL);
-    gempba::branch_handler &v_branch_handler = gempba::mt::create_branch_handler(v_load_balancer);
+    gempba::node_manager &v_branch_handler = gempba::mt::create_branch_handler(v_load_balancer);
 
     v_branch_handler.set_goal(gempba::MINIMISE, gempba::score_type::I32);
     v_branch_handler.set_thread_pool_size(p_threads_per_task);
@@ -47,13 +47,13 @@ int run(const int p_threads_per_task, const int p_probability, const std::string
     const std::tuple<int, GBITSET, int> v_seed_args = std::make_tuple(v_zero, v_allones, v_zero);
     gempba::node v_seed = gempba::create_seed_node<void>(*v_load_balancer, v_function, v_seed_args);
 
-    const double v_start_time = gempba::branch_handler::get_wall_time();
+    const double v_start_time = gempba::node_manager::get_wall_time();
     const bool v_submitted = v_branch_handler.try_local_submit(v_seed);
     if (!v_submitted) {
         throw std::runtime_error("unable to submit seed node");
     }
     v_branch_handler.wait();
-    const double v_end_time = gempba::branch_handler::get_wall_time();
+    const double v_end_time = gempba::node_manager::get_wall_time();
 
     const gempba::score v_score = v_branch_handler.get_score();
     double v_elapsed_time = v_end_time - v_start_time;

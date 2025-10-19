@@ -29,7 +29,7 @@
 #include <future>
 #include <optional>
 
-#include <gempba/branch_handler.hpp>
+#include <gempba/node_manager.hpp>
 #include <gempba/core/node.hpp>
 #include <gempba/core/serial_runnable.hpp>
 
@@ -56,7 +56,7 @@ namespace gempba {
 
         [[nodiscard]] int get_id() const override { return m_id; }
 
-        std::optional<std::shared_future<task_packet> > operator()(branch_handler &p_branch_handler, const task_packet &p_args) override {
+        std::optional<std::shared_future<task_packet> > operator()(node_manager &p_branch_handler, const task_packet &p_args) override {
             std::tuple<Args...> v_user_args = m_args_deserializer(std::move(p_args));
 
             std::future<std::any> v_fut = p_branch_handler.force_local_submit([this, v_user_args = std::move(v_user_args)] {

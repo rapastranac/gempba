@@ -33,10 +33,10 @@ public:
     std::atomic<size_t> m_passes;
     std::mutex m_mutex;
 
-    gempba::branch_handler &m_branch_handler;
+    gempba::node_manager &m_branch_handler;
     gempba::load_balancer *m_load_balancer;
 
-    explicit mt_bitvector_optimized_encoding(gempba::branch_handler &p_branch_handler, gempba::load_balancer *p_load_balancer) :
+    explicit mt_bitvector_optimized_encoding(gempba::node_manager &p_branch_handler, gempba::load_balancer *p_load_balancer) :
         m_branch_handler(p_branch_handler), m_load_balancer(p_load_balancer) {
 
         this->m_function = std::bind(&mt_bitvector_optimized_encoding::mvcbitset, this, _1, _2, _3, _4, _5);

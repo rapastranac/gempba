@@ -10,7 +10,7 @@ int run(const int p_num_threads, const int p_probability, const std::string &fil
     Graph graph;
     Graph oGraph;
     gempba::load_balancer *v_load_balancer = gempba::mt::create_load_balancer(gempba::balancing_policy::QUASI_HORIZONTAL);
-    gempba::branch_handler &v_branch_handler = gempba::mt::create_branch_handler(v_load_balancer);
+    gempba::node_manager &v_branch_handler = gempba::mt::create_branch_handler(v_load_balancer);
     mt_graph_opt_enc_semi_non_void cover(v_branch_handler, *v_load_balancer);
 
     graph.readEdges(filename);

@@ -8,12 +8,12 @@
 
 class mt_graph_optimized_encoding_semi_centralized final : public VertexCover {
 
-    gempba::branch_handler &m_branch_handler;
+    gempba::node_manager &m_branch_handler;
     gempba::load_balancer &m_load_balancer;
     std::function<void(std::thread::id, int, Graph, gempba::node)> m_function;
 
 public:
-    explicit mt_graph_optimized_encoding_semi_centralized(gempba::branch_handler &p_branch_handler, gempba::load_balancer &p_load_balancer) :
+    explicit mt_graph_optimized_encoding_semi_centralized(gempba::node_manager &p_branch_handler, gempba::load_balancer &p_load_balancer) :
         m_branch_handler(p_branch_handler), m_load_balancer(p_load_balancer) {
         this->m_function = std::bind(&mt_graph_optimized_encoding_semi_centralized::mvc, this, _1, _2, _3, _4);
     }

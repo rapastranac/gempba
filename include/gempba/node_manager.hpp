@@ -27,7 +27,7 @@
  * rapastranac@gmail.com
  */
 namespace gempba {
-    class branch_handler {
+    class node_manager {
 
         std::atomic<size_t> m_thread_requests;
         /*This section refers to the strategy wrapping a function
@@ -52,7 +52,7 @@ namespace gempba {
     public:
         //<editor-fold desc="Construction/Destruction">
 
-        explicit branch_handler(load_balancer *const p_load_balancer, scheduler::worker *p_scheduler) :
+        explicit node_manager(load_balancer *const p_load_balancer, scheduler::worker *p_scheduler) :
             m_balancer(p_load_balancer), m_scheduler(p_scheduler) {
 
             m_processor_count = std::thread::hardware_concurrency();
@@ -64,15 +64,15 @@ namespace gempba {
             }
         }
 
-        ~branch_handler() = default;
+        ~node_manager() = default;
 
-        branch_handler(const branch_handler &) = delete;
+        node_manager(const node_manager &) = delete;
 
-        branch_handler(branch_handler &&) = delete;
+        node_manager(node_manager &&) = delete;
 
-        branch_handler &operator=(const branch_handler &) = delete;
+        node_manager &operator=(const node_manager &) = delete;
 
-        branch_handler &operator=(branch_handler &&) = delete;
+        node_manager &operator=(node_manager &&) = delete;
 
         //</editor-fold>
 

@@ -8,12 +8,12 @@
 
 class mt_graph_opt_enc_semi_non_void final : public VertexCover {
 
-    gempba::branch_handler &m_branch_handler;
+    gempba::node_manager &m_branch_handler;
     gempba::load_balancer &m_load_balancer;
     std::function<Graph(std::thread::id, int, Graph, gempba::node)> m_function;
 
 public:
-    mt_graph_opt_enc_semi_non_void(gempba::branch_handler &p_branch_handler, gempba::load_balancer &p_load_balancer) :
+    mt_graph_opt_enc_semi_non_void(gempba::node_manager &p_branch_handler, gempba::load_balancer &p_load_balancer) :
         m_branch_handler(p_branch_handler), m_load_balancer(p_load_balancer) {
         this->m_function = std::bind(&mt_graph_opt_enc_semi_non_void::mvc, this, _1, _2, _3, _4);
     }
