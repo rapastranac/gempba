@@ -123,7 +123,7 @@ TEST(tree_test, invalid_release) {
 std::string get_test_resource_path(const std::string& p_name) {
     namespace fs = std::filesystem;
     const fs::path v_file_path = __FILE__;  // expands to something like /path/to/tests/test_tree.cpp
-    return (v_file_path.parent_path() / "resources" / p_name).string();
+    return (v_file_path.parent_path().parent_path().parent_path() / "resources" / p_name).string();
 }
 
 std::string load_resource(const std::string& p_filename) {
