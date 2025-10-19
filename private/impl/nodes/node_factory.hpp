@@ -28,7 +28,7 @@
 #include <memory>
 #include <optional>
 #include <utility>
-#include <node_trace/impl/node_core_impl.hpp>
+#include <gempba/detail/nodes/node_core_impl.hpp>
 #include <load_balancing/api/load_balancer.hpp>
 
 /**
