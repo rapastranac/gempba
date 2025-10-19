@@ -26,7 +26,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include <branch_handling/branch_handler.hpp>
+#include <gempba/branch_handler.hpp>
 #include <gempba/core/node.hpp>
 #include <gempba/core/node_core.hpp>
 #include <impl/load_balancing/quasi_horizontal_load_balancer.hpp>

@@ -35,7 +35,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include <branch_handling/branch_handler.hpp>
+#include <gempba/branch_handler.hpp>
 #include <gempba/core/load_balancer.hpp>
 #include <impl/nodes/node_factory.hpp>
 

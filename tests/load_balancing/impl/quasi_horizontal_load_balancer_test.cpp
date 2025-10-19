@@ -28,7 +28,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include <branch_handling/branch_handler.hpp>
+#include <gempba/branch_handler.hpp>
 #include <gempba/core/scheduler.hpp>
 #include <gempba/core/serial_runnable.hpp>
 #include <gempba/detail/nodes/node_core_impl.hpp>

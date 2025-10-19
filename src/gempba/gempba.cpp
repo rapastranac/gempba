@@ -1,6 +1,6 @@
 #include <memory>
 #include <gempba/gempba.hpp>
-#include <branch_handling/branch_handler.hpp>
+#include <gempba/branch_handler.hpp>
 #include <impl/load_balancing/quasi_horizontal_load_balancer.hpp>
 #include <impl/load_balancing/work_stealing_load_balancer.hpp>
 #include <impl/schedulers/mpi_centralized_scheduler.hpp>
