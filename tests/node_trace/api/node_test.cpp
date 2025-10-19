@@ -27,10 +27,10 @@
 #include <gtest/gtest.h>
 
 #include <branch_handling/branch_handler.hpp>
-#include <load_balancing/impl/quasi_horizontal_load_balancer.hpp>
+#include <impl/load_balancing/quasi_horizontal_load_balancer.hpp>
 #include <node_trace/api/node.hpp>
 #include <node_trace/api/node_core.hpp>
-#include <node_trace/factory/node_factory.hpp>
+#include <impl/nodes/node_factory.hpp>
 
 
 class node_core_mock final : public gempba::node_core {

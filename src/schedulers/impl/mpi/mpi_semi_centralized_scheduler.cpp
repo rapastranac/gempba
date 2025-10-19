@@ -1,5 +1,5 @@
 #include <branch_handling/branch_handler.hpp>
-#include <schedulers/impl/mpi/mpi_semi_centralized_scheduler.hpp>
+#include <impl/schedulers/mpi_semi_centralized_scheduler.hpp>
 
 namespace gempba {
     void mpi_semi_centralized_scheduler::send_final_solution_to_center(branch_handler &p_branch_handler) const {

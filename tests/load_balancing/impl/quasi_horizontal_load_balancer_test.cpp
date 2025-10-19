@@ -29,7 +29,7 @@
 #include <gtest/gtest.h>
 
 #include <branch_handling/branch_handler.hpp>
-#include <load_balancing/impl/quasi_horizontal_load_balancer.hpp>
+#include <impl/load_balancing/quasi_horizontal_load_balancer.hpp>
 #include <node_trace/impl/node_core_impl.hpp>
 #include <runnables/api/serial_runnable.hpp>
 #include <schedulers/api/scheduler.hpp>

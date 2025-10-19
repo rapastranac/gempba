@@ -1,10 +1,10 @@
 #include <memory>
 #include <gempba/gempba.hpp>
 #include <branch_handling/branch_handler.hpp>
-#include <load_balancing/impl/quasi_horizontal_load_balancer.hpp>
-#include <load_balancing/impl/work_stealing_load_balancer.hpp>
-#include <schedulers/impl/mpi/mpi_centralized_scheduler.hpp>
-#include <schedulers/impl/mpi/mpi_semi_centralized_scheduler.hpp>
+#include <impl/load_balancing/quasi_horizontal_load_balancer.hpp>
+#include <impl/load_balancing/work_stealing_load_balancer.hpp>
+#include <impl/schedulers/mpi_centralized_scheduler.hpp>
+#include <impl/schedulers/mpi_semi_centralized_scheduler.hpp>
 
 namespace {
     inline std::unique_ptr<gempba::scheduler> g_scheduler;

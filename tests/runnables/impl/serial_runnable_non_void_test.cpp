@@ -30,7 +30,7 @@
 #include <gtest/gtest.h>
 
 #include <gempba/gempba.hpp>
-#include <load_balancing/impl/work_stealing_load_balancer.hpp>
+#include <impl/load_balancing/work_stealing_load_balancer.hpp>
 #include <node_trace/api/node.hpp>
 
 

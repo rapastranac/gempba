@@ -15,7 +15,7 @@
 #include <thread>
 
 #include <schedulers/api/scheduler.hpp>
-#include <schedulers/impl/mpi/default_mpi_stats.hpp>
+#include <impl/schedulers/default_mpi_stats.hpp>
 #include <spdlog/spdlog.h>
 #include <utils/Queue.hpp>
 #include <utils/gempba_utils.hpp>

@@ -49,6 +49,7 @@ find_package(MPI REQUIRED)
 include_directories(${MPI_INCLUDE_PATH})
 include_directories(include)
 include_directories(GemPBA)
+include_directories(private)
 
 # 📦 Subprojects
 add_subdirectory(external)

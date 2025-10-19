@@ -37,7 +37,7 @@
 #include <test_utils.hpp>
 #include <branch_handling/branch_handler.hpp>
 #include <load_balancing/api/load_balancer.hpp>
-#include <node_trace/factory/node_factory.hpp>
+#include <impl/nodes/node_factory.hpp>
 
 
 /**
