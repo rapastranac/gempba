@@ -4,14 +4,14 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <gempba/utils/gempba_utils.hpp>
+#include <gempba/utils/result.hpp>
+#include <gempba/utils/score.hpp>
+#include <gempba/utils/task_packet.hpp>
+#include <gempba/utils/transmission_guard.hpp>
+#include <gempba/utils/tree.hpp>
 #include <runnables/api/serial_runnable.hpp>
 #include <schedulers/api/scheduler_traits.hpp>
-#include <utils/gempba_utils.hpp>
-#include <utils/transmission_guard.hpp>
-#include <utils/tree.hpp>
-#include <utils/ipc/result.hpp>
-#include <utils/ipc/score.hpp>
-#include <utils/ipc/task_packet.hpp>
 
 namespace gempba {
 

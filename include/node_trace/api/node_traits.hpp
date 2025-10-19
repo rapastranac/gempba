@@ -31,7 +31,7 @@
 
 #include <node_trace/api/serializable.hpp>
 #include <schedulers/api/scheduler.hpp>
-#include <utils/ipc/task_packet.hpp>
+#include <gempba/utils/task_packet.hpp>
 
 namespace gempba {
 

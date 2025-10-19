@@ -29,10 +29,10 @@
 #include <set>
 #include <thread>
 
+#include <gempba/utils/transmission_guard.hpp>
+#include <gempba/utils/utils.hpp>
 #include <load_balancing/api/load_balancer.hpp>
 #include <node_trace/api/node.hpp>
-#include <utils/transmission_guard.hpp>
-#include <utils/utils.hpp>
 
 /**
  * @author Andres Pastrana

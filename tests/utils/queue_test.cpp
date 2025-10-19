@@ -23,7 +23,7 @@
  */
 #include <memory>
 #include <gtest/gtest.h>
-#include <utils/Queue.hpp>
+#include <gempba/utils/Queue.hpp>
 
 struct my_struct {
     int m_value;

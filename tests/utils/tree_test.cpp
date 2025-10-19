@@ -25,7 +25,7 @@
 #include <filesystem>
 #include <fstream>
 #include <gtest/gtest.h>
-#include <utils/tree.hpp>
+#include <gempba/utils/tree.hpp>
 
 TEST(tree_test, constructor) {
     const tree instance;

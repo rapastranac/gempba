@@ -25,8 +25,8 @@
 #include <future>
 #include <gtest/gtest.h>
 #include <string>
-#include <utils/tree.hpp>
-#include <utils/utils.hpp>
+#include <gempba/utils/tree.hpp>
+#include <gempba/utils/utils.hpp>
 
 /**
  * @author Andres Pastrana

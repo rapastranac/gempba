@@ -1,7 +1,7 @@
 #ifndef GEMPBA_CENTRALIZED_UTILS_HPP
 #define GEMPBA_CENTRALIZED_UTILS_HPP
-#include <utils/ipc/task_bundle.hpp>
-#include <utils/ipc/task_packet.hpp>
+#include <gempba/utils/task_bundle.hpp>
+#include <gempba/utils/task_packet.hpp>
 
 /*
  * Author:  David Robert Nadeau

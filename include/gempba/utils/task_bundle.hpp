@@ -23,7 +23,7 @@
  */
 #ifndef GEMPBA_TASK_BUNDLE_HPP
 #define GEMPBA_TASK_BUNDLE_HPP
-#include <utils/ipc/task_packet.hpp>
+#include <gempba/utils/task_packet.hpp>
 
 namespace gempba {
     class task_bundle {

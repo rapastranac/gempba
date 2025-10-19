@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include <utils/ipc/result.hpp>
+#include <gempba/utils/result.hpp>
 
 namespace gempba {
     const result result::EMPTY{};

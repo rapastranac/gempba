@@ -27,8 +27,8 @@
 
 #include <utility>
 
-#include <utils/ipc/score.hpp>
-#include <utils/ipc/task_packet.hpp>
+#include <gempba/utils/score.hpp>
+#include <gempba/utils/task_packet.hpp>
 
 namespace gempba {
     class result {

@@ -8,10 +8,11 @@
 #include <sstream>
 #include <thread>
 #include <tuple>
-#include <gempba/gempba.hpp>
-#include <node_trace/api/node.hpp>
 #include <spdlog/spdlog.h>
-#include <utils/ipc/task_packet.hpp>
+
+#include <gempba/gempba.hpp>
+#include <gempba/utils/task_packet.hpp>
+#include <node_trace/api/node.hpp>
 
 #include "Graph.hpp"
 #include "optimized_encoding_utils.hpp"

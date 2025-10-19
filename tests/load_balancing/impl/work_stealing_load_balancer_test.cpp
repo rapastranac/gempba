@@ -28,11 +28,11 @@
 #include <gtest/gtest.h>
 
 #include <branch_handling/branch_handler.hpp>
+#include <gempba/utils/transmission_guard.hpp>
 #include <impl/load_balancing/work_stealing_load_balancer.hpp>
 #include <runnables/api/serial_runnable.hpp>
 #include <schedulers/api/scheduler.hpp>
 #include <schedulers/api/stats.hpp>
-#include <utils/transmission_guard.hpp>
 
 /**
  * @author Andres Pastrana

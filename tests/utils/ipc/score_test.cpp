@@ -24,7 +24,7 @@
 #include <cmath>
 #include <gtest/gtest.h>
 
-#include <utils/ipc/score.hpp>
+#include <gempba/utils/score.hpp>
 
 using namespace gempba;
 

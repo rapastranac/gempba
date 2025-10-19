@@ -25,8 +25,8 @@
 #include <vector>
 #include <gtest/gtest.h>
 
-#include <utils/ipc/task_bundle.hpp>
-#include <utils/ipc/task_packet.hpp>
+#include <gempba/utils/task_bundle.hpp>
+#include <gempba/utils/task_packet.hpp>
 
 TEST(task_bundle_test, construct_with_task_packet_and_function_id) {
     const std::vector v_data = {std::byte{0x01}, std::byte{0x02}, std::byte{0x03}};

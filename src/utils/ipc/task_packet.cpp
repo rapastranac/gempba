@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include <utils/ipc/task_packet.hpp>
+#include <gempba/utils/task_packet.hpp>
 
 namespace gempba {
     const task_packet task_packet::EMPTY{};

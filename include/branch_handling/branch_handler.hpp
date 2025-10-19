@@ -17,8 +17,8 @@
 #include <load_balancing/api/load_balancer.hpp>
 #include <schedulers/api/scheduler.hpp>
 #include <spdlog/spdlog.h>
-#include <utils/gempba_utils.hpp>
-#include <utils/utils.hpp>
+#include <gempba/utils/gempba_utils.hpp>
+#include <gempba/utils/utils.hpp>
 
 /*
  * Created by Andrés Pastrana on 2019

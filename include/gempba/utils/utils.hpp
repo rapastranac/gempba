@@ -29,9 +29,9 @@
 #include <future>
 #include <spdlog/spdlog.h>
 #include <sys/time.h>
-#include <utils/gempba_utils.hpp>
-#include <utils/tree.hpp>
-#include <utils/ipc/score.hpp>
+#include <gempba/utils/gempba_utils.hpp>
+#include <gempba/utils/tree.hpp>
+#include <gempba/utils/score.hpp>
 
 
 

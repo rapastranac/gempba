@@ -27,7 +27,7 @@
 #include <future>
 #include <optional>
 
-#include <utils/ipc/task_packet.hpp>
+#include <gempba/utils/task_packet.hpp>
 
 namespace gempba {
     class branch_handler;

@@ -25,10 +25,10 @@
 #define GEMPBA_WORK_STEALING_LOAD_BALANCER_HPP
 
 #include <BS_thread_pool.hpp>
-#include <spdlog/spdlog.h>
+#include <gempba/utils/transmission_guard.hpp>
 #include <load_balancing/api/load_balancer.hpp>
 #include <node_trace/api/node.hpp>
-#include <utils/transmission_guard.hpp>
+#include <spdlog/spdlog.h>
 
 /**
  * @author Andres Pastrana

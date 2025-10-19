@@ -25,7 +25,7 @@
 #ifndef GEMPBA_SERIALIZABLE_HPP
 #define GEMPBA_SERIALIZABLE_HPP
 
-#include <utils/ipc/task_packet.hpp>
+#include <gempba/utils/task_packet.hpp>
 
 namespace gempba {
 

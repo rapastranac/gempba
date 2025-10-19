@@ -14,16 +14,16 @@
 #include <string>
 #include <thread>
 
-#include <schedulers/api/scheduler.hpp>
+#include <gempba/utils/Queue.hpp>
+#include <gempba/utils/gempba_utils.hpp>
+#include <gempba/utils/result.hpp>
+#include <gempba/utils/task_bundle.hpp>
+#include <gempba/utils/task_packet.hpp>
+#include <gempba/utils/tree.hpp>
+#include <gempba/utils/utils.hpp>
 #include <impl/schedulers/default_mpi_stats.hpp>
+#include <schedulers/api/scheduler.hpp>
 #include <spdlog/spdlog.h>
-#include <utils/Queue.hpp>
-#include <utils/gempba_utils.hpp>
-#include <utils/tree.hpp>
-#include <utils/utils.hpp>
-#include <utils/ipc/result.hpp>
-#include <utils/ipc/task_bundle.hpp>
-#include <utils/ipc/task_packet.hpp>
 
 namespace gempba {
 

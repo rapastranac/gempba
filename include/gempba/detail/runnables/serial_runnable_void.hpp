@@ -30,9 +30,9 @@
 #include <optional>
 
 #include <branch_handling/branch_handler.hpp>
+#include <gempba/utils/task_packet.hpp>
 #include <node_trace/api/node.hpp>
 #include <runnables/api/serial_runnable.hpp>
-#include <utils/ipc/task_packet.hpp>
 
 namespace gempba {
     template<typename T>

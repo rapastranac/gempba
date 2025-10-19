@@ -26,7 +26,7 @@
 #include <vector>
 #include <gtest/gtest.h>
 
-#include <utils/ipc/task_packet.hpp>
+#include <gempba/utils/task_packet.hpp>
 
 
 TEST(task_packet_test, construct_from_size) {

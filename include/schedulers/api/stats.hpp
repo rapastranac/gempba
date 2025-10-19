@@ -28,7 +28,7 @@
 #include <functional>
 #include <string>
 #include <vector>
-#include <utils/ipc/task_packet.hpp>
+#include <gempba/utils/task_packet.hpp>
 
 namespace gempba {
     class stats_visitor;
