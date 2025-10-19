@@ -30,9 +30,9 @@
 #include <memory>
 #include <functional>
 
-#include <node_trace/api/node_core.hpp>
-#include <node_trace//api/node_traits.hpp>
-#include <schedulers/api/scheduler.hpp>
+#include <gempba/core/node_core.hpp>
+#include <gempba/core/node_traits.hpp>
+#include <gempba/core/scheduler.hpp>
 
 
 /**

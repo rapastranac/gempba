@@ -26,8 +26,8 @@
 
 #include <BS_thread_pool.hpp>
 #include <gempba/utils/transmission_guard.hpp>
-#include <load_balancing/api/load_balancer.hpp>
-#include <node_trace/api/node.hpp>
+#include <gempba/core/load_balancer.hpp>
+#include <gempba/core/node.hpp>
 #include <spdlog/spdlog.h>
 
 /**

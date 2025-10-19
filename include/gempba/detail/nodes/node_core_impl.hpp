@@ -37,8 +37,8 @@
 #include <utility>
 #include <variant>
 
-#include <load_balancing/api/load_balancer.hpp>
-#include <node_trace/api/node_core.hpp>
+#include <gempba/core/load_balancer.hpp>
+#include <gempba/core/node_core.hpp>
 
 /**
  * @author Andres Pastrana

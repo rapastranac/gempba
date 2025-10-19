@@ -29,8 +29,8 @@
 #include <future>
 #include <optional>
 #include <branch_handling/branch_handler.hpp>
-#include <node_trace/api/node.hpp>
-#include <runnables/api/serial_runnable.hpp>
+#include <gempba/core/node.hpp>
+#include <gempba/core/serial_runnable.hpp>
 
 namespace gempba {
     template<typename T>

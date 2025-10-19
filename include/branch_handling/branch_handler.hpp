@@ -14,9 +14,10 @@
 #include <utility>
 #include <variant>
 #include <bits/stdc++.h>
-#include <load_balancing/api/load_balancer.hpp>
-#include <schedulers/api/scheduler.hpp>
 #include <spdlog/spdlog.h>
+
+#include <gempba/core/load_balancer.hpp>
+#include <gempba/core/scheduler.hpp>
 #include <gempba/utils/gempba_utils.hpp>
 #include <gempba/utils/utils.hpp>
 

@@ -31,8 +31,8 @@
 
 #include <gempba/utils/transmission_guard.hpp>
 #include <gempba/utils/utils.hpp>
-#include <load_balancing/api/load_balancer.hpp>
-#include <node_trace/api/node.hpp>
+#include <gempba/core/load_balancer.hpp>
+#include <gempba/core/node.hpp>
 
 /**
  * @author Andres Pastrana

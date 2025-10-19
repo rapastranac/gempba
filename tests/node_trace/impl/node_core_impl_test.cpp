@@ -24,6 +24,7 @@
 
 #include <functional>
 #include <future>
+#include <test_utils.hpp>
 #include <thread>
 #include <tuple>
 #include <utility>
@@ -34,9 +35,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include <test_utils.hpp>
 #include <branch_handling/branch_handler.hpp>
-#include <load_balancing/api/load_balancer.hpp>
+#include <gempba/core/load_balancer.hpp>
 #include <impl/nodes/node_factory.hpp>
 
 

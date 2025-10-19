@@ -14,7 +14,9 @@
 #include <string>
 #include <thread>
 #include <unistd.h>
+#include <spdlog/spdlog.h>
 
+#include <gempba/core/scheduler.hpp>
 #include <gempba/utils/Queue.hpp>
 #include <gempba/utils/gempba_utils.hpp>
 #include <gempba/utils/result.hpp>
@@ -24,8 +26,6 @@
 #include <gempba/utils/utils.hpp>
 #include <impl/schedulers/centralized_utils.hpp>
 #include <impl/schedulers/default_mpi_stats.hpp>
-#include <schedulers/api/scheduler.hpp>
-#include <spdlog/spdlog.h>
 
 // max memory is in mb, e.g. 1024 * 10 = 10 GB
 #define MAX_MEMORY_MB (1024 * 10)

@@ -29,8 +29,8 @@
 #include <list>
 #include <thread>
 
-#include <node_trace/api/serializable.hpp>
-#include <schedulers/api/scheduler.hpp>
+#include <gempba/core/serializable.hpp>
+#include <gempba/core/scheduler.hpp>
 #include <gempba/utils/task_packet.hpp>
 
 namespace gempba {

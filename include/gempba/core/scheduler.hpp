@@ -10,8 +10,8 @@
 #include <gempba/utils/task_packet.hpp>
 #include <gempba/utils/transmission_guard.hpp>
 #include <gempba/utils/tree.hpp>
-#include <runnables/api/serial_runnable.hpp>
-#include <schedulers/api/scheduler_traits.hpp>
+#include <gempba/core/serial_runnable.hpp>
+#include <gempba/core/scheduler_traits.hpp>
 
 namespace gempba {
 

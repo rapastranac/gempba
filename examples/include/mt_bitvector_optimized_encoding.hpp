@@ -10,7 +10,7 @@
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/container/flat_map.hpp>
 #include <gempba/gempba.hpp>
-#include <node_trace/api/node.hpp>
+#include <gempba/core/node.hpp>
 #include <spdlog/spdlog.h>
 
 #include "Graph.hpp"

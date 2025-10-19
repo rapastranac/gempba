@@ -27,9 +27,9 @@
 #include <gtest/gtest.h>
 
 #include <branch_handling/branch_handler.hpp>
+#include <gempba/core/node.hpp>
+#include <gempba/core/node_core.hpp>
 #include <impl/load_balancing/quasi_horizontal_load_balancer.hpp>
-#include <node_trace/api/node.hpp>
-#include <node_trace/api/node_core.hpp>
 #include <impl/nodes/node_factory.hpp>
 
 

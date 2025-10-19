@@ -26,8 +26,8 @@
 
 #include <any>
 #include <memory>
-#include <node_trace/api/node_traits.hpp>
-#include <schedulers/api/scheduler.hpp>
+#include <gempba/core/node_traits.hpp>
+#include <gempba/core/scheduler.hpp>
 
 namespace gempba {
     class node_core : public node_traits<std::shared_ptr<node_core> > {

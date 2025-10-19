@@ -30,8 +30,8 @@
 #include <gtest/gtest.h>
 
 #include <gempba/gempba.hpp>
+#include <gempba/core/node.hpp>
 #include <impl/load_balancing/work_stealing_load_balancer.hpp>
-#include <node_trace/api/node.hpp>
 
 
 TEST(serial_runnable_non_void_test, test) {

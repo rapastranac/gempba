@@ -28,8 +28,8 @@
 #include <memory>
 #include <optional>
 #include <utility>
+#include <gempba/core/load_balancer.hpp>
 #include <gempba/detail/nodes/node_core_impl.hpp>
-#include <load_balancing/api/load_balancer.hpp>
 
 /**
  * @author Andres Pastrana

@@ -11,8 +11,8 @@
 #include <spdlog/spdlog.h>
 
 #include <gempba/gempba.hpp>
+#include <gempba/core/node.hpp>
 #include <gempba/utils/task_packet.hpp>
-#include <node_trace/api/node.hpp>
 
 #include "Graph.hpp"
 #include "optimized_encoding_utils.hpp"

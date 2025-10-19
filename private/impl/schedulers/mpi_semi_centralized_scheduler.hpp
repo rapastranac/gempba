@@ -13,7 +13,9 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <spdlog/spdlog.h>
 
+#include <gempba/core/scheduler.hpp>
 #include <gempba/utils/Queue.hpp>
 #include <gempba/utils/gempba_utils.hpp>
 #include <gempba/utils/result.hpp>
@@ -22,8 +24,6 @@
 #include <gempba/utils/tree.hpp>
 #include <gempba/utils/utils.hpp>
 #include <impl/schedulers/default_mpi_stats.hpp>
-#include <schedulers/api/scheduler.hpp>
-#include <spdlog/spdlog.h>
 
 namespace gempba {
 
