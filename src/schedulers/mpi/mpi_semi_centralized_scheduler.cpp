@@ -2,8 +2,8 @@
 #include <impl/schedulers/mpi_semi_centralized_scheduler.hpp>
 
 namespace gempba {
-    void mpi_semi_centralized_scheduler::send_final_solution_to_center(node_manager &p_branch_handler) const {
-        auto v_bytes_opt = p_branch_handler.get_result_bytes();
+    void mpi_semi_centralized_scheduler::send_final_solution_to_center(node_manager &p_node_manager) const {
+        auto v_bytes_opt = p_node_manager.get_result_bytes();
 
         if (!v_bytes_opt.has_value()) {
             MPI_Send(nullptr, 0, MPI_BYTE, CENTER_NODE, NO_RESULT, m_world_communicator);
@@ -24,13 +24,13 @@ namespace gempba {
         MPI_Send(&v_score, sizeof(score), MPI_BYTE, CENTER_NODE, HAS_RESULT, m_world_communicator);
     }
 
-    void mpi_semi_centralized_scheduler::collect_stats_data(const node_manager &p_branch_handler) {
-        m_idle_time = p_branch_handler.get_idle_time();
-        m_stats.m_idle_time = p_branch_handler.get_idle_time();
-        m_stats.m_total_thread_requests = p_branch_handler.get_thread_request_count();
+    void mpi_semi_centralized_scheduler::collect_stats_data(const node_manager &p_node_manager) {
+        m_idle_time = p_node_manager.get_idle_time();
+        m_stats.m_idle_time = p_node_manager.get_idle_time();
+        m_stats.m_total_thread_requests = p_node_manager.get_thread_request_count();
     }
 
-    void mpi_semi_centralized_scheduler::task_funneling(node_manager &p_branch_handler) {
+    void mpi_semi_centralized_scheduler::task_funneling(node_manager &p_node_manager) {
         std::shared_ptr<task_bundle> v_bundle;
         bool v_is_pop = m_tasks_bundle_queue.pop(v_bundle);
 
@@ -60,13 +60,13 @@ namespace gempba {
                 maybe_receive_score_from_center();
                 maybe_receive_next_process();
 
-                update_score(p_branch_handler);
+                update_score(p_node_manager);
                 update_next_process();
             }
 
             v_is_pop = m_tasks_bundle_queue.pop(v_bundle);
 
-            if (!v_is_pop && p_branch_handler.is_done()) {
+            if (!v_is_pop && p_node_manager.is_done()) {
                 /* by the time this thread realises that the thread pool has no more tasks,
                     another buffer might have been pushed, which should be verified in the next line*/
                 v_is_pop = m_tasks_bundle_queue.pop(v_bundle);
@@ -83,12 +83,12 @@ namespace gempba {
         }
     }
 
-    void mpi_semi_centralized_scheduler::update_score(node_manager &p_branch_handler) {
+    void mpi_semi_centralized_scheduler::update_score(node_manager &p_node_manager) {
         const score v_global_score_temp = m_global_score; // constant within this scope
-        const score v_local_score_temp = p_branch_handler.get_score(); // constant within this scope
+        const score v_local_score_temp = p_node_manager.get_score(); // constant within this scope
 
         if (should_update_local(m_goal, v_global_score_temp, v_local_score_temp)) {
-            p_branch_handler.try_update_score_and_invalidate_result(v_global_score_temp);
+            p_node_manager.try_update_score_and_invalidate_result(v_global_score_temp);
         } else if (should_update_global(m_goal, v_global_score_temp, v_local_score_temp)) {
             MPI_Ssend(&v_local_score_temp, sizeof(score), MPI_BYTE, CENTER_NODE, SCORE_PROPOSAL, m_global_score_communicator);
         }

@@ -82,7 +82,7 @@ namespace gempba {
         public:
             ~worker() override = default;
 
-            virtual void run(node_manager &p_branch_handler, std::map<int, std::shared_ptr<serial_runnable> > p_runnables) = 0;
+            virtual void run(node_manager &p_node_manager, std::map<int, std::shared_ptr<serial_runnable> > p_runnables) = 0;
 
             virtual unsigned int force_push(task_packet &&p_task, int p_function_id) = 0;
 

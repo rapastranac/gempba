@@ -31,11 +31,11 @@ public:
     std::atomic<size_t> m_passes;
     std::mutex m_mutex;
 
-    gempba::node_manager &m_branch_handler;
+    gempba::node_manager &m_node_manager;
     gempba::load_balancer *m_load_balancer;
 
-    explicit mp_bitvector_optimized_encoding(gempba::node_manager &p_branch_handler, gempba::load_balancer *p_load_balancer) :
-        m_branch_handler(p_branch_handler), m_load_balancer(p_load_balancer) {
+    explicit mp_bitvector_optimized_encoding(gempba::node_manager &p_node_manager, gempba::load_balancer *p_load_balancer) :
+        m_node_manager(p_node_manager), m_load_balancer(p_load_balancer) {
 
         this->m_function = std::bind(&mp_bitvector_optimized_encoding::mvcbitset, this, _1, _2, _3, _4, _5);
         this->m_args_deserializer = create_deserializer();
@@ -114,8 +114,8 @@ public:
 
             const auto v_str = fmt::format(
                     "WR= {} ID= {} passes={} gsize={} refvalue={} solsize={} isskips={} deglbskips={} {}",
-                    m_branch_handler.rank_me(), thread_id_to_string(p_tid), m_passes.load(), p_bits_in_graph.count(),
-                    m_branch_handler.get_score().get<int>(), v_cursol_size, m_is_skips, m_deglb_skips,
+                    m_node_manager.rank_me(), thread_id_to_string(p_tid), m_passes.load(), p_bits_in_graph.count(),
+                    m_node_manager.get_score().get<int>(), v_cursol_size, m_is_skips, m_deglb_skips,
                     std::ctime(&v_time));
 
             spdlog::info(v_str);
@@ -127,8 +127,8 @@ public:
             return;
         }
 
-        if (v_cursol_size >= m_branch_handler.get_score().get<int>()) {
-            spdlog::debug("Return with solsize: {}, score: {}", v_cursol_size, m_branch_handler.get_score().to_string());
+        if (v_cursol_size >= m_node_manager.get_score().get<int>()) {
+            spdlog::debug("Return with solsize: {}, score: {}", v_cursol_size, m_node_manager.get_score().to_string());
             return;
         }
 
@@ -193,14 +193,14 @@ public:
         int v_indsetub = static_cast<int>(0.5f * (1.0f + sqrt(v_tmp)));
         const int vclb = v_nb_vertices - v_indsetub;
 
-        if (vclb + v_cursol_size >= m_branch_handler.get_score().get<int>()) {
+        if (vclb + v_cursol_size >= m_node_manager.get_score().get<int>()) {
             m_is_skips++;
             return;
         }
 
         int v_deg_lb = 0; //getDegLB(bits_in_graph, nbEdgesDoubleCounted/2);
         v_deg_lb = (v_nb_edges_double_counted / 2) / v_maxdeg;
-        if (v_deg_lb + v_cursol_size >= m_branch_handler.get_score().get<int>()) {
+        if (v_deg_lb + v_cursol_size >= m_node_manager.get_score().get<int>()) {
             m_deglb_skips++;
             return;
         }
@@ -217,7 +217,7 @@ public:
             }
             v_ingraph1.set(v_maxdeg_v, false);
             int v_solution_size1 = v_cursol_size + 1;
-            int v_best_val = m_branch_handler.get_score().get<int>();
+            int v_best_val = m_node_manager.get_score().get<int>();
 
             if (v_solution_size1 < v_best_val) {
                 return std::make_tuple(v_new_depth, v_ingraph1, v_solution_size1);
@@ -241,7 +241,7 @@ public:
             v_ingraph2 = p_bits_in_graph & (~m_graph_bits[v_maxdeg_v]);
             G_BITSET v_neighbours = (m_graph_bits[v_maxdeg_v] & p_bits_in_graph);
             int v_solutions_size2 = v_cursol_size + v_neighbours.count();
-            const int v_best_val = m_branch_handler.get_score().get<int>();
+            const int v_best_val = m_node_manager.get_score().get<int>();
 
             if (v_solutions_size2 < v_best_val) {
                 return std::make_tuple(v_new_depth, v_ingraph2, v_solutions_size2);
@@ -257,8 +257,8 @@ public:
                 m_args_deserializer
                 );
 
-        m_branch_handler.try_remote_submit(v_left, 0);
-        m_branch_handler.forward(v_right);
+        m_node_manager.try_remote_submit(v_left, 0);
+        m_node_manager.forward(v_right);
     }
 
 private:
@@ -290,15 +290,15 @@ private:
             return;
         }
 
-        if (p_solution_size < m_branch_handler.get_score().get<int>()) {
+        if (p_solution_size < m_node_manager.get_score().get<int>()) {
             spdlog::debug("About to update result: {}", p_solution_size);
             std::function<gempba::task_packet(int &)> v_serializer = make_single_serializer<int>();
-            m_branch_handler.try_update_result(p_solution_size, gempba::score::make(p_solution_size), v_serializer);
+            m_node_manager.try_update_result(p_solution_size, gempba::score::make(p_solution_size), v_serializer);
 
             const auto v_clock = std::chrono::system_clock::now();
             const std::time_t v_time = std::chrono::system_clock::to_time_t(v_clock); //it includes a "\n"
 
-            spdlog::debug("rank {}, MVC solution so far: {} @ depth : {}, {}", m_branch_handler.rank_me(), p_solution_size, p_depth, std::ctime(&v_time));
+            spdlog::debug("rank {}, MVC solution so far: {} @ depth : {}, {}", m_node_manager.rank_me(), p_solution_size, p_depth, std::ctime(&v_time));
 
         }
     }
@@ -434,8 +434,8 @@ private:
                 << "\n";
 
         v_col1 = "Idle time:";
-        v_col2 = std::to_string(m_branch_handler.get_idle_time());
-        string col3 = std::to_string((m_branch_handler.get_idle_time() * 100.0 / (elapsed_secs * 1.0e-9))) + "%";
+        v_col2 = std::to_string(m_node_manager.get_idle_time());
+        string col3 = std::to_string((m_node_manager.get_idle_time() * 100.0 / (elapsed_secs * 1.0e-9))) + "%";
 
         cout << std::left << std::setw(wide * 0.3)
                 << v_col1
@@ -453,8 +453,8 @@ private:
                 << "\n";
 
         v_col1 = "Pool idle time:";
-        v_col2 = Util::ToString((double) (m_branch_handler.get_idle_time()));
-        col3 = Util::ToString((double) (m_branch_handler.get_idle_time() * 100.0 / (elapsed_secs * 1.0e-9))) + "%";
+        v_col2 = Util::ToString((double) (m_node_manager.get_idle_time()));
+        col3 = Util::ToString((double) (m_node_manager.get_idle_time() * 100.0 / (elapsed_secs * 1.0e-9))) + "%";
 
         cout << std::left << std::setw(wide * 0.3)
                 << v_col1
@@ -472,7 +472,7 @@ private:
                 << "\n";
 
         v_col1 = "Successful requests:";
-        v_col2 = std::to_string(m_branch_handler.get_thread_request_count());
+        v_col2 = std::to_string(m_node_manager.get_thread_request_count());
         cout << std::internal
                 << v_col1
                 << std::setfill(' ')
@@ -505,8 +505,8 @@ private:
                 << Util::ToString((double) (elapsed_secs * 1.0e-9)) << ","
                 << Util::ToString((int) leaves) << ","
                 << Util::ToString((int) measured_Depth) << ","
-                << Util::ToString(m_branch_handler.get_idle_time() * 1.0e-9) << ","
-                << Util::ToString(m_branch_handler.get_idle_time()) << "\n";
+                << Util::ToString(m_node_manager.get_idle_time() * 1.0e-9) << ","
+                << Util::ToString(m_node_manager.get_idle_time()) << "\n";
         output_raw.close();
     }
 
@@ -517,8 +517,8 @@ private:
     void recurrent_msg(int id) {
         auto clock = std::chrono::system_clock::now();
         std::time_t time = std::chrono::system_clock::to_time_t(clock); //it includes a "\n"
-        string col1 = fmt::format("VC = {}", m_branch_handler.get_score().to_string());
-        string col2 = fmt::format("process {}, thread {}, {}", m_branch_handler.rank_me(), id, std::ctime(&time));
+        string col1 = fmt::format("VC = {}", m_node_manager.get_score().to_string());
+        string col2 = fmt::format("process {}, thread {}, {}", m_node_manager.rank_me(), id, std::ctime(&time));
         cout << std::internal
                 << std::setfill('.')
                 << col1

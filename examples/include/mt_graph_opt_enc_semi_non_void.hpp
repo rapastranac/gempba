@@ -8,13 +8,13 @@
 
 class mt_graph_opt_enc_semi_non_void final : public VertexCover {
 
-    gempba::node_manager &m_branch_handler;
+    gempba::node_manager &m_node_manager;
     gempba::load_balancer &m_load_balancer;
     std::function<Graph(std::thread::id, int, Graph, gempba::node)> m_function;
 
 public:
-    mt_graph_opt_enc_semi_non_void(gempba::node_manager &p_branch_handler, gempba::load_balancer &p_load_balancer) :
-        m_branch_handler(p_branch_handler), m_load_balancer(p_load_balancer) {
+    mt_graph_opt_enc_semi_non_void(gempba::node_manager &p_node_manager, gempba::load_balancer &p_load_balancer) :
+        m_node_manager(p_node_manager), m_load_balancer(p_load_balancer) {
         this->m_function = std::bind(&mt_graph_opt_enc_semi_non_void::mvc, this, _1, _2, _3, _4);
     }
 
@@ -27,7 +27,7 @@ public:
         cout << msg_center;
         outFile(msg_center, "");
 
-        this->branchHandler.set_thread_pool_size(numThreads);
+        this->m_node_manager.set_thread_pool_size(numThreads);
         preSize = graph.preprocessing();
 
         size_t k_mm = maximum_matching(graph);
@@ -39,7 +39,7 @@ public:
         begin = std::chrono::steady_clock::now();
 
         try {
-            branchHandler.set_score(gempba::score::make(currentMVCSize));
+            m_node_manager.set_score(gempba::score::make(currentMVCSize));
 
             const auto dummy_node = gempba::create_dummy_node(m_load_balancer);
             const Graph result = mvc(std::this_thread::get_id(), 0, graph, dummy_node);
@@ -62,7 +62,7 @@ public:
         end = std::chrono::steady_clock::now();
         elapsed_secs = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
 
-        printf("refGlobal : %d \n", branchHandler.get_score().get<int>());
+        printf("refGlobal : %d \n", m_node_manager.get_score().get<int>());
         return true;
     }
 
@@ -74,7 +74,7 @@ public:
         //size_t mm = maximum_matching(graph);
         //size_t k = relaxation(k1, k2);
 
-        if (graph.coverSize() + std::max({LB, degLB, acLB}) >= static_cast<size_t>(branchHandler.get_score().get<int>())) {
+        if (graph.coverSize() + std::max({LB, degLB, acLB}) >= static_cast<size_t>(m_node_manager.get_score().get<int>())) {
             //size_t addition = k + graph.coverSize();
             //return;
             return {};
@@ -97,17 +97,16 @@ public:
             g.clean_graph();
             //g.removeZeroVertexDegree();
             int v_cover_size = g.coverSize();
-            const int v_best_val = m_branch_handler.get_score().get<int>();
+            const int v_best_val = m_node_manager.get_score().get<int>();
 
             if (v_cover_size < v_best_val) {
                 if (v_cover_size == 0) {
-                    spdlog::error("rank {}, thread {}, cover is empty", m_branch_handler.rank_me(), thread_id_to_string(p_id));
+                    spdlog::error("rank {}, thread {}, cover is empty", m_node_manager.rank_me(), thread_id_to_string(p_id));
                     throw;
                 }
                 return std::make_tuple(depth + 1, g);
             }
             return std::nullopt;
-
         };
 
         gempba::node v_left = gempba::mt::create_lazy_node<Graph>(m_load_balancer, v_parent, m_function, v_left_args_initializer);
@@ -115,14 +114,14 @@ public:
         std::function<std::optional<std::tuple<int, Graph> >()> v_right_args_initializer = [&]() -> std::optional<std::tuple<int, Graph> > {
             Graph g = graph;
             if (g.empty()) {
-                spdlog::error("rank {}, thread {}, Graph is empty\n", m_branch_handler.rank_me(), thread_id_to_string(p_id));
+                spdlog::error("rank {}, thread {}, Graph is empty\n", m_node_manager.rank_me(), thread_id_to_string(p_id));
                 throw;
             }
             g.removeNv(v);
             g.clean_graph();
 
             const int cover_size = g.coverSize();
-            const int v_best_val = m_branch_handler.get_score().get<int>();
+            const int v_best_val = m_node_manager.get_score().get<int>();
 
             if (cover_size < v_best_val) {
                 return std::make_tuple(depth + 1, g);
@@ -136,8 +135,8 @@ public:
                 v_right_args_initializer
                 );
 
-        branchHandler.try_local_submit(v_left);
-        branchHandler.forward(v_right);
+        m_node_manager.try_local_submit(v_left);
+        m_node_manager.forward(v_right);
 
         //*******************************************************************************************
 
@@ -157,7 +156,7 @@ public:
     }
 
     Graph termination(Graph &graph) const {
-        bool updated = branchHandler.try_update_result(graph, gempba::score::make(graph.size()));
+        bool updated = m_node_manager.try_update_result(graph, gempba::score::make(graph.size()));
 
         if (updated) {
             return graph;

@@ -16,12 +16,12 @@ int run(const int p_threads_per_task, const int p_probability, const std::string
     std::cout << "NUMTHREADS= " << p_threads_per_task << std::endl;
 
     gempba::load_balancer *v_load_balancer = gempba::mt::create_load_balancer(gempba::balancing_policy::QUASI_HORIZONTAL);
-    gempba::node_manager &v_branch_handler = gempba::mt::create_branch_handler(v_load_balancer);
+    gempba::node_manager &v_node_manager = gempba::mt::create_node_manager(v_load_balancer);
 
-    v_branch_handler.set_goal(gempba::MINIMISE, gempba::score_type::I32);
-    v_branch_handler.set_thread_pool_size(p_threads_per_task);
+    v_node_manager.set_goal(gempba::MINIMISE, gempba::score_type::I32);
+    v_node_manager.set_thread_pool_size(p_threads_per_task);
 
-    mt_bitvector_optimized_encoding v_instance(v_branch_handler, v_load_balancer);
+    mt_bitvector_optimized_encoding v_instance(v_node_manager, v_load_balancer);
     auto v_function = std::bind(&mt_bitvector_optimized_encoding::mvcbitset, &v_instance, _1, _2, _3, _4, _5); // target algorithm [all arguments]
 
 
@@ -35,8 +35,8 @@ int run(const int p_threads_per_task, const int p_probability, const std::string
     GBITSET v_allzeros(v_gsize);
     GBITSET v_allones = ~v_allzeros;
 
-    v_branch_handler.set_score(gempba::score::make(v_gsize)); // thus, all processes know the best value so far
-    v_branch_handler.set_goal(gempba::MINIMISE, gempba::score_type::I32);
+    v_node_manager.set_score(gempba::score::make(v_gsize)); // thus, all processes know the best value so far
+    v_node_manager.set_goal(gempba::MINIMISE, gempba::score_type::I32);
 
     const int v_zero = 0;
     const int v_solution_size = v_graph.size();
@@ -48,17 +48,17 @@ int run(const int p_threads_per_task, const int p_probability, const std::string
     gempba::node v_seed = gempba::create_seed_node<void>(*v_load_balancer, v_function, v_seed_args);
 
     const double v_start_time = gempba::node_manager::get_wall_time();
-    const bool v_submitted = v_branch_handler.try_local_submit(v_seed);
+    const bool v_submitted = v_node_manager.try_local_submit(v_seed);
     if (!v_submitted) {
         throw std::runtime_error("unable to submit seed node");
     }
-    v_branch_handler.wait();
+    v_node_manager.wait();
     const double v_end_time = gempba::node_manager::get_wall_time();
 
-    const gempba::score v_score = v_branch_handler.get_score();
+    const gempba::score v_score = v_node_manager.get_score();
     double v_elapsed_time = v_end_time - v_start_time;
-    double v_global_idle_time = v_branch_handler.get_idle_time();
-    size_t v_thread_request_count = v_branch_handler.get_thread_request_count();
+    double v_global_idle_time = v_node_manager.get_idle_time();
+    size_t v_thread_request_count = v_node_manager.get_thread_request_count();
 
     spdlog::info("cover size: {}", v_score.to_string());
     spdlog::info("global pool idle time: {0:.6f} seconds", v_global_idle_time);

@@ -9,7 +9,7 @@
 namespace {
     inline std::unique_ptr<gempba::scheduler> g_scheduler;
     inline std::unique_ptr<gempba::load_balancer> g_load_balancer;
-    inline std::unique_ptr<gempba::node_manager> g_branch_handler;
+    inline std::unique_ptr<gempba::node_manager> g_node_manager;
 }
 
 #if GEMPBA_DEBUG_COMMENTS
@@ -44,8 +44,8 @@ gempba::load_balancer *gempba::mt::create_load_balancer(const balancing_policy &
     return mp::create_load_balancer(p_policy, nullptr);
 }
 
-gempba::node_manager &gempba::mt::create_branch_handler(load_balancer *p_load_balancer) {
-    return mp::create_branch_handler(p_load_balancer, nullptr);
+gempba::node_manager &gempba::mt::create_node_manager(load_balancer *p_load_balancer) {
+    return mp::create_node_manager(p_load_balancer, nullptr);
 }
 
 gempba::scheduler *gempba::mp::create_scheduler(std::unique_ptr<scheduler> p_your_implementation) {
@@ -98,12 +98,12 @@ std::unique_ptr<gempba::default_mpi_stats_visitor> gempba::mp::get_default_mpi_s
     return std::make_unique<default_mpi_stats_visitor>();
 }
 
-gempba::node_manager &gempba::mp::create_branch_handler(load_balancer *p_load_balancer, scheduler::worker *p_worker) {
-    if (g_branch_handler != nullptr) {
-        throw std::runtime_error("branch_handler already exist!");
+gempba::node_manager &gempba::mp::create_node_manager(load_balancer *p_load_balancer, scheduler::worker *p_worker) {
+    if (g_node_manager != nullptr) {
+        throw std::runtime_error("node_manager already exist!");
     }
-    g_branch_handler = std::make_unique<node_manager>(p_load_balancer, p_worker);
-    return *g_branch_handler;
+    g_node_manager = std::make_unique<node_manager>(p_load_balancer, p_worker);
+    return *g_node_manager;
 }
 
 gempba::scheduler *gempba::get_scheduler() {
@@ -125,21 +125,21 @@ void gempba::reset_load_balancer() {
     g_load_balancer.reset();
 }
 
-gempba::node_manager &gempba::get_branch_handler() {
-    if (!g_branch_handler) {
+gempba::node_manager &gempba::get_node_manager() {
+    if (!g_node_manager) {
         // Temporarily disabled while I convert all the examples to new development
         throw std::runtime_error("scheduler not yet instantiated!");
     }
-    return *g_branch_handler;
+    return *g_node_manager;
 }
 
-void gempba::reset_branch_handler() {
-    g_branch_handler.reset();
+void gempba::reset_node_manager() {
+    g_node_manager.reset();
 }
 
 int gempba::shutdown() {
     g_scheduler.reset();
     g_load_balancer.reset();
-    g_branch_handler.reset();
+    g_node_manager.reset();
     return EXIT_SUCCESS;
 }

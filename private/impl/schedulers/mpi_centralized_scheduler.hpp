@@ -199,7 +199,7 @@ namespace gempba {
         }
 
     private:
-        void run(node_manager &p_branch_handler, std::map<int, std::shared_ptr<serial_runnable> > p_runnables) {
+        void run(node_manager &p_node_manager, std::map<int, std::shared_ptr<serial_runnable> > p_runnables) {
             MPI_Barrier(m_world_communicator);
             m_start_time = MPI_Wtime();
 
@@ -210,7 +210,7 @@ namespace gempba {
                 switch (v_status.MPI_TAG) {
                     case TERMINATION: {
                         process_termination(v_status);
-                        collect_stats_data(p_branch_handler);
+                        collect_stats_data(p_node_manager);
                         v_is_terminated = true; // temporary, it should always happen
                         spdlog::debug("rank {} received termination", m_world_rank);
                         break;
@@ -228,7 +228,7 @@ namespace gempba {
                         break;
                     }
                     case TASK_FROM_CENTER: {
-                        process_message(v_status, p_branch_handler, p_runnables);
+                        process_message(v_status, p_node_manager, p_runnables);
                         break;
                     }
                     default: {
@@ -245,12 +245,12 @@ namespace gempba {
              * this applies only when parallelising non-void functions
              */
 
-            send_final_solution_to_center(p_branch_handler);
+            send_final_solution_to_center(p_node_manager);
             m_end_time = MPI_Wtime();
             m_stats.m_elapsed_time = m_end_time - m_start_time;
         }
 
-        void send_final_solution_to_center(node_manager &p_branch_handler) const;
+        void send_final_solution_to_center(node_manager &p_node_manager) const;
 
         unsigned int force_push(task_packet &&p_task_packet, const int p_function_id) {
             if (p_task_packet.empty()) {
@@ -308,7 +308,7 @@ namespace gempba {
             MPI_Barrier(m_world_communicator);
         }
 
-        void collect_stats_data(const node_manager &p_branch_handler);
+        void collect_stats_data(const node_manager &p_node_manager);
 
         void receive_score_from_center(MPI_Status p_status) {
             utils::print_ipc_debug_comments("rank {}, about to receive global score from Center\n", m_world_rank);
@@ -330,7 +330,7 @@ namespace gempba {
             utils::print_ipc_debug_comments("Node {} received free center\n", rank_me());
         }
 
-        void process_message(MPI_Status &p_status, node_manager &p_branch_handler, std::map<int, std::shared_ptr<serial_runnable> > &p_runnables) {
+        void process_message(MPI_Status &p_status, node_manager &p_node_manager, std::map<int, std::shared_ptr<serial_runnable> > &p_runnables) {
             // Receives the task  -------------------------------------------------------------------------------------------
             int v_count; // count to be received
             MPI_Get_count(&p_status, MPI_BYTE, &v_count); // receives total number of datatype elements of the message
@@ -355,15 +355,15 @@ namespace gempba {
 
             //  Delegates the processing of the incoming buffer to the node manager and stores the potential returned value in _returned_value_future.
             const auto v_runnable = p_runnables[v_function_id];
-            auto v_returned_value = (*v_runnable)(p_branch_handler, v_task_packet);
+            auto v_returned_value = (*v_runnable)(p_node_manager, v_task_packet);
             utils::print_ipc_debug_comments("rank {}, pushed buffer to thread pool \n", m_world_rank, p_status.MPI_SOURCE);
             // **********************************************************************************************
 
-            task_funneling(p_branch_handler);
+            task_funneling(p_node_manager);
             notify_available_state();
         }
 
-        void task_funneling(node_manager &p_branch_handler);
+        void task_funneling(node_manager &p_node_manager);
 
         std::optional<MPI_Status> probe_score_comm_at_node() {
             int v_is_message_received = 0; // logical
@@ -422,7 +422,7 @@ namespace gempba {
 
         // if score is received, it attempts updating local value
         // if local value is better than the one in center, then the local best value is sent to center
-        void update_score(node_manager &p_branch_handler);
+        void update_score(node_manager &p_node_manager);
 
         void notify_available_state() {
             utils::print_ipc_debug_comments("rank {} entered notify_available_state()\n", m_world_rank);
@@ -1012,8 +1012,8 @@ namespace gempba {
                 return m_parent.get_stats();
             }
 
-            void run(node_manager &p_branch_handler, std::map<int, std::shared_ptr<serial_runnable> > p_runnables) override {
-                m_parent.run(p_branch_handler, std::move(p_runnables));
+            void run(node_manager &p_node_manager, std::map<int, std::shared_ptr<serial_runnable> > p_runnables) override {
+                m_parent.run(p_node_manager, std::move(p_runnables));
             }
 
             unsigned int force_push(task_packet &&p_task, const int p_function_id) override {

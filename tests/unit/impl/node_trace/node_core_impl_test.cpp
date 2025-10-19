@@ -477,12 +477,12 @@ TEST_F(node_core_impl_test, remote_result_non_void) {
     v_node.set_result_serializer(v_result_serializer);
     v_node.set_result_deserializer(v_result_deserializer);
 
-    gempba::node_manager v_branch_handler(&m_balancer_mock, nullptr);
+    gempba::node_manager v_node_manager(&m_balancer_mock, nullptr);
     ASSERT_EQ(v_node, v_node.get_root());
     ASSERT_EQ(nullptr, v_node.get_parent());
 
     constexpr int runner_id = -1;
-    bool v_is_submitted = v_branch_handler.try_remote_submit(v_node, runner_id); // mimics a remote call
+    bool v_is_submitted = v_node_manager.try_remote_submit(v_node, runner_id); // mimics a remote call
     ASSERT_FALSE(v_is_submitted);
 
     // It should be pruned

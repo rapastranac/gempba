@@ -53,9 +53,9 @@ namespace gempba {
 
         [[nodiscard]] int get_id() const override { return m_id; }
 
-        std::optional<std::shared_future<task_packet> > operator()(node_manager &p_branch_handler, const task_packet &p_args) override {
+        std::optional<std::shared_future<task_packet> > operator()(node_manager &p_node_manager, const task_packet &p_args) override {
             std::tuple<Args...> v_user_args = m_args_deserializer(std::move(p_args));
-            std::future<std::any> v_fut = p_branch_handler.force_local_submit([this, v_tup = std::move(v_user_args)] {
+            std::future<std::any> v_fut = p_node_manager.force_local_submit([this, v_tup = std::move(v_user_args)] {
                 auto v_all_args = std::tuple_cat(std::make_tuple(std::this_thread::get_id()), v_tup, std::make_tuple<node>(node()));
                 std::apply(m_f, v_all_args);
                 return std::any{};

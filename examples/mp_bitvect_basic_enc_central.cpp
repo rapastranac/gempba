@@ -14,12 +14,12 @@
 
 using namespace std::placeholders;
 
-gempba::node_manager &initiate_branch_handler(gempba::scheduler *p_scheduler, gempba::load_balancer *p_load_balancer) {
+gempba::node_manager &initiate_node_manager(gempba::scheduler *p_scheduler, gempba::load_balancer *p_load_balancer) {
     if (p_scheduler->rank_me() == 0) {
-        return gempba::mp::create_branch_handler(p_load_balancer, nullptr);
+        return gempba::mp::create_node_manager(p_load_balancer, nullptr);
     }
     gempba::scheduler::worker *v_worker_view = &p_scheduler->worker_view();
-    return gempba::mp::create_branch_handler(p_load_balancer, v_worker_view);
+    return gempba::mp::create_node_manager(p_load_balancer, v_worker_view);
 }
 
 gempba::load_balancer *initiate_load_balancer(gempba::scheduler *p_scheduler, const gempba::balancing_policy p_policy) {
@@ -43,12 +43,12 @@ int run(int p_job_id, int p_nodes, int p_ntasks_per_node, int p_ntasks_per_socke
 
     std::cout << "NUMTHREADS= " << p_threads_per_task << std::endl;
     gempba::load_balancer *v_load_balancer = initiate_load_balancer(v_scheduler, gempba::balancing_policy::QUASI_HORIZONTAL);
-    gempba::node_manager &v_branch_handler = initiate_branch_handler(v_scheduler, v_load_balancer);
+    gempba::node_manager &v_node_manager = initiate_node_manager(v_scheduler, v_load_balancer);
 
-    v_branch_handler.set_goal(gempba::MINIMISE, gempba::score_type::I32);
+    v_node_manager.set_goal(gempba::MINIMISE, gempba::score_type::I32);
     v_scheduler->set_goal(gempba::MINIMISE, gempba::score_type::I32);
 
-    mp_bitvector_basic_encoding cover(v_branch_handler, v_load_balancer);
+    mp_bitvector_basic_encoding cover(v_node_manager, v_load_balancer);
     auto v_function = std::bind(&mp_bitvector_basic_encoding::mvcbitset, &cover, _1, _2, _3, _4, _5); // target algorithm [all arguments]
 
 
@@ -67,7 +67,7 @@ int run(int p_job_id, int p_nodes, int p_ntasks_per_node, int p_ntasks_per_socke
     G_BITSET allzeros(gsize);
     G_BITSET allones = ~allzeros;
 
-    v_branch_handler.set_score(gempba::score::make(gsize)); // thus, all processes know the best value so far
+    v_node_manager.set_score(gempba::score::make(gsize)); // thus, all processes know the best value so far
 
     int zero = 0;
     int solsize = graph.size();
@@ -94,7 +94,7 @@ int run(int p_job_id, int p_nodes, int p_ntasks_per_node, int p_ntasks_per_socke
     } else {
         // worker process
         gempba::scheduler::worker &v_worker_view = v_scheduler->worker_view();
-        v_branch_handler.set_thread_pool_size(p_threads_per_task);
+        v_node_manager.set_thread_pool_size(p_threads_per_task);
 
         auto v_deser = create_deserializer();
         auto v_runnable = gempba::mp::runnables::return_none::create(v_runnable_id, v_function, v_deser);
@@ -102,7 +102,7 @@ int run(int p_job_id, int p_nodes, int p_ntasks_per_node, int p_ntasks_per_socke
         std::map<int, std::shared_ptr<gempba::serial_runnable> > v_runnables;
         v_runnables[v_runnable->get_id()] = v_runnable;
 
-        v_worker_view.run(v_branch_handler, v_runnables);
+        v_worker_view.run(v_node_manager, v_runnables);
     }
     v_scheduler->barrier();
     // *****************************************************************************************

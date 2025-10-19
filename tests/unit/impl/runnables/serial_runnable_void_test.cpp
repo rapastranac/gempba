@@ -61,11 +61,11 @@ TEST(serial_runnable_void_test, test) {
     ASSERT_EQ(314, v_runnable->get_id());
 
     gempba::load_balancer *v_load_balancer = new gempba::work_stealing_load_balancer(nullptr);
-    gempba::node_manager v_branch_handler(v_load_balancer, nullptr);
+    gempba::node_manager v_node_manager(v_load_balancer, nullptr);
     const auto v_bytes = gempba::task_packet("7,1.6825127784311510");
-    const std::optional<std::shared_future<gempba::task_packet> > v_optional = (*v_runnable)(v_branch_handler, v_bytes);
+    const std::optional<std::shared_future<gempba::task_packet> > v_optional = (*v_runnable)(v_node_manager, v_bytes);
 
     ASSERT_FALSE(v_optional.has_value());
 
-    v_branch_handler.wait(); // gives time to the internal thread pool to execute the function
+    v_node_manager.wait(); // gives time to the internal thread pool to execute the function
 }

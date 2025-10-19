@@ -209,8 +209,8 @@ public:
                 << "\n";
 
         col1 = "Idle time:";
-        col2 = std::to_string(branchHandler.get_idle_time());
-        string col3 = std::to_string((branchHandler.get_idle_time() * 100.0 / (elapsed_secs * 1.0e-9))) + "%";
+        col2 = std::to_string(m_node_manager.get_idle_time());
+        string col3 = std::to_string((m_node_manager.get_idle_time() * 100.0 / (elapsed_secs * 1.0e-9))) + "%";
 
         cout << std::left << std::setw(wide * 0.3)
                 << col1
@@ -228,8 +228,8 @@ public:
                 << "\n";
 
         col1 = "Pool idle time:";
-        col2 = Util::ToString(branchHandler.get_idle_time());
-        col3 = Util::ToString(branchHandler.get_idle_time() * 100.0 / (elapsed_secs * 1.0e-9)) + "%";
+        col2 = Util::ToString(m_node_manager.get_idle_time());
+        col3 = Util::ToString(m_node_manager.get_idle_time() * 100.0 / (elapsed_secs * 1.0e-9)) + "%";
 
         cout << std::left << std::setw(wide * 0.3)
                 << col1
@@ -247,7 +247,7 @@ public:
                 << "\n";
 
         col1 = "Successful requests:";
-        col2 = std::to_string(branchHandler.get_thread_request_count());
+        col2 = std::to_string(m_node_manager.get_thread_request_count());
         cout << std::internal
                 << col1
                 << std::setfill(' ')
@@ -280,8 +280,8 @@ public:
                 << Util::ToString((double) (elapsed_secs * 1.0e-9)) << ","
                 << Util::ToString((int) leaves) << ","
                 << Util::ToString((int) measured_Depth) << ","
-                << Util::ToString(branchHandler.get_idle_time() * 1.0e-9) << ","
-                << Util::ToString(branchHandler.get_idle_time()) << "\n";
+                << Util::ToString(m_node_manager.get_idle_time() * 1.0e-9) << ","
+                << Util::ToString(m_node_manager.get_idle_time()) << "\n";
         output_raw.close();
     }
 
@@ -298,8 +298,8 @@ public:
     void recurrent_msg(std::thread::id p_id) {
         auto clock = std::chrono::system_clock::now();
         std::time_t time = std::chrono::system_clock::to_time_t(clock); //it includes a "\n"
-        string col1 = fmt::format("VC = {}", branchHandler.get_score().to_string());
-        string col2 = fmt::format("process {}, thread {}, {}", branchHandler.rank_me(), thread_id_to_string(p_id), std::ctime(&time));
+        string col1 = fmt::format("VC = {}", m_node_manager.get_score().to_string());
+        string col2 = fmt::format("process {}, thread {}, {}", m_node_manager.rank_me(), thread_id_to_string(p_id), std::ctime(&time));
         cout << std::internal
                 << std::setfill('.')
                 << col1
@@ -339,7 +339,7 @@ protected:
     }
 
 protected:
-    gempba::node_manager &branchHandler = gempba::get_branch_handler();
+    gempba::node_manager &m_node_manager = gempba::get_node_manager();
 
     Graph graph;
     Graph graph_res;

@@ -27,11 +27,11 @@ public:
     std::atomic<size_t> passes;
     std::mutex mtx;
 
-    gempba::node_manager &m_branch_handler;
+    gempba::node_manager &m_node_manager;
     gempba::load_balancer *m_load_balancer;
 
-    mp_bitvector_basic_encoding(gempba::node_manager &p_branch_handler, gempba::load_balancer *p_load_balancer) :
-        m_branch_handler(p_branch_handler), m_load_balancer(p_load_balancer) {
+    mp_bitvector_basic_encoding(gempba::node_manager &p_node_manager, gempba::load_balancer *p_load_balancer) :
+        m_node_manager(p_node_manager), m_load_balancer(p_load_balancer) {
         this->m_function = std::bind(&mp_bitvector_basic_encoding::mvcbitset, this, _1, _2, _3, _4, _5);
         this->m_args_deserializer = create_deserializer();
         this->m_args_serializer = make_serializer();
@@ -121,8 +121,8 @@ public:
             auto v_ctime = std::string(std::ctime(&v_time));
             const auto v_str = std::format(
                     "WR= {} ID= {} passes={} gsize={} refvalue={} solsize={} isskips={} deglbskips={} {}",
-                    branchHandler.rank_me(), thread_id_to_string(p_id), passes.load(), bits_in_graph.count(),
-                    branchHandler.get_score().get<int>(), v_cursol_size, is_skips, deglb_skips,
+                    m_node_manager.rank_me(), thread_id_to_string(p_id), passes.load(), bits_in_graph.count(),
+                    m_node_manager.get_score().get<int>(), v_cursol_size, is_skips, deglb_skips,
                     v_ctime);
 
             cout << v_str;
@@ -134,7 +134,7 @@ public:
             return;
         }
 
-        if (v_cursol_size >= branchHandler.get_score().get<int>()) {
+        if (v_cursol_size >= m_node_manager.get_score().get<int>()) {
             return;
         }
 
@@ -200,14 +200,14 @@ public:
         const int indsetub = (int) (0.5f * (1.0f + sqrt(tmp)));
         const int vclb = nb_vertices - indsetub;
 
-        if (vclb + v_cursol_size >= branchHandler.get_score().get<int>()) {
+        if (vclb + v_cursol_size >= m_node_manager.get_score().get<int>()) {
             is_skips++;
             return;
         }
 
         int deg_lb = 0;
         deg_lb = (nbEdgesDoubleCounted / 2) / maxdeg;
-        if (deg_lb + v_cursol_size >= branchHandler.get_score().get<int>()) {
+        if (deg_lb + v_cursol_size >= m_node_manager.get_score().get<int>()) {
             deglb_skips++;
             return;
         }
@@ -224,7 +224,7 @@ public:
             }
             v_ingraph1.set(maxdeg_v, false);
             int v_solution_size1 = v_cursol_size + 1;
-            const int v_best_val = m_branch_handler.get_score().get<int>();
+            const int v_best_val = m_node_manager.get_score().get<int>();
 
             if (v_solution_size1 < v_best_val) {
                 BitGraph v_bg;
@@ -249,7 +249,7 @@ public:
             v_ingraph2 = bits_in_graph & (~graphbits[maxdeg_v]);
             G_BITSET v_neighbours = (graphbits[maxdeg_v] & bits_in_graph);
             int v_solution_size2 = v_cursol_size + v_neighbours.count();
-            const int v_best_val = m_branch_handler.get_score().get<int>();
+            const int v_best_val = m_node_manager.get_score().get<int>();
 
             if (v_solution_size2 < v_best_val) {
                 BitGraph v_bg;
@@ -267,8 +267,8 @@ public:
                 m_args_deserializer
                 );
 
-        branchHandler.try_remote_submit(v_left, 0);
-        branchHandler.forward(v_right);
+        m_node_manager.try_remote_submit(v_left, 0);
+        m_node_manager.forward(v_right);
     }
 
 private:
@@ -277,15 +277,15 @@ private:
             return;
         }
 
-        if (p_solution_size < m_branch_handler.get_score().get<int>()) {
+        if (p_solution_size < m_node_manager.get_score().get<int>()) {
             spdlog::debug("About to update result: {}", p_solution_size);
             std::function<gempba::task_packet(int &)> v_serializer = make_single_serializer<int>();
-            m_branch_handler.try_update_result(p_solution_size, gempba::score::make(p_solution_size), v_serializer);
+            m_node_manager.try_update_result(p_solution_size, gempba::score::make(p_solution_size), v_serializer);
 
             const auto v_clock = std::chrono::system_clock::now();
             const std::time_t v_time = std::chrono::system_clock::to_time_t(v_clock); //it includes a "\n"
 
-            spdlog::debug("rank {}, MVC solution so far: {} @ depth : {}, {}", m_branch_handler.rank_me(), p_solution_size, p_depth, std::ctime(&v_time));
+            spdlog::debug("rank {}, MVC solution so far: {} @ depth : {}, {}", m_node_manager.rank_me(), p_solution_size, p_depth, std::ctime(&v_time));
 
         }
     }
