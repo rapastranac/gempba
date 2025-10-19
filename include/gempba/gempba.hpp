@@ -24,13 +24,13 @@
 #ifndef GEMPBA_GEMPBA_HPP
 #define GEMPBA_GEMPBA_HPP
 
+#include <gempba/defaults/default_mpi_stats_visitor.hpp>
 #include <gempba/detail/nodes/node_core_impl.hpp>
 #include <gempba/detail/runnables/serial_runnable_non_void.hpp>
 #include <gempba/detail/runnables/serial_runnable_void.hpp>
 #include <gempba/utils/gempba_utils.hpp>
 #include <load_balancing/api/load_balancer.hpp>
 #include <schedulers/api/scheduler.hpp>
-#include <schedulers/defaults/default_mpi_stats_visitor.hpp>
 
 namespace gempba {
 

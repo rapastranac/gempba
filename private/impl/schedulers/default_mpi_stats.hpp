@@ -28,8 +28,8 @@
 #include <memory>
 #include <tuple>
 
-#include <schedulers/api/stats.hpp>
-#include <schedulers/api/stats_visitor.hpp>
+#include <gempba/stats/stats.hpp>
+#include <gempba/stats/stats_visitor.hpp>
 
 namespace gempba {
     class default_mpi_stats final : public stats {

@@ -24,8 +24,8 @@
 #ifndef GEMPBA_DEFAULT_MPI_STATS_VISITOR_HPP
 #define GEMPBA_DEFAULT_MPI_STATS_VISITOR_HPP
 #include <cstddef>
-#include <schedulers/api/stats.hpp>
-#include <schedulers/api/stats_visitor.hpp>
+#include <gempba/stats/stats.hpp>
+#include <gempba/stats/stats_visitor.hpp>
 
 namespace gempba {
     class default_mpi_stats_visitor final : public stats_visitor {

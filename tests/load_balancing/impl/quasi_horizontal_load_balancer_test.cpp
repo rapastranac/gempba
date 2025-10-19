@@ -30,11 +30,11 @@
 
 #include <branch_handling/branch_handler.hpp>
 #include <gempba/detail/nodes/node_core_impl.hpp>
+#include <gempba/stats/stats.hpp>
 #include <gempba/utils/transmission_guard.hpp>
 #include <impl/load_balancing/quasi_horizontal_load_balancer.hpp>
 #include <runnables/api/serial_runnable.hpp>
 #include <schedulers/api/scheduler.hpp>
-#include <schedulers/api/stats.hpp>
 
 using namespace std::chrono_literals;
 

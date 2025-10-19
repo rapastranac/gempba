@@ -24,9 +24,9 @@
 #include <cstring>
 #include <set>
 #include <unordered_map>
+#include <gempba/stats/stats.hpp>
 #include <gtest/gtest.h>
 #include <impl/schedulers/default_mpi_stats.hpp>
-#include <schedulers/api/stats.hpp>
 
 TEST(default_mpi_stats_test, construction_and_defaults) {
     const gempba::default_mpi_stats v_stats_impl(5);
