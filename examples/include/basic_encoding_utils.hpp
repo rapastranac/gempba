@@ -128,4 +128,26 @@ auto deserializer = [](std::stringstream &ss, auto &... args) {
     helper_dser(archive, args...);
 };
 
+
+inline std::function<std::tuple<int, BitGraph, int>(const gempba::task_packet &&)> create_deserializer() {
+    return [=](const gempba::task_packet &&p_buffer) {
+        int v_depth;
+        BitGraph v_bits_in_graph;
+        int v_solution_size;
+
+        std::stringstream v_ss;
+        v_ss.write(reinterpret_cast<const char *>(p_buffer.data()), static_cast<int>(p_buffer.size()));
+        deserializer(v_ss, v_depth, v_bits_in_graph, v_solution_size);
+
+        return std::make_tuple(v_depth, v_bits_in_graph, v_solution_size);
+    };
+};
+
+inline std::function<gempba::task_packet(int, BitGraph, int)> make_serializer() {
+    return [&](int p_depth, BitGraph p_bits_in_graph, int p_solution_size) {
+        auto v_ser = serializer(p_depth, p_bits_in_graph, p_solution_size);
+        return v_ser;
+    };
+}
+
 #endif //GEMPBA_BASIC_ENCODING_UTILS_HPP
