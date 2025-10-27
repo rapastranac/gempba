@@ -289,11 +289,17 @@ public:
         this->currentMVCSize = mvcSize;
     }
 
-    void recurrent_msg(int id) {
+    static std::string thread_id_to_string(const std::thread::id p_id) {
+        std::ostringstream v_oss;
+        v_oss << p_id;
+        return v_oss.str();
+    }
+
+    void recurrent_msg(std::thread::id p_id) {
         auto clock = std::chrono::system_clock::now();
         std::time_t time = std::chrono::system_clock::to_time_t(clock); //it includes a "\n"
         string col1 = fmt::format("VC = {}", branchHandler.get_score().to_string());
-        string col2 = fmt::format("process {}, thread {}, {}", branchHandler.rank_me(), id, std::ctime(&time));
+        string col2 = fmt::format("process {}, thread {}, {}", branchHandler.rank_me(), thread_id_to_string(p_id), std::ctime(&time));
         cout << std::internal
                 << std::setfill('.')
                 << col1
@@ -333,7 +339,6 @@ protected:
     }
 
 protected:
-    gempba::dynamic_load_balancer_handler &dlb = gempba::dynamic_load_balancer_handler::getInstance();
     gempba::branch_handler &branchHandler = gempba::get_branch_handler();
 
     Graph graph;

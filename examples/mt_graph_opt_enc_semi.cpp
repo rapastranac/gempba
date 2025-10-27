@@ -5,17 +5,19 @@
 #include "include/main.hpp"
 
 int run(int job_id, int ntasks_per_node, int prob, string &filename) {
-    gempba::mt::create_branch_handler(nullptr);
     Graph graph;
     Graph oGraph;
-    MTGraphOptimizedEncodingSemiCentralized cover;
+
+    gempba::load_balancer *v_load_balancer = gempba::mt::create_load_balancer(gempba::balancing_policy::QUASI_HORIZONTAL);
+    gempba::branch_handler &v_branch_handler = gempba::mt::create_branch_handler(v_load_balancer);
+    mt_graph_optimized_encoding_semi_centralized v_cover(v_branch_handler, *v_load_balancer);
 
     graph.readEdges(filename);
     //graph.readDimacs(filename);
 
-    cover.init(graph, ntasks_per_node, filename, prob);
-    cover.findCover(job_id);
-    cover.printSolution();
+    v_cover.init(graph, ntasks_per_node, filename, prob);
+    v_cover.findCover(job_id);
+    v_cover.printSolution();
 
     return 0;
 }

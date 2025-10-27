@@ -5,16 +5,17 @@
 
 #include "include/main.hpp"
 
-int run(int numThreads, int prob, std::string &filename) {
-    gempba::mt::create_branch_handler(nullptr);
+int run(const int p_num_threads, const int p_probability, const std::string &filename) {
 
     Graph graph;
     Graph oGraph;
-    gempba::VC_non_void cover;
+    gempba::load_balancer *v_load_balancer = gempba::mt::create_load_balancer(gempba::balancing_policy::QUASI_HORIZONTAL);
+    gempba::branch_handler &v_branch_handler = gempba::mt::create_branch_handler(v_load_balancer);
+    mt_graph_opt_enc_semi_non_void cover(v_branch_handler, *v_load_balancer);
 
     graph.readEdges(filename);
 
-    cover.init(graph, numThreads, filename, prob);
+    cover.init(graph, p_num_threads, filename, p_probability);
     cover.findCover(1);
     cover.printSolution();
 
