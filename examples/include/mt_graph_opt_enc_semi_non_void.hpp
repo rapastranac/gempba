@@ -3,7 +3,6 @@
 
 #include <gempba/gempba.hpp>
 #include "VertexCover.hpp"
-#include "node_trace/factory/node_factory.hpp"
 
 // TODO... The whole algorithm passes by value, which is not efficient. We should pass by reference.
 
@@ -42,7 +41,7 @@ public:
         try {
             branchHandler.set_score(gempba::score::make(currentMVCSize));
 
-            const auto dummy_node = gempba::node_factory::create_dummy_node(m_load_balancer);
+            const auto dummy_node = gempba::create_dummy_node(m_load_balancer);
             const Graph result = mvc(std::this_thread::get_id(), 0, graph, dummy_node);
 
             graph_res = result;
@@ -90,7 +89,7 @@ public:
         int newDepth = depth + 1;
 
         const int v = graph.id_max(false);
-        const gempba::node v_parent = p_parent == nullptr ? gempba::node_factory::create_dummy_node(m_load_balancer) : p_parent;
+        const gempba::node v_parent = p_parent == nullptr ? gempba::create_dummy_node(m_load_balancer) : p_parent;
 
         const std::function<std::optional<std::tuple<int, Graph> >()> v_left_args_initializer = [&]()-> std::optional<std::tuple<int, Graph> > {
             Graph g = graph;
@@ -111,7 +110,7 @@ public:
 
         };
 
-        gempba::node v_left = gempba::node_factory::create_lazy_node<Graph>(m_load_balancer, v_parent, m_function, v_left_args_initializer);
+        gempba::node v_left = gempba::mt::create_lazy_node<Graph>(m_load_balancer, v_parent, m_function, v_left_args_initializer);
 
         std::function<std::optional<std::tuple<int, Graph> >()> v_right_args_initializer = [&]() -> std::optional<std::tuple<int, Graph> > {
             Graph g = graph;
@@ -131,7 +130,7 @@ public:
             return std::nullopt;
         };
 
-        gempba::node v_right = gempba::node_factory::create_lazy_node<Graph>(
+        gempba::node v_right = gempba::mt::create_lazy_node<Graph>(
                 m_load_balancer,
                 v_parent, m_function,
                 v_right_args_initializer

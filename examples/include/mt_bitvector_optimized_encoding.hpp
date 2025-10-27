@@ -11,7 +11,6 @@
 #include <boost/container/flat_map.hpp>
 #include <gempba/gempba.hpp>
 #include <node_trace/api/node.hpp>
-#include <node_trace/factory/node_factory.hpp>
 #include <spdlog/spdlog.h>
 
 #include "Graph.hpp"
@@ -204,7 +203,7 @@ public:
 
         int v_new_depth = p_depth + 1;
 
-        const gempba::node v_parent = p_parent == nullptr ? gempba::node_factory::create_dummy_node(*m_load_balancer) : p_parent;
+        const gempba::node v_parent = p_parent == nullptr ? gempba::create_dummy_node(*m_load_balancer) : p_parent;
 
         std::function<std::optional<std::tuple<int, GBITSET, int> >()> v_left_args_initializer = [&]()-> std::optional<std::tuple<int, GBITSET, int> > {
             GBITSET v_ingraph1 = p_bits_in_graph;
@@ -222,7 +221,7 @@ public:
             return std::nullopt;
         };
 
-        gempba::node v_left = gempba::node_factory::create_lazy_node<void>(
+        gempba::node v_left = gempba::mt::create_lazy_node<void>(
                 *m_load_balancer,
                 v_parent, m_function,
                 v_left_args_initializer
@@ -244,7 +243,7 @@ public:
         };
 
 
-        gempba::node v_right = gempba::node_factory::create_lazy_node<void>(
+        gempba::node v_right = gempba::mt::create_lazy_node<void>(
                 *m_load_balancer,
                 v_parent, m_function,
                 v_right_args_initializer

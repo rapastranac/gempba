@@ -6,7 +6,6 @@
 #include <functional>
 #include <map>
 #include <gempba/gempba.hpp>
-#include <node_trace/factory/node_factory.hpp>
 #include <spdlog/spdlog.h>
 
 #include "VertexCover.hpp"
@@ -214,7 +213,7 @@ public:
         }
 
         int newDepth = depth + 1;
-        const gempba::node v_parent = p_parent == nullptr ? gempba::node_factory::create_dummy_node(*m_load_balancer) : p_parent;
+        const gempba::node v_parent = p_parent == nullptr ? gempba::create_dummy_node(*m_load_balancer) : p_parent;
 
 
         std::function<std::optional<std::tuple<int, BitGraph, int> >()> v_left_args_initializer = [&]() -> std::optional<std::tuple<int, BitGraph, int> > {
@@ -235,7 +234,7 @@ public:
             return std::nullopt;
         };
 
-        gempba::node v_left = gempba::node_factory::create_serializable_lazy_node<void>(
+        gempba::node v_left = gempba::mp::create_lazy_node<void>(
                 *m_load_balancer,
                 v_parent, m_function,
                 v_left_args_initializer,
@@ -260,7 +259,7 @@ public:
             return std::nullopt;
         };
 
-        gempba::node v_right = gempba::node_factory::create_serializable_lazy_node<void>(
+        gempba::node v_right = gempba::mp::create_lazy_node<void>(
                 *m_load_balancer,
                 v_parent, m_function,
                 v_right_args_initializer,

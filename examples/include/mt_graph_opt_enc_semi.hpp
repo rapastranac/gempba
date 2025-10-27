@@ -6,8 +6,6 @@
 #include <spdlog/spdlog.h>
 #include "VertexCover.hpp"
 
-#include "node_trace/factory/node_factory.hpp"
-
 class mt_graph_optimized_encoding_semi_centralized final : public VertexCover {
 
     gempba::branch_handler &m_branch_handler;
@@ -53,7 +51,7 @@ public:
             m_branch_handler.set_score(gempba::score::make(currentMVCSize));
             m_branch_handler.set_goal(gempba::MINIMISE, gempba::score_type::I32);
             //testing ****************************************
-            gempba::node seed_node = gempba::node_factory::create_seed_node<void>(m_load_balancer, m_function, std::make_tuple(0, graph));
+            gempba::node seed_node = gempba::create_seed_node<void>(m_load_balancer, m_function, std::make_tuple(0, graph));
             {
                 m_branch_handler.try_local_submit(seed_node);
             }
@@ -108,7 +106,7 @@ public:
         int v = graph.id_max(false);
         int SIZE = graph.size();
 
-        const gempba::node v_parent = p_parent == nullptr ? gempba::node_factory::create_dummy_node(m_load_balancer) : p_parent;
+        const gempba::node v_parent = p_parent == nullptr ? gempba::create_dummy_node(m_load_balancer) : p_parent;
 
         const std::function<std::optional<std::tuple<int, Graph> >()> v_left_args_initializer = [&]() -> std::optional<std::tuple<int, Graph> > {
             Graph g = graph;
@@ -128,7 +126,7 @@ public:
             return std::nullopt;
         };
 
-        gempba::node v_left = gempba::node_factory::create_lazy_node<void>(m_load_balancer, v_parent, m_function, v_left_args_initializer);
+        gempba::node v_left = gempba::mt::create_lazy_node<void>(m_load_balancer, v_parent, m_function, v_left_args_initializer);
 
         std::function<std::optional<std::tuple<int, Graph> >()> v_right_args_initializer = [&]() -> std::optional<std::tuple<int, Graph> > {
             Graph g = graph;
@@ -148,7 +146,7 @@ public:
             return std::nullopt;
         };
 
-        gempba::node v_right = gempba::node_factory::create_lazy_node<void>(
+        gempba::node v_right = gempba::mt::create_lazy_node<void>(
                 m_load_balancer,
                 v_parent, m_function,
                 v_right_args_initializer

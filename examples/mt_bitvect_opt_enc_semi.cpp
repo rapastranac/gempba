@@ -42,10 +42,10 @@ int run(const int p_threads_per_task, const int p_probability, const std::string
     const int v_solution_size = v_graph.size();
     std::cout << "solsize=" << v_solution_size << std::endl;
 
-    gempba::node v_dummy = gempba::node_factory::create_dummy_node(*v_load_balancer);
+    gempba::node v_dummy = gempba::create_dummy_node(*v_load_balancer);
 
     const std::tuple<int, GBITSET, int> v_seed_args = std::make_tuple(v_zero, v_allones, v_zero);
-    gempba::node v_seed = gempba::node_factory::create_seed_node<void>(*v_load_balancer, v_function, v_seed_args);
+    gempba::node v_seed = gempba::create_seed_node<void>(*v_load_balancer, v_function, v_seed_args);
 
     const double v_start_time = gempba::branch_handler::get_wall_time();
     const bool v_submitted = v_branch_handler.try_local_submit(v_seed);

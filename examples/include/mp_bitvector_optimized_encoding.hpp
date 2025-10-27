@@ -10,7 +10,6 @@
 #include <tuple>
 #include <gempba/gempba.hpp>
 #include <node_trace/api/node.hpp>
-#include <node_trace/factory/node_factory.hpp>
 #include <spdlog/spdlog.h>
 #include <utils/ipc/task_packet.hpp>
 
@@ -207,7 +206,7 @@ public:
 
         int v_new_depth = p_depth + 1;
 
-        const gempba::node v_parent = p_parent == nullptr ? gempba::node_factory::create_dummy_node(*m_load_balancer) : p_parent;
+        const gempba::node v_parent = p_parent == nullptr ? gempba::create_dummy_node(*m_load_balancer) : p_parent;
 
         std::function<std::optional<std::tuple<int, G_BITSET, int> >()> v_left_args_initializer = [&]()-> std::optional<std::tuple<int, G_BITSET, int> > {
             G_BITSET v_ingraph1 = p_bits_in_graph;
@@ -226,7 +225,7 @@ public:
         };
 
 
-        gempba::node v_left = gempba::node_factory::create_serializable_lazy_node<void>(
+        gempba::node v_left = gempba::mp::create_lazy_node<void>(
                 *m_load_balancer,
                 v_parent, m_function,
                 v_left_args_initializer,
@@ -249,7 +248,7 @@ public:
             return std::nullopt;
         };
 
-        gempba::node v_right = gempba::node_factory::create_serializable_lazy_node<void>(
+        gempba::node v_right = gempba::mp::create_lazy_node<void>(
                 *m_load_balancer,
                 v_parent, m_function,
                 v_right_args_initializer,
