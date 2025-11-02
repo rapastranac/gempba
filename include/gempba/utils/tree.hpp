@@ -42,28 +42,7 @@ class tree {
         }
 
         // this method allows to add a next node,
-        void add_next(const int p_index) {
-            if (p_index >= static_cast<int>(m_tree.m_c.size())) {
-                spdlog::throw_spdlog_ex("node " + std::to_string(p_index) + " is out of bounds");
-            }
-            if (m_tree[p_index].m_parent) {
-                spdlog::throw_spdlog_ex("node " + std::to_string(m_index) + " is already assigned to " + std::to_string(m_tree[p_index].m_parent->m_index));
-            }
-
-            m_tree[p_index].m_parent = this;
-            if (m_children_count == 0) {
-                m_next = &m_tree[p_index];
-            } else {
-                tree_node *tail = m_next;
-                while (tail->m_right_sibling) {
-                    tail = tail->m_right_sibling;
-                }
-                m_tree[p_index].m_left_sibling = tail;
-                tail->m_right_sibling = &m_tree[p_index];
-            }
-            m_last = &m_tree[p_index];
-            m_children_count++;
-        }
+        void add_next(const int p_index);
 
         // tell if this node is assigned to another one
         [[nodiscard]] bool is_assigned() const { return m_parent ? true : false; }
@@ -76,27 +55,7 @@ class tree {
         [[nodiscard]] int get_parent() const { return m_parent ? m_parent->m_index : -1; }
 
         // this method unlinks and pops out the next node, leaving the second one (if applicable) as the new next
-        void pop_front() {
-            if (m_next == nullptr) {
-                spdlog::throw_spdlog_ex("there's no next to pop");
-            }
-            if (m_next->m_right_sibling != nullptr) {
-                // at least two nodes
-                const auto next_cpy = m_next;
-                m_next = m_next->m_right_sibling;
-                m_next->m_left_sibling = nullptr;
-
-                next_cpy->m_parent = nullptr;
-                next_cpy->m_left_sibling = nullptr;
-                next_cpy->m_right_sibling = nullptr;
-            } else {
-                // the only available node
-                m_next->m_parent = nullptr;
-                m_next = nullptr;
-                m_last = nullptr;
-            }
-            --m_children_count;
-        }
+        void pop_front();
 
         void clear() {
             while (m_next) {
@@ -105,34 +64,7 @@ class tree {
         }
 
         // releases current node from its parent
-        void release() {
-            if (m_parent == nullptr) {
-                spdlog::throw_spdlog_ex("node " + std::to_string(m_index) + " is not assigned to any other node");
-            }
-
-            if (m_left_sibling && m_right_sibling) {
-                // both non-nullptr
-                // in the middle
-                m_left_sibling->m_right_sibling = m_right_sibling;
-                m_right_sibling->m_left_sibling = m_left_sibling;
-                --(m_parent->m_children_count);
-                m_parent = nullptr;
-                m_right_sibling = nullptr;
-                m_left_sibling = nullptr;
-            } else if (m_left_sibling && !m_right_sibling) {
-                // left non-null and right null
-                // last one
-                m_left_sibling->m_right_sibling = nullptr;
-                m_parent->m_last = m_left_sibling;
-                --(m_parent->m_children_count);
-                m_parent = nullptr;
-                m_left_sibling = nullptr;
-            } else {
-                // (!m_left_sibling && m_right_sibling) : left null and right non-null
-                // the only one or the first one
-                m_parent->pop_front();
-            }
-        }
+        void release();
 
         [[nodiscard]] int size() const { return m_children_count; }
 
