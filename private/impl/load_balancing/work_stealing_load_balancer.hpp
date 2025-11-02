@@ -26,6 +26,7 @@
 
 #include <BS_thread_pool.hpp>
 #include <gempba/utils/transmission_guard.hpp>
+#include <gempba/utils/utils.hpp>
 #include <gempba/core/load_balancer.hpp>
 #include <gempba/core/node.hpp>
 #include <spdlog/spdlog.h>
@@ -80,7 +81,7 @@ namespace gempba {
 
         bool try_remote_submit(node &p_node, const int p_runnable_id) override {
             if (!m_scheduler_worker) {
-                spdlog::throw_spdlog_ex("Attempted to do remote submission without a scheduler worker");
+                utils::log_and_throw("Attempted to do remote submission without a scheduler worker");
             }
             if (send(p_node, p_runnable_id)) {
                 return true;
@@ -143,7 +144,7 @@ namespace gempba {
             }
             // push current node
             if (p_node.is_consumed()) {
-                spdlog::throw_spdlog_ex("Node: {} is already consumed", p_node.get_node_id());
+                utils::log_and_throw("Node: {} is already consumed", p_node.get_node_id());
             }
 
             // —————— after this line, only leftMost node should be pushed ——————————————————————————————————————————————
@@ -169,7 +170,7 @@ namespace gempba {
             }
             // push current node
             if (p_node.is_consumed()) {
-                spdlog::throw_spdlog_ex("Node: {} is already consumed", p_node.get_node_id());
+                utils::log_and_throw("Node: {} is already consumed", p_node.get_node_id());
             }
 
             // node should be pruned before submission —— ORDER MATTERS (avoids memory leaks)

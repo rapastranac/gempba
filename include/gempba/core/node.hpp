@@ -33,6 +33,7 @@
 #include <gempba/core/node_core.hpp>
 #include <gempba/core/node_traits.hpp>
 #include <gempba/core/scheduler.hpp>
+#include <gempba/utils/utils.hpp>
 
 
 /**
@@ -53,7 +54,7 @@ namespace gempba {
 
         static void throw_if_null(const std::shared_ptr<node_core> &p_node) {
             if (!p_node) {
-                spdlog::throw_spdlog_ex("Attempted to access a null node");
+                utils::log_and_throw("Attempted to access a null node");
             }
         }
 

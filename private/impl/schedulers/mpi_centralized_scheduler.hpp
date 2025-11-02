@@ -74,7 +74,7 @@ namespace gempba {
         explicit mpi_centralized_scheduler(const double p_timeout) :
             m_timeout(p_timeout) {
             if (m_timeout <= 0) {
-                spdlog::throw_spdlog_ex(fmt::format("Timeout must be greater than 0, got: {:.8f}", m_timeout));
+                utils::log_and_throw("Timeout must be greater than 0, got: {:.8f}", m_timeout);
             }
             init_mpi();
             init_member_variables();
@@ -578,7 +578,7 @@ namespace gempba {
                 }
 
                 if (m_nodes_running < 0) {
-                    spdlog::throw_spdlog_ex("rank {}: m_nodes_running is negative, this should not happen", m_world_rank);
+                    utils::log_and_throw("rank {}: m_nodes_running is negative, this should not happen", m_world_rank);
                 }
 
                 // Timeout or termination condition
@@ -770,7 +770,7 @@ namespace gempba {
                         break;
                     }
                     default: {
-                        spdlog::throw_spdlog_ex(std::format("rank {} received unknown tag {} from rank {} in receive_solution()", m_world_rank, status.MPI_TAG, rank));
+                        utils::log_and_throw("rank {} received unknown tag {} from rank {} in receive_solution()", m_world_rank, status.MPI_TAG, rank);
                     };
                 }
             }
@@ -1037,14 +1037,14 @@ namespace gempba {
         // ————————— ↓↓↓↓  New development ↓↓↓↓ ——————————
         center &center_view() override {
             if (m_world_rank != 0) {
-                spdlog::throw_spdlog_ex("Only rank 0 can access center_view()");
+                utils::log_and_throw("Only rank 0 can access center_view()");
             }
             return m_center_view;
         }
 
         worker &worker_view() override {
             if (m_world_rank == 0) {
-                spdlog::throw_spdlog_ex("Rank 0 cannot access worker_view()");
+                utils::log_and_throw("Rank 0 cannot access worker_view()");
             }
             return m_worker_view;
         }

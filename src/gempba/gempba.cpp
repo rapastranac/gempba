@@ -28,7 +28,7 @@ namespace {
 
 void gempba::check_not_null([[maybe_unused]] const node &p_parent) {
     if (p_parent == nullptr) {
-        spdlog::throw_spdlog_ex("Node creation cannot have a nullptr for a parent");
+        utils::log_and_throw("Node creation cannot have a nullptr for a parent");
     }
 }
 

@@ -92,7 +92,7 @@ namespace gempba {
 
         bool try_remote_submit(node &p_node, const int p_runnable_id) override {
             if (!m_scheduler_worker) {
-                spdlog::throw_spdlog_ex("Attempted to do remote submission without a scheduler worker");
+                utils::log_and_throw("Attempted to do remote submission without a scheduler worker");
             }
             if (send(p_node, p_runnable_id)) {
                 return true;
@@ -176,7 +176,7 @@ namespace gempba {
                 }
                 // push current node
                 if (p_node.is_consumed()) {
-                    spdlog::throw_spdlog_ex("Node: {} is already consumed", p_node.get_node_id());
+                    utils::log_and_throw("Node: {} is already consumed", p_node.get_node_id());
                 }
 
                 // after this line, only leftMost node should be pushed
@@ -210,7 +210,7 @@ namespace gempba {
                 }
                 // push current node
                 if (p_node.is_consumed()) {
-                    spdlog::throw_spdlog_ex("Node: {} is already consumed", p_node.get_node_id());
+                    utils::log_and_throw("Node: {} is already consumed", p_node.get_node_id());
                 }
 
                 // node should be pruned before submission —— ORDER MATTERS (avoids memory leaks)
@@ -229,10 +229,10 @@ namespace gempba {
             node v_top_node = p_node.map_core([&](const std::shared_ptr<node_core> &p_core) { return this->find_top_node(p_core); });
             if (v_top_node != nullptr) {
                 if (v_top_node.is_consumed()) {
-                    spdlog::throw_spdlog_ex("Attempt to push a consumed node");
+                    utils::log_and_throw("Attempt to push a consumed node");
                 }
 
-                v_top_node.prune(); // VERY IMPORTANT!! 
+                v_top_node.prune(); // VERY IMPORTANT!!
                 if (v_top_node.should_branch()) {
                     v_top_node.delegate_locally(this);
                 } else {
@@ -252,7 +252,7 @@ namespace gempba {
             node v_top_node = p_node.map_core([&](std::shared_ptr<node_core> p_core) { return this->find_top_node(p_core); });
             if (v_top_node != nullptr) {
                 if (v_top_node.is_consumed()) {
-                    spdlog::throw_spdlog_ex("Attempt to push a consumed node");
+                    utils::log_and_throw("Attempt to push a consumed node");
                 }
 
                 v_top_node.prune(); // VERY IMPORTANT!!
@@ -380,7 +380,7 @@ namespace gempba {
 
             spdlog::error("fw_count : {} \n ph_count : {}\n isVirtual :{} \n isDiscarded : {} \n", v_root->get_forward_count(),
                           v_root->get_push_count(), v_root->is_dummy(), v_root->get_state() == DISCARDED);
-            spdlog::throw_spdlog_ex("4 Testing, it's not supposed to happen, <code>findTopNode()</code>");
+            utils::log_and_throw("4 Testing, it's not supposed to happen, <code>findTopNode()</code>");
         }
 
         /**
@@ -567,7 +567,7 @@ namespace gempba {
                 return;
             }
 
-            spdlog::throw_spdlog_ex("4 Testing, it's not supposed to happen, pruneLeftSibling()\n");
+            utils::log_and_throw("4 Testing, it's not supposed to happen, pruneLeftSibling()\n");
         }
 
         void prune(const std::shared_ptr<node_core> &p_node) {

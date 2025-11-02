@@ -30,6 +30,7 @@
 #include <utility>
 #include <gempba/core/load_balancer.hpp>
 #include <gempba/detail/nodes/node_core_impl.hpp>
+#include <gempba/utils/utils.hpp>
 
 /**
  * @author Andres Pastrana
@@ -40,7 +41,7 @@ namespace gempba {
         static void check_not_null([[maybe_unused]] const node& p_parent) {
             #ifdef GEMPBA_TEST_MODE
             if (p_parent == nullptr) {
-                spdlog::throw_spdlog_ex("Node creation cannot have a nullptr for a parent");
+                utils::log_and_throw("Node creation cannot have a nullptr for a parent");
             }
             #endif
         }

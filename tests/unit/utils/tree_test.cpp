@@ -238,17 +238,17 @@ TEST(tree_test, iterator_test) {
 TEST(tree_test, invalid_add_next) {
     tree instance(3);
     instance[0].add_next(1);
-    EXPECT_THROW(instance[0].add_next(1), spdlog::spdlog_ex);
+    EXPECT_THROW(instance[0].add_next(1), std::runtime_error);
 }
 
 TEST(tree_test, invalid_pop_front) {
     tree instance(1);
-    EXPECT_THROW(instance[0].pop_front(), spdlog::spdlog_ex);
+    EXPECT_THROW(instance[0].pop_front(), std::runtime_error);
 }
 
 TEST(tree_test, invalid_release) {
     tree instance(1);
-    EXPECT_THROW(instance[0].release(), spdlog::spdlog_ex);
+    EXPECT_THROW(instance[0].release(), std::runtime_error);
 }
 
 std::string get_test_resource_path(const std::string &p_name) {

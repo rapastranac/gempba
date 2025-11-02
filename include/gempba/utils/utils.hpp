@@ -46,6 +46,17 @@ namespace utils {
         #endif
     }
 
+    inline void log_and_throw(const std::string &v_message) {
+        spdlog::error(v_message);
+        throw std::runtime_error(v_message);
+    }
+
+    template<typename... T>
+    void log_and_throw(const fmt::format_string<T...> &p_format_string, T &&... p_args) {
+        const std::string v_message = fmt::format(p_format_string, std::forward<T>(p_args)...);
+        log_and_throw(v_message);
+    }
+
     template<typename T>
     std::future<std::any> convert_to_any_future(std::future<T> &&p_future) {
         std::future<std::any> any_future = std::async(std::launch::async, [fut = std::move(p_future)]() mutable {
@@ -90,7 +101,7 @@ namespace utils {
     static void shift_left(std::vector<int> &vector_) {
         const int size = static_cast<int>(vector_.size());
         if (size == 0) {
-            spdlog::throw_spdlog_ex("Attempted to shift an empty vector");
+            utils::log_and_throw("Attempted to shift an empty vector");
         }
         for (int i = 0; i < size - 1; i++) {
             if (vector_[i] != -1) {
@@ -146,7 +157,7 @@ namespace utils {
                 return gempba::score::make(LDBL_MAX); // minimisation
             }
             default: {
-                spdlog::throw_spdlog_ex("Invalid score type: {}", static_cast<int>(p_type));
+                utils::log_and_throw("Invalid score type: {}", static_cast<int>(p_type));
             }
         }
     }

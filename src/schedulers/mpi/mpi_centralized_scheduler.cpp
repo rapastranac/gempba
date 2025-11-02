@@ -51,7 +51,7 @@ namespace gempba {
                 if (!v_is_pop) {
                     m_transmitting = false;
                 } else {
-                    spdlog::throw_spdlog_ex("Task found in queue, this should not happen in task_funneling()\n");
+                    utils::log_and_throw("Task found in queue, this should not happen in task_funneling()\n");
                 }
             }
             {
@@ -78,7 +78,7 @@ namespace gempba {
         utils::print_ipc_debug_comments("rank {} sent {} tasks\n", m_world_rank, m_sent_tasks);
 
         if (!m_tasks_bundle_queue.empty()) {
-            spdlog::throw_spdlog_ex("leaving process with a pending message\n");
+            utils::log_and_throw("leaving process with a pending message\n");
         }
     }
 

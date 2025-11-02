@@ -493,7 +493,7 @@ TEST_F(node_core_impl_test, remote_result_non_void) {
         v_node.run();
         FAIL();
     } catch (std::exception &e) {
-        ASSERT_STREQ("node is already consumed", e.what());
+        ASSERT_STREQ("node is already consumed, node: 1, state: SENT_TO_ANOTHER_PROCESS", e.what());
     };
     {
         gempba::node_state v_state = v_node.get_state();

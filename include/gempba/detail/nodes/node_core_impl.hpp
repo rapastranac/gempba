@@ -39,6 +39,7 @@
 
 #include <gempba/core/load_balancer.hpp>
 #include <gempba/core/node_core.hpp>
+#include <gempba/utils/utils.hpp>
 
 /**
  * @author Andres Pastrana
@@ -255,15 +256,15 @@ namespace gempba {
         //<editor-fold desc="Delegable">
         void run() override {
             if (m_state != UNUSED) {
-                spdlog::throw_spdlog_ex("node is already consumed");
+                utils::log_and_throw("node is already consumed, node: {}, state: {}", m_node_id, get_state_string(m_state));
             }
             if (m_initialization_flag == UNINITIALIZED) {
-                spdlog::throw_spdlog_ex("node arguments have not been initialized");
+                utils::log_and_throw("node arguments have not been initialized");
             }
             if (m_initialization_flag == LAZY) {
                 auto v_opt = m_initializer();
                 if (!v_opt.has_value()) {
-                    spdlog::throw_spdlog_ex("Attempted to initialize a non-worthy node: this should not happen!");
+                    utils::log_and_throw("Attempted to initialize a non-worthy node: this should not happen!");
                 }
                 m_arguments = std::move(v_opt.value());
                 m_initialization_flag = INITIALIZED;
@@ -275,15 +276,15 @@ namespace gempba {
 
         void delegate_locally(load_balancer *p_load_balancer) override {
             if (m_state != UNUSED) {
-                spdlog::throw_spdlog_ex("node is already consumed");
+                utils::log_and_throw("node is already consumed, node: {}, state: {}", m_node_id, get_state_string(m_state));
             }
             if (m_initialization_flag == UNINITIALIZED) {
-                spdlog::throw_spdlog_ex("Node arguments have not been initialized");
+                utils::log_and_throw("Node arguments have not been initialized");
             }
             if (m_initialization_flag == LAZY) {
                 auto v_opt = m_initializer();
                 if (!v_opt.has_value()) {
-                    spdlog::throw_spdlog_ex("Attempted to initialize a non-worthy node: this should not happen!");
+                    utils::log_and_throw("Attempted to initialize a non-worthy node: this should not happen!");
                 }
                 m_arguments = std::move(v_opt.value());
                 m_initialization_flag = INITIALIZED;
@@ -298,15 +299,15 @@ namespace gempba {
 
         void delegate_remotely(scheduler::worker *p_worker, const int p_runner_id) override {
             if (m_state != UNUSED) {
-                spdlog::throw_spdlog_ex("node is already consumed");
+                utils::log_and_throw("node is already consumed, node: {}, state: {}", m_node_id, get_state_string(m_state));
             }
             if (m_initialization_flag == UNINITIALIZED) {
-                spdlog::throw_spdlog_ex("Node arguments have not been initialized");
+                utils::log_and_throw("Node arguments have not been initialized");
             }
             if (m_initialization_flag == LAZY) {
                 auto v_opt = m_initializer();
                 if (!v_opt.has_value()) {
-                    spdlog::throw_spdlog_ex("Attempted to initialize a non-worthy node: this should not happen!");
+                    utils::log_and_throw("Attempted to initialize a non-worthy node: this should not happen!");
                 }
                 m_arguments = std::move(v_opt.value());
                 m_initialization_flag = INITIALIZED;
@@ -320,20 +321,20 @@ namespace gempba {
         //<editor-fold desc="Serializable">
         task_packet serialize() override {
             if (m_initialization_flag == UNINITIALIZED || m_initialization_flag == LAZY) {
-                spdlog::throw_spdlog_ex("node arguments have not been initialized");
+                utils::log_and_throw("node arguments have not been initialized");
             }
             if (m_args_serializer == nullptr) {
-                spdlog::throw_spdlog_ex("Arguments serializer has not been set");
+                utils::log_and_throw("Arguments serializer has not been set");
             }
             return std::apply(m_args_serializer, m_arguments);
         }
 
         void deserialize(const task_packet &p_buffer) override {
             if (m_initialization_flag != UNINITIALIZED) {
-                spdlog::throw_spdlog_ex("node arguments have already been initialized");
+                utils::log_and_throw("node arguments have already been initialized");
             }
             if (m_args_deserializer == nullptr) {
-                spdlog::throw_spdlog_ex("Arguments deserializer has not been set");
+                utils::log_and_throw("Arguments deserializer has not been set");
             }
             m_arguments = m_args_deserializer(p_buffer);
             m_initialization_flag = DESERIALIZED;
@@ -344,14 +345,14 @@ namespace gempba {
         //<editor-fold desc="RemoteResult">
         void set_result(const task_packet &p_result) override {
             if (m_result_deserializer == nullptr) {
-                spdlog::throw_spdlog_ex("Result deserializer has not been set");
+                utils::log_and_throw("Result deserializer has not been set");
             }
             m_result = m_result_deserializer(p_result);
         }
 
         [[nodiscard]] task_packet get_result() override {
             if (m_result_serializer == nullptr) {
-                spdlog::throw_spdlog_ex("Result serializer has not been set");
+                utils::log_and_throw("Result serializer has not been set");
             }
             const std::any &v_any = get_any_result();
             return m_result_serializer(v_any);
@@ -401,6 +402,7 @@ namespace gempba {
         [[nodiscard]] bool is_consumed() const override { return m_state != UNUSED; }
 
         bool should_branch() override {
+            utils::print_ipc_debug_comments("run_id: {}, should_branch() called, state={}, init_flag={}", m_node_id, get_state_string(m_state), m_initialization_flag);
 
             if (m_should_branch_cached.has_value()) {
                 utils::print_ipc_debug_comments("run_id: {}, should_branch() returning cached value: {}", m_node_id, m_should_branch_cached.value());
@@ -408,6 +410,7 @@ namespace gempba {
             }
 
             if (m_state == FORWARDED || m_state == PUSHED || m_state == DISCARDED) {
+                utils::print_ipc_debug_comments("run_id: {}, should_branch() returning false due to state", m_node_id);
                 m_initialization_flag = INITIALIZED;
                 m_should_branch_cached = false;
                 return false;
@@ -418,7 +421,9 @@ namespace gempba {
             }
             if (m_initialization_flag == LAZY) {
                 auto v_args_opt = m_initializer();
+                utils::print_ipc_debug_comments("run_id: {}, should_branch() calling initializer", m_node_id);
                 if (!v_args_opt.has_value()) {
+                    utils::print_ipc_debug_comments("run_id: {}, should_branch() initializer returned nullopt", m_node_id);
                     m_should_branch_cached = false;
                     m_initialization_flag = INITIALIZED;
                     return false;
@@ -426,6 +431,7 @@ namespace gempba {
                 m_arguments = std::move(v_args_opt.value());
                 m_initialization_flag = INITIALIZED;
                 m_should_branch_cached = true;
+                utils::print_ipc_debug_comments("run_id: {}, should_branch() initializer succeeded, returning true", m_node_id);
                 return true;
             }
             m_should_branch_cached = true;
@@ -438,14 +444,14 @@ namespace gempba {
 
         void set_parent(const std::shared_ptr<node_core> &p_parent) override {
             if (m_is_dummy && p_parent != nullptr) {
-                spdlog::throw_spdlog_ex("Cannot set parent for a dummy node");
+                utils::log_and_throw("Cannot set parent for a dummy node");
             }
             if (p_parent.get() == this) {
                 // Check if the new parent is not this node itself
-                spdlog::throw_spdlog_ex("Cannot set self as parent");
+                utils::log_and_throw("Cannot set self as parent");
             }
             if (!m_children.empty() && p_parent != nullptr) {
-                spdlog::throw_spdlog_ex("Cannot set parent to nullptr when children are present");
+                utils::log_and_throw("Cannot set parent to nullptr when children are present");
             }
             if (m_parent.get() == p_parent.get()) {
                 // No change in parent, so return early to avoid recursion
@@ -468,7 +474,7 @@ namespace gempba {
 
         [[nodiscard]] std::shared_ptr<node_core> get_second_leftmost_child() override {
             if (m_children.size() < 2) {
-                spdlog::throw_spdlog_ex("Cannot get second child when there are less than 2 children");
+                utils::log_and_throw("Cannot get second child when there are less than 2 children");
             }
             auto it = m_children.begin();
             return *(++it);
@@ -478,7 +484,7 @@ namespace gempba {
 
         void remove_second_leftmost_child() override {
             if (m_children.size() < 2) {
-                spdlog::throw_spdlog_ex("Cannot prune second child when there are less than 2 children");
+                utils::log_and_throw("Cannot prune second child when there are less than 2 children");
             }
             auto it = m_children.begin();
             m_children.erase(++it);
@@ -525,7 +531,7 @@ namespace gempba {
 
         void add_child(const std::shared_ptr<node_core> &p_child) override {
             if (p_child == nullptr || p_child.get() == this) {
-                spdlog::throw_spdlog_ex("Cannot add null or self as a child");
+                utils::log_and_throw("Cannot add null or self as a child");
             }
 
             // Set the parent of the child
@@ -551,7 +557,7 @@ namespace gempba {
                 this->m_state = RETRIEVED;
                 return v_any_result;
             }
-            spdlog::throw_spdlog_ex("Attempting to get result of node that has not been executed");
+            utils::log_and_throw("Attempting to get result of node that has not been executed");
         }
 
         void remove_child(std::shared_ptr<node_core> &p_child) override { m_children.remove(p_child); }
@@ -564,6 +570,27 @@ namespace gempba {
             }
             m_root = nullptr;
             set_parent(nullptr);
+        }
+
+    private:
+        // Utilities
+        static std::string get_state_string(const node_state& p_state) {
+            switch (p_state) {
+                case UNUSED:
+                    return "UNUSED";
+                case FORWARDED:
+                    return "FORWARDED";
+                case PUSHED:
+                    return "PUSHED";
+                case DISCARDED:
+                    return "DISCARDED";
+                case RETRIEVED:
+                    return "RETRIEVED";
+                case SENT_TO_ANOTHER_PROCESS:
+                    return "SENT_TO_ANOTHER_PROCESS";
+                default:
+                    return "UNKNOWN_STATE";
+            }
         }
     };
 } // namespace gempba

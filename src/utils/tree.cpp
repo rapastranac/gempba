@@ -1,11 +1,12 @@
 #include <gempba/utils/tree.hpp>
+#include <gempba/utils/utils.hpp>
 
 void tree::tree_node::add_next(const int p_index) {
     if (p_index >= static_cast<int>(m_tree.m_c.size())) {
-        spdlog::throw_spdlog_ex("node " + std::to_string(p_index) + " is out of bounds");
+        utils::log_and_throw("node " + std::to_string(p_index) + " is out of bounds");
     }
     if (m_tree[p_index].m_parent) {
-        spdlog::throw_spdlog_ex("node " + std::to_string(m_index) + " is already assigned to " + std::to_string(m_tree[p_index].m_parent->m_index));
+        utils::log_and_throw("node " + std::to_string(m_index) + " is already assigned to " + std::to_string(m_tree[p_index].m_parent->m_index));
     }
 
     m_tree[p_index].m_parent = this;
@@ -25,7 +26,7 @@ void tree::tree_node::add_next(const int p_index) {
 
 void tree::tree_node::pop_front() {
     if (m_next == nullptr) {
-        spdlog::throw_spdlog_ex("there's no next to pop");
+        utils::log_and_throw("there's no next to pop");
     }
     if (m_next->m_right_sibling != nullptr) {
         // at least two nodes
@@ -47,7 +48,7 @@ void tree::tree_node::pop_front() {
 
 void tree::tree_node::release() {
     if (m_parent == nullptr) {
-        spdlog::throw_spdlog_ex("node " + std::to_string(m_index) + " is not assigned to any other node");
+        utils::log_and_throw("node " + std::to_string(m_index) + " is not assigned to any other node");
     }
 
     if (m_left_sibling && m_right_sibling) {
