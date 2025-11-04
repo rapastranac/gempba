@@ -99,6 +99,52 @@ public:
         return v_oss.str();
     }
 
+    void some_rules_applies(GBITSET& p_bits_in_graph, int &p_cursol_size, int &p_maxdeg, int &p_maxdeg_v, int &p_nb_edges_double_counted) {
+        bool v_some_rule_applies = true;
+        while (v_some_rule_applies) {
+            p_nb_edges_double_counted = 0;
+            p_maxdeg = -1;
+            p_maxdeg_v = 0;
+            v_some_rule_applies = false;
+
+            for (size_t i = p_bits_in_graph.find_first(); i != GBITSET::npos; i = p_bits_in_graph.find_next(i)) {
+
+                GBITSET nbrs = (m_graphbits[i] & p_bits_in_graph);
+
+                int cnt = nbrs.count();
+                if (cnt == 0) {
+                    p_bits_in_graph[i] = false;
+                } else if (cnt == 1) {
+                    int the_nbr = nbrs.find_first();
+                    //cur_sol[the_nbr] = true;
+                    p_cursol_size++;
+                    p_bits_in_graph[i] = false;
+                    p_bits_in_graph[the_nbr] = false;
+                    v_some_rule_applies = true;
+                } else if (cnt > p_maxdeg) {
+                    p_maxdeg = cnt;
+                    p_maxdeg_v = i;
+                } else {
+                    //looking for a nbr with at least same nbrs as i
+                    if (cnt == 2) {
+                        int n1 = nbrs.find_first();
+                        int n2 = nbrs.find_next(n1);
+                        if (m_graphbits[n1][n2]) {
+                            //cur_sol[n1] = true;
+                            //cur_sol[n2] = true;
+                            p_bits_in_graph[i] = false;
+                            p_bits_in_graph[n1] = false;
+                            p_bits_in_graph[n2] = false;
+                            p_cursol_size += 2;
+                            v_some_rule_applies = true;
+                        }
+                    }
+                }
+                p_nb_edges_double_counted += cnt;
+            }
+        }
+    }
+
     void mvcbitset(std::thread::id p_tid, int p_depth, GBITSET p_bits_in_graph, int p_solsize, gempba::node p_parent) {
 
         ++m_passes;
@@ -131,53 +177,9 @@ public:
         //max degree dude
         int v_maxdeg = 0;
         int v_maxdeg_v = 0;
-
         int v_nb_edges_double_counted = 0;
 
-        bool v_some_rule_applies = true;
-
-        while (v_some_rule_applies) {
-            v_nb_edges_double_counted = 0;
-            v_maxdeg = -1;
-            v_maxdeg_v = 0;
-            v_some_rule_applies = false;
-
-            for (size_t i = p_bits_in_graph.find_first(); i != GBITSET::npos; i = p_bits_in_graph.find_next(i)) {
-
-                GBITSET nbrs = (m_graphbits[i] & p_bits_in_graph);
-
-                int cnt = nbrs.count();
-                if (cnt == 0) {
-                    p_bits_in_graph[i] = false;
-                } else if (cnt == 1) {
-                    int the_nbr = nbrs.find_first();
-                    //cur_sol[the_nbr] = true;
-                    v_cursol_size++;
-                    p_bits_in_graph[i] = false;
-                    p_bits_in_graph[the_nbr] = false;
-                    v_some_rule_applies = true;
-                } else if (cnt > v_maxdeg) {
-                    v_maxdeg = cnt;
-                    v_maxdeg_v = i;
-                } else {
-                    //looking for a nbr with at least same nbrs as i
-                    if (cnt == 2) {
-                        int n1 = nbrs.find_first();
-                        int n2 = nbrs.find_next(n1);
-                        if (m_graphbits[n1][n2]) {
-                            //cur_sol[n1] = true;
-                            //cur_sol[n2] = true;
-                            p_bits_in_graph[i] = false;
-                            p_bits_in_graph[n1] = false;
-                            p_bits_in_graph[n2] = false;
-                            v_cursol_size += 2;
-                            v_some_rule_applies = true;
-                        }
-                    }
-                }
-                v_nb_edges_double_counted += cnt;
-            }
-        }
+        some_rules_applies(p_bits_in_graph, v_cursol_size, v_maxdeg, v_maxdeg_v, v_nb_edges_double_counted);
 
         int v_nb_vertices = p_bits_in_graph.count();
         if (v_nb_vertices <= 1) {
@@ -209,7 +211,7 @@ public:
             GBITSET v_ingraph1 = p_bits_in_graph;
 
             if (!v_ingraph1[v_maxdeg_v]) {
-                cout << "ERROR : max deg_v already gone" << endl;
+                spdlog::error("ERROR : max deg_v already gone");
             }
             v_ingraph1.set(v_maxdeg_v, false);
             int v_solution_size1 = v_cursol_size + 1;
@@ -241,7 +243,6 @@ public:
             }
             return std::nullopt;
         };
-
 
         gempba::node v_right = gempba::mt::create_lazy_node<void>(
                 *m_load_balancer,
