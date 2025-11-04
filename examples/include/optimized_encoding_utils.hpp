@@ -86,7 +86,7 @@ inline auto deserializer = [](std::stringstream &p_ss, auto &... p_args) {
 };
 
 inline std::function<std::tuple<int, G_BITSET, int>(const gempba::task_packet &&)> create_deserializer() {
-    return [=](const gempba::task_packet &&p_buffer) {
+    return [](const gempba::task_packet &&p_buffer) {
         int v_depth;
         G_BITSET v_bits_in_graph;
         int v_solution_size;
@@ -100,7 +100,7 @@ inline std::function<std::tuple<int, G_BITSET, int>(const gempba::task_packet &&
 };
 
 inline std::function<gempba::task_packet(int, G_BITSET, int)> make_serializer() {
-    return [&](int p_depth, G_BITSET p_bits_in_graph, int p_solution_size) {
+    return [](int p_depth, G_BITSET p_bits_in_graph, int p_solution_size) {
         auto v_ser = serializer(p_depth, p_bits_in_graph, p_solution_size);
         return v_ser;
     };
