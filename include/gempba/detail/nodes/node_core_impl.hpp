@@ -264,7 +264,7 @@ namespace gempba {
             if (m_initialization_flag == LAZY) {
                 auto v_opt = m_initializer();
                 if (!v_opt.has_value()) {
-                    utils::log_and_throw("Attempted to initialize a non-worthy node: this should not happen!");
+                    utils::log_and_throw("Attempted to initialize a non-worthy node: this should not happen!, node: {}, state: {}", m_node_id, get_state_string(m_state));
                 }
                 m_arguments = std::move(v_opt.value());
                 m_initialization_flag = INITIALIZED;
@@ -284,7 +284,7 @@ namespace gempba {
             if (m_initialization_flag == LAZY) {
                 auto v_opt = m_initializer();
                 if (!v_opt.has_value()) {
-                    utils::log_and_throw("Attempted to initialize a non-worthy node: this should not happen!");
+                    utils::log_and_throw("Attempted to initialize a non-worthy node: this should not happen!, node: {}, state: {}", m_node_id, get_state_string(m_state));
                 }
                 m_arguments = std::move(v_opt.value());
                 m_initialization_flag = INITIALIZED;
@@ -307,7 +307,7 @@ namespace gempba {
             if (m_initialization_flag == LAZY) {
                 auto v_opt = m_initializer();
                 if (!v_opt.has_value()) {
-                    utils::log_and_throw("Attempted to initialize a non-worthy node: this should not happen!");
+                    utils::log_and_throw("Attempted to initialize a non-worthy node: this should not happen!, node: {}, state: {}", m_node_id, get_state_string(m_state));
                 }
                 m_arguments = std::move(v_opt.value());
                 m_initialization_flag = INITIALIZED;
