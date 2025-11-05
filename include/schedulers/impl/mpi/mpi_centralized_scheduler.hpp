@@ -189,7 +189,7 @@ namespace gempba {
         }
 
     private:
-        void run_node(branch_handler &p_branch_handler, std::function<std::shared_ptr<result_holder_parent>(task_packet)> &p_buffer_decoder) {
+        [[deprecated]] void run_node(branch_handler &p_branch_handler, std::function<std::shared_ptr<result_holder_parent>(task_packet)> &p_buffer_decoder) {
             MPI_Barrier(m_world_communicator);
             m_start_time = MPI_Wtime();
 
@@ -239,11 +239,15 @@ namespace gempba {
             m_stats.m_elapsed_time = m_end_time - m_start_time;
         }
 
+        void run(branch_handler &p_branch_handler, std::map<int, std::shared_ptr<serial_runnable> > p_runnables) {
+            throw std::runtime_error("Not implemented yet");
+        }
+
         /**
          * Forces pushing a task packet to the next assigned process. This method is not thread-safe.
          * @param p_task_packet The serialized message to be sent.
          */
-        void push(task_packet &&p_task_packet) {
+        [[deprecated]] void push(task_packet &&p_task_packet) {
             if (p_task_packet.empty()) {
                 throw std::runtime_error(fmt::format("rank {}, attempted to send empty buffer \n", m_world_rank));
             }
@@ -258,6 +262,10 @@ namespace gempba {
             }
 
             m_tasks_queue.push(v_message);
+        }
+
+        unsigned int force_push(task_packet &&p_task, int p_function_id) {
+            throw std::runtime_error("Not implemented yet");
         }
 
         MPI_Status probe_communicators_at_worker() {
@@ -984,12 +992,20 @@ namespace gempba {
                 return m_parent.get_stats();
             }
 
-            void run(branch_handler &p_branch_handler, std::function<std::shared_ptr<result_holder_parent>(task_packet)> &p_buffer_decoder) override {
+            [[deprecated]] void run(branch_handler &p_branch_handler, std::function<std::shared_ptr<result_holder_parent>(task_packet)> &p_buffer_decoder) override {
                 m_parent.run_node(p_branch_handler, p_buffer_decoder);
             }
 
-            void push(task_packet &&p_task) override {
+            void run(branch_handler &p_branch_handler, std::map<int, std::shared_ptr<serial_runnable> > p_runnables) override {
+                m_parent.run(p_branch_handler, std::move(p_runnables));
+            }
+
+            [[deprecated]] void push(task_packet &&p_task) override {
                 m_parent.push(std::move(p_task));
+            }
+
+            unsigned int force_push(task_packet &&p_task, const int p_function_id) override {
+                return m_parent.force_push(std::move(p_task), p_function_id);
             }
 
             [[nodiscard]] unsigned int next_process() const override {

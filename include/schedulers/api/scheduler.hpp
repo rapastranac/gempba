@@ -2,7 +2,9 @@
 #define GEMPBA_SCHEDULER_HPP
 
 #include <functional>
+#include <map>
 #include <memory>
+#include <runnables/api/serial_runnable.hpp>
 #include <schedulers/api/scheduler_traits.hpp>
 #include <utils/gempba_utils.hpp>
 #include <utils/transmission_guard.hpp>
@@ -89,7 +91,9 @@ namespace gempba {
             * @param p_branch_handler Reference to the branch handler that manages task distribution and result collection.
             * @param p_buffer_decoder Function to decode incoming task packets into result holders.
             */
-            virtual void run(branch_handler &p_branch_handler, std::function<std::shared_ptr<result_holder_parent>(task_packet)> &p_buffer_decoder) = 0;
+            [[deprecated]] virtual void run(branch_handler &p_branch_handler, std::function<std::shared_ptr<result_holder_parent>(task_packet)> &p_buffer_decoder) = 0;
+
+            virtual void run(branch_handler &p_branch_handler, std::map<int, std::shared_ptr<serial_runnable> > p_runnables) = 0;
 
             /**
             * Pushes a message to the next assigned process. This method is not thread-safe. Sending channel must be opened before calling this
@@ -98,7 +102,10 @@ namespace gempba {
             *
             * @param p_task The serialized message to be sent.
             */
-            virtual void push(task_packet &&p_task) = 0;
+            [[deprecated]] virtual void push(task_packet &&p_task) = 0;
+
+            virtual unsigned int force_push(task_packet &&p_task, int p_function_id) = 0;
+
 
             [[nodiscard]] virtual unsigned int next_process() const = 0;
 
