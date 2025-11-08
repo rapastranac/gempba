@@ -136,6 +136,7 @@ namespace gempba {
             std::scoped_lock<std::mutex> v_lock(m_mutex);
 
             if (should_update_result(p_new_score)) {
+                spdlog::debug("rank {}, invalidated existing score : {} -> new score: {}", rank_me(), m_score.to_string(), p_new_score.to_string());
                 m_score = p_new_score;
                 m_result = task_packet::EMPTY;
                 return true;
