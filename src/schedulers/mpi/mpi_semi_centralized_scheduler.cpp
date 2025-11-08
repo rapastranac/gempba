@@ -76,6 +76,8 @@ namespace gempba {
                 }
             }
         }
+        //This call here is thread safe because all tasks have been resolved and no other thread is pushing new tasks
+        update_score(p_node_manager); // Attempt final score update before exiting
         utils::print_ipc_debug_comments("rank {} sent {} tasks\n", m_world_rank, m_sent_tasks);
 
         if (!m_tasks_bundle_queue.empty()) {
