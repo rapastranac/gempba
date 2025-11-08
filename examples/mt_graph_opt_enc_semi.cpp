@@ -17,7 +17,6 @@ int run(int job_id, int ntasks_per_node, int prob, string &filename) {
 
     v_cover.init(graph, ntasks_per_node, filename, prob);
     v_cover.findCover(job_id);
-    v_cover.printSolution();
 
     return gempba::shutdown();
 }

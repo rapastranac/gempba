@@ -25,7 +25,6 @@ public:
         string msg_center = fmt::format("run # {} ", run);
         msg_center = "!" + fmt::format("{:-^{}}", msg_center, wide - 2) + "!" + "\n";
         cout << msg_center;
-        outFile(msg_center, "");
 
         this->m_node_manager.set_thread_pool_size(numThreads);
         preSize = graph.preprocessing();
@@ -48,14 +47,7 @@ public:
 
             graph_res2 = graph_res;
             cover = graph_res.postProcessing();
-        } catch (std::exception &e) {
-            this->output.open(outPath, std::ofstream::in | std::ofstream::out | std::ofstream::app);
-            if (!output.is_open()) {
-                printf("Error, output file not found ! \n");
-            }
-            std::cout << "Exception caught : " << e.what() << '\n';
-            output << "Exception caught : " << e.what() << '\n';
-            output.close();
+        } catch (...) {
         }
 
         cout << "DONE!" << endl;
