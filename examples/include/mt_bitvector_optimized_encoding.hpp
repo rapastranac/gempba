@@ -280,12 +280,13 @@ private:
             return;
 
         if (p_solution_size < m_node_manager.get_score().get<int>()) {
-            m_node_manager.try_update_result(p_solution_size, gempba::score::make(p_solution_size));
+            const bool v_updated = m_node_manager.try_update_result(p_solution_size, gempba::score::make(p_solution_size));
 
             const auto v_clock = std::chrono::system_clock::now();
             const std::time_t v_time = std::chrono::system_clock::to_time_t(v_clock); //it includes a "\n"
 
-            spdlog::debug("rank {}, MVC solution so far: {} @ depth : {}, {}", m_node_manager.rank_me(), p_solution_size, p_depth, std::ctime(&v_time));
+            spdlog::debug("rank {}, MVC solution so far: {} @ depth : {}, updated:{} {}",
+                          m_node_manager.rank_me(), p_solution_size, p_depth, v_updated ? "SUCCESS" : "FAIL", std::ctime(&v_time));
 
         }
     }
