@@ -4,42 +4,57 @@ echo "Current working directory: $(pwd)"
 echo "Starting run at: $(date)"
 
 ## Release ---------------------------------------------------------------------
+JOB_NAME="Default Job"  # SLURM
 JOB_ID=9999             # SLURM
 NODES=9999              # SLURM, this is the number of nodes in a super cluster
-TASKS_PER_NODE=3        # SLURM, this is the number of tasks per node
+TASKS_PER_NODE=5        # SLURM, this is the number of tasks per node
 TASKS_PER_SOCKET=9999   # SLURM,
-CPUS_PER_TASK=4         # SLURM, this is the number of cores per process
+CPUS_PER_TASK=2         # SLURM, this is the number of cores per process
+CSV="true"              # Append results summary to CSV file
 GRAPH_FILE=data/prob_4/400/00400_1
 
-# From the following args variable, only CPUS_PER_TASK is used by the project, the rest is used only for stats purposes
-args="-job_id $JOB_ID -nodes $NODES -ntasks_per_node $TASKS_PER_NODE -ntasks_per_socket $TASKS_PER_SOCKET -cpus_per_task $CPUS_PER_TASK -I $GRAPH_FILE"
+# ---------------------- Argument construction -------------------------
+# NOTE:
+# Only CPUS_PER_TASK is used by the project;
+# the rest are passed for reporting / statistics.
+
+args=(
+    "-job_name"          "$JOB_NAME"
+    "-job_id"            "$JOB_ID"
+    "-nodes"             "$NODES"
+    "-ntasks_per_node"   "$TASKS_PER_NODE"
+    "-ntasks_per_socket" "$TASKS_PER_SOCKET"
+    "-cpus_per_task"     "$CPUS_PER_TASK"
+    "-csv"               "$CSV"
+    "-I"                 "$GRAPH_FILE"
+)
 
 # Here below are the scenarios to run, uncomment the one you want to run.
 
 ## Multiprocessing scenarios:
 
 #  - Bitvector Optimized Encoding Semi-Centralized
-mpirun -n "$TASKS_PER_NODE" --bind-to core --map-by slot:PE="$CPUS_PER_TASK" --report-bindings ./bin/mp_bitvect_opt_enc_semi $args
+mpirun -n "$TASKS_PER_NODE" --bind-to core --map-by slot:PE="$CPUS_PER_TASK" --report-bindings ./bin/mp_bitvect_opt_enc_semi "${args[@]}"
 
 #  - Bitvector Optimized Encoding Centralized
-#mpirun -n "$TASKS_PER_NODE" --bind-to core --map-by slot:PE="$CPUS_PER_TASK" --report-bindings ./bin/mp_bitvect_opt_enc_central $args
+#mpirun -n "$TASKS_PER_NODE" --bind-to core --map-by slot:PE="$CPUS_PER_TASK" --report-bindings ./bin/mp_bitvect_opt_enc_central "${args[@]}"
 
 #  - Bitvector Basic Encoding Semi-Centralized
-#mpirun -n "$TASKS_PER_NODE" --bind-to core --map-by slot:PE="$CPUS_PER_TASK" --report-bindings ./bin/mp_bitvect_basic_enc_semi $args
+#mpirun -n "$TASKS_PER_NODE" --bind-to core --map-by slot:PE="$CPUS_PER_TASK" --report-bindings ./bin/mp_bitvect_basic_enc_semi "${args[@]}"
 
 #  - Bitvector Basic Encoding Centralized
-#mpirun -n "$TASKS_PER_NODE" --bind-to core --map-by slot:PE="$CPUS_PER_TASK" --report-bindings ./bin/mp_bitvect_basic_enc_central $args
+#mpirun -n "$TASKS_PER_NODE" --bind-to core --map-by slot:PE="$CPUS_PER_TASK" --report-bindings ./bin/mp_bitvect_basic_enc_central "${args[@]}"
 
 ## Multithreading scenarios:
 
 #  - Bitvector Optimized Encoding Semi-Centralized
-#./bin/mt_bitvect_opt_enc_semi $args
+#./bin/mt_bitvect_opt_enc_semi "${args[@]}"
 
 #  - Graph Optimized Encoding Semi-Centralized
-#./bin/mt_graph_opt_enc_semi $args
+#./bin/mt_graph_opt_enc_semi "${args[@]}"
 
 #  - Graph Optimized Encoding Semi-Centralized for non-void algorithms
-#./bin/mt_graph_opt_enc_semi_non_void $args
+#./bin/mt_graph_opt_enc_semi_non_void "${args[@]}"
 
 
 

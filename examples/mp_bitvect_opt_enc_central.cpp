@@ -29,7 +29,7 @@ gempba::load_balancer *initiate_load_balancer(gempba::scheduler *p_scheduler, co
     return gempba::mp::create_load_balancer(p_policy, &v_worker_view);
 }
 
-int run(int p_job_id, int p_nodes, int p_ntasks_per_node, int p_ntasks_per_socket, int p_threads_per_task, int p_probability, const std::string &p_filename_path) {
+int run(const std::string& p_job_name, int p_job_id, int p_nodes, int p_ntasks_per_node, int p_ntasks_per_socket, int p_threads_per_task, int p_probability, bool p_csv_append, const std::string &p_filename_path) {
 
     std::cout << "USING OPTIMIZED ENCODING" << std::endl;
     std::cout << "USING CENTRALIZED STRATEGY" << std::endl;
@@ -170,10 +170,10 @@ int run(int p_job_id, int p_nodes, int p_ntasks_per_node, int p_ntasks_per_socke
         }
 
         // print stats to a file ***********
-        print_to_summary_file(p_job_id, p_nodes, p_ntasks_per_node, p_ntasks_per_socket, p_threads_per_task, p_filename_path,
-                              v_elapsed_times[0], v_gsize, v_world_size, v_total_thread_requests, v_received_tasks,
-                              v_sent_tasks, v_solution_size, v_global_cpu_idle_time, v_global_thread_request,
-                              v_total_requests_at_center);
+        print_to_summary_file(p_job_name, p_job_id, p_nodes, p_ntasks_per_node, p_ntasks_per_socket, p_threads_per_task,
+                              p_filename_path, v_elapsed_times[0], v_gsize, v_world_size, v_total_thread_requests,
+                              v_received_tasks, v_sent_tasks, v_solution_size, v_global_cpu_idle_time,
+                              v_global_thread_request, v_total_requests_at_center, p_csv_append);
         // **************************************************************************
     }
     v_scheduler->barrier();
@@ -182,7 +182,7 @@ int run(int p_job_id, int p_nodes, int p_ntasks_per_node, int p_ntasks_per_socke
 
 int main(const int argc, char *argv[]) {
     // spdlog::set_level(spdlog::level::debug);
-    const auto [job_id, nodes, ntasks_per_node, ntasks_per_socket, cpus_per_task, prob, filename] = parse(argc, argv);
+    const auto [job_name,job_id, nodes, ntasks_per_node, ntasks_per_socket, cpus_per_task, prob,csv_append, filename] = parse(argc, argv);
 
-    return run(job_id, nodes, ntasks_per_node, ntasks_per_socket, cpus_per_task, prob, filename);
+    return run(job_name, job_id, nodes, ntasks_per_node, ntasks_per_socket, cpus_per_task, prob,csv_append, filename);
 }

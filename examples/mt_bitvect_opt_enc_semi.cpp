@@ -9,7 +9,7 @@
 
 using namespace std::placeholders;
 
-int run(const int p_threads_per_task, const int p_probability, const std::string &p_filename_path) {
+int run(const std::string& p_job_name, int p_job_id, int p_nodes, int p_ntasks_per_node, int p_ntasks_per_socket, int p_threads_per_task, int p_probability, bool p_csv_append, const std::string &p_filename_directory) {
 
     std::cout << "USING OPTIMIZED ENCODING" << std::endl;
     std::cout << "USING MULTITHREADING ONLY" << std::endl;
@@ -26,9 +26,9 @@ int run(const int p_threads_per_task, const int p_probability, const std::string
 
 
     Graph v_graph;
-    v_graph.readEdges(p_filename_path);
+    v_graph.readEdges(p_filename_directory);
 
-    v_instance.init(v_graph, p_threads_per_task, p_filename_path, p_probability);
+    v_instance.init(v_graph, p_threads_per_task, p_filename_directory, p_probability);
     v_instance.set_graph(v_graph);
 
     int v_gsize = v_graph.size() + 1; //+1 cuz some files use node ids from 1 to n (instead of 0 to n - 1)
@@ -65,11 +65,17 @@ int run(const int p_threads_per_task, const int p_probability, const std::string
     spdlog::info("elapsed time: {0:.6f}", v_elapsed_time);
     spdlog::info("thread requests: {}", v_thread_request_count);
 
+    // print stats to a file ***********
+    print_to_summary_file(p_job_name, p_job_id, p_nodes, p_ntasks_per_node, p_ntasks_per_socket, p_threads_per_task,
+                          p_filename_directory, v_elapsed_time, v_gsize, -1, {},
+                          {}, {}, v_score.get_loose<int>(), v_global_idle_time,
+                          v_thread_request_count, 0, p_csv_append);
+
     return gempba::shutdown();
 }
 
 int main(const int argc, char *argv[]) {
-    const auto [job_id, nodes, ntasks_per_node, ntasks_per_socket, cpus_per_task, prob, filename] = parse(argc, argv);
+    const auto [job_name, job_id, nodes, ntasks_per_node, ntasks_per_socket, cpus_per_task, prob,csv_append, filename] = parse(argc, argv);
 
-    return run(cpus_per_task, prob, filename);
+    return run(job_name, job_id, nodes, ntasks_per_node, ntasks_per_socket, cpus_per_task, prob,csv_append, filename);
 }
