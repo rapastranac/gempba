@@ -31,16 +31,26 @@ gempba::load_balancer *initiate_load_balancer(gempba::scheduler *p_scheduler, co
 
 int run(const std::string& p_job_name, int p_job_id, int p_nodes, int p_ntasks_per_node, int p_ntasks_per_socket, int p_threads_per_task, int p_probability, bool p_csv_append, std::string &p_filename_directory) {
 
-    std::cout << "USING LARGE ENCODING" << std::endl;
-    std::cout << "USING SEMI-CENTRALIZED STRATEGY" << std::endl;
-
     // NOTE: instantiated object depends on SCHEDULER_CENTRALIZED macro
     auto v_scheduler = gempba::mp::create_scheduler(gempba::mp::scheduler_topology::SEMI_CENTRALIZED);
     v_scheduler->set_goal(gempba::MINIMISE, gempba::score_type::I32);
 
     int rank = v_scheduler->rank_me();
 
-    std::cout << "NUMTHREADS= " << p_threads_per_task << std::endl;
+    // logging in center only
+    if (rank == 0) {
+        std::cout << "USING LARGE ENCODING" << std::endl;
+        std::cout << "USING SEMI-CENTRALIZED STRATEGY" << std::endl << std::endl;
+        std::cout << "Running with parameters: " << std::endl;
+        std::cout << "Job name : " << p_job_name << std::endl;
+        std::cout << "Job id : " << p_job_id << std::endl;
+        std::cout << "Nodes : " << p_nodes << std::endl;
+        std::cout << "NTasks per node : " << p_ntasks_per_node << std::endl;
+        std::cout << "NTasks per socket : " << p_ntasks_per_socket << std::endl;
+        std::cout << "Threads per task : " << p_threads_per_task << std::endl;
+        std::cout << "Filename directory : " << p_filename_directory << std::endl;
+    }
+
     gempba::load_balancer *v_load_balancer = initiate_load_balancer(v_scheduler, gempba::balancing_policy::QUASI_HORIZONTAL);
     gempba::node_manager &v_node_manager = initiate_node_manager(v_scheduler, v_load_balancer);
 
