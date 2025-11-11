@@ -172,7 +172,7 @@ namespace gempba {
         }
 
         static std::shared_ptr<node_core> create_lazy(load_balancer &p_load_balancer, std::shared_ptr<node_core> &p_parent, invokable<Ret, Args...> auto &&p_runnable,
-                                                      std::function<std::tuple<Args...>()> p_args_initializer) {
+                                                      std::function<std::optional<std::tuple<Args...>>()> p_args_initializer) {
 
             auto v_args_serializer = static_cast<std::function<task_packet(Args...)>>(nullptr);
             auto v_args_deserializer = static_cast<std::function<std::tuple<Args...>(task_packet)>>(nullptr);

@@ -1,15 +1,13 @@
 #ifndef GEMPBA_MAIN_HPP
 #define GEMPBA_MAIN_HPP
 
-#include "argparse/argparse.hpp"
-#include "Graph.hpp"
-#include <schedulers/api/scheduler.hpp>
-
-#include <iostream>
 #include <filesystem>
 #include <fstream>
-#include <spdlog/spdlog.h>
+#include <iostream>
 #include <string>
+#include <argparse/argparse.hpp>
+#include <spdlog/spdlog.h>
+
 namespace fs = std::filesystem;
 
 
@@ -122,7 +120,7 @@ inline void print_to_summary_file(const int p_job_id, const int p_nodes, const i
     const std::string v_file_name = p_filename_directory.substr(p_filename_directory.find_last_of("/\\") + 1);
     const std::string v_target_dir = create_directory("results", std::to_string(p_gsize), std::to_string(p_nodes));
 
-    ofstream v_target_file;
+    std::ofstream v_target_file;
     v_target_file.open(v_target_dir + v_file_name);
     v_target_file << "job id:\t" << p_job_id << std::endl;
     v_target_file << "nodes:\t" << p_nodes << std::endl;

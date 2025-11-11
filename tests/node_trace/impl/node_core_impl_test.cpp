@@ -177,7 +177,7 @@ TEST_F(node_core_impl_test, lazily_initialization) {
         v_vec = std::move(p_v);
     };
 
-    std::function<std::tuple<my_struct, float, double, std::vector<float> >()> v_initializer = []() {
+    std::function<std::optional<std::tuple<my_struct, float, double, std::vector<float> > >()> v_initializer = []() {
         my_struct v_ins{7};
         float v_f1 = 1.0f;
         double v_d1 = 3.0;
@@ -186,7 +186,7 @@ TEST_F(node_core_impl_test, lazily_initialization) {
         return std::make_tuple(v_ins, v_f1, v_d1, v_vec);
     };
 
-    gempba::node v_node = gempba::node_factory::create_seed_node<void>(m_balancer_mock, dummy_function, v_initializer);
+    gempba::node v_node = gempba::node_factory::create_lazy_node<void>(m_balancer_mock, gempba::node(nullptr), dummy_function, v_initializer);
     v_node.run();
 
     const auto exp_struct = my_struct{7};
@@ -418,7 +418,7 @@ TEST_F(node_core_impl_test, remote_result_non_void) {
             [](std::thread::id, const my_struct &p_my_struct, float p_f, double p_d, std::vector<float> p_v, gempba::node) { return custom_object{p_my_struct, p_f, p_d, p_v}; };
 
 
-    std::function<std::optional<std::tuple<my_struct, float, double, std::vector<float> >>()> v_args_initializer = [] {
+    std::function<std::optional<std::tuple<my_struct, float, double, std::vector<float> > >()> v_args_initializer = [] {
         my_struct my_struct{7};
         float f_value = 1.0f;
         double d_value = 3.0;

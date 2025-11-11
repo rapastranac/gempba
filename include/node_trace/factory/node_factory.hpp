@@ -135,9 +135,10 @@ namespace gempba {
         template <typename Ret, typename... Args>
         static node create_seed_node(load_balancer& p_load_balancer,
                                      invokable<Ret, Args...> auto&& p_runnable,
-                                     std::function<std::tuple<Args...>()> p_args_initializer) {
+                                     std::tuple<Args...> p_args) {
 
-            auto v_seed = node_core_impl<Ret(Args...)>::create_seed(p_load_balancer, p_runnable, p_args_initializer);
+            std::shared_ptr<node_core> null;
+            auto v_seed = node_core_impl<Ret(Args...)>::create_explicit(p_load_balancer, null, p_runnable, std::move(p_args));
             return node(v_seed);
         }
 

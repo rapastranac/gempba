@@ -458,10 +458,10 @@ TEST_F(node_test, delegate_locally_test) {
             v_value = p_int * static_cast<int>(p_double);
         };
 
-        const std::function<std::tuple<int, double>()> v_args_initializer = [] {
+        const std::function<std::optional<std::tuple<int, double> >()> v_args_initializer = [] {
             return std::make_tuple(7, 6.0);
         };
-        auto v_explicit_node = gempba::node_factory::create_seed_node<void>(v_load_balancer, v_dummy_function, v_args_initializer);
+        auto v_explicit_node = gempba::node_factory::create_lazy_node<void>(v_load_balancer, gempba::node(nullptr), v_dummy_function, v_args_initializer);
 
         const bool v_submitted = v_manager.try_local_submit(v_explicit_node);
         ASSERT_TRUE(v_submitted);
