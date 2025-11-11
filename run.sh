@@ -5,10 +5,10 @@ echo "Starting run at: $(date)"
 
 ## Release ---------------------------------------------------------------------
 JOB_NAME="Default Job"  # SLURM
-JOB_ID=9999             # SLURM
-NODES=9999              # SLURM, this is the number of nodes in a super cluster
+JOB_ID=-1               # SLURM
+NODES=-1                # SLURM, this is the number of nodes in a super cluster
 TASKS_PER_NODE=5        # SLURM, this is the number of tasks per node
-TASKS_PER_SOCKET=9999   # SLURM,
+TASKS_PER_SOCKET=-1     # SLURM,
 CPUS_PER_TASK=2         # SLURM, this is the number of cores per process
 CSV="true"              # Append results summary to CSV file
 GRAPH_FILE=data/prob_4/400/00400_1

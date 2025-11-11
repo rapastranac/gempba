@@ -128,7 +128,7 @@ std::string create_directory(std::string root, std::string folder, T... dir) {
     return create_directory(root + "/" + folder, dir...);
 }
 
-inline void append_to_summary_csv(const std::string& p_job_name, const int p_job_id, const int p_nodes,
+inline void append_to_summary_csv(const std::string &p_job_name, const int p_job_id, const int p_nodes,
                                   const int p_ntasks_per_node, const int p_ntasks_per_socket,
                                   const int p_cpus_per_task, const std::string &p_file_name, const double p_elapsed_time,
                                   const int p_gsize, const int p_sol_size,
@@ -177,6 +177,31 @@ inline void append_to_summary_csv(const std::string& p_job_name, const int p_job
     v_out.close();
 }
 
+inline std::pair<std::string, std::ofstream> create_or_open_file(const int p_job_id, const int p_nodes, const std::string &p_filename_directory, const int p_gsize) {
+    std::string v_target_dir;
+    if (p_nodes == -1) {
+        v_target_dir = create_directory("results", std::to_string(p_gsize));
+    } else {
+        v_target_dir = create_directory("results", std::to_string(p_gsize), std::to_string(p_nodes));
+    }
+
+    // Extract stem and extension
+    fs::path v_path(p_filename_directory);
+    std::string v_stem = v_path.stem().string();
+    std::string v_extension = v_path.extension().string();
+
+    std::string v_file_name;
+    if (p_job_id == -1) {
+        v_file_name = v_stem + v_extension;
+    } else {
+        v_file_name = v_stem + "_" + std::to_string(p_job_id) + v_extension;
+    }
+
+    std::ofstream v_ofstream;
+    v_ofstream.open(v_target_dir + v_file_name);
+
+    return std::make_pair(v_file_name, std::move(v_ofstream));
+}
 
 inline void print_to_summary_file(const std::string &p_job_name, const int p_job_id, const int p_nodes, const int p_ntasks_per_node, const int p_ntasks_per_socket,
                                   const int p_cpus_per_task, const std::string &p_filename_directory, const double p_elapsed_time,
@@ -184,11 +209,9 @@ inline void print_to_summary_file(const std::string &p_job_name, const int p_job
                                   const std::vector<size_t> &p_received_tasks, const std::vector<size_t> &p_sent_tasks, const int p_sol_size,
                                   const double p_global_cpu_idle_time, const size_t p_global_thread_request,
                                   const size_t p_total_requests_at_center, const bool p_append_csv) {
-    const std::string v_file_name = p_filename_directory.substr(p_filename_directory.find_last_of("/\\") + 1);
-    const std::string v_target_dir = create_directory("results", std::to_string(p_gsize), std::to_string(p_nodes));
 
-    std::ofstream v_target_file;
-    v_target_file.open(v_target_dir + v_file_name);
+    auto [v_file_name,v_target_file] = create_or_open_file(p_job_id, p_nodes, p_filename_directory, p_gsize);
+
     v_target_file << "file name:\t" << v_file_name << std::endl;
     v_target_file << "job name:\t" << p_job_name << std::endl;
     v_target_file << "job id:\t" << p_job_id << std::endl;
