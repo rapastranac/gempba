@@ -62,7 +62,7 @@ int run(const std::string& p_job_name, int p_job_id, int p_nodes, int p_ntasks_p
     v_instance.init(v_graph, p_threads_per_task, p_filename_path, p_probability);
     v_instance.set_graph(v_graph);
 
-    int v_gsize = v_graph.size() + 1; //+1 cuz some files use node ids from 1 to n (instead of 0 to n - 1)
+    int v_gsize = v_graph.size();
     G_BITSET v_allzeros(v_gsize);
     G_BITSET v_allones = ~v_allzeros;
 
@@ -73,7 +73,7 @@ int run(const std::string& p_job_name, int p_job_id, int p_nodes, int p_ntasks_p
     std::cout << "solsize=" << v_solution_size << std::endl;
     v_scheduler->barrier();
 
-    int gsize = v_graph.size() + 1; //+1 cuz some files use node ids from 1 to n (instead of 0 to n - 1)
+    int gsize = v_graph.size();// + 1; //+1 cuz some files use node ids from 1 to n (instead of 0 to n - 1)
     G_BITSET allzeros(gsize);
     G_BITSET allones = ~allzeros;
     gempba::task_packet v_buffer = serializer(v_zero, allones, v_zero);

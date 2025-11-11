@@ -31,7 +31,7 @@ int run(const std::string& p_job_name, int p_job_id, int p_nodes, int p_ntasks_p
     v_instance.init(v_graph, p_threads_per_task, p_filename_directory, p_probability);
     v_instance.set_graph(v_graph);
 
-    int v_gsize = v_graph.size() + 1; //+1 cuz some files use node ids from 1 to n (instead of 0 to n - 1)
+    int v_gsize = v_graph.size();
     GBITSET v_allzeros(v_gsize);
     GBITSET v_allones = ~v_allzeros;
 

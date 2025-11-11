@@ -62,7 +62,7 @@ int run(const std::string& p_job_name, int p_job_id, int p_nodes, int p_ntasks_p
     cover.init(graph, p_threads_per_task, p_filename_directory, p_probability);
     cover.setGraph(graph);
 
-    int gsize = graph.adj.size() + 1; //+1 cuz some files use node ids from 1 to n (instead of 0 to n - 1)
+    int gsize = graph.adj.size();
     G_BITSET allzeros(gsize);
     G_BITSET allones = ~allzeros;
 

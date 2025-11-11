@@ -45,7 +45,7 @@ public:
         seen_skips = 0;
 
         passes = 0;
-        int gsize = graph.adj.size() + 1; //+1 cuz some files use node ids from 1 to n (instead of 0 to n - 1)
+        int gsize = graph.adj.size();
 
         cout << "Graph has " << graph.adj.size() << " vertices and " << graph.getNumEdges() << " edges" << endl;
         vector<pair<int, int> > deg_v;

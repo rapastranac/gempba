@@ -50,7 +50,7 @@ public:
         m_seen_skips = 0;
 
         m_passes = 0;
-        int gsize = p_graph.size() + 1; //+1 cuz some files use node ids from 1 to n (instead of 0 to n - 1)
+        int gsize = p_graph.size();
 
         cout << "Graph has " << p_graph.size() << " vertices and " << p_graph.getNumEdges() << " edges" << endl;
         vector<pair<int, int> > deg_v;
