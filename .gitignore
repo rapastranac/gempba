@@ -9,6 +9,7 @@ cmake_install.cmake
 CMakeSettings.json
 build
 .build-debug
+.build-debug-coverage
 .build-release
 build-with-coverage
 cmake-build-debug
