@@ -116,6 +116,7 @@ namespace gempba {
         }
 
         std::shared_ptr<std::shared_ptr<node_core> > get_root(const std::thread::id p_thread_id) override {
+            std::scoped_lock v_lock(m_recursive_mutex);
             if (m_roots.contains(p_thread_id)) {
                 return m_roots.at(p_thread_id);
             }
