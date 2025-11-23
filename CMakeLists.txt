@@ -5,6 +5,18 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# 🔍 FORCE DEBUG SYMBOLS AND DYNAMIC SYMBOL EXPORT FOR ALL TARGETS
+# 🔍 DEBUG SYMBOLS AND DYNAMIC EXPORT - ONLY FOR DEBUG BUILDS
+if (NOT MSVC)
+    add_compile_options(-g)
+    add_link_options(-g)
+
+    # -rdynamic is Linux-only
+    if (UNIX)
+        add_link_options(-rdynamic)
+    endif ()
+endif ()
+
 # ⚙️ Flags to control the compilation of tests and examples
 option(GEMPBA_DEV_MODE "Build gempba unit tests" OFF)
 option(GEMPBA_BUILD_TESTS "Build gempba unit tests" OFF)
@@ -100,6 +112,16 @@ target_link_libraries(gempba PUBLIC
         MPI::MPI_CXX
         OpenMP::OpenMP_CXX
 )
+
+# C++23 stacktrace support (standard library, not external)
+if (NOT MSVC)
+    target_link_libraries(gempba PUBLIC stdc++exp)
+
+    # -rdynamic is Linux-only
+    if (UNIX)
+        target_link_options(gempba PUBLIC -rdynamic)
+    endif ()
+endif ()
 
 # 📁 Executables output directory
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin)

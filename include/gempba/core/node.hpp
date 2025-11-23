@@ -29,6 +29,8 @@
 #include <thread>
 #include <memory>
 #include <functional>
+#include <iostream>
+#include <stacktrace>
 
 #include <gempba/core/node_core.hpp>
 #include <gempba/core/node_traits.hpp>
@@ -54,6 +56,11 @@ namespace gempba {
 
         static void throw_if_null(const std::shared_ptr<node_core> &p_node) {
             if (!p_node) {
+                std::stringstream v_ss;
+                v_ss << std::stacktrace::current() << std::endl;
+                std::cerr << v_ss.str();
+                std::cerr.flush();  // Extra flush for paranoia
+
                 utils::log_and_throw("Attempted to access a null node");
             }
         }
@@ -94,7 +101,7 @@ namespace gempba {
 
         bool operator!=(std::nullptr_t) const noexcept { return m_node_core != nullptr; }
 
-        node map_core(std::function<std::shared_ptr<node_core>(const std::shared_ptr<node_core>&)> &&p_accessor) const {
+        node map_core(std::function<std::shared_ptr<node_core>(std::shared_ptr<node_core> &)> &&p_accessor) {
             return node(p_accessor(m_node_core));
         }
 
