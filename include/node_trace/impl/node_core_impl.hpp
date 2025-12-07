@@ -406,6 +406,7 @@ namespace gempba {
             }
 
             if (m_state == FORWARDED || m_state == PUSHED || m_state == DISCARDED) {
+                m_initialization_flag = INITIALIZED;
                 m_should_branch_cached = false;
                 return false;
             }
@@ -417,6 +418,7 @@ namespace gempba {
                 auto v_args_opt = m_initializer();
                 if (!v_args_opt.has_value()) {
                     m_should_branch_cached = false;
+                    m_initialization_flag = INITIALIZED;
                     return false;
                 }
                 m_arguments = std::move(v_args_opt.value());
