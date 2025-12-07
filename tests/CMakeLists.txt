@@ -2,10 +2,13 @@ cmake_minimum_required(VERSION 3.28)
 
 project(gempba_tests LANGUAGES CXX)
 
-# We need GTest y Boost
+# We need GTest and Boost
 cmake_policy(SET CMP0167 NEW)
 find_package(Boost COMPONENTS system serialization fiber REQUIRED)
 find_package(GTest REQUIRED)
+
+# Include GoogleTest module for test discovery
+include(GoogleTest)
 
 # Include directories
 include_directories(support)
@@ -32,7 +35,7 @@ endif ()
 # Create a single test executable
 add_executable(all_tests ${TEST_SOURCES})
 
-# Link necessary libraries (e.g., Google Test)
+# Link necessary libraries
 target_link_libraries(all_tests
         PRIVATE
         gempba
@@ -51,5 +54,13 @@ target_compile_options(all_tests PRIVATE
         $<$<CONFIG:Release>:-O3 -DNDEBUG>
 )
 
-# Add the test to the testing system
-add_test(NAME all_tests COMMAND all_tests)
+# 🔥 CRITICAL: Discover individual GTest tests and register them with CTest
+# This allows CTest to see each test case individually
+gtest_discover_tests(all_tests
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        PROPERTIES
+        TIMEOUT 60
+        DISCOVERY_TIMEOUT 30
+)
+
+message(STATUS "GTest test discovery enabled for all_tests executable")
