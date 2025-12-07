@@ -175,7 +175,7 @@ namespace gempba {
         }
 
         static std::shared_ptr<node_core> create_lazy(load_balancer &p_load_balancer, std::shared_ptr<node_core> &p_parent, invokable<Ret, Args...> auto &&p_runnable,
-                                                      std::function<std::optional<std::tuple<Args...>>()> p_args_initializer) {
+                                                      std::function<std::optional<std::tuple<Args...> >()> p_args_initializer) {
 
             auto v_args_serializer = static_cast<std::function<task_packet(Args...)>>(nullptr);
             auto v_args_deserializer = static_cast<std::function<std::tuple<Args...>(task_packet)>>(nullptr);
@@ -291,8 +291,14 @@ namespace gempba {
             }
 
             m_result = p_load_balancer->force_local_submit([v_copy = shared_from_this(), this] {
-                // IMPORTANT: copy keeps "this" alive
-                return m_invoke(true);
+                // IMPORTANT: "v_copy" keeps "this" alive until the pool thread executes the function
+                try {
+                    return m_invoke(true);
+                } catch (const std::exception &v_e) {
+                    utils::log_and_throw("TASK EXCEPTION - Node {}: {}", this->m_node_id, v_e.what());
+                } catch (...) {
+                    utils::log_and_throw("TASK UNKNOWN EXCEPTION - Node {}", this->m_node_id);
+                }
             });
             m_state = PUSHED;
         }
@@ -575,7 +581,7 @@ namespace gempba {
 
     private:
         // Utilities
-        static std::string get_state_string(const node_state& p_state) {
+        static std::string get_state_string(const node_state &p_state) {
             switch (p_state) {
                 case UNUSED:
                     return "UNUSED";
