@@ -569,6 +569,7 @@ namespace gempba {
                 m_parent->remove_child(v_itself);
             }
             m_root = nullptr;
+            m_children.clear();
             set_parent(nullptr);
         }
 
