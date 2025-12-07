@@ -68,18 +68,22 @@ namespace gempba {
             return m_thread_pool.submit_task(p_function);
         }
 
+        void prune_and_correct_root_after_forward(node &p_node) {
+            node v_parent = p_node.get_parent();
+            if (v_parent == nullptr) {
+                // p_node is a root (or was just made root), just prune it
+                p_node.prune();
+                return;
+            }
+            p_node.prune(); // prune as it was already resolved
+            try_correct_root(v_parent);
+        }
+
         void forward(node &p_node) override {
             if (p_node.get_state() == UNUSED && p_node.should_branch()) {
                 p_node.run();
             }
-            node v_parent = p_node.get_parent();
-            const node v_root = p_node.get_root();
-            p_node.prune();
-            if (v_parent != nullptr && v_parent == v_root) {
-                v_parent.apply_core([this](const std::shared_ptr<node_core> &p_core) {
-                    maybe_correct_root(p_core);
-                });
-            }
+            prune_and_correct_root_after_forward(p_node);
         }
 
         bool try_local_submit(node &p_node) override {
@@ -161,6 +165,36 @@ namespace gempba {
         }
 
 
+        void prune_and_fix_parent_root_if_needed(node &p_node) {
+            node v_parent = p_node.get_parent();
+            const node v_root = p_node.get_root();
+            if (p_node == v_root && p_node.get_children_count() == 0) {
+                return; // p_node was root and a leaf — nothing to fix
+            }
+            p_node.prune();
+
+            /**
+             * Scenarios to consider (binary): (■ = pruned node, x = consumed child, o = pending child)
+             *               root
+             *               /  \
+             *              ■    o ← This will become the new root
+             *
+             *               root
+             *               /  \
+             *              x    o
+             *               \
+             *                x
+             *                 \
+             *                  x   ← This will become the new root
+             *                 / \
+             *                ■   o
+             *
+             * Root correction is done only when the root ends up with a single child after pruning.
+             **/
+
+            try_correct_root(v_parent);
+        }
+
         bool send(node &p_node) {
             while (true) {
                 const std::unique_lock v_lock(m_recursive_mutex, std::try_to_lock);
@@ -183,7 +217,7 @@ namespace gempba {
                 // after this line, only leftMost node should be pushed
 
                 // node should be pruned before submission —— ORDER MATTERS (avoids memory leaks)
-                p_node.prune();
+                prune_and_fix_parent_root_if_needed(p_node);
                 if (p_node.should_branch()) {
                     p_node.delegate_locally(this);
                 } else {
@@ -215,7 +249,7 @@ namespace gempba {
                 }
 
                 // node should be pruned before submission —— ORDER MATTERS (avoids memory leaks)
-                p_node.prune();
+                prune_and_fix_parent_root_if_needed(p_node);
                 if (p_node.should_branch()) {
                     p_node.delegate_remotely(m_scheduler_worker, p_runnable_id);
                 } else {
@@ -227,13 +261,13 @@ namespace gempba {
 
         bool try_push_root_level_node_locally(node &p_node) {
 
-            node v_top_node = p_node.map_core([&](const std::shared_ptr<node_core> &p_core) { return this->find_top_node(p_core); });
+            node v_top_node = p_node.map_core([&](const std::shared_ptr<node_core> &p_core) { return get_root_level_pending_node(p_core); });
             if (v_top_node != nullptr) {
                 if (v_top_node.is_consumed()) {
                     utils::log_and_throw("Attempt to push a consumed node");
                 }
 
-                v_top_node.prune(); // VERY IMPORTANT!!
+                try_correct_root(p_node); // VERY IMPORTANT!!
                 if (v_top_node.should_branch()) {
                     v_top_node.delegate_locally(this);
                 } else {
@@ -242,21 +276,18 @@ namespace gempba {
                 // root-level node found whether discarded or pushed
                 return true;
             }
-            // TODO ... double check this, why is not top_node
-            //  I see, because find_top_node also corrects the root. Rename method!
-            p_node.apply_core([&](const std::shared_ptr<node_core> &p_core) { this->prune_left_sibling(p_core); });
             return false;
         }
 
         bool try_push_root_level_node_remotely(node &p_node, const int p_runnable_id) {
 
-            node v_top_node = p_node.map_core([&](std::shared_ptr<node_core> p_core) { return this->find_top_node(p_core); });
+            node v_top_node = p_node.map_core([&](const std::shared_ptr<node_core> &p_core) { return get_root_level_pending_node(p_core); });
             if (v_top_node != nullptr) {
                 if (v_top_node.is_consumed()) {
                     utils::log_and_throw("Attempt to push a consumed node");
                 }
 
-                v_top_node.prune(); // VERY IMPORTANT!!
+                try_correct_root(p_node); // VERY IMPORTANT!!
                 if (v_top_node.should_branch()) {
                     v_top_node.delegate_remotely(m_scheduler_worker, p_runnable_id);
                 } else {
@@ -265,321 +296,63 @@ namespace gempba {
                 // root-level node found whether discarded or pushed
                 return true;
             }
-            // TODO ... double check this, why is not top_node
-            //  I see, because find_top_node also corrects the root. Rename method!
-            p_node.apply_core([&](const std::shared_ptr<node_core> &p_core) { this->prune_left_sibling(p_core); });
             return false;
-
         }
 
-        std::shared_ptr<node_core> find_top_node(const std::shared_ptr<node_core> &p_node) {
-            std::shared_ptr<node_core> v_leftmost; // this is the branch that led us to the root
-            std::shared_ptr<node_core> v_root; // local pointer to root, to avoid "*" use
-
+        /**
+         * It finds a pending node at the root level, prunes it from the root, and returns it.
+         *
+         * @param p_node The node from which to start the search.
+         * @return The pending node at the root level, or nullptr if none found.
+         */
+        static std::shared_ptr<node_core> get_root_level_pending_node(const std::shared_ptr<node_core> &p_node) {
             if (p_node->get_parent() == nullptr) {
-                return nullptr; // there is no parent
+                return nullptr; // there is no parent — node is a root
             }
-            // Hereto, there might be a root
             if (p_node->get_parent() == p_node->get_root()) {
+                // it avoids pushing the right most siblings first at the root level
                 return nullptr; // parent == root
             }
-            /**
-             * <pre>Hereto:
-             * <ul>
-             *  <li>the root isn't the parent</li>
-             *  <li>the branch has already been pushed, to ensure pushing the <code>leftMost</code> first </li>
-             * </ul>
-             * </pre>
-             */
-            v_root = p_node->get_root(); // no need to iterate
-            // int tmp = root->get_children_count(); // this probably fix the following
 
-            // the following is not true, it could be also the right branch
-            // Unless root is guaranteed to have at least 2 children,
-            // TODO ... verify
+            const std::shared_ptr<node_core> v_root = p_node->get_root();
 
-            v_leftmost = v_root->get_leftmost_child(); // TODO ... check if the branch has been pushed or forwarded
+            if (!v_root) {
+                return nullptr;
+            }
 
-            utils::print_ipc_debug_comments("rank {}, likely to get an upperNode \n", -1);
-            utils::print_ipc_debug_comments("rank {}, root->get_children_count() = {} \n", -1, v_root->get_children_count());
+            // Defensive check
+            if (v_root->get_children_count() < 2) {
+                // Not really sure how we can get here, but just in case
+                return nullptr;
+            }
 
-            /**
-             * Here below, we check is the left child was pushed to the thread pool, then the pointer to its parent is pruned
-             * @code
-             *                    parent
-             *                 /  |  \   \  \
-             *                /   |   \   \   \
-             *               /    |    \   \    \
-             *             p<sub>b</sub>     c<sub>b</sub>    w<sub>1</sub>  w<sub>2</sub> ... w<sub>k</sub>
-             *             △ -->
-             * @endcode
-             * <ul>
-             *   <li> p<sub>b</sub>	stands for pushed branch </li>
-             *   <li> c<sub>b</sub>	stands for current branch </li>
-             *   <li> w<sub>i</sub>	stands for waiting branch, or target node i={1...k} </li>
-             * </ul>
-             *
-             * if <code>p<sub>b</sub></code> is already pushed, it won't be part of the children list of <code>parent</code>,
-             * then <code>list = {c<sub>b</sub>,w<sub>1</sub>,w<sub>2</sub>}</code>
-             * @code
-             *   leftMost = c<sub>b</sub>
-             *   nextElt = w<sub>1</sub>
-             * @endcode
-             *
-             * <pre>
-             * There will never be fewer than two elements, assuming multiple recursions per scope,
-             * because as long as there remain two elements, it implies that the rightMost element
-             * will be pushed to the pool, and then the leftMost element will no longer need a parent.
-             * This condition is the first one to explore at this level of the tree.
-             * </pre>
-             */
             if (v_root->get_children_count() > 2) {
-                /**
-                 * this condition is for multiple recursion (>2), the difference with the one below is that
-                 * the root does not move after returning one of the waiting nodes,
-                 * say we have the following root's children
-                 * @code
-                 *   children =	{c<sub>b</sub>,w<sub>1</sub>,w<sub>2</sub> ... w<sub>k</sub>}
-                 * @endcode
-                 *   the goal is to push <code>w<sub>1</sub></code>, which is the immediate right node
-                 */
+                // Multiple pending nodes: at least three possible branches
+                // 1. leftmost (already pushed)
+                // 2. second leftmost (pending) <-- to be returned
+                // 3. others (waiting)
+
                 std::shared_ptr<node_core> v_second_child = v_root->get_second_leftmost_child();
-                v_root->remove_second_leftmost_child();
+                v_second_child->prune();
                 return v_second_child;
-            } else if (v_root->get_children_count() == 2) {
-                utils::print_ipc_debug_comments("rank {}, about to choose an upperNode \n", -1);
-                /**
-                 * <pre>
-                 * this scope is meant to push the right branch which was put in the waiting line
-                 * because there was no available thread to push the <code>leftMost</code> branch, then <code>leftMost</code>
-                 * will be the new root because after this scope the right branch will have been already pushed
-                 * </pre>
-                 */
-
-                v_root->remove_leftmost_child(); // deletes leftMost from root's children
-                std::shared_ptr<node_core> v_right = v_root->get_leftmost_child(); // The one to be pushed
-                v_root->remove_leftmost_child(); // there should not be anything left in the children list
-
-                this->prune(v_right); // just in case, the right branch is not being sent anyway, only its data is
-                this->lower_root(v_leftmost); // it sets leftMost as the new root
-
-                maybe_correct_root(v_leftmost);
-                /**
-                 * if <code>leftMost</code> has no pending branch, then root will be assigned to the next
-                 * descendant with at least two children (which is at least a pending branch),
-                 * or the lowest branch which is the one giving priority to root's children
-                 * */
-
-                return v_right;
             }
 
-            /**
-             * this should not happen because when the root get only two children, the root is lowered to either the last node
-             * down the line, or the firs node from top-to-bottom with at least two children
-             */
+            // This conditions should be met:  v_root->get_children_count() == 2
 
-
-            spdlog::error("fw_count : {} \n ph_count : {}\n isVirtual :{} \n isDiscarded : {} \n", v_root->get_forward_count(),
-                          v_root->get_push_count(), v_root->is_dummy(), v_root->get_state() == DISCARDED);
-            utils::log_and_throw("4 Testing, it's not supposed to happen, <code>findTopNode()</code>");
-        }
-
-        /**
-         * @brief controls the root for sequential calls
-         *
-         * Having the following tree
-         * @code
-         *                  root == parent
-         *                 /  |  \   \  \
-         *                /   |   \   \   \
-         *               /    |    \   \    \
-         *             p<sub>b</sub>     c<sub>b</sub>    w<sub>1</sub>  w<sub>2</sub> ... w<sub>k</sub>
-         *             △ -->
-         * @endcode
-         * <ul>
-         *   <li> p<sub>b</sub>	stands for previous branch </li>
-         *   <li> c<sub>b</sub>	stands for current branch </li>
-         *   <li> w<sub>i</sub>	stands for waiting branch, or target node_ i={1...k} </li>
-         * </ul>
-         *
-         * <pre>
-         * if p<sub>b</sub> is fully solved sequentially or w<sub>i</sub> were pushed but there is at least
-         * one <code>w<sub>i</sub></code> remaining, then the thread will return to first level where the
-         * parent is also the root, then the <code>leftMost</code> child of the root should be
-         * deleted of the list since it is already solved. Thus, pushing c<sub>b</sub> twice
-         * is avoided because <code>findTopNode()</code> pushes the second element of the children
-         * </pre>
-         */
-        void maybe_prune_left_sibling(std::shared_ptr<node_core> &p_node) {
-            std::shared_ptr<node_core> v_parent = p_node->get_parent();
-            if (v_parent == nullptr) {
-                // This node is a root, nothing to prune
-                return;
+            if (v_root->get_children_count() != 2) {
+                utils::log_and_throw("Unexpected condition: root should have exactly two children");
             }
 
-            std::shared_ptr<node_core> v_leftmost = v_parent->get_leftmost_child();
-            if (v_leftmost == p_node) {
-                // node is the leftMost child, no need to prune nor correct the root
-                return;
+            // Last pending node - return it
+            std::shared_ptr<node_core> v_second = v_root->get_second_leftmost_child();
+
+            if (v_second == nullptr) {
+                utils::log_and_throw("Unexpected condition: second child is null");
             }
 
-            if (v_parent == p_node->get_root()) {
-                /**
-                 * @brief this confirms that it's the first level of the root
-                 * @code
-                 *    root == parent
-                 *     /  |  \   \   \
-                 *    /   |   \   \    \
-                 *   /    |    \   \     \
-                 * p<sub>b</sub>     c<sub>b</sub>    w<sub>1</sub>  w<sub>2</sub> ... w<sub>k</sub>
-                 *        **
-                 * @endcode
-                 * <pre>
-                 * next <code>if-statement</code> should always evaluate to true, it should not be necessary
-                 * to use a loop.Therefore, this <code>while</code> should ideally run only once.
-                 * This is important for testing purposes.
-                 * </pre>
-                 */
-                std::set<std::shared_ptr<node_core> > v_left_siblings;
-                while (v_leftmost != p_node) {
-                    v_left_siblings.insert(v_leftmost);
-                    v_parent->remove_leftmost_child(); // removes pb from the parent's children
-                    v_leftmost = v_parent->get_leftmost_child(); // it gets what it was the second element from the parent's children
-                }
-                // after this line,this should be true leftMost == node
-
-                // There might be more than one remaining sibling
-                if (v_parent->get_children_count() > 1) {
-                    for (const auto &v_to_be_pruned: v_left_siblings) {
-                        this->prune(v_to_be_pruned);
-                    }
-                    return; // root does not change
-                }
-
-                /**
-                 * if the node is the only remaining child from the parent
-                 * then this node will become a new root
-                 * */
-                v_parent->remove_leftmost_child(); // removes remaining node from the parent's children
-
-                this->lower_root(p_node);
-                this->prune(v_parent);
-                for (const auto &v_to_be_pruned: v_left_siblings) {
-                    this->prune(v_to_be_pruned);
-                }
-                maybe_correct_root(p_node);
-                return;
-            }
-            // Any other level
-
-            /**
-             * @code
-             *         root != parent
-             *           /|  \   \  \
-             *          / |   \   \   \
-             *    solved  *    w<sub>1</sub>  w<sub>2</sub> .. W<sub>k</sub>
-             *           /|
-             *    solved  *
-             *           /|
-             *    solved  * parent
-             *           / \
-             * solved(p<sub>b</sub>)  c<sub>b</sub>
-             * @endcode
-             *
-             * <pre>
-             *  This is relevant because although the root still has some waiting nodes,
-             *  the thread in charge of the tree might be deep down solving everything sequentially.
-             *  Every time a <code>leftMost</code> branch is solved sequentially, this one should be removed from
-             *  the list to avoid failure attempts of solving a branch that has already been consumed.
-             * </pre>
-             * <pre>
-             *  If a thread attempts to solve a consumed branch, this will throw an error
-             *  because the node won't have information anymore since it has already been passed on
-             * </pre>
-             *
-             *
-             * By here, <code>p<sub>b</sub></code> has already been solved
-             * <pre>
-             *  This scope only deletes the <code>leftMost</code> node, which is already
-             * solved sequentially by here and leaves the parent with at
-             * least a child because the root still has at least a node in
-             * the waiting list
-             * </pre>
-             */
-            v_parent->remove_leftmost_child();
-        }
-
-
-        /**
-         * @brief controls the root when successful parallel calls (if no <code>upperNode</code> available)
-         *
-         * this method is invoked when the <code>load_balancer</code> is enabled and the method <code>findTopNode()</code> was not able to find
-         *  a top branch to push, because it means the next right sibling will become a root(for binary recursion)
-         *  or just the <code>leftMost</code> will be unlisted from the parent's children. This method is invoked if and only if
-         *  a thread is available
-         *
-         *      In this scenario, the root does not change
-         * @code
-         *                  parent == root          (potentially dummy)
-         *                       /    \    \
-         *                      /      \      \
-         *                     /        \        \
-         *                  left        next     right
-         *              (pushed or
-         *              sequential)
-         * @endcode
-         *
-         *      In the following scenario the remaining right child becomes the root, because the right child was pushed
-         * @code
-         *                  parent == root          (potentially dummy)
-         *                       /    \
-         *                      /      \
-         *                     /        \
-         *                  left        right
-         *              (pushed or      (new root)
-         *              sequential)
-         * @endcode
-         */
-        void prune_left_sibling(const std::shared_ptr<node_core> &p_node) {
-            const std::shared_ptr<node_core> v_parent = p_node->get_parent();
-            if (v_parent == nullptr) {
-                return;
-            }
-            // it also confirms that node is not a parent (applies for load_balancer)
-            if (v_parent->get_children_count() > 2) {
-                std::shared_ptr<node_core> v_leftmost = v_parent->get_leftmost_child();
-                // v_parent->remove_leftmost_child();
-                // v_parent->remove_child(v_leftmost);
-                prune(v_leftmost);
-                return;
-            }
-
-            if (v_parent->get_children_count() == 2) {
-                // this verifies that it is binary and the rightMost will become a new root
-                std::shared_ptr<node_core> v_leftmost = v_parent->get_leftmost_child();
-                // v_parent->remove_leftmost_child();
-                // v_parent->remove_child(v_leftmost);
-                prune(v_leftmost);
-                std::shared_ptr<node_core> v_rightmost = v_parent->get_leftmost_child();
-                // v_parent->remove_leftmost_child();
-                v_parent->remove_child(v_rightmost);
-                this->lower_root(v_rightmost);
-                this->prune(v_parent);
-                return;
-            }
-
-            utils::log_and_throw("4 Testing, it's not supposed to happen, pruneLeftSibling()\n");
-        }
-
-        void prune(const std::shared_ptr<node_core> &p_node) {
-            p_node->prune();
-            // p_node->set_root(nullptr);
-            // p_node->set_parent(nullptr);
-        }
-
-        void lower_root(std::shared_ptr<node_core> &p_node) {
-            set_root(p_node->get_thread_id(), p_node);
-            p_node->set_parent(nullptr);
+            v_second->prune();
+            // at this point, root should have only one child: the leftMost which was already resolved
+            return v_second; // Just return it
         }
 
         /**
@@ -595,17 +368,17 @@ namespace gempba {
          * </pre>
          *
          * @code
-         *                   root == parent
-         *                  /  |  \   \  \
-         *                 /   |   \   \   \
-         *                /    |    \   \    \
-         *        leftMost     w<sub>1</sub>    w<sub>2</sub>  w<sub>3</sub> ... w<sub>k</sub>
+         *                    root
+         *                    /|\
+         *                  /  | \
+         *                /    |  \
+         *               x     o   o
          *                \
          *                 x
          *                  \
          *                   x
          *                    \
-         *                current_level
+         *                     ■
          * @endcode
          *
          * <pre>
@@ -613,19 +386,46 @@ namespace gempba {
          * then the root should be lowered down where it finds a node_ with at least two children or
          * the deepest node_
          * </pre>
-         */
-        void maybe_correct_root(const std::shared_ptr<node_core> &p_node) {
-            std::shared_ptr<node_core> v_root = p_node;
-            std::shared_ptr<node_core> v_parent = p_node;
-
-            while (v_root->get_children_count() == 1) {
-                // lowering the root
-                v_root = v_root->get_leftmost_child();
-                v_parent->remove_leftmost_child();
-                this->lower_root(v_root);
-                this->prune(v_parent);
-                v_parent = v_root;
+         **/
+        void try_correct_root(node &p_node) {
+            node v_root = p_node.get_root();
+            // Check if root is null (shouldn't happen with new prune(), but defensive)
+            if (v_root == nullptr) {
+                return;
             }
+
+            // Check if p_node is already its own root (was pruned)
+            if (v_root == p_node && v_root.get_children_count() == 0) {
+                return; // Nothing to correct - node is already root and a leaf
+            }
+
+            if (v_root.get_children_count() >= 2) {
+                return; // root has multiple children, no need to correct
+            }
+
+            // Root has 0 or 1 children, need to lower it
+            while (v_root.get_children_count() == 1) {
+                node v_leftmost = v_root.get_leftmost_child();
+                make_root(v_leftmost);
+                v_root.prune();
+                v_root = v_leftmost;
+
+                // Check if we've reached p_node or a node with 2+ children
+                if (v_root == p_node || v_root.get_children_count() >= 2) {
+                    return;
+                }
+            }
+            // After exiting loop, v_root either:
+            // - has 0 children (is a leaf) - it's already the root
+            // - has 2+ children (has pending work) - it's already the root
+        }
+
+        void make_root(node &p_node) {
+            p_node.map_core([this](std::shared_ptr<node_core> &p_core) {
+                this->set_root(p_core->get_thread_id(), p_core);
+                p_core->set_parent(nullptr);
+                return p_core;
+            });
         }
 
     };
