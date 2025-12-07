@@ -8,6 +8,7 @@ find_package(Boost COMPONENTS system serialization fiber REQUIRED)
 find_package(GTest REQUIRED)
 
 # Include directories
+include_directories(include)
 include_directories(${GTEST_INCLUDE_DIRS})
 include_directories(${Boost_INCLUDE_DIRS})
 
