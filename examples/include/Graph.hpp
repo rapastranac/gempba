@@ -1,6 +1,8 @@
 #ifndef GRAPH_HPP
 #define GRAPH_HPP
 
+#include <config.h>
+
 using namespace std;
 
 #if GEMPBA_MULTIPROCESSING

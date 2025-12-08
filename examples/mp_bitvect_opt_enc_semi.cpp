@@ -1,36 +1,65 @@
-#include "include/mp_bitvec_opt_enc.hpp"
-#include "include/main.hpp"
-
 #include <filesystem>
 #include <iostream>
 #include <istream>
 #include <sstream>
 #include <string>
-#include <spdlog/spdlog.h>
-#include <vector>
 #include <unistd.h>
+#include <utility>
+#include <vector>
+#include <spdlog/spdlog.h>
+
+#include "include/main.hpp"
+#include "include/mp_bitvector_optimized_encoding.hpp"
 
 using namespace std::placeholders;
 
-int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int threads_per_task, int prob,
-        std::string &filename_directory) {
+gempba::node_manager &initiate_node_manager(gempba::scheduler *p_scheduler, gempba::load_balancer *p_load_balancer) {
+    if (p_scheduler->rank_me() == 0) {
+        return gempba::mp::create_node_manager(p_load_balancer, nullptr);
+    }
+    gempba::scheduler::worker *v_worker_view = &p_scheduler->worker_view();
+    return gempba::mp::create_node_manager(p_load_balancer, v_worker_view);
+}
 
-    std::cout << "USING OPTIMIZED ENCODING" << std::endl;
-    std::cout << "USING SEMI-CENTRALIZED STRATEGY" << std::endl;
+gempba::load_balancer *initiate_load_balancer(gempba::scheduler *p_scheduler, const gempba::balancing_policy p_policy) {
+    if (p_scheduler->rank_me() == 0) {
+        return gempba::mp::create_load_balancer(p_policy, nullptr);
+    }
+    gempba::scheduler::worker *v_worker_view = &p_scheduler->worker_view();
+    return gempba::mp::create_load_balancer(p_policy, v_worker_view);
+}
+
+int run(const std::string& p_job_name, int p_job_id, int p_nodes, int p_ntasks_per_node, int p_ntasks_per_socket, int p_threads_per_task, int p_probability, bool p_csv_append, const std::string &p_filename_directory) {
 
 
-    gempba::branch_handler &branchHandler = gempba::branch_handler::get_instance(); // parallel library
 
-    // NOTE: instantiated object depends on SCHEDULER_CENTRALIZED macro
-    auto &mpiScheduler = gempba::mpi_scheduler::get_instance();
+    auto *v_scheduler = gempba::mp::create_scheduler(gempba::mp::scheduler_topology::SEMI_CENTRALIZED);
+    v_scheduler->set_goal(gempba::MINIMISE, gempba::score_type::I32);
 
-    int rank = mpiScheduler.rank_me();
-    branchHandler.pass_mpi_scheduler(&mpiScheduler);
+    int v_rank = v_scheduler->rank_me();
 
-    std::cout << "NUMTHREADS= " << threads_per_task << std::endl;
+    // logging in center only
+    if (v_rank == 0) {
+        std::cout << "USING OPTIMIZED ENCODING" << std::endl;
+        std::cout << "USING SEMI-CENTRALIZED STRATEGY" << std::endl << std::endl;
+        std::cout << "Running with parameters: " << std::endl;
+        std::cout << "Job name : " << p_job_name << std::endl;
+        std::cout << "Job id : " << p_job_id << std::endl;
+        std::cout << "Nodes : " << p_nodes << std::endl;
+        std::cout << "NTasks per node : " << p_ntasks_per_node << std::endl;
+        std::cout << "NTasks per socket : " << p_ntasks_per_socket << std::endl;
+        std::cout << "Threads per task : " << p_threads_per_task << std::endl;
+        std::cout << "Filename directory : " << p_filename_directory << std::endl;
+    }
 
-    VC_void_MPI_bitvec cover;
-    auto function = std::bind(&VC_void_MPI_bitvec::mvcbitset, &cover, _1, _2, _3, _4, _5); // target algorithm [all arguments]
+    gempba::load_balancer *v_load_balancer = initiate_load_balancer(v_scheduler, gempba::balancing_policy::QUASI_HORIZONTAL);
+    gempba::node_manager &v_node_manager = initiate_node_manager(v_scheduler, v_load_balancer);
+
+    v_node_manager.set_goal(gempba::MINIMISE, gempba::score_type::I32);
+    v_scheduler->set_goal(gempba::MINIMISE, gempba::score_type::I32);
+
+    mp_bitvector_optimized_encoding v_instance(v_node_manager, v_load_balancer);
+    auto v_function = std::bind(&mp_bitvector_optimized_encoding::mvcbitset, &v_instance, _1, _2, _3, _4, _5); // target algorithm [all arguments]
 
 
     // initialize MPI and member variable linkin
@@ -38,147 +67,132 @@ int run(int job_id, int nodes, int ntasks_per_node, int ntasks_per_socket, int t
     /* this is run by all processes, because it is a bitvector implementation,
         all processes should know the original graph ******************************************************/
 
-    Graph graph;
-    graph.readEdges(filename_directory);
+    Graph v_graph;
+    v_graph.readEdges(p_filename_directory);
 
-    cover.init(graph, threads_per_task, filename_directory, prob);
-    cover.setGraph(graph);
+    v_instance.init(v_graph, p_threads_per_task, p_filename_directory, p_probability);
+    v_instance.set_graph(v_graph);
 
-    int gsize = graph.adj.size() + 1; //+1 cuz some files use node ids from 1 to n (instead of 0 to n - 1)
-    gbitset allzeros(gsize);
-    gbitset allones = ~allzeros;
+    int v_gsize = v_graph.size();
+    G_BITSET v_allzeros(v_gsize);
+    G_BITSET v_allones = ~v_allzeros;
 
-    branchHandler.set_score(gempba::score::make(gsize)); // thus, all processes know the best value so far
-    branchHandler.set_goal(gempba::MINIMISE, gempba::score_type::I32);
+    v_node_manager.set_score(gempba::score::make(v_gsize)); // thus, all processes know the best value so far
 
-    int zero = 0;
-    int solsize = graph.size();
-    std::cout << "solsize=" << solsize << std::endl;
-    mpiScheduler.barrier();
+    int v_zero = 0;
+    int v_solution_size = v_graph.size();
+    std::cout << "solsize=" << v_solution_size << std::endl;
+    v_scheduler->barrier();
 
-    gempba::task_packet v_buffer = serializer(zero, allones, zero);
+    int gsize = v_graph.size();// + 1; //+1 cuz some files use node ids from 1 to n (instead of 0 to n - 1)
+    G_BITSET allzeros(gsize);
+    G_BITSET allones = ~allzeros;
+    gempba::task_packet v_buffer = serializer(v_zero, allones, v_zero);
 
+    std::cout << "Starting MPI node " << v_scheduler->rank_me() << std::endl;
 
-    std::cout << "Starting MPI node " << branchHandler.rank_me() << std::endl;
+    v_scheduler->barrier();
 
-    mpiScheduler.barrier();
+    int v_pid = getpid(); // for debugging purposes
+    spdlog::debug("rank {} is process ID : {}\n", v_rank, v_pid); // for debugging purposes
 
-    int pid = getpid(); // for debugging purposes
-    spdlog::debug("rank {} is process ID : {}\n", rank, pid); // for debugging purposes
+    v_scheduler->barrier();
 
-    mpiScheduler.barrier();
-
-    if (rank == 0) {
+    constexpr int v_runnable_id = 0;
+    if (v_rank == 0) {
         // center process
-        gempba::task_packet v_seed(v_buffer);
-        mpiScheduler.run_center(v_seed);
+        gempba::scheduler::center &v_center_view = v_scheduler->center_view();
+        const gempba::task_packet &v_seed(v_buffer);
+        v_center_view.run(v_seed, v_runnable_id);
+
     } else {
-        /*	worker process
-            main thread will take care of Inter-process communication (IPC), dedicated core
-            numThreads could be the number of physical cores managed by this process - 1
-        */
-        branchHandler.init_thread_pool(threads_per_task);
+        // worker process
+        gempba::scheduler::worker &v_worker_view = v_scheduler->worker_view();
+        v_node_manager.set_thread_pool_size(p_threads_per_task);
 
-        std::function<std::shared_ptr<gempba::ResultHolderParent>(gempba::task_packet)> bufferDecoder = branchHandler.construct_buffer_decoder<void, int, gbitset, int>(function, deserializer);
-        utils::print_mpi_debug_comments("Buffer decoded fetched successfully!\n");
-        std::function<gempba::result()> resultFetcher = branchHandler.construct_result_fetcher();
-        mpiScheduler.run_node(branchHandler, bufferDecoder, resultFetcher);
+        auto v_deser = create_deserializer();
+        auto v_runnable = gempba::mp::runnables::return_none::create(v_runnable_id, v_function, v_deser);
+
+        std::map<int, std::shared_ptr<gempba::serial_runnable> > v_runnables;
+        v_runnables[v_runnable->get_id()] = v_runnable;
+
+        v_worker_view.run(v_node_manager, v_runnables);
     }
-    mpiScheduler.barrier();
-    // *****************************************************************************************
-    // this is a generic way of getting information from all the other processes after execution retuns
-    auto world_size = mpiScheduler.get_world_size();
-    std::vector<double> idleTime(world_size);
-    std::vector<size_t> threadRequests(world_size);
-    std::vector<int> nTasksRecvd(world_size);
-    std::vector<int> nTasksSent(world_size);
-
-    double idl_tm = 0;
-    size_t rqst = 0;
-    int taskRecvd;
-    int taskSent;
-
-    if (rank != 0) {
-        // rank 0 does not run the main function
-        idl_tm = branchHandler.get_pool_idle_time();
-        rqst = branchHandler.number_thread_requests();
-
-        taskRecvd = mpiScheduler.tasks_recvd();
-        taskSent = mpiScheduler.tasks_sent();
-    }
-
-    // here below, idl_tm is the idle time of the other ranks, which is gathered by .allgather() and stored in
-    // a contiguos array
-    mpiScheduler.allgather(idleTime.data(), &idl_tm, MPI_DOUBLE);
-    mpiScheduler.allgather(threadRequests.data(), &rqst, MPI_UNSIGNED_LONG_LONG);
-
-    mpiScheduler.gather(&taskRecvd, 1, MPI_INT, nTasksRecvd.data(), 1, MPI_INT, 0);
-    mpiScheduler.gather(&taskSent, 1, MPI_INT, nTasksSent.data(), 1, MPI_INT, 0);
-
+    v_scheduler->barrier();
     // *****************************************************************************************
 
-    if (rank == 0) {
-        std::vector<gempba::result> solutions = mpiScheduler.fetch_result_vector();
+    spdlog::info("rank {}, finished tasks successfully!!", v_rank);
 
-        mpiScheduler.print_stats();
+    auto v_world_size = v_scheduler->world_size();
 
-        // print sumation of refValGlobal
-        int solsize;
-        std::stringstream ss;
-        gempba::task_packet packet = mpiScheduler.fetch_solution(); // returns a std::stringstream
+    // Synchronize stats across all processes
+    v_scheduler->synchronize_stats();
 
-        ss.write(reinterpret_cast<const char *>(packet.data()), static_cast<int>(packet.size()));
+    if (v_rank == 0) {
+        // Retrieve solution
+        auto &&v_center_view = v_scheduler->center_view();
+        gempba::task_packet v_packet = v_center_view.get_result();
+        std::stringstream v_ss;
+        v_ss.write(reinterpret_cast<const char *>(v_packet.data()), static_cast<int>(v_packet.size()));
 
-        deserializer(ss, solsize);
-        spdlog::debug("Cover size : {} \n", solsize);
-
-        double global_cpu_idle_time = 0;
-        for (int i = 1; i < world_size; i++) {
-            global_cpu_idle_time += idleTime[i];
-        }
-        spdlog::debug("\nGlobal cpu idle time: {0:.6f} seconds\n\n\n", global_cpu_idle_time);
-
-        // **************************************************************************
-
-        for (int rank = 1; rank < world_size; rank++) {
-            spdlog::debug("tasks sent by rank {} = {} \n", rank, nTasksSent[rank]);
-        }
-        spdlog::debug("\n");
-
-        for (int rank = 1; rank < world_size; rank++) {
-            spdlog::debug("tasks received by rank {} = {} \n", rank, nTasksRecvd[rank]);
-        }
-        spdlog::debug("\n");
-        size_t totalThreadRequests = 0;
-        for (int rank = 1; rank < world_size; rank++) {
-            size_t rank_thread_requests = threadRequests[rank];
-            totalThreadRequests += rank_thread_requests;
-
-            spdlog::debug("rank {}, thread requests: {} \n", rank, rank_thread_requests);
-        }
-
+        int v_solution_size;
+        deserializer(v_ss, v_solution_size);
+        spdlog::debug("Cover size : {} \n", v_solution_size);
         spdlog::debug("\n\n\n");
 
+        // Collect and print stats to console ***********
+        std::vector<std::unique_ptr<gempba::stats> > v_stats_vector = v_scheduler->get_stats_vector();
+        std::vector<std::size_t> v_received_tasks(v_world_size);
+        std::vector<std::size_t> v_sent_tasks(v_world_size);
+        std::vector<std::size_t> v_total_requests(v_world_size);
+        std::vector<std::size_t> v_total_thread_requests(v_world_size);
+        std::vector<double> v_idle_times(v_world_size);
+        std::vector<double> v_elapsed_times(v_world_size);
+
+        for (int v_rank = 0; std::cmp_less(v_rank, v_stats_vector.size()); ++v_rank) {
+            std::unique_ptr<gempba::stats> &v_stats = v_stats_vector[v_rank];
+
+            std::unique_ptr<gempba::default_mpi_stats_visitor> v_visitor = gempba::mp::get_default_mpi_stats_visitor();
+            v_stats->visit(v_visitor.get());
+
+            v_received_tasks[v_rank] = v_visitor->m_received_task_count;
+            v_sent_tasks[v_rank] = v_visitor->m_sent_task_count;
+            v_total_requests[v_rank] = v_visitor->m_total_requested_tasks;
+            v_total_thread_requests[v_rank] = v_visitor->m_total_thread_requests;
+            v_idle_times[v_rank] = v_visitor->m_idle_time;
+            v_elapsed_times[v_rank] = v_visitor->m_elapsed_time;
+        }
+
+        double v_global_cpu_idle_time = 0;
+        size_t v_global_thread_request = 0;
+        size_t v_total_requests_at_center = v_total_requests[0];
+        for (int v_rank = 0; v_rank < v_world_size; ++v_rank) {
+            spdlog::info("rank {}", v_rank);
+            spdlog::info("  received_task_count: {}", v_received_tasks[v_rank]);
+            spdlog::info("  sent_task_count: {}", v_sent_tasks[v_rank]);
+            spdlog::info("  total_requested_tasks: {}", v_total_requests[v_rank]);
+            spdlog::info("  total_thread_requests: {}", v_total_thread_requests[v_rank]);
+            spdlog::info("  idle_time: {}", v_idle_times[v_rank]);
+            spdlog::info("  elapsed_time: {}", v_elapsed_times[v_rank]);
+
+            v_global_cpu_idle_time += v_idle_times[v_rank];
+            v_global_thread_request += v_total_thread_requests[v_rank];
+        }
+
         // print stats to a file ***********
-        printToSummaryFile(job_id, nodes, ntasks_per_node, ntasks_per_socket, threads_per_task, filename_directory,
-                           mpiScheduler, gsize,
-                           world_size, threadRequests, nTasksRecvd, nTasksSent, solsize, global_cpu_idle_time,
-                           totalThreadRequests);
+        print_to_summary_file(p_job_name, p_job_id, p_nodes, p_ntasks_per_node, p_ntasks_per_socket, p_threads_per_task,
+                              p_filename_directory, v_elapsed_times[0], v_gsize, v_world_size, v_total_thread_requests,
+                              v_received_tasks, v_sent_tasks, v_solution_size, v_global_cpu_idle_time,
+                              v_global_thread_request, v_total_requests_at_center, p_csv_append);
         // **************************************************************************
     }
-    return 0;
+    v_scheduler->barrier();
+    return gempba::shutdown();
 }
 
-int main(int argc, char *argv[]) {
-    Params params = parse(argc, argv);
+int main(const int argc, char *argv[]) {
+    // spdlog::set_level(spdlog::level::debug);
+    const auto [job_name, job_id, nodes, ntasks_per_node, ntasks_per_socket, cpus_per_task, prob,csv_append, filename] = parse(argc, argv);
 
-    int job_id = params.job_id;
-    int nodes = params.nodes;
-    int ntasks_per_node = params.ntasks_per_node;
-    int ntasks_per_socket = params.ntasks_per_socket;
-    int cpus_per_task = params.cpus_per_task;
-    int prob = params.prob;
-    auto filename = params.filename;
-
-    return run(job_id, nodes, ntasks_per_node, ntasks_per_socket, cpus_per_task, prob, filename);
+    return run(job_name, job_id, nodes, ntasks_per_node, ntasks_per_socket, cpus_per_task, prob,csv_append, filename);
 }

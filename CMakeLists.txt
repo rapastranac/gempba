@@ -2,8 +2,23 @@ cmake_minimum_required(VERSION 3.28)
 
 project(gempba VERSION 2.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# 🔍 FORCE DEBUG SYMBOLS AND DYNAMIC SYMBOL EXPORT FOR ALL TARGETS
+# 🔍 DEBUG SYMBOLS AND DYNAMIC EXPORT - ONLY FOR DEBUG BUILDS
+if (NOT MSVC)
+    add_compile_options(-g)
+    add_link_options(-g)
+
+    # -rdynamic is Linux-only
+    if (UNIX)
+        add_link_options(-rdynamic)
+    endif ()
+endif ()
 
 # ⚙️ Flags to control the compilation of tests and examples
+option(GEMPBA_DEV_MODE "Build gempba unit tests" OFF)
 option(GEMPBA_BUILD_TESTS "Build gempba unit tests" OFF)
 option(GEMPBA_BUILD_EXAMPLES "Build gempba examples" OFF)
 option(GEMPBA_MULTIPROCESSING "Enable multiprocessing support in gempba" OFF)
@@ -13,6 +28,7 @@ option(GEMPBA_DEBUG_COMMENTS "Enable debug comments in gempba" OFF)
 if (CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
     message(STATUS "GemPBA detected as root project. Defaulting to build tests and examples.")
 
+    set(GEMPBA_DEV_MODE ON)
     set(GEMPBA_MULTIPROCESSING ON)
     set(GEMPBA_BUILD_TESTS ON)
     set(GEMPBA_BUILD_EXAMPLES ON)
@@ -45,6 +61,7 @@ find_package(MPI REQUIRED)
 include_directories(${MPI_INCLUDE_PATH})
 include_directories(include)
 include_directories(GemPBA)
+include_directories(private)
 
 # 📦 Subprojects
 add_subdirectory(external)
@@ -65,7 +82,8 @@ file(GLOB_RECURSE Sources "src/*.cpp" "GemPBA/*.cpp")
 add_library(gempba STATIC ${Sources})
 
 # 🔧️ Add macros for the library
-target_compile_definitions(gempba PUBLIC
+target_compile_definitions(gempba PRIVATE
+        $<$<BOOL:${GEMPBA_DEV_MODE}>:GEMPBA_DEV_MODE>
         $<$<BOOL:${GEMPBA_MULTIPROCESSING}>:GEMPBA_MULTIPROCESSING>
         $<$<BOOL:${GEMPBA_DEBUG_COMMENTS}>:GEMPBA_DEBUG_COMMENTS>
         $<$<BOOL:${GEMPBA_BUILD_EXAMPLES}>:GEMPBA_BUILD_EXAMPLES>
@@ -73,11 +91,11 @@ target_compile_definitions(gempba PUBLIC
 )
 
 # Print messages to confirm the flags
+message(STATUS "🔧 GEMPBA_DEV_MODE=${GEMPBA_DEV_MODE}")
 message(STATUS "🔧 GEMPBA_MULTIPROCESSING=${GEMPBA_MULTIPROCESSING}")
 message(STATUS "🔧 GEMPBA_DEBUG_COMMENTS=${GEMPBA_DEBUG_COMMENTS}")
 message(STATUS "🔧 GEMPBA_BUILD_EXAMPLES=${GEMPBA_BUILD_EXAMPLES}")
 message(STATUS "🔧 GEMPBA_BUILD_TESTS=${GEMPBA_BUILD_TESTS}")
-
 
 
 # 🏷️ Conditional compilation flags for Debug/Release
@@ -95,15 +113,32 @@ target_link_libraries(gempba PUBLIC
         OpenMP::OpenMP_CXX
 )
 
+# C++23 stacktrace support (standard library, not external)
+if (NOT MSVC)
+    target_link_libraries(gempba PUBLIC stdc++exp)
+
+    # -rdynamic is Linux-only
+    if (UNIX)
+        target_link_options(gempba PUBLIC -rdynamic)
+    endif ()
+endif ()
+
 # 📁 Executables output directory
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
 # modern alias for the library
 add_library(gempba::gempba ALIAS gempba)
 
+# Generate config.h from config.h.in
+configure_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/config.h.in
+        ${CMAKE_CURRENT_BINARY_DIR}/config.h
+)
+
 # 📤 Includes for consumers of the library
 target_include_directories(gempba
         PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/GemPBA>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
 )

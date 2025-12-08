@@ -1,22 +1,20 @@
 #ifndef VERTEXCOVER_HPP
 #define VERTEXCOVER_HPP
 
-#include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
-
-#include "Graph.hpp"
-#include "BranchHandler/branch_handler.hpp"
-#include "Resultholder/ResultHolder.hpp"
-#include "util.hpp"
-#include <format>
-#include "DLB/DLB_Handler.hpp"
+#include <boost/archive/text_oarchive.hpp>
 
 #include <algorithm>
-#include <filesystem>
-#include <iomanip>
-#include <vector>
 #include <chrono>
 #include <ctime>
+#include <filesystem>
+#include <format>
+#include <iomanip>
+#include <vector>
+
+#include <gempba/gempba.hpp>
+#include "Graph.hpp"
+#include "util.hpp"
 
 using namespace std::placeholders;
 
@@ -33,276 +31,31 @@ public:
         input_file_name = file;
         this->numThreads = numThreads;
         std::string graph_size = std::to_string(graph.size());
-        std::string nameout = graph_size + "_out.dat";
-        std::string nameout_raw = graph_size + "_out_raw.csv";
 
         std::string dir = graph_size;
         std::string threads_dir = std::to_string(numThreads);
-
-        this->outPath = "output/";
-
-        if (!fs::is_directory(outPath)) {
-            fs::create_directory(outPath);
-        }
-
-        this->outPath += "prob_" + std::to_string(prob) + "/";
-
-        if (!fs::is_directory(outPath)) {
-            fs::create_directory(outPath);
-        }
-
-        this->outPath += dir + "/";
-
-        if (!fs::is_directory(outPath)) {
-            fs::create_directory(outPath);
-        }
-
-        this->outPath += threads_dir;
-
-        if (!fs::is_directory(outPath)) {
-            fs::create_directory(outPath);
-        }
-
-        this->outPath = outPath + "/";
-        this->outPath_raw = outPath;
-
-        this->outPath = outPath + nameout;
-        this->outPath_raw = outPath_raw + nameout_raw;
-
-        this->output.open(outPath, std::ofstream::in | std::ofstream::out | std::ofstream::app);
-        this->output_raw.open(outPath_raw, std::ofstream::in | std::ofstream::out | std::ofstream::app);
-        if (!output.is_open()) {
-            printf("Error, output file not found !");
-        }
-        output.close();
-        output_raw.close();
-    }
-
-    void outFile(std::string col1, std::string col2) {
-        //std::unique_lock<std::mutex> lck(mtx);
-        this->output.open(outPath, std::ofstream::in | std::ofstream::out | std::ofstream::app);
-        if (!output.is_open()) {
-            printf("Error, output file not found !");
-        }
-
-        output << std::internal
-                << col1
-                << std::setw(wide - col1.size())
-                << col2;
-
-        output.close();
-    }
-
-    void printSolution() {
-        this->output.open(outPath, std::ofstream::in | std::ofstream::out | std::ofstream::app);
-        if (!output.is_open()) {
-            printf("Error, output file not found !");
-        }
-
-        cout << "!" << fmt::format("{:-^{}}", "Minimum vertex cover", wide - 2) << "!"
-                << "\n";
-        output << "!" << fmt::format("{:-^{}}", "Minimum vertex cover", wide - 2) << "!"
-                << "\n";
-
-        /* create string of lenght wide*/
-        auto it = cover.begin();
-        string str;
-        while (it != cover.end()) {
-            str += Util::ToString(*it) + "   ";
-            if (static_cast<int>(str.size()) >= wide) {
-                std::cout << fmt::format("{:<{}}", str, wide);
-                std::cout << "\n";
-                output << fmt::format("{:<{}}", str, wide);
-                output << "\n";
-                str.clear();
-            }
-            it++;
-        }
-        cout << fmt::format("{:<{}}", str, wide);
-        cout << "\n";
-        output << fmt::format("{:<{}}", str, wide);
-        output << "\n";
-        str.clear();
-        cout << fmt::format("{:-^{}}", "", wide) << "\n";
-        output << fmt::format("{:-^{}}", "", wide) << "\n";
-
-        cout << "\n";
-        output << "\n";
-
-        string col1 = "path";
-        string col2 = input_file_name;
-
-        cout << std::internal
-                << col1
-                << std::setfill(' ')
-                << std::setw(wide - col1.size()) << col2
-                << "\n";
-        output << std::internal
-                << col1
-                << std::setw(wide - col1.size()) << col2
-                << "\n";
-
-        col1 = "Initial graph size after preprocessing: ";
-        col2 = Util::ToString((int) preSize);
-        cout << std::internal
-                << col1
-                << std::setfill(' ')
-                << std::setw(wide - col1.size()) << col2
-                << "\n";
-        output << std::internal
-                << col1
-                << std::setw(wide - col1.size()) << col2
-                << "\n";
-
-        col1 = "Size:";
-        col2 = Util::ToString((int) cover.size());
-        cout << std::internal
-                << col1
-                << std::setw(wide - col1.size()) << col2
-                << "\n";
-        output << std::internal
-                << col1
-                << std::setw(wide - col1.size()) << col2
-                << "\n";
-
-        col1 = "Found at depth:";
-        col2 = Util::ToString((int) foundAtDepth);
-        cout << std::internal
-                << col1
-                << std::setw(wide - col1.size()) << col2
-                << "\n";
-        output << std::internal
-                << col1
-                << std::setw(wide - col1.size()) << col2
-                << "\n";
-
-        col1 = "Elapsed time:";
-        col2 = Util::ToString((double) (elapsed_secs * 1.0e-9)) + " s";
-        //auto tmp = std::setw(wide - col1.size() - col2.size());
-        cout << std::internal
-                << col1
-                << std::setw(wide - col1.size()) << col2
-                << "\n";
-        output << std::internal
-                << col1
-                << std::setw(wide - col1.size()) << col2
-                << "\n";
-
-        col1 = "Number of leaves:";
-        col2 = Util::ToString((int) leaves);
-        cout << std::internal
-                << col1
-                << std::setw(wide - col1.size()) << col2
-                << "\n";
-        output << std::internal
-                << col1
-                << std::setw(wide - col1.size()) << col2
-                << "\n";
-
-        col1 = "Maximum depth reached:";
-        col2 = Util::ToString((int) measured_Depth);
-        cout << std::internal
-                << col1
-                << std::setw(wide - col1.size()) << col2
-                << "\n";
-        output << std::internal
-                << col1
-                << std::setw(wide - col1.size()) << col2
-                << "\n";
-
-        col1 = "Idle time:";
-        col2 = std::to_string(branchHandler.idle_time());
-        string col3 = std::to_string((branchHandler.idle_time() * 100.0 / (elapsed_secs * 1.0e-9))) + "%";
-
-        cout << std::left << std::setw(wide * 0.3)
-                << col1
-                << std::right << std::setw(wide * 0.3)
-                << col2
-                << std::right << std::setw(wide * 0.4)
-                << col3
-                << "\n";
-        output << std::left << std::setw(wide * 0.3)
-                << col1
-                << std::right << std::setw(wide * 0.3)
-                << col2
-                << std::right << std::setw(wide * 0.4)
-                << col3
-                << "\n";
-
-        col1 = "Pool idle time:";
-        col2 = Util::ToString((double) (branchHandler.get_pool_idle_time()));
-        col3 = Util::ToString((double) (branchHandler.get_pool_idle_time() * 100.0 / (elapsed_secs * 1.0e-9))) + "%";
-
-        cout << std::left << std::setw(wide * 0.3)
-                << col1
-                << std::right << std::setw(wide * 0.3)
-                << col2
-                << std::right << std::setw(wide * 0.4)
-                << col3
-                << "\n";
-        output << std::left << std::setw(wide * 0.3)
-                << col1
-                << std::right << std::setw(wide * 0.3)
-                << col2
-                << std::right << std::setw(wide * 0.4)
-                << col3
-                << "\n";
-
-        col1 = "Successful requests:";
-        col2 = std::to_string(branchHandler.number_thread_requests());
-        cout << std::internal
-                << col1
-                << std::setfill(' ')
-                << std::setw(wide - col1.size()) << col2
-                << "\n";
-        output << std::internal
-                << col1
-                << std::setw(wide - col1.size()) << col2
-                << "\n";
-
-        std::cout << "!" << fmt::format("{:-^{}}", "", wide - 2) << "!"
-                << "\n";
-        output << "!" << fmt::format("{:-^{}}", "", wide - 2) << "!"
-                << "\n";
-        std::cout << "\n"
-                << "\n"
-                << "\n";
-        output << "\n"
-                << "\n"
-                << "\n";
-
-        output.close();
-
-        this->output_raw.open(outPath_raw, std::ofstream::in | std::ofstream::out | std::ofstream::app);
-
-        output_raw << input_file_name << ","
-                << Util::ToString((int) preSize) << ","
-                << Util::ToString((int) cover.size()) << ","
-                << Util::ToString((int) foundAtDepth) << ","
-                << Util::ToString((double) (elapsed_secs * 1.0e-9)) << ","
-                << Util::ToString((int) leaves) << ","
-                << Util::ToString((int) measured_Depth) << ","
-                << Util::ToString((double) (branchHandler.idle_time() * 1.0e-9)) << ","
-                << Util::ToString((double) (branchHandler.get_pool_idle_time())) << "\n";
-        output_raw.close();
     }
 
     void setMVCSize(size_t mvcSize) {
         this->currentMVCSize = mvcSize;
     }
 
-    void recurrent_msg(int id) {
+    static std::string thread_id_to_string(const std::thread::id p_id) {
+        std::ostringstream v_oss;
+        v_oss << p_id;
+        return v_oss.str();
+    }
+
+    void recurrent_msg(std::thread::id p_id) {
         auto clock = std::chrono::system_clock::now();
         std::time_t time = std::chrono::system_clock::to_time_t(clock); //it includes a "\n"
-        string col1 = fmt::format("VC = {}", branchHandler.get_score().to_string());
-        string col2 = fmt::format("process {}, thread {}, {}", branchHandler.rank_me(), id, std::ctime(&time));
+        string col1 = fmt::format("VC = {}", m_node_manager.get_score().to_string());
+        string col2 = fmt::format("process {}, thread {}, {}", m_node_manager.rank_me(), thread_id_to_string(p_id), std::ctime(&time));
         cout << std::internal
                 << std::setfill('.')
                 << col1
                 << std::setw(wide - col1.size())
                 << col2;
-
-        outFile(col1, col2);
     }
 
     size_t maximum_matching(Graph g) {
@@ -335,8 +88,7 @@ protected:
     }
 
 protected:
-    gempba::DLB_Handler &dlb = gempba::DLB_Handler::getInstance();
-    gempba::branch_handler &branchHandler = gempba::branch_handler::get_instance();
+    gempba::node_manager &m_node_manager = gempba::get_node_manager();
 
     Graph graph;
     Graph graph_res;
@@ -358,10 +110,6 @@ protected:
 
     double factor = 0.0; /* k_lower_bound [0.0 - 1.0] k_upper_bound*/
 public:
-    ofstream output;
-    ofstream output_raw;
-    std::string outPath;
-    std::string outPath_raw;
     int wide = 60;
 
     std::string input_file_name;

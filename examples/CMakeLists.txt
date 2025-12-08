@@ -4,6 +4,9 @@ project(gempba_examples LANGUAGES CXX)
 
 cmake_policy(SET CMP0167 NEW)
 
+# 📦 Subprojects
+add_subdirectory(external)
+
 # Static linking of Boost
 set(Boost_USE_STATIC_LIBS ON)
 
@@ -24,6 +27,7 @@ foreach (EXAMPLE ${EXAMPLES})
     target_link_libraries(${EXAMPLE_NAME}
             PRIVATE
             gempba
+            example_libs
             Boost::system
             Boost::serialization
             Boost::fiber

@@ -2,29 +2,30 @@
 #define MT_GRAPH_OPT_ENC_SEMI_HPP
 
 
+#include <gempba/gempba.hpp>
 #include <spdlog/spdlog.h>
 #include "VertexCover.hpp"
 
-class MTGraphOptimizedEncodingSemiCentralized : public VertexCover {
-    using HolderType = gempba::ResultHolder<void, int, Graph>;
+class mt_graph_optimized_encoding_semi_centralized final : public VertexCover {
 
-private:
-    std::function<void(int, int, Graph &, void *)> _f;
+    gempba::node_manager &m_node_manager;
+    gempba::load_balancer &m_load_balancer;
+    std::function<void(std::thread::id, int, Graph, gempba::node)> m_function;
 
 public:
-    MTGraphOptimizedEncodingSemiCentralized() {
-        this->_f = std::bind(&MTGraphOptimizedEncodingSemiCentralized::mvc, this, _1, _2, _3, _4);
+    explicit mt_graph_optimized_encoding_semi_centralized(gempba::node_manager &p_node_manager, gempba::load_balancer &p_load_balancer) :
+        m_node_manager(p_node_manager), m_load_balancer(p_load_balancer) {
+        this->m_function = std::bind(&mt_graph_optimized_encoding_semi_centralized::mvc, this, _1, _2, _3, _4);
     }
 
-    ~MTGraphOptimizedEncodingSemiCentralized() override = default;
+    ~mt_graph_optimized_encoding_semi_centralized() override = default;
 
     bool findCover(int run) {
         string msg_center = fmt::format("run # {} ", run);
         msg_center = "!" + fmt::format("{:-^{}}", msg_center, wide - 2) + "!" + "\n";
         cout << msg_center;
-        outFile(msg_center, "");
 
-        this->branchHandler.init_thread_pool(numThreads);
+        this->m_node_manager.set_thread_pool_size(numThreads);
 
         //size_t _k_mm = maximum_matching(graph);
         //size_t _k_uBound = graph.max_k();
@@ -46,42 +47,33 @@ public:
         begin = std::chrono::steady_clock::now();
 
         try {
-            branchHandler.set_score(gempba::score::make(currentMVCSize));
-            branchHandler.set_goal(gempba::MINIMISE, gempba::score_type::I32);
-            //mvc(-1, 0, graph);
+            m_node_manager.set_score(gempba::score::make(currentMVCSize));
+            m_node_manager.set_goal(gempba::MINIMISE, gempba::score_type::I32);
             //testing ****************************************
-            HolderType initial(dlb, -1); {
-                int depth = 0;
-                initial.holdArgs(depth, graph);
-                //branchHandler.try_push_MT<void>(_f, -1, initial);
-                branchHandler.force_push<void>(_f, -1, initial);
-                //mvc(-1, 0, graph, nullptr);
+            gempba::node seed_node = gempba::create_seed_node<void>(m_load_balancer, m_function, std::make_tuple(0, graph));
+            {
+                m_node_manager.try_local_submit(seed_node);
             }
             //************************************************
-
-            branchHandler.wait();
-            graph_res = branchHandler.fetch_solution<Graph>();
+            m_node_manager.wait();
+            const optional<Graph> v_result_opt = m_node_manager.get_result<Graph>();
+            if (v_result_opt) {
+                graph_res = v_result_opt.value();
+            }
             graph_res2 = graph_res;
             cover = graph_res.postProcessing();
-        } catch (std::exception &e) {
-            this->output.open(outPath, std::ofstream::in | std::ofstream::out | std::ofstream::app);
-            if (!output.is_open()) {
-                printf("Error, output file not found ! \n");
-            }
-            std::cout << "Exception caught : " << e.what() << '\n';
-            output << "Exception caught : " << e.what() << '\n';
-            output.close();
+        } catch (...) {
         }
 
         cout << "DONE!" << endl;
         end = std::chrono::steady_clock::now();
         elapsed_secs = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
 
-        printf("refGlobal : %d \n", branchHandler.get_score().get<int>());
+        printf("refGlobal : %d \n", m_node_manager.get_score().get<int>());
         return true;
     }
 
-    void mvc(int id, int depth, Graph graph, void *parent) {
+    void mvc(std::thread::id p_id, int depth, Graph graph, gempba::node p_parent) {
         size_t LB = graph.min_k();
         size_t degLB = 0; //graph.DegLB();
         size_t UB = graph.max_k();
@@ -90,99 +82,85 @@ public:
         size_t k = relaxation(LB, UB);
         //std::max({LB, degLB, acLB})
 
-        if (k + graph.coverSize() >= (size_t) branchHandler.get_score().get<int>()) {
+        if (k + graph.coverSize() >= static_cast<size_t>(m_node_manager.get_score().get<int>())) {
             //size_t addition = k + graph.coverSize();
             return;
         }
 
         if (graph.size() == 0) {
-#ifdef GEMPBA_DEBUG_COMMENTS
-            printf("Leaf reached, depth : %d \n", depth);
-#endif
-            terminate_condition(graph, id, depth);
+            #if GEMPBA_DEBUG_COMMENTS
+            spdlog::debug("Leaf reached, depth : %d \n", depth);
+            #endif
+            terminate_condition(graph, p_id, depth);
             return;
         }
 
         int v = graph.id_max(false);
         int SIZE = graph.size();
 
-        HolderType *dummyParent = nullptr;
-        HolderType hol_l(dlb, id, parent);
-        HolderType hol_r(dlb, id, parent);
-        hol_l.setDepth(depth);
-        hol_r.setDepth(depth);
-        if (branchHandler.get_load_balancing_strategy() == gempba::QUASI_HORIZONTAL) {
-            dummyParent = new HolderType(dlb, id);
-            dlb.linkVirtualRoot(id, dummyParent, hol_l, hol_r);
-        }
+        const gempba::node v_parent = p_parent == nullptr ? gempba::create_dummy_node(m_load_balancer) : p_parent;
 
-        hol_l.bind_branch_checkIn([&] {
+        const std::function<std::optional<std::tuple<int, Graph> >()> v_left_args_initializer = [&]() -> std::optional<std::tuple<int, Graph> > {
             Graph g = graph;
             g.removeVertex(v);
             g.clean_graph();
             //g.removeZeroVertexDegree();
-            int C = g.coverSize();
+            int v_cover_size = g.coverSize();
+            const int v_best_val = m_node_manager.get_score().get<int>();
 
-            if (C == 0) {
-                spdlog::debug("rank {}, thread {}, cover is empty\n", branchHandler.rank_me(), id);
+            if (v_cover_size == 0) {
+                spdlog::error("rank {}, thread {}, cover is empty", m_node_manager.rank_me(), thread_id_to_string(p_id));
                 throw;
             }
-            if (C < branchHandler.get_score().get<int>()) // user's condition to see if it's worth it to make branch call
-            {
-                int newDepth = depth + 1;
-                hol_l.holdArgs(newDepth, g);
-                return true; // it's worth it
-            } else
-                return false; // it's not worth it
-        });
+            if (v_cover_size < v_best_val) {
+                return std::make_tuple(depth + 1, g);
+            }
+            return std::nullopt;
+        };
 
-        hol_r.bind_branch_checkIn([&] {
+        gempba::node v_left = gempba::mt::create_lazy_node<void>(m_load_balancer, v_parent, m_function, v_left_args_initializer);
+
+        std::function<std::optional<std::tuple<int, Graph> >()> v_right_args_initializer = [&]() -> std::optional<std::tuple<int, Graph> > {
             Graph g = graph;
-            if (g.empty())
-                spdlog::debug("rank {}, thread {}, Graph is empty\n", branchHandler.rank_me(), id);
-
+            if (g.empty()) {
+                spdlog::error("rank {}, thread {}, Graph is empty\n", m_node_manager.rank_me(), thread_id_to_string(p_id));
+                throw;
+            }
             g.removeNv(v);
             g.clean_graph();
-            //g.removeZeroVertexDegree();
-            int C = g.coverSize();
-            if (C < branchHandler.get_score().get<int>()) // user's condition to see if it's worth it to make branch call
-            {
-                int newDepth = depth + 1;
-                hol_r.holdArgs(newDepth, g);
-                return true; // it's worth it
-            } else
-                return false; // it's not worth it
-        });
 
-        if (hol_l.evaluate_branch_checkIn()) {
-            //int nbVertices = std::get<1>(hol_l.getArgs()).size(); //temp
-            //if (nbVertices < 50)
-            //	branchHandler.forward<void>(_f, id, hol_l);
-            //else
-            branchHandler.try_push_mt<void>(_f, id, hol_l);
-        }
-        if (hol_r.evaluate_branch_checkIn()) {
-            branchHandler.forward<void>(_f, id, hol_r);
-        }
+            const int v_best_val = m_node_manager.get_score().get<int>();
+            int cover_size = g.coverSize();
 
-        if (dummyParent)
-            delete dummyParent;
+            if (cover_size < v_best_val) {
+                return std::make_tuple(depth + 1, g);
+            }
+            return std::nullopt;
+        };
 
-        return;
+        gempba::node v_right = gempba::mt::create_lazy_node<void>(
+                m_load_balancer,
+                v_parent, m_function,
+                v_right_args_initializer
+                );
+
+        m_node_manager.try_local_submit(v_left);
+        m_node_manager.forward(v_right);
+
     }
 
 private:
-    void terminate_condition(Graph &graph, int id, int depth) {
+    void terminate_condition(Graph &p_graph, const std::thread::id p_id, const int p_depth) {
         std::scoped_lock<std::mutex> lck(mtx);
-        if (graph.coverSize() < branchHandler.get_score().get<int>()) {
-            int SZ = graph.coverSize(); // debuggin line
-            branchHandler.try_update_result(graph, gempba::score::make(graph.coverSize()));
+        if (p_graph.coverSize() < m_node_manager.get_score().get<int>()) {
+            int SZ = p_graph.coverSize(); // debuggin line
+            m_node_manager.try_update_result(p_graph, gempba::score::make(p_graph.coverSize()));
 
-            foundAtDepth = depth;
-            recurrent_msg(id);
+            foundAtDepth = p_depth;
+            recurrent_msg(p_id);
 
-            if (depth > (int) measured_Depth)
-                measured_Depth = (size_t) depth;
+            if (p_depth > (int) measured_Depth)
+                measured_Depth = (size_t) p_depth;
 
             ++leaves;
         }
