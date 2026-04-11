@@ -387,7 +387,6 @@ nm.try_update_result(candidate, new_score, serializer);
 gempba::score best = nm.get_score();
 
 // Multithreading: retrieve the actual result object
-auto value = nm.fetch_result<MyResult>();    // throws if no result was set
 auto opt   = nm.get_result<MyResult>();     // returns std::nullopt if not set
 
 // Multiprocessing: retrieve result as raw bytes for deserialization
