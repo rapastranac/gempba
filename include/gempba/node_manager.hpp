@@ -167,22 +167,6 @@ namespace gempba {
             return utils::wall_time();
         }
 
-        /**
-         * if running in multithreading mode, the best solution can directly fetch without any deserialization
-         * @tparam Ret
-         */
-        template<typename Ret>
-        [[nodiscard]] auto fetch_result() -> Ret {
-            std::unique_lock v_lock(m_mutex);
-            if (!std::holds_alternative<std::any>(m_result)) {
-                utils::log_and_throw(std::format("Attempt to fetch a result of type {} but the result is not set", typeid(Ret).name()));
-            }
-            if (auto v_any = std::get<std::any>(m_result); v_any.has_value()) {
-                return std::any_cast<Ret>(v_any);
-            }
-            utils::log_and_throw(std::format("Attempt to fetch a result of type {} but the result is not set", typeid(Ret).name()));
-        }
-
         [[nodiscard]] score get_score() const {
             return m_score;
         }
