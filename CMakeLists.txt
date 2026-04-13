@@ -56,6 +56,8 @@ endif ()
 find_package(OpenMP REQUIRED)
 find_package(Threads REQUIRED)
 find_package(MPI REQUIRED)
+find_package(spdlog REQUIRED)
+find_package(fmt REQUIRED)
 
 # 📂 Includes
 include_directories(${MPI_INCLUDE_PATH})
@@ -111,7 +113,15 @@ target_link_libraries(gempba PUBLIC
         Threads::Threads
         MPI::MPI_CXX
         OpenMP::OpenMP_CXX
+        fmt::fmt
 )
+
+# spdlog is used in header-only mode. Deliberately NOT linked as a CMake target
+# so spdlog::spdlog_header_only never appears in gempbaTargets.cmake and
+# consumers don't need find_package(spdlog) just to use gempba.
+get_target_property(_spdlog_includes spdlog::spdlog_header_only INTERFACE_INCLUDE_DIRECTORIES)
+target_include_directories(gempba PRIVATE ${_spdlog_includes})
+target_compile_definitions(gempba PUBLIC SPDLOG_HEADER_ONLY)
 
 # C++23 stacktrace support (standard library, not external)
 if (NOT MSVC)
