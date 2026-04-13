@@ -18,6 +18,9 @@ CPMAddPackage(
 add_library(BS_thread_pool INTERFACE)
 target_include_directories(BS_thread_pool INTERFACE ${BS_thread_pool_SOURCE_DIR}/include)
 
+# Propagate fetched source dir to parent scope so root CMakeLists.txt can use it
+set(GEMPBA_BS_THREAD_POOL_INCLUDE_DIR "${BS_thread_pool_SOURCE_DIR}/include" CACHE PATH "" FORCE)
+
 # Define 'external_libs' as an INTERFACE library
 add_library(external_libs INTERFACE)
 
