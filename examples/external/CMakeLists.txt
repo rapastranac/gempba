@@ -24,5 +24,4 @@ add_library(example_libs INTERFACE)
 target_link_libraries(example_libs
         INTERFACE
         argparse
-        spdlog
 )

@@ -12,16 +12,6 @@ endif ()
 include(${CPM_DOWNLOAD_LOCATION})
 
 CPMAddPackage(
-        NAME spdlog
-        GITHUB_REPOSITORY gabime/spdlog
-        VERSION 1.15.1
-        OPTIONS
-        "SPDLOG_BUILD_SHARED OFF"
-        "SPDLOG_BUILD_STATIC ON"
-        GIT_SHALLOW TRUE          # shallow clone: minimal history
-)
-
-CPMAddPackage(
         NAME BS_thread_pool
         GITHUB_REPOSITORY rapastranac/thread-pool
         GIT_TAG master)
@@ -34,5 +24,4 @@ add_library(external_libs INTERFACE)
 # Link argparse to 'external_libs'
 target_link_libraries(external_libs
         INTERFACE
-        spdlog
         BS_thread_pool)
