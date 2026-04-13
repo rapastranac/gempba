@@ -102,8 +102,9 @@ target_compile_options(gempba PRIVATE
 )
 
 # 🔗 Linking
+# external_libs is intentionally excluded: it is not an installable exported target.
+# Its contents (BS_thread_pool headers, spdlog) are wired in via target_include_directories.
 target_link_libraries(gempba PUBLIC
-        external_libs
         Threads::Threads
         MPI::MPI_CXX
         OpenMP::OpenMP_CXX
