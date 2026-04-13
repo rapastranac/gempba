@@ -67,10 +67,10 @@ Building GemPBA as the root project automatically enables examples and tests. Al
 
 ### Dependencies (the no-hassle part)
 
-GemPBA uses [CPM.cmake](https://github.com/cpm-cmake/CPM.cmake) to manage its external dependencies. You do not need to install anything manually. CMake fetches and builds what it needs:
+GemPBA uses [CPM.cmake](https://github.com/cpm-cmake/CPM.cmake) for some of its external dependencies, and expects others to be installed on the system:
 
-- **spdlog**: Logging (managed automatically by CPM)
-- **BS_thread_pool**: Thread pool (managed automatically by CPM)
+- **spdlog**: Must be installed system-wide (`apt-get install libspdlog-dev` / `pacman -S mingw-w64-x86_64-spdlog`)
+- **BS_thread_pool**: Thread pool (fetched automatically by CPM)
 
 When building examples or tests, CPM also fetches:
 
@@ -78,6 +78,36 @@ When building examples or tests, CPM also fetches:
 - **GoogleTest**: Test framework
 
 No `apt install libboost-all-dev` hunting required. I know, I was surprised too the first time it worked.
+
+### Installing via system package manager
+
+If you just want to consume GemPBA as a library without embedding it in your build, install it system-wide and use `find_package`.
+
+**Ubuntu (APT)**
+
+```bash
+curl -fsSL https://rapastranac.github.io/gempba/pubkey.gpg \
+  | sudo gpg --dearmor -o /etc/apt/keyrings/gempba.gpg
+echo "deb [signed-by=/etc/apt/keyrings/gempba.gpg] https://rapastranac.github.io/gempba stable main" \
+  | sudo tee /etc/apt/sources.list.d/gempba.list
+sudo apt-get update
+sudo apt-get install libgempba-dev
+```
+
+**Windows (MSYS2 / MinGW64)**
+
+Download the latest `.pkg.tar.zst` from the [Releases page](https://github.com/rapastranac/gempba/releases), then:
+
+```bash
+pacman -U mingw-w64-x86_64-gempba-<version>-1-x86_64.pkg.tar.zst
+```
+
+Once installed, wire it into your CMake project:
+
+```cmake
+find_package(gempba REQUIRED)
+target_link_libraries(your-target PRIVATE gempba::gempba)
+```
 
 ### Installing into your own project
 
