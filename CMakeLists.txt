@@ -57,7 +57,6 @@ find_package(fmt REQUIRED)
 # 📂 Includes
 include_directories(${MPI_INCLUDE_PATH})
 include_directories(include)
-include_directories(GemPBA)
 include_directories(private)
 
 # 📦 Subprojects
@@ -73,7 +72,7 @@ if (GEMPBA_BUILD_EXAMPLES AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/examples/CMake
 endif ()
 
 # 📄 Main source files
-file(GLOB_RECURSE Sources "src/*.cpp" "GemPBA/*.cpp")
+file(GLOB_RECURSE Sources "src/*.cpp")
 
 # 🛠️ Create the main library
 add_library(gempba STATIC ${Sources})
@@ -144,6 +143,5 @@ configure_file(
 target_include_directories(gempba
         PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/GemPBA>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
 )
