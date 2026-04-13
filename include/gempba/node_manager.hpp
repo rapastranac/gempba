@@ -4,7 +4,7 @@
 #include <any>
 #include <atomic>
 #include <climits>
-#include <config.h>
+#include <gempba/config.h>
 #include <functional>
 #include <memory>
 #include <mutex>

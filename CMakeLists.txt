@@ -142,7 +142,7 @@ add_library(gempba::gempba ALIAS gempba)
 # Generate config.h from config.h.in
 configure_file(
         ${CMAKE_CURRENT_SOURCE_DIR}/config.h.in
-        ${CMAKE_CURRENT_BINARY_DIR}/config.h
+        ${CMAKE_CURRENT_BINARY_DIR}/gempba/config.h
 )
 
 # 📤 Includes for consumers of the library
