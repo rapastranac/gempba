@@ -144,4 +144,6 @@ target_include_directories(gempba
         PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+        PRIVATE
+        ${GEMPBA_BS_THREAD_POOL_INCLUDE_DIR} # - BS_thread_pool: PRIVATE, only used in private impl headers.
 )
