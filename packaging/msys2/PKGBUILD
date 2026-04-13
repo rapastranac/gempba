@@ -1,0 +1,52 @@
+# Maintainer: Andres Pastrana <gempba@outlook.com>
+
+_realname=gempba
+pkgbase=mingw-w64-${_realname}
+pkgname=("${MINGW_PACKAGE_PREFIX}-${_realname}")
+pkgver=3.0.0
+pkgrel=1
+pkgdesc="Generic Massive Parallelisation of Branching Algorithms — parallel branch-and-bound C++23 framework (mingw-w64)"
+arch=('any')
+mingw_arch=('mingw64' 'ucrt64' 'clang64')
+url="https://github.com/rapastranac/gempba"
+license=('spdx:MIT')
+depends=(
+    "${MINGW_PACKAGE_PREFIX}-gcc-libs"
+    "${MINGW_PACKAGE_PREFIX}-msmpi"
+    "${MINGW_PACKAGE_PREFIX}-spdlog"
+    "${MINGW_PACKAGE_PREFIX}-fmt"
+)
+makedepends=(
+    "${MINGW_PACKAGE_PREFIX}-cmake"
+    "${MINGW_PACKAGE_PREFIX}-gcc"
+    "${MINGW_PACKAGE_PREFIX}-ninja"
+)
+options=('staticlibs')
+source=("${_realname}-${pkgver}.tar.gz::https://github.com/rapastranac/gempba/archive/refs/tags/v${pkgver}.tar.gz")
+sha256sums=('d5558cd419c8d46bdc958064cb97f963d1ea793866414c025906ec15033512ed')
+
+build() {
+    mkdir -p "${srcdir}/build-${MSYSTEM}"
+    cd "${srcdir}/build-${MSYSTEM}"
+
+    MSYS2_ARG_CONV_EXCL="-DCMAKE_INSTALL_PREFIX=" \
+    ${MINGW_PREFIX}/bin/cmake \
+        -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX="${MINGW_PREFIX}" \
+        -DGEMPBA_BUILD_TESTS=OFF \
+        -DGEMPBA_BUILD_EXAMPLES=OFF \
+        -DGEMPBA_DEV_MODE=OFF \
+        -DGEMPBA_MULTIPROCESSING=ON \
+        "../${_realname}-${pkgver}"
+
+    ${MINGW_PREFIX}/bin/cmake --build . --parallel
+}
+
+package() {
+    cd "${srcdir}/build-${MSYSTEM}"
+    DESTDIR="${pkgdir}" ${MINGW_PREFIX}/bin/cmake --install .
+
+    install -Dm644 "${srcdir}/${_realname}-${pkgver}/LICENSE" \
+        "${pkgdir}${MINGW_PREFIX}/share/licenses/${_realname}/LICENSE"
+}
