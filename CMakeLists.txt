@@ -5,16 +5,9 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# 🔍 FORCE DEBUG SYMBOLS AND DYNAMIC SYMBOL EXPORT FOR ALL TARGETS
-# 🔍 DEBUG SYMBOLS AND DYNAMIC EXPORT - ONLY FOR DEBUG BUILDS
-if (NOT MSVC)
-    add_compile_options(-g)
-    add_link_options(-g)
-
-    # -rdynamic is Linux-only
-    if (UNIX)
-        add_link_options(-rdynamic)
-    endif ()
+# 🔍 DYNAMIC SYMBOL EXPORT - ONLY FOR DEBUG BUILDS, LINUX-ONLY
+if (NOT MSVC AND UNIX)
+    add_link_options($<$<CONFIG:Debug>:-rdynamic>)
 endif ()
 
 # ⚙️ Flags to control the compilation of tests and examples
