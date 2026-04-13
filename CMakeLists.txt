@@ -10,21 +10,17 @@ if (NOT MSVC AND UNIX)
     add_link_options($<$<CONFIG:Debug>:-rdynamic>)
 endif ()
 
-# ⚙️ Flags to control the compilation of tests and examples
-option(GEMPBA_DEV_MODE "Build gempba unit tests" OFF)
-option(GEMPBA_BUILD_TESTS "Build gempba unit tests" OFF)
-option(GEMPBA_BUILD_EXAMPLES "Build gempba examples" OFF)
-option(GEMPBA_MULTIPROCESSING "Enable multiprocessing support in gempba" OFF)
-option(GEMPBA_DEBUG_COMMENTS "Enable debug comments in gempba" OFF)
-
-# 🧠 If used as a root project, we default to building tests and examples, otherwise, we turn them off.
+# ⚙️ Options — declared inside the if/else so defaults are context-aware.
+# option() only writes the cache when the key is not yet present, so user-passed
+# -DGEMPBA_BUILD_TESTS=OFF (or =ON) always takes precedence over these defaults.
 if (CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
     message(STATUS "GemPBA detected as root project. Defaulting to build tests and examples.")
 
-    set(GEMPBA_DEV_MODE ON)
-    set(GEMPBA_MULTIPROCESSING ON)
-    set(GEMPBA_BUILD_TESTS ON)
-    set(GEMPBA_BUILD_EXAMPLES ON)
+    option(GEMPBA_DEV_MODE         "Enable dev mode"                      ON)
+    option(GEMPBA_BUILD_TESTS      "Build gempba unit tests"              ON)
+    option(GEMPBA_BUILD_EXAMPLES   "Build gempba examples"                ON)
+    option(GEMPBA_MULTIPROCESSING  "Enable multiprocessing support"       ON)
+    option(GEMPBA_DEBUG_COMMENTS   "Enable debug comments in gempba"      OFF)
 
     message(STATUS "GEMPBA_BUILD_TESTS=${GEMPBA_BUILD_TESTS}, GEMPBA_BUILD_EXAMPLES=${GEMPBA_BUILD_EXAMPLES}")
 
@@ -38,10 +34,16 @@ if (CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
 
 else ()
     message(STATUS "GemPBA detected as a subproject. Defaulting to not build tests and examples.")
+
+    option(GEMPBA_DEV_MODE         "Enable dev mode"                      OFF)
+    option(GEMPBA_BUILD_TESTS      "Build gempba unit tests"              OFF)
+    option(GEMPBA_BUILD_EXAMPLES   "Build gempba examples"                OFF)
+    option(GEMPBA_MULTIPROCESSING  "Enable multiprocessing support"       OFF)
+    option(GEMPBA_DEBUG_COMMENTS   "Enable debug comments in gempba"      OFF)
+
     message(STATUS "GEMPBA_BUILD_TESTS=${GEMPBA_BUILD_TESTS}, GEMPBA_BUILD_EXAMPLES=${GEMPBA_BUILD_EXAMPLES}")
 
-    # ⚠️ DO NOT set CMAKE_BUILD_TYPE here, to let it inherit from the parent
-    # Just print what the parent set
+    # ⚠️ DO NOT set CMAKE_BUILD_TYPE here — inherit from parent
     message(STATUS "Using parent project's CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}")
 endif ()
 
