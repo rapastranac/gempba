@@ -7,7 +7,7 @@ cmake_install.cmake
 .vscode
 .vs
 CMakeSettings.json
-build
+.build
 .build-debug
 .build-debug-coverage
 .build-release
