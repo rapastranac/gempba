@@ -1,4 +1,5 @@
 #!/bin/bash
+cd "$(dirname "$0")/.." || exit 1
 # ---------------------------------------------------------------------
 echo "Current working directory: $(pwd)"
 echo "Starting run at: $(date)"
