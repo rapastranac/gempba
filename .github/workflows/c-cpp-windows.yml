@@ -127,10 +127,12 @@ jobs:
           git archive --prefix="gempba-${VERSION}/" HEAD \
             | gzip > "packaging/msys2/gempba-${VERSION}.tar.gz"
 
-          # Patch PKGBUILD: set version and point source at the local tarball
+          # Patch PKGBUILD: set version, point source at the local tarball,
+          # and skip checksum validation (local git archive != GitHub release tarball)
           cd packaging/msys2
           sed -i "s|^pkgver=.*|pkgver=${VERSION}|" PKGBUILD
           sed -i 's|^source=.*|source=("gempba-${pkgver}.tar.gz")|' PKGBUILD
+          sed -i "s|^sha256sums=.*|sha256sums=('SKIP')|" PKGBUILD
 
           # makepkg-mingw builds, installs into fakeroot, and adds .PKGINFO/.MTREE
           PKGDEST="$WS" MINGW_ARCH=mingw64 makepkg-mingw --nocheck --noconfirm --noprogressbar
