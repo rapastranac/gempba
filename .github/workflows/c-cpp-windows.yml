@@ -3,6 +3,7 @@ name: C/C++ CI (Windows 2022)
 on:
   push:
     branches: [ "main", "${NUMBER}-*" ]
+    tags: [ "v*" ]
   pull_request:
     branches: [ "main", "${NUMBER}-*" ]
 
@@ -37,6 +38,8 @@ jobs:
             mingw-w64-x86_64-boost
             mingw-w64-x86_64-msmpi
             mingw-w64-x86_64-gtest
+            mingw-w64-x86_64-spdlog
+            mingw-w64-x86_64-fmt
 
       # 3️⃣ Echo versions of installed dependencies
       - name: Echo Dependencies Version
@@ -63,13 +66,13 @@ jobs:
         shell: msys2 {0}
         run: |
           cd "$GITHUB_WORKSPACE/build"
-          
+
           echo "🔵 First pass: all tests"
           ctest --output-on-failure --output-junit test_results.xml || true
-          
+
           echo "🟡 Retry flaky tests (up to 3 attempts)"
           ctest --repeat until-pass:3 --output-on-failure -R "FLAKY_" || true
-          
+
           echo "🟢 Final check: non-flaky tests MUST be green"
           ctest --output-on-failure -E "FLAKY_"
 
@@ -81,6 +84,76 @@ jobs:
           name: test-results-windows
           path: ${{ github.workspace }}/build/test_results.xml
           retention-days: 30
+
+  publish-msys2:
+    needs: build-and-test
+    runs-on: windows-2022
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'pull_request'
+    permissions:
+      contents: write
+
+    steps:
+      # 1️⃣ Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      # 2️⃣ Set up MSYS2 (no gtest needed for publish build)
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            base-devel
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-msmpi
+            mingw-w64-x86_64-spdlog
+            mingw-w64-x86_64-fmt
+            git
+            zstd
+
+      # 3️⃣ Build package via makepkg-mingw (handles configure/build/install + metadata)
+      - name: Build MSYS2 package
+        shell: msys2 {0}
+        run: |
+          WS=$(cygpath -u "$GITHUB_WORKSPACE")
+          VERSION=$(grep -m1 'project(gempba VERSION' CMakeLists.txt | grep -oP '\d+\.\d+\.\d+')
+
+          # Create source tarball from current commit so PKGBUILD can unpack it
+          git archive --prefix="gempba-${VERSION}/" HEAD \
+            | gzip > "packaging/msys2/gempba-${VERSION}.tar.gz"
+
+          # Patch PKGBUILD: set version, point source at the local tarball,
+          # and skip checksum validation (local git archive != GitHub release tarball)
+          cd packaging/msys2
+          sed -i "s|^pkgver=.*|pkgver=${VERSION}|" PKGBUILD
+          sed -i 's|^source=.*|source=("gempba-${pkgver}.tar.gz")|' PKGBUILD
+          sed -i "s|^sha256sums=.*|sha256sums=('SKIP')|" PKGBUILD
+
+          # makepkg-mingw builds, installs into fakeroot, and adds .PKGINFO/.MTREE
+          PKGDEST="$WS" MINGW_ARCH=mingw64 makepkg-mingw --nocheck --noconfirm --noprogressbar
+
+      # 4️⃣a Tag → attach to GitHub Release
+      - name: Upload MSYS2 package to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ github.workspace }}/mingw-w64-x86_64-gempba-*.pkg.tar.zst
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 4️⃣b PR → store as workflow artifact for inspection
+      - name: Upload MSYS2 package as workflow artifact (PR)
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: msys2-package
+          path: ${{ github.workspace }}/mingw-w64-x86_64-gempba-*.pkg.tar.zst
+          retention-days: 7
 
   publish-test-results:
     needs: build-and-test

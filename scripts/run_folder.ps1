@@ -1,4 +1,5 @@
 # ---------------------------------------------------------------------
+Set-Location (Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path))
 Write-Output "Current working directory: $( Get-Location )"
 Write-Output "Starting batch run at: $( Get-Date )"
 # ---------------------------------------------------------------------

@@ -1,7 +1,7 @@
 #ifndef GRAPH_HPP
 #define GRAPH_HPP
 
-#include <config.h>
+#include <gempba/config.h>
 
 using namespace std;
 

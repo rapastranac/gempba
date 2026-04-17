@@ -14,6 +14,8 @@ include(GoogleTest)
 include_directories(support)
 include_directories(${GTEST_INCLUDE_DIRS})
 include_directories(${Boost_INCLUDE_DIRS})
+include_directories(${CMAKE_SOURCE_DIR}/private)
+include_directories(${GEMPBA_BS_THREAD_POOL_INCLUDE_DIR})
 
 # Set the output directory to be the same as the main project
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)

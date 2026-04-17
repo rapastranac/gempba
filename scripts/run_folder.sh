@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-
+cd "$(dirname "$0")/.." || exit 1
 # ---------------------------------------------------------------------
 echo "Current working directory: $(pwd)"
 echo "Starting batch run at: $(date)"
