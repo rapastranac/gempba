@@ -1,0 +1,11 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=${prefix}/@CMAKE_INSTALL_LIBDIR@
+includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+
+Name: gempba
+Description: Generic Massive Parallelisation of Branching Algorithms — parallel branch-and-bound C++23 framework
+Version: @PROJECT_VERSION@
+Requires: ompi-cxx
+Libs: -L${libdir} -lgempba -lstdc++exp -lgomp -lpthread
+Cflags: -I${includedir} -std=c++23 -DSPDLOG_HEADER_ONLY
