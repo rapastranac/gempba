@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.28)
 
 project(gempba VERSION 3.0.0 LANGUAGES CXX)
+
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -141,10 +144,66 @@ configure_file(
 )
 
 # 📤 Includes for consumers of the library
+# - BS_thread_pool: PRIVATE, only used in private impl headers.
 target_include_directories(gempba
         PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
         PRIVATE
-        ${GEMPBA_BS_THREAD_POOL_INCLUDE_DIR} # - BS_thread_pool: PRIVATE, only used in private impl headers.
+        ${GEMPBA_BS_THREAD_POOL_INCLUDE_DIR}
 )
+
+
+# ─── Install: library archive ────────────────────────────────────────────────
+install(TARGETS gempba
+        EXPORT gempbaTargets
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+# ─── Install: public headers ──────────────────────────────────────────────────
+install(DIRECTORY include/gempba
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+        FILES_MATCHING PATTERN "*.hpp"
+)
+
+# ─── Install: generated config.h ─────────────────────────────────────────────
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/gempba/config.h
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gempba
+)
+
+# ─── Install: exported CMake targets ─────────────────────────────────────────
+install(EXPORT gempbaTargets
+        FILE gempbaTargets.cmake
+        NAMESPACE gempba::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/gempba
+)
+
+# ─── Generate and install: CMake package config files ────────────────────────
+configure_package_config_file(
+        cmake/gempbaConfig.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/gempbaConfig.cmake
+        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/gempba
+)
+
+write_basic_package_version_file(
+        ${CMAKE_CURRENT_BINARY_DIR}/gempbaConfigVersion.cmake
+        VERSION ${PROJECT_VERSION}
+        COMPATIBILITY SameMajorVersion
+)
+
+install(FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/gempbaConfig.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/gempbaConfigVersion.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/gempba
+)
+
+# ─── Generate and install: pkg-config .pc file ───────────────────────────────
+configure_file(cmake/gempba.pc.in gempba.pc @ONLY)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/gempba.pc
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
+)
+
+# ─── CPack packaging ─────────────────────────────────────────────────────────
+include(cmake/CPackConfig.cmake)
