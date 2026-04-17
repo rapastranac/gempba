@@ -1,27 +1,30 @@
-CMakeFiles
-bin/*
+# ─── Build output ────────────────────────────────────────────────────────────
+bin/
 *.out
+output/
+results/
+Testing/
+
+# ─── CMake ────────────────────────────────────────────────────────────────────
+CMakeFiles/
 CMakeCache.txt
-Makefile
-cmake_install.cmake
-.vscode
-.vs
 CMakeSettings.json
-.build
-.build-debug
-.build-debug-coverage
-.build-release
-build-with-coverage
-cmake-build-debug
-cmake-build-debug-wsl
-.cmake
-.idea
+cmake_install.cmake
+Makefile
+.cmake/
+
+# ─── Build directories ───────────────────────────────────────────────────────
+build*/
+.build*/
+cmake-build-*/
+
+# ─── IDEs ────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+.vs/
+.claude/
 global.cbp
-Testing
-output
-results
-external
 
-
-# Allow
+# ─── Dependencies ────────────────────────────────────────────────────────────
+external/
 !external/CMakeLists.txt
