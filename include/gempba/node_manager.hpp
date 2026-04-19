@@ -13,7 +13,6 @@
 #include <tuple>
 #include <utility>
 #include <variant>
-#include <bits/stdc++.h>
 #include <spdlog/spdlog.h>
 
 #include <gempba/core/load_balancer.hpp>
