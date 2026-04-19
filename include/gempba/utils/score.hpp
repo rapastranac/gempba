@@ -69,7 +69,7 @@ namespace gempba {
             static_assert(sizeof(T) <= PAYLOAD_SIZE, "type too large for score payload");
             score v_score{};
             v_score.m_kind = TYPE_OF<T>;
-            auto v_bytes = std::bit_cast<std::array<std::byte, sizeof(T)> >(p_value);
+            auto v_bytes = std::bit_cast<std::array<std::byte, sizeof(T)>>(p_value);
             std::memcpy(v_score.m_payload.data(), v_bytes.data(), sizeof(T));
             if constexpr (sizeof(T) < PAYLOAD_SIZE) {
                 std::memset(v_score.m_payload.data() + sizeof(T), 0, PAYLOAD_SIZE - sizeof(T));
@@ -104,13 +104,49 @@ namespace gempba {
             std::unreachable();
         }
 
-        // Strong ordering
-        friend constexpr auto operator<=>(const score &p_lhs, const score &p_rhs) noexcept {
+        friend constexpr std::partial_ordering operator<=>(const score &p_lhs, const score &p_rhs) noexcept {
+            if (p_lhs.m_kind == p_rhs.m_kind) {
+                switch (p_lhs.m_kind) {
+                    case score_type::I32:
+                        return read_as<std::int32_t>(p_lhs) <=> read_as<std::int32_t>(p_rhs);
+                    case score_type::U_I32:
+                        return read_as<std::uint32_t>(p_lhs) <=> read_as<std::uint32_t>(p_rhs);
+                    case score_type::I64:
+                        return read_as<std::int64_t>(p_lhs) <=> read_as<std::int64_t>(p_rhs);
+                    case score_type::U_I64:
+                        return read_as<std::uint64_t>(p_lhs) <=> read_as<std::uint64_t>(p_rhs);
+                    case score_type::F32:
+                        return read_as<float>(p_lhs) <=> read_as<float>(p_rhs);
+                    case score_type::F64:
+                        return read_as<double>(p_lhs) <=> read_as<double>(p_rhs);
+                    case score_type::F128:
+                        return read_as<long double>(p_lhs) <=> read_as<long double>(p_rhs);
+                }
+            }
             return to_long_double(p_lhs) <=> to_long_double(p_rhs);
         }
 
         friend constexpr bool operator==(const score &p_lhs, const score &p_rhs) noexcept {
-            return p_lhs.m_kind == p_rhs.m_kind && to_long_double(p_lhs) == to_long_double(p_rhs);
+            if (p_lhs.m_kind != p_rhs.m_kind) {
+                return false;
+            }
+            switch (p_lhs.m_kind) {
+                case score_type::I32:
+                    return read_as<std::int32_t>(p_lhs) == read_as<std::int32_t>(p_rhs);
+                case score_type::U_I32:
+                    return read_as<std::uint32_t>(p_lhs) == read_as<std::uint32_t>(p_rhs);
+                case score_type::I64:
+                    return read_as<std::int64_t>(p_lhs) == read_as<std::int64_t>(p_rhs);
+                case score_type::U_I64:
+                    return read_as<std::uint64_t>(p_lhs) == read_as<std::uint64_t>(p_rhs);
+                case score_type::F32:
+                    return read_as<float>(p_lhs) == read_as<float>(p_rhs);
+                case score_type::F64:
+                    return read_as<double>(p_lhs) == read_as<double>(p_rhs);
+                case score_type::F128:
+                    return read_as<long double>(p_lhs) == read_as<long double>(p_rhs);
+            }
+            return false;
         }
 
         /**
@@ -249,29 +285,39 @@ namespace gempba {
     private:
         template<typename T>
         static constexpr bool IS_SUPPORTED =
-                std::same_as<std::remove_cvref_t<T>, std::int32_t> ||
-                std::same_as<std::remove_cvref_t<T>, std::int64_t> ||
-                std::same_as<std::remove_cvref_t<T>, std::uint32_t> ||
-                std::same_as<std::remove_cvref_t<T>, std::uint64_t> ||
+                (std::is_integral_v<std::remove_cvref_t<T>> &&
+                 !std::same_as<std::remove_cvref_t<T>, bool> &&
+                 (sizeof(std::remove_cvref_t<T>) == 4 || sizeof(std::remove_cvref_t<T>) == 8)) ||
                 std::same_as<std::remove_cvref_t<T>, float> ||
                 std::same_as<std::remove_cvref_t<T>, double> ||
                 std::same_as<std::remove_cvref_t<T>, long double>;
 
         template<typename T>
-        static constexpr score_type TYPE_OF =
-                std::same_as<std::remove_cvref_t<T>, std::int32_t>
-                    ? score_type::I32
-                    : std::same_as<std::remove_cvref_t<T>, std::uint32_t>
-                    ? score_type::U_I32
-                    : std::same_as<std::remove_cvref_t<T>, std::int64_t>
-                    ? score_type::I64
-                    : std::same_as<std::remove_cvref_t<T>, std::uint64_t>
-                    ? score_type::U_I64
-                    : std::same_as<std::remove_cvref_t<T>, float>
-                    ? score_type::F32
-                    : std::same_as<std::remove_cvref_t<T>, double>
-                    ? score_type::F64
-                    : score_type::F128;
+        static constexpr score_type TYPE_OF = []() consteval {
+            using U = std::remove_cvref_t<T>;
+            if constexpr (std::is_integral_v<U> && sizeof(U) == 4 && std::is_signed_v<U>) {
+                return score_type::I32;
+            } else if constexpr (std::is_integral_v<U> && sizeof(U) == 4 && std::is_unsigned_v<U>) {
+                return score_type::U_I32;
+            } else if constexpr (std::is_integral_v<U> && sizeof(U) == 8 && std::is_signed_v<U>) {
+                return score_type::I64;
+            } else if constexpr (std::is_integral_v<U> && sizeof(U) == 8 && std::is_unsigned_v<U>) {
+                return score_type::U_I64;
+            } else if constexpr (std::same_as<U, float>) {
+                return score_type::F32;
+            } else if constexpr (std::same_as<U, double>) {
+                return score_type::F64;
+            } else {
+                return score_type::F128;
+            }
+        }();
+
+        template<typename T>
+        static constexpr T read_as(const score &p_score) noexcept {
+            T v_value{};
+            std::memcpy(&v_value, p_score.m_payload.data(), sizeof(T));
+            return v_value;
+        }
 
         static constexpr long double to_long_double(const score &p_score) noexcept {
             switch (p_score.m_kind) {
