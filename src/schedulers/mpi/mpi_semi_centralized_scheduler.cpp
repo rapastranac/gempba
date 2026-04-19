@@ -10,17 +10,17 @@ namespace gempba {
             return;
         }
 
-        const result result = v_bytes_opt.value();
-        const task_packet bytes = result.get_task_packet();
+        const result &v_result = v_bytes_opt.value();
+        const task_packet v_bytes = v_result.get_task_packet();
 
-        if (bytes.size() == 0) {
+        if (v_bytes.empty()) {
             MPI_Send(nullptr, 0, MPI_BYTE, CENTER_NODE, NO_RESULT, m_world_communicator);
             return;
         }
 
-        MPI_Send(bytes.data(), static_cast<int>(bytes.size()), MPI_BYTE, CENTER_NODE, HAS_RESULT, m_world_communicator);
+        MPI_Send(v_bytes.data(), static_cast<int>(v_bytes.size()), MPI_BYTE, CENTER_NODE, HAS_RESULT, m_world_communicator);
 
-        const score &v_score = result.get_score();
+        const score &v_score = v_result.get_score();
         MPI_Send(&v_score, sizeof(score), MPI_BYTE, CENTER_NODE, HAS_RESULT, m_world_communicator);
     }
 
@@ -76,7 +76,7 @@ namespace gempba {
                 }
             }
         }
-        //This call here is thread safe because all tasks have been resolved and no other thread is pushing new tasks
+        // This call here is thread safe because all tasks have been resolved and no other thread is pushing new tasks
         update_score(p_node_manager); // Attempt final score update before exiting
         utils::print_ipc_debug_comments("rank {} sent {} tasks\n", m_world_rank, m_sent_tasks);
 
@@ -96,4 +96,4 @@ namespace gempba {
         }
     }
 
-}
+} // namespace gempba

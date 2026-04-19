@@ -60,6 +60,6 @@ namespace gempba {
             });
         }
     };
-}
+} // namespace gempba
 
-#endif //GEMPBA_DEFAULT_MPI_STATS_VISITOR_HPP
+#endif // GEMPBA_DEFAULT_MPI_STATS_VISITOR_HPP

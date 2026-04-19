@@ -25,12 +25,12 @@
 #define NODE_BLOCK_HPP
 
 #include <any>
-#include <memory>
 #include <gempba/core/node_traits.hpp>
 #include <gempba/core/scheduler.hpp>
+#include <memory>
 
 namespace gempba {
-    class node_core : public node_traits<std::shared_ptr<node_core> > {
+    class node_core : public node_traits<std::shared_ptr<node_core>> {
     protected:
         node_core() = default;
 
@@ -103,7 +103,7 @@ namespace gempba {
 
         [[nodiscard]] std::shared_ptr<node_core> get_right_sibling() override = 0;
 
-        [[deprecated]] std::list<std::shared_ptr<node_core> > get_children() override = 0;
+        [[deprecated]] std::list<std::shared_ptr<node_core>> get_children() override = 0;
 
         [[nodiscard]] int get_children_count() const override = 0;
 

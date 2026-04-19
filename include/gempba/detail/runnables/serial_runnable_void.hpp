@@ -29,10 +29,11 @@
 #include <future>
 #include <optional>
 
-#include <gempba/node_manager.hpp>
 #include <gempba/core/node.hpp>
 #include <gempba/core/serial_runnable.hpp>
+#include <gempba/node_manager.hpp>
 #include <gempba/utils/task_packet.hpp>
+#include <utility>
 
 namespace gempba {
     template<typename T>
@@ -46,15 +47,14 @@ namespace gempba {
 
     public:
         serial_runnable_void(const int p_id, invokable<void, Args...> auto &&p_f, std::function<std::tuple<Args...>(const task_packet &&)> p_args_deserializer) :
-            m_id(p_id), m_f(p_f), m_args_deserializer(p_args_deserializer) {
-        }
+            m_id(p_id), m_f(p_f), m_args_deserializer(std::move(std::move(p_args_deserializer))) {}
 
         ~serial_runnable_void() override = default;
 
         [[nodiscard]] int get_id() const override { return m_id; }
 
-        std::optional<std::shared_future<task_packet> > operator()(node_manager &p_node_manager, const task_packet &p_args) override {
-            std::tuple<Args...> v_user_args = m_args_deserializer(std::move(p_args));
+        std::optional<std::shared_future<task_packet>> operator()(node_manager &p_node_manager, const task_packet &p_args) override {
+            std::tuple<Args...> v_user_args = m_args_deserializer(std::move(p_args)); // NOLINT(performance-move-const-arg)
             std::future<std::any> v_fut = p_node_manager.force_local_submit([this, v_tup = std::move(v_user_args)] {
                 auto v_all_args = std::tuple_cat(std::make_tuple(std::this_thread::get_id()), v_tup, std::make_tuple<node>(node()));
                 std::apply(m_f, v_all_args);

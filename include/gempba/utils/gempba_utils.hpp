@@ -3,14 +3,12 @@
 
 namespace gempba {
 
-    enum goal {
-        MAXIMISE, MINIMISE
-    };
+    enum goal { MAXIMISE, MINIMISE };
 
     enum balancing_policy {
         QUASI_HORIZONTAL, // Our Novel Dynamic Load Balancer
         WORK_STEALING
     };
-}
+} // namespace gempba
 
-#endif //GEMPBA_GEMPBA_UTILS_H
+#endif // GEMPBA_GEMPBA_UTILS_H

@@ -42,10 +42,9 @@ namespace gempba {
         load_balancer() = default;
 
     public:
-
         virtual ~load_balancer() = default;
 
-        virtual std::shared_ptr<std::shared_ptr<node_core> > get_root(std::thread::id p_thread_id) = 0;
+        virtual std::shared_ptr<std::shared_ptr<node_core>> get_root(std::thread::id p_thread_id) = 0;
 
         virtual void set_root(std::thread::id p_thread_id, std::shared_ptr<node_core> &p_root) = 0;
 
@@ -57,11 +56,11 @@ namespace gempba {
 
         virtual std::future<std::any> force_local_submit(std::function<std::any()> &&p_function) = 0;
 
-        virtual void forward(node &p_node) =0;
+        virtual void forward(node &p_node) = 0;
 
         virtual bool try_local_submit(node &p_node) = 0;
 
-        virtual bool try_remote_submit(node &p_node, int p_runnable_id) =0;
+        virtual bool try_remote_submit(node &p_node, int p_runnable_id) = 0;
 
         [[nodiscard]] virtual double get_idle_time() const = 0;
 

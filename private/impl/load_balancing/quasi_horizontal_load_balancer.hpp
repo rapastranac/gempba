@@ -1,5 +1,5 @@
 /*
-* MIT License
+ * MIT License
  *
  * Copyright (c) 2025. Andrés Pastrana
  *
@@ -29,10 +29,10 @@
 #include <set>
 #include <thread>
 
-#include <gempba/utils/transmission_guard.hpp>
-#include <gempba/utils/utils.hpp>
 #include <gempba/core/load_balancer.hpp>
 #include <gempba/core/node.hpp>
+#include <gempba/utils/transmission_guard.hpp>
+#include <gempba/utils/utils.hpp>
 
 /**
  * @author Andres Pastrana
@@ -46,22 +46,16 @@ namespace gempba {
         unsigned int m_unique_id_counter = 0;
         std::recursive_mutex m_recursive_mutex;
         scheduler::worker *const m_scheduler_worker;
-        std::map<std::thread::id, std::shared_ptr<std::shared_ptr<node_core> > > m_roots; // every thread will be solving a subtree, this point to their roots
+        std::map<std::thread::id, std::shared_ptr<std::shared_ptr<node_core>>> m_roots; // every thread will be solving a subtree, this point to their roots
         unsigned int m_thread_count = std::thread::hardware_concurrency();
         std::size_t m_thread_request_count = 0;
 
     public:
-        explicit quasi_horizontal_load_balancer(scheduler::worker *const p_scheduler_worker = nullptr) :
-            m_scheduler_worker(p_scheduler_worker) {
-        }
+        explicit quasi_horizontal_load_balancer(scheduler::worker *const p_scheduler_worker = nullptr) : m_scheduler_worker(p_scheduler_worker) {}
 
-        balancing_policy get_balancing_policy() override {
-            return QUASI_HORIZONTAL;
-        }
+        balancing_policy get_balancing_policy() override { return QUASI_HORIZONTAL; }
 
-        unsigned generate_unique_id() override {
-            return ++m_unique_id_counter;
-        }
+        unsigned generate_unique_id() override { return ++m_unique_id_counter; }
 
         std::future<std::any> force_local_submit(std::function<std::any()> &&p_function) override {
             ++m_thread_request_count;
@@ -105,9 +99,7 @@ namespace gempba {
             return false;
         }
 
-        [[nodiscard]] double get_idle_time() const override {
-            return m_thread_pool.get_wall_idle_time();
-        }
+        [[nodiscard]] double get_idle_time() const override { return m_thread_pool.get_wall_idle_time(); }
 
         void set_root(const std::thread::id p_thread_id, std::shared_ptr<node_core> &p_root) override {
             std::scoped_lock v_lock(m_recursive_mutex);
@@ -115,11 +107,11 @@ namespace gempba {
                 const auto v_ptr = m_roots.at(p_thread_id);
                 *v_ptr = p_root; // should I assign this way
             } else {
-                m_roots.emplace(p_thread_id, std::make_shared<std::shared_ptr<node_core> >(p_root));
+                m_roots.emplace(p_thread_id, std::make_shared<std::shared_ptr<node_core>>(p_root));
             }
         }
 
-        std::shared_ptr<std::shared_ptr<node_core> > get_root(const std::thread::id p_thread_id) override {
+        std::shared_ptr<std::shared_ptr<node_core>> get_root(const std::thread::id p_thread_id) override {
             std::scoped_lock v_lock(m_recursive_mutex);
             if (m_roots.contains(p_thread_id)) {
                 return m_roots.at(p_thread_id);
@@ -132,32 +124,26 @@ namespace gempba {
             spdlog::debug("thread pool size: {}", m_thread_pool.get_thread_count());
         }
 
-        void wait() override {
-            m_thread_pool.wait();
-        }
+        void wait() override { m_thread_pool.wait(); }
 
-        bool is_done() const override {
-            return m_thread_pool.get_tasks_total() == 0;
-        }
+        bool is_done() const override { return m_thread_pool.get_tasks_total() == 0; }
 
-        std::size_t get_thread_request_count() const override {
-            return m_thread_request_count;
-        }
+        std::size_t get_thread_request_count() const override { return m_thread_request_count; }
 
-        #if GEMPBA_DEV_MODE && GEMPBA_BUILD_TESTS
+#if GEMPBA_DEV_MODE && GEMPBA_BUILD_TESTS
 
     public:
-        #else
+#else
     private:
-        #endif
+#endif
 
 
         /**
-        * @brief Utility method to check if the thread_pool can receive another task. Always use within a lock_guard as
-        * it might change when attempting to submit a new task.
-        *
-        * @return Returns true if the thread pool is not full, false otherwise.
-        */
+         * @brief Utility method to check if the thread_pool can receive another task. Always use within a lock_guard as
+         * it might change when attempting to submit a new task.
+         *
+         * @return Returns true if the thread pool is not full, false otherwise.
+         */
         bool is_thread_pool_full() const {
             const unsigned int v_thread_count = m_thread_pool.get_thread_count();
             const unsigned int v_tasks_running = m_thread_pool.get_tasks_running();
@@ -427,11 +413,10 @@ namespace gempba {
                 return p_core;
             });
         }
-
     };
 
 
-}
+} // namespace gempba
 
 
-#endif //GEMPBA_QUASI_HORIZONTAL_LOAD_BALANCER_HPP
+#endif // GEMPBA_QUASI_HORIZONTAL_LOAD_BALANCER_HPP

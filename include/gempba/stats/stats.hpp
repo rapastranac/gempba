@@ -26,9 +26,9 @@
 
 #include <any>
 #include <functional>
+#include <gempba/utils/task_packet.hpp>
 #include <string>
 #include <vector>
-#include <gempba/utils/task_packet.hpp>
 
 namespace gempba {
     class stats_visitor;
@@ -54,7 +54,7 @@ namespace gempba {
          * Returns a vector of strings representing the labels of the internal members of the stats object.
          * @return A vector of strings with the labels of the stats members.
          */
-        [[nodiscard]] virtual std::vector<std::string> labels() const =0;
+        [[nodiscard]] virtual std::vector<std::string> labels() const = 0;
 
         /**
          * This function allows to see the internal members of the stats object.
@@ -70,6 +70,6 @@ namespace gempba {
         virtual void visit(stats_visitor *p_visitor) const = 0;
     };
 
-}
+} // namespace gempba
 
-#endif //GEMPBA_STATS_HPP
+#endif // GEMPBA_STATS_HPP

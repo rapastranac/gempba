@@ -1,5 +1,5 @@
 /*
-* MIT License
+ * MIT License
  *
  * Copyright (c) 2025. Andrés Pastrana
  *
@@ -22,9 +22,9 @@
  * SOFTWARE.
  */
 #include <cstring>
+#include <gtest/gtest.h>
 #include <string>
 #include <vector>
-#include <gtest/gtest.h>
 
 #include <gempba/utils/task_packet.hpp>
 
@@ -60,7 +60,7 @@ TEST(task_packet_test, construct_from_vector_move) {
     EXPECT_EQ(v_packet.size(), 2);
     EXPECT_EQ(v_packet.data(), v_original_data_ptr);
     // Original vector should be empty
-    EXPECT_TRUE(v_bytes.empty());
+    EXPECT_TRUE(v_bytes.empty()); // NOLINT(bugprone-use-after-move)
 }
 
 TEST(task_packet_test, construct_from_cstring) {
@@ -79,9 +79,7 @@ TEST(task_packet_test, construct_from_string) {
     EXPECT_EQ(std::memcmp(v_packet.data(), v_string.data(), v_string.size()), 0);
 }
 
-TEST(task_packet_test, nullptr_with_non_zero_size_throws) {
-    EXPECT_THROW(gempba::task_packet(nullptr, 10), std::invalid_argument);
-}
+TEST(task_packet_test, nullptr_with_non_zero_size_throws) { EXPECT_THROW(gempba::task_packet(nullptr, 10), std::invalid_argument); }
 
 TEST(task_packet_test, copy_constructor_and_assignment) {
     const std::vector<std::byte> v_bytes = {std::byte{0x11}, std::byte{0x22}, std::byte{0x33}};
@@ -130,7 +128,7 @@ TEST(task_packet_test, empty_query) {
     EXPECT_FALSE(v_moved_packet.empty());
 
     // now the non-empty packet should be empty
-    EXPECT_TRUE(v_non_empty_packet.empty());
+    EXPECT_TRUE(v_non_empty_packet.empty()); // NOLINT(bugprone-use-after-move)
 }
 
 

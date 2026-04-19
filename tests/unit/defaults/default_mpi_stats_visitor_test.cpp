@@ -1,5 +1,5 @@
-#include <gtest/gtest.h>
 #include <gempba/defaults/default_mpi_stats_visitor.hpp>
+#include <gtest/gtest.h>
 #include <impl/schedulers/default_mpi_stats.hpp>
 
 TEST(default_mpi_stats_visitor_test, collects_expected_fields) {

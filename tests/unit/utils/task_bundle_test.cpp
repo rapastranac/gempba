@@ -1,5 +1,5 @@
 /*
-* MIT License
+ * MIT License
  *
  * Copyright (c) 2025. Andrés Pastrana
  *
@@ -22,8 +22,8 @@
  * SOFTWARE.
  */
 #include <cstring>
-#include <vector>
 #include <gtest/gtest.h>
+#include <vector>
 
 #include <gempba/utils/task_bundle.hpp>
 #include <gempba/utils/task_packet.hpp>
@@ -107,7 +107,7 @@ TEST(task_bundle_test, copy_constructor_creates_deep_copy) {
     const gempba::task_packet v_packet(v_data);
     const gempba::task_bundle v_original(v_packet, 100);
 
-    const gempba::task_bundle v_copy(v_original);
+    const gempba::task_bundle &v_copy(v_original);
 
     EXPECT_EQ(v_copy.get_runnable_id(), v_original.get_runnable_id());
     EXPECT_EQ(v_copy.size(), v_original.size());

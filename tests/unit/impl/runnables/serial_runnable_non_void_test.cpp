@@ -23,14 +23,14 @@
  */
 
 #include <functional>
+#include <gtest/gtest.h>
 #include <iomanip>
 #include <sstream>
 #include <string>
 #include <vector>
-#include <gtest/gtest.h>
 
-#include <gempba/gempba.hpp>
 #include <gempba/core/node.hpp>
+#include <gempba/gempba.hpp>
 #include <impl/load_balancing/work_stealing_load_balancer.hpp>
 
 
@@ -38,7 +38,7 @@ TEST(serial_runnable_non_void_test, test) {
     int v_int_for_test;
     double v_double_for_test;
 
-    std::function<double(std::thread::id, int, double, gempba::node)> v_function = [&](std::thread::id, int p_i_val, double p_f_val, gempba::node) {
+    std::function<double(std::thread::id, int, double, gempba::node)> v_function = [&](std::thread::id, int p_i_val, double p_f_val, const gempba::node &) {
         v_int_for_test = p_i_val;
         v_double_for_test = p_f_val;
         return p_i_val * p_f_val;
@@ -65,14 +65,13 @@ TEST(serial_runnable_non_void_test, test) {
         return gempba::task_packet(v_result);
     };
     constexpr int v_id = 548;
-    const std::shared_ptr<gempba::serial_runnable> v_runnable = gempba::mp::runnables::return_value::create<double>(
-            v_id, v_function, v_args_deserializer, v_result_serializer);
+    const std::shared_ptr<gempba::serial_runnable> v_runnable = gempba::mp::runnables::return_value::create<double>(v_id, v_function, v_args_deserializer, v_result_serializer);
 
     ASSERT_EQ(548, v_runnable->get_id());
 
     gempba::load_balancer *v_load_balancer = new gempba::work_stealing_load_balancer(nullptr);
     gempba::node_manager v_node_manager(v_load_balancer, nullptr);
-    const std::optional<std::shared_future<gempba::task_packet> > v_optional = (*v_runnable)(v_node_manager, gempba::task_packet("7,1.6825127784311510"));
+    const std::optional<std::shared_future<gempba::task_packet>> v_optional = (*v_runnable)(v_node_manager, gempba::task_packet("7,1.6825127784311510"));
 
     ASSERT_TRUE(v_optional.has_value());
     const std::shared_future<gempba::task_packet> &v_future = v_optional.value();

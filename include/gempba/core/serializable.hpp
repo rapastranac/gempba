@@ -48,6 +48,6 @@ namespace gempba {
          */
         virtual void deserialize(const task_packet &p_task) = 0;
     };
-}
+} // namespace gempba
 
-#endif //GEMPBA_SERIALIZABLE_HPP
+#endif // GEMPBA_SERIALIZABLE_HPP

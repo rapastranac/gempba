@@ -1,5 +1,5 @@
 /*
-* MIT License
+ * MIT License
  *
  * Copyright (c) 2025. Andrés Pastrana
  *
@@ -21,15 +21,15 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
 #include <map>
 #include <memory>
 #include <optional>
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
 
-#include <gempba/node_manager.hpp>
 #include <gempba/core/scheduler.hpp>
 #include <gempba/core/serial_runnable.hpp>
+#include <gempba/node_manager.hpp>
 #include <gempba/stats/stats.hpp>
 #include <gempba/utils/transmission_guard.hpp>
 #include <impl/load_balancing/work_stealing_load_balancer.hpp>
@@ -42,25 +42,21 @@
 class scheduler_worker_mock final : public gempba::scheduler::worker {
 public:
     MOCK_METHOD(void, barrier, (), (override));
-    MOCK_METHOD(int, rank_me, (), ( const ,override));
-    MOCK_METHOD(int, world_size, (), (const ,override));
-    MOCK_METHOD(void, run, (gempba::node_manager &node_manager, (std::map<int, std::shared_ptr<gempba::serial_runnable>> p_runnables)), (override));
-    MOCK_METHOD(unsigned int, force_push, (gempba::task_packet &&p_task, int p_function_id), (override));
+    MOCK_METHOD(int, rank_me, (), (const, override));
+    MOCK_METHOD(int, world_size, (), (const, override));
+    MOCK_METHOD(void, run, (gempba::node_manager & p_node_manager, (std::map<int, std::shared_ptr<gempba::serial_runnable>> p_runnables)), (override));
+    MOCK_METHOD(unsigned int, force_push, (gempba::task_packet && p_task, int p_function_id), (override));
     MOCK_METHOD(std::optional<gempba::transmission_guard>, try_open_transmission_channel, (), (override));
-    MOCK_METHOD(std::unique_ptr<gempba::stats>, get_stats, (), ( const, override));
+    MOCK_METHOD(std::unique_ptr<gempba::stats>, get_stats, (), (const, override));
     MOCK_METHOD(unsigned int, next_process, (), (const, override));
 };
 
 
 class work_stealing_load_balancer_test : public ::testing::Test {
 protected:
-    void SetUp() override {
-        m_scheduler_worker_mock = new scheduler_worker_mock();
-    }
+    void SetUp() override { m_scheduler_worker_mock = new scheduler_worker_mock(); }
 
-    void TearDown() override {
-        delete m_scheduler_worker_mock;
-    }
+    void TearDown() override { delete m_scheduler_worker_mock; }
 
     scheduler_worker_mock *m_scheduler_worker_mock = nullptr;
 };

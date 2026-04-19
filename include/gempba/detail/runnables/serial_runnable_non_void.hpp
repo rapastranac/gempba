@@ -29,9 +29,10 @@
 #include <future>
 #include <optional>
 
-#include <gempba/node_manager.hpp>
 #include <gempba/core/node.hpp>
 #include <gempba/core/serial_runnable.hpp>
+#include <gempba/node_manager.hpp>
+#include <utility>
 
 namespace gempba {
     template<typename T>
@@ -49,15 +50,14 @@ namespace gempba {
     public:
         serial_runnable_non_void(const int p_id, invokable<R, Args...> auto &&p_f, std::function<std::tuple<Args...>(const task_packet &&)> p_args_deserializer,
                                  std::function<task_packet(R)> p_result_serializer) :
-            m_id(p_id), m_f(p_f), m_args_deserializer(p_args_deserializer), m_result_serializer(p_result_serializer) {
-        }
+            m_id(p_id), m_f(p_f), m_args_deserializer(std::move(std::move(p_args_deserializer))), m_result_serializer(std::move(std::move(p_result_serializer))) {}
 
         ~serial_runnable_non_void() override = default;
 
         [[nodiscard]] int get_id() const override { return m_id; }
 
-        std::optional<std::shared_future<task_packet> > operator()(node_manager &p_node_manager, const task_packet &p_args) override {
-            std::tuple<Args...> v_user_args = m_args_deserializer(std::move(p_args));
+        std::optional<std::shared_future<task_packet>> operator()(node_manager &p_node_manager, const task_packet &p_args) override {
+            std::tuple<Args...> v_user_args = m_args_deserializer(std::move(p_args)); // NOLINT(performance-move-const-arg)
 
             std::future<std::any> v_fut = p_node_manager.force_local_submit([this, v_user_args = std::move(v_user_args)] {
                 auto v_all_args = std::tuple_cat(std::make_tuple(std::this_thread::get_id()), v_user_args, std::make_tuple<node>(node()));
@@ -65,7 +65,7 @@ namespace gempba {
             });
 
             std::future<R> v_future_actual = std::async(std::launch::async, [this, v_future = v_fut.share()] {
-                //spawns another thread, but it will be just waiting until the future is ready
+                // spawns another thread, but it will be just waiting until the future is ready
                 std::any v_any = v_future.get();
                 return std::any_cast<R>(v_any);
             });

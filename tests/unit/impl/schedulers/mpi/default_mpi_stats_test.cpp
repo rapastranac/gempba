@@ -22,11 +22,11 @@
  * SOFTWARE.
  */
 #include <cstring>
-#include <set>
-#include <unordered_map>
 #include <gempba/stats/stats.hpp>
 #include <gtest/gtest.h>
 #include <impl/schedulers/default_mpi_stats.hpp>
+#include <set>
+#include <unordered_map>
 
 TEST(default_mpi_stats_test, construction_and_defaults) {
     const gempba::default_mpi_stats v_stats_impl(5);
@@ -51,9 +51,7 @@ TEST(default_mpi_stats_test, visitor_returns_all_fields_correctly) {
 
     std::unordered_map<std::string, std::any> v_collected;
 
-    v_stats_impl.visit([&](const std::string &p_key, std::any &&p_value) {
-        v_collected[p_key] = std::move(p_value);
-    });
+    v_stats_impl.visit([&](const std::string &p_key, std::any &&p_value) { v_collected[p_key] = std::move(p_value); });
 
     EXPECT_EQ(7, v_collected.size());
     EXPECT_EQ(3, std::any_cast<int>(v_collected["rank"]));
@@ -273,13 +271,9 @@ TEST(stats_interface_test, visitor_comparison_identical_objects) {
     std::unordered_map<std::string, std::any> v_collected1;
     std::unordered_map<std::string, std::any> v_collected2;
 
-    v_stats_ref1.visit([&](const std::string &p_key, std::any &&p_value) {
-        v_collected1[p_key] = std::move(p_value);
-    });
+    v_stats_ref1.visit([&](const std::string &p_key, std::any &&p_value) { v_collected1[p_key] = std::move(p_value); });
 
-    v_stats_ref2.visit([&](const std::string &p_key, std::any &&p_value) {
-        v_collected2[p_key] = std::move(p_value);
-    });
+    v_stats_ref2.visit([&](const std::string &p_key, std::any &&p_value) { v_collected2[p_key] = std::move(p_value); });
 
     EXPECT_EQ(v_collected2.size(), v_collected1.size());
     EXPECT_EQ(7, v_collected1.size());
@@ -299,7 +293,7 @@ TEST(stats_interface_test, visitor_comparison_identical_objects) {
 }
 
 TEST(stats_interface_test, polymorphic_behavior_through_interface) {
-    std::vector<std::unique_ptr<gempba::stats> > v_stats_objects;
+    std::vector<std::unique_ptr<gempba::stats>> v_stats_objects;
 
     auto v_stats1 = std::make_unique<gempba::default_mpi_stats>(1);
     v_stats1->m_received_task_count = 10;

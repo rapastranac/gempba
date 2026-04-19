@@ -23,19 +23,19 @@
  */
 
 #include <functional>
+#include <gtest/gtest.h>
 #include <iomanip>
 #include <sstream>
 #include <string>
 #include <vector>
-#include <gtest/gtest.h>
 
-#include <gempba/gempba.hpp>
 #include <gempba/core/node.hpp>
+#include <gempba/gempba.hpp>
 #include <impl/load_balancing/work_stealing_load_balancer.hpp>
 
 
 TEST(serial_runnable_void_test, test) {
-    std::function<void(std::thread::id, int, double, gempba::node)> v_function = [](std::thread::id, int p_integer, double p_double, gempba::node) {
+    std::function<void(std::thread::id, int, double, gempba::node)> v_function = [](std::thread::id, int p_integer, double p_double, const gempba::node &) {
         ASSERT_EQ(7, p_integer);
         ASSERT_DOUBLE_EQ(1.6825127784311510, p_double);
     };
@@ -63,7 +63,7 @@ TEST(serial_runnable_void_test, test) {
     gempba::load_balancer *v_load_balancer = new gempba::work_stealing_load_balancer(nullptr);
     gempba::node_manager v_node_manager(v_load_balancer, nullptr);
     const auto v_bytes = gempba::task_packet("7,1.6825127784311510");
-    const std::optional<std::shared_future<gempba::task_packet> > v_optional = (*v_runnable)(v_node_manager, v_bytes);
+    const std::optional<std::shared_future<gempba::task_packet>> v_optional = (*v_runnable)(v_node_manager, v_bytes);
 
     ASSERT_FALSE(v_optional.has_value());
 

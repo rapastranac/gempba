@@ -27,12 +27,11 @@
 #include <any>
 #include <cfloat>
 #include <future>
+#include <gempba/utils/gempba_utils.hpp>
+#include <gempba/utils/score.hpp>
+#include <gempba/utils/tree.hpp>
 #include <spdlog/spdlog.h>
 #include <sys/time.h>
-#include <gempba/utils/gempba_utils.hpp>
-#include <gempba/utils/tree.hpp>
-#include <gempba/utils/score.hpp>
-
 
 
 /**
@@ -40,31 +39,31 @@
  */
 namespace utils {
     template<typename... T>
-    void print_ipc_debug_comments(const fmt::format_string<T...> &p_format_string, T &&... p_args) {
-        #if GEMPBA_DEBUG_COMMENTS
+    void print_ipc_debug_comments(const fmt::format_string<T...> &p_format_string, T &&...p_args) {
+#if GEMPBA_DEBUG_COMMENTS
         spdlog::debug(p_format_string, std::forward<T>(p_args)...);
-        #endif
+#endif
     }
 
-    inline void log_and_throw(const std::string &v_message) {
-        spdlog::error(v_message);
-        throw std::runtime_error(v_message);
+    inline void log_and_throw(const std::string &p_v_message) {
+        spdlog::error(p_v_message);
+        throw std::runtime_error(p_v_message);
     }
 
     template<typename... T>
-    void log_and_throw(const fmt::format_string<T...> &p_format_string, T &&... p_args) {
+    void log_and_throw(const fmt::format_string<T...> &p_format_string, T &&...p_args) {
         const std::string v_message = fmt::format(p_format_string, std::forward<T>(p_args)...);
         log_and_throw(v_message);
     }
 
     template<typename T>
     std::future<std::any> convert_to_any_future(std::future<T> &&p_future) {
-        std::future<std::any> any_future = std::async(std::launch::async, [fut = std::move(p_future)]() mutable {
-            fut.wait();
-            T result = fut.get();
-            return std::make_any<T>(result);
+        std::future<std::any> v_any_future = std::async(std::launch::async, [v_fut = std::move(p_future)]() mutable {
+            v_fut.wait();
+            T v_result = v_fut.get();
+            return std::make_any<T>(v_result);
         });
-        return any_future;
+        return v_any_future;
     }
 
     // already adapted for multi-branching
@@ -73,20 +72,20 @@ namespace utils {
     }
 
     static void build_topology(tree &p_tree, int p_parent, const int p_depth_start, const int p_children_per_node, const int p_total) {
-        for (int depth = p_depth_start; depth < log2(p_total); depth++) {
-            for (int child = 1; child < p_children_per_node; child++) {
-                int next_child = get_next_child(child, p_parent, p_children_per_node, depth);
-                if (next_child >= p_total || next_child <= 0) {
+        for (int v_depth = p_depth_start; v_depth < log2(p_total); v_depth++) {
+            for (int v_child = 1; v_child < p_children_per_node; v_child++) {
+                int v_next_child = get_next_child(v_child, p_parent, p_children_per_node, v_depth);
+                if (v_next_child >= p_total || v_next_child <= 0) {
                     continue;
                 }
-                p_tree[p_parent].add_next(next_child);
-                spdlog::debug("process: {}, child: {}\n", p_parent, next_child);
-                build_topology(p_tree, next_child, depth + 1, p_children_per_node, p_total);
+                p_tree[p_parent].add_next(v_next_child);
+                spdlog::debug("process: {}, child: {}\n", p_parent, v_next_child);
+                build_topology(p_tree, v_next_child, v_depth + 1, p_children_per_node, p_total);
             }
         }
     }
 
-    static double diff_time(const double w_time0, const double w_time1) { return w_time1 - w_time0; }
+    static double diff_time(const double p_w_time0, const double p_w_time1) { return p_w_time1 - p_w_time0; }
 
     /**
      * @brief Shifts elements of the vector to the left by one position.
@@ -98,16 +97,16 @@ namespace utils {
      * @param vector_ The vector to be shifted. It should have been initialized with at least
      *            the required number of elements.
      */
-    static void shift_left(std::vector<int> &vector_) {
-        const int size = static_cast<int>(vector_.size());
-        if (size == 0) {
+    static void shift_left(std::vector<int> &p_vector) {
+        const int v_size = static_cast<int>(p_vector.size());
+        if (v_size == 0) {
             utils::log_and_throw("Attempted to shift an empty vector");
         }
-        for (int i = 0; i < size - 1; i++) {
-            if (vector_[i] != -1) {
-                vector_[i] = vector_[i + 1]; // shift one cell to the left
-                if (i == size - 2 && vector_[i] != -1) {
-                    vector_[i + 1] = -1; // set the last cell to -1
+        for (int i = 0; i < v_size - 1; i++) {
+            if (p_vector[i] != -1) {
+                p_vector[i] = p_vector[i + 1]; // shift one cell to the left
+                if (i == v_size - 2 && p_vector[i] != -1) {
+                    p_vector[i + 1] = -1; // set the last cell to -1
                 }
             } else {
                 break; // Stop if the first -1 is encountered
@@ -116,11 +115,11 @@ namespace utils {
     }
 
     static double wall_time() {
-        timeval time{};
-        if (gettimeofday(&time, nullptr)) {
+        timeval v_time{};
+        if (gettimeofday(&v_time, nullptr)) {
             return -1.0;
         }
-        return static_cast<double>(time.tv_sec) + static_cast<double>(time.tv_usec) * .000001;
+        return static_cast<double>(v_time.tv_sec) + static_cast<double>(v_time.tv_usec) * .000001;
     }
 
 

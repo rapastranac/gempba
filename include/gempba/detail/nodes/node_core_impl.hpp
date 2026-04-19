@@ -60,14 +60,14 @@ namespace gempba {
         };
 
 
-        std::shared_ptr<std::shared_ptr<node_core> > m_root;
+        std::shared_ptr<std::shared_ptr<node_core>> m_root;
         std::shared_ptr<node_core> m_parent;
-        std::list<std::shared_ptr<node_core> > m_children;
+        std::list<std::shared_ptr<node_core>> m_children;
 
-        std::variant<std::any, std::future<std::any> > m_result; // Result of the function call (if any)
+        std::variant<std::any, std::future<std::any>> m_result; // Result of the function call (if any)
 
         std::function<Ret(std::thread::id, Args..., node)> m_runnable;
-        std::function<std::optional<std::tuple<Args...> >()> m_initializer;
+        std::function<std::optional<std::tuple<Args...>>()> m_initializer;
 
         std::function<task_packet(Args...)> m_args_serializer;
         std::function<std::tuple<Args...>(task_packet)> m_args_deserializer;
@@ -95,7 +95,9 @@ namespace gempba {
 
 
         template<typename T = Ret>
-        std::any m_invoke(const bool p_delegated) requires(std::is_void_v<T>) {
+        std::any m_invoke(const bool p_delegated)
+            requires(std::is_void_v<T>)
+        {
             auto v_parent_node = p_delegated ? node() : node(shared_from_this());
             std::thread::id v_thread_id = std::this_thread::get_id();
             auto v_args = std::tuple_cat(std::make_tuple(v_thread_id), m_arguments, std::make_tuple(v_parent_node));
@@ -104,7 +106,9 @@ namespace gempba {
         }
 
         template<typename T = Ret>
-        std::any m_invoke(const bool p_delegated) requires(!std::is_void_v<T>) {
+        std::any m_invoke(const bool p_delegated)
+            requires(!std::is_void_v<T>)
+        {
             auto v_parent_node = p_delegated ? node() : node(shared_from_this());
             std::thread::id v_thread_id = std::this_thread::get_id();
             auto v_args = std::tuple_cat(std::make_tuple(v_thread_id), m_arguments, std::make_tuple(v_parent_node));
@@ -119,36 +123,32 @@ namespace gempba {
             m_runnable = std::forward<decltype(p_runnable)>(p_runnable);
 
             m_initialization_flag = INITIALIZED;
-            m_args_serializer = p_args_serializer;
-            m_args_deserializer = p_args_deserializer;
+            m_args_serializer = std::move(p_args_serializer);
+            m_args_deserializer = std::move(p_args_deserializer);
             m_arguments = std::move(p_args);
-            m_initializer = [&] {
-                return m_arguments;
-            };
+            m_initializer = [&] { return m_arguments; };
         }
 
         // Lazily initialized with serializer/deserializer
-        explicit node_core_impl(load_balancer &p_load_balancer, invokable<Ret, Args...> auto &&p_runnable, std::function<std::optional<std::tuple<Args...> >()> p_initializer,
+        explicit node_core_impl(load_balancer &p_load_balancer, invokable<Ret, Args...> auto &&p_runnable, std::function<std::optional<std::tuple<Args...>>()> p_initializer,
                                 std::function<task_packet(Args...)> p_args_serializer, std::function<std::tuple<Args...>(task_packet)> p_args_deserializer) :
-            node_core_impl(p_load_balancer, p_runnable, p_args_serializer, p_args_deserializer) {
+            node_core_impl(p_load_balancer, p_runnable, std::move(p_args_serializer), std::move(p_args_deserializer)) {
 
-            m_initializer = p_initializer;
+            m_initializer = std::move(p_initializer);
             m_initialization_flag = LAZY;
         }
 
         // Placeholder node that can be built from deserialization
         explicit node_core_impl(load_balancer &p_load_balancer, invokable<Ret, Args...> auto &&p_runnable, std::function<task_packet(Args...)> p_args_serializer,
-                                std::function<std::tuple<Args...>(task_packet)> p_args_deserializer) :
-            node_core_impl(p_load_balancer, false) {
+                                std::function<std::tuple<Args...>(task_packet)> p_args_deserializer) : node_core_impl(p_load_balancer, false) {
 
             m_runnable = std::forward<decltype(p_runnable)>(p_runnable);
-            m_args_serializer = p_args_serializer;
-            m_args_deserializer = p_args_deserializer;
+            m_args_serializer = std::move(p_args_serializer);
+            m_args_deserializer = std::move(p_args_deserializer);
         }
 
         // Dummy node
-        explicit node_core_impl(load_balancer &p_load_balancer, bool p_is_dummy) :
-            m_load_balancer(p_load_balancer) {
+        explicit node_core_impl(load_balancer &p_load_balancer, bool p_is_dummy) : m_load_balancer(p_load_balancer) {
             this->m_thread_id = std::this_thread::get_id();
             this->m_node_id = m_load_balancer.generate_unique_id();
             this->m_is_dummy = p_is_dummy;
@@ -163,32 +163,31 @@ namespace gempba {
             return create_serializable_explicit(p_load_balancer, p_parent, p_runnable, std::move(p_args), v_args_serializer, v_args_deserializer);
         }
 
-        static std::shared_ptr<node_core> create_serializable_explicit(load_balancer &p_load_balancer, std::shared_ptr<node_core> &p_parent,
-                                                                       invokable<Ret, Args...> auto &&p_runnable, std::tuple<Args...> &&p_args,
-                                                                       std::function<task_packet(Args...)> p_args_serializer,
+        static std::shared_ptr<node_core> create_serializable_explicit(load_balancer &p_load_balancer, std::shared_ptr<node_core> &p_parent, invokable<Ret, Args...> auto &&p_runnable,
+                                                                       std::tuple<Args...> &&p_args, std::function<task_packet(Args...)> p_args_serializer,
                                                                        std::function<std::tuple<Args...>(task_packet)> p_args_deserializer) {
 
-            auto ptr = new node_core_impl(p_load_balancer, p_runnable, std::move(p_args), p_args_serializer, p_args_deserializer);
-            std::shared_ptr<node_core_impl> v_instance = std::shared_ptr<node_core_impl>(ptr);
+            auto v_ptr = new node_core_impl(p_load_balancer, p_runnable, std::move(p_args), std::move(p_args_serializer), std::move(p_args_deserializer));
+            std::shared_ptr<node_core_impl> v_instance = std::shared_ptr<node_core_impl>(v_ptr);
             v_instance->init(p_parent);
             return v_instance;
         }
 
         static std::shared_ptr<node_core> create_lazy(load_balancer &p_load_balancer, std::shared_ptr<node_core> &p_parent, invokable<Ret, Args...> auto &&p_runnable,
-                                                      std::function<std::optional<std::tuple<Args...> >()> p_args_initializer) {
+                                                      std::function<std::optional<std::tuple<Args...>>()> p_args_initializer) {
 
             auto v_args_serializer = static_cast<std::function<task_packet(Args...)>>(nullptr);
             auto v_args_deserializer = static_cast<std::function<std::tuple<Args...>(task_packet)>>(nullptr);
-            return create_serializable_lazy(p_load_balancer, p_parent, p_runnable, p_args_initializer, v_args_serializer, v_args_deserializer);
+            return create_serializable_lazy(p_load_balancer, p_parent, p_runnable, std::move(p_args_initializer), v_args_serializer, v_args_deserializer);
         }
 
         static std::shared_ptr<node_core> create_serializable_lazy(load_balancer &p_load_balancer, std::shared_ptr<node_core> &p_parent, invokable<Ret, Args...> auto &&p_runnable,
-                                                                   std::function<std::optional<std::tuple<Args...> >()> p_args_initializer,
+                                                                   std::function<std::optional<std::tuple<Args...>>()> p_args_initializer,
                                                                    std::function<task_packet(Args...)> p_args_serializer,
                                                                    std::function<std::tuple<Args...>(task_packet)> p_args_deserializer) {
 
-            auto ptr = new node_core_impl(p_load_balancer, p_runnable, p_args_initializer, p_args_serializer, p_args_deserializer);
-            std::shared_ptr<node_core_impl> v_instance = std::shared_ptr<node_core_impl>(ptr);
+            auto v_ptr = new node_core_impl(p_load_balancer, p_runnable, std::move(p_args_initializer), std::move(p_args_serializer), std::move(p_args_deserializer));
+            std::shared_ptr<node_core_impl> v_instance = std::shared_ptr<node_core_impl>(v_ptr);
             v_instance->init(p_parent);
 
             return v_instance;
@@ -196,30 +195,28 @@ namespace gempba {
 
 
         static std::shared_ptr<node_core> create_serializable(load_balancer &p_load_balancer, std::shared_ptr<node_core> &p_parent, invokable<Ret, Args...> auto &&p_runnable,
-                                                              std::function<task_packet(Args...)> p_args_serializer,
-                                                              std::function<std::tuple<Args...>(task_packet)> p_args_deserializer) {
-            auto ptr = new node_core_impl(p_load_balancer, p_runnable, p_args_serializer, p_args_deserializer);
-            std::shared_ptr<node_core_impl> v_instance = std::shared_ptr<node_core_impl>(ptr);
+                                                              std::function<task_packet(Args...)> p_args_serializer, std::function<std::tuple<Args...>(task_packet)> p_args_deserializer) {
+            auto v_ptr = new node_core_impl(p_load_balancer, p_runnable, std::move(p_args_serializer), std::move(p_args_deserializer));
+            std::shared_ptr<node_core_impl> v_instance = std::shared_ptr<node_core_impl>(v_ptr);
             v_instance->init(p_parent);
 
             return v_instance;
         }
 
-        static std::shared_ptr<node_core> create_seed(load_balancer &p_load_balancer, invokable<Ret, Args...> auto &&p_runnable,
-                                                      std::function<std::tuple<Args...>()> p_args_initializer) {
+        static std::shared_ptr<node_core> create_seed(load_balancer &p_load_balancer, invokable<Ret, Args...> auto &&p_runnable, std::function<std::tuple<Args...>()> p_args_initializer) {
 
             auto v_args_serializer = static_cast<std::function<task_packet(Args...)>>(nullptr);
             auto v_args_deserializer = static_cast<std::function<std::tuple<Args...>(task_packet)>>(nullptr);
 
-            auto ptr = new node_core_impl(p_load_balancer, p_runnable, p_args_initializer, v_args_serializer, v_args_deserializer);
-            std::shared_ptr<node_core_impl> v_instance = std::shared_ptr<node_core_impl>(ptr);
+            auto v_ptr = new node_core_impl(p_load_balancer, p_runnable, p_args_initializer, v_args_serializer, v_args_deserializer);
+            std::shared_ptr<node_core_impl> v_instance = std::shared_ptr<node_core_impl>(v_ptr);
             v_instance->init(nullptr);
             return v_instance;
         }
 
         static std::shared_ptr<node_core> create_dummy(load_balancer &p_load_balancer) {
-            auto ptr = new node_core_impl(p_load_balancer, true);
-            std::shared_ptr<node_core_impl> v_instance = std::shared_ptr<node_core_impl>(ptr);
+            auto v_ptr = new node_core_impl(p_load_balancer, true);
+            std::shared_ptr<node_core_impl> v_instance = std::shared_ptr<node_core_impl>(v_ptr);
             v_instance->init(nullptr);
             return v_instance;
         }
@@ -444,9 +441,7 @@ namespace gempba {
             return true;
         }
 
-        [[nodiscard]] std::shared_ptr<node_core> get_root() override {
-            return m_root ? *m_root : nullptr;
-        }
+        [[nodiscard]] std::shared_ptr<node_core> get_root() override { return m_root ? *m_root : nullptr; }
 
         void set_parent(const std::shared_ptr<node_core> &p_parent) override {
             if (m_is_dummy && p_parent != nullptr) {
@@ -507,7 +502,7 @@ namespace gempba {
             if (m_is_dummy || !m_parent) {
                 return nullptr;
             }
-            std::list<std::shared_ptr<node_core> > v_parent_children = m_parent->get_children();
+            std::list<std::shared_ptr<node_core>> v_parent_children = m_parent->get_children();
             auto v_first = v_parent_children.begin();
             if (this == v_first->get()) {
                 return nullptr;
@@ -520,7 +515,7 @@ namespace gempba {
             if (m_is_dummy || m_parent == nullptr) {
                 return nullptr;
             }
-            std::list<std::shared_ptr<node_core> > v_parent_children = m_parent->get_children();
+            std::list<std::shared_ptr<node_core>> v_parent_children = m_parent->get_children();
             auto v_first = v_parent_children.begin();
             auto v_last = v_parent_children.end();
             auto v_it = std::find(v_first, v_last, shared_from_this());
@@ -531,7 +526,7 @@ namespace gempba {
             return v_temp;
         }
 
-        std::list<std::shared_ptr<node_core> > get_children() override { return m_children; }
+        std::list<std::shared_ptr<node_core>> get_children() override { return m_children; }
 
         [[nodiscard]] int get_children_count() const override { return m_children.size(); }
 
@@ -556,8 +551,8 @@ namespace gempba {
                 this->m_state = RETRIEVED;
                 return std::get<std::any>(m_result);
             }
-            if (std::holds_alternative<std::future<std::any> >(m_result)) {
-                auto &v_future = std::get<std::future<std::any> >(m_result);
+            if (std::holds_alternative<std::future<std::any>>(m_result)) {
+                auto &v_future = std::get<std::future<std::any>>(m_result);
                 v_future.wait();
                 std::any v_any_result = v_future.get();
                 this->m_state = RETRIEVED;
