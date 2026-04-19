@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <atomic>
 #include <mutex>
 #include <thread>
 #include <chrono>
@@ -62,20 +63,22 @@ TEST_F(transmission_guard_test, supports_move_assignment) {
 }
 
 TEST_F(transmission_guard_test, prevents_concurrent_access) {
-    bool thread_executed = false;
+    std::atomic<bool> worker_has_lock{false};
+    std::atomic<bool> thread_executed{false};
     bool main_thread_finished = false;
 
     std::thread worker([&]() {
         std::unique_lock<std::mutex> lock(test_mutex);
         gempba::transmission_guard guard(std::move(lock));
+        worker_has_lock.store(true, std::memory_order_release);
 
-        // Wait for main thread to try accessing
         std::this_thread::sleep_for(50ms);
-        thread_executed = true;
+        thread_executed.store(true, std::memory_order_release);
     });
 
-    // Give worker thread time to acquire lock
-    std::this_thread::sleep_for(10ms);
+    while (!worker_has_lock.load(std::memory_order_acquire)) {
+        std::this_thread::yield();
+    }
 
     // This should block until worker releases the lock
     const auto start = std::chrono::steady_clock::now();
