@@ -23,14 +23,14 @@
  */
 #include <memory>
 #include <gtest/gtest.h>
-#include <gempba/utils/Queue.hpp>
+#include <gempba/utils/queue.hpp>
 
 struct my_struct {
     int m_value;
 };
 
 TEST(queue_test, push_and_pop) {
-    Queue<my_struct *> q;
+    gempba::queue<my_struct *> q;
 
     auto *a = new my_struct{1};
     auto *b = new my_struct{2};
@@ -57,7 +57,7 @@ TEST(queue_test, push_and_pop) {
 }
 
 TEST(queue_test, push_and_pop_with_shared_pointer) {
-    Queue<std::shared_ptr<my_struct> > q;
+    gempba::queue<std::shared_ptr<my_struct> > q;
 
     const auto a = std::make_shared<my_struct>(1);
     const auto b = std::make_shared<my_struct>(2);
@@ -85,7 +85,7 @@ TEST(queue_test, push_and_pop_with_shared_pointer) {
 
 
 TEST(queue_test, empty) {
-    Queue<my_struct *> q;
+    gempba::queue<my_struct *> q;
 
     auto *a = new my_struct{1};
     auto *b = new my_struct{2};
