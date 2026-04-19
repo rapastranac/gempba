@@ -1,0 +1,56 @@
+name: Lint
+
+on:
+  push:
+    branches: [ "main", "${NUMBER}-*" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main", "${NUMBER}-*" ]
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+jobs:
+  lint:
+    runs-on: [ self-hosted, ubuntu-24.04 ]
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.ref }}
+
+      - name: Setup Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake gcc make
+          sudo apt-get install -y libboost-all-dev
+          sudo apt-get install -y libopenmpi-dev
+          sudo apt-get install -y libspdlog-dev libfmt-dev
+          sudo apt-get install -y libgtest-dev libgmock-dev
+          sudo apt-get install -y lsb-release wget gnupg software-properties-common
+
+      - name: Install LLVM
+        run: |
+          wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s -- 21
+          sudo apt-get install -y clang-format-21 clang-tidy-18 clang-18
+          echo "CLANG_FORMAT=clang-format-21" >> $GITHUB_ENV
+          echo "CLANG_TIDY=clang-tidy-18"    >> $GITHUB_ENV
+          echo "RUN_CLANG_TIDY=run-clang-tidy-18" >> $GITHUB_ENV
+
+      - name: Echo Tool Versions
+        run: |
+          echo "clang-tidy:   $(${CLANG_TIDY} --version | head -2 | tail -1 | xargs)"
+          echo "clang-format: $(${CLANG_FORMAT} --version)"
+          echo "cmake:        $(cmake --version | head -1 | awk '{print $3}')"
+          echo "g++:          $(g++ --version | head -1 | awk '{print $4}')"
+
+      - name: Run clang-format check
+        run: bash scripts/lint.sh --format-only
+
+      - name: Run clang-tidy check
+        run: bash scripts/lint.sh --tidy-only
