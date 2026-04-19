@@ -22,6 +22,9 @@
  * SOFTWARE.
  */
 #include <cmath>
+#include <iomanip>
+#include <limits>
+#include <sstream>
 #include <gtest/gtest.h>
 
 #include <gempba/utils/score.hpp>
@@ -207,7 +210,9 @@ TEST(score_test, to_string) {
     // Long double / F128 test
     constexpr long double v_pi_ld = 3.14159265358979323851L;
     const auto v_score_f128 = score::make(v_pi_ld);
-    const std::string v_expected_f128 = "3.14159265358979323851";
+    std::ostringstream v_oss_f128;
+    v_oss_f128 << std::setprecision(std::numeric_limits<long double>::max_digits10) << v_pi_ld;
+    const std::string v_expected_f128 = v_oss_f128.str();
     const std::string v_actual_f128 = v_score_f128.to_string();
     EXPECT_EQ(v_expected_f128, v_actual_f128);
 }
