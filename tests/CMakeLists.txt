@@ -3,7 +3,9 @@ cmake_minimum_required(VERSION 3.28)
 project(gempba_tests LANGUAGES CXX)
 
 # We need GTest and Boost
-cmake_policy(SET CMP0167 NEW)
+if(POLICY CMP0167)
+    cmake_policy(SET CMP0167 NEW)
+endif()
 find_package(Boost COMPONENTS serialization fiber REQUIRED)
 find_package(GTest REQUIRED)
 
