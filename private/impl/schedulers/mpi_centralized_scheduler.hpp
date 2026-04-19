@@ -680,7 +680,7 @@ namespace gempba {
 
 
             if (m_center_bundle_queue.size() > 2 * CENTER_NBSTORED_TASKS_PER_PROCESS * m_world_size) {
-                if (utils::diff_time(m_time_centerfull_sent, MPI_Wtime() > 1)) {
+                if (utils::diff_time(m_time_centerfull_sent, MPI_Wtime()) > 1) {
                     spdlog::debug("Center queue size is twice the limit.  Contacting workers to let them know.\n");
                     m_center_last_full_status = false; //handleFullMessaging will see this and recontact workers
                 }
