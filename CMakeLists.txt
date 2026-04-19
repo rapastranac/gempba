@@ -99,8 +99,8 @@ message(STATUS "🔧 GEMPBA_BUILD_TESTS=${GEMPBA_BUILD_TESTS}")
 
 # 🏷️ Conditional compilation flags for Debug/Release
 target_compile_options(gempba PRIVATE
-        -Wall -Wextra -Wpedantic -pthread -fexceptions
-        $<$<CONFIG:Debug>:-g -O0 -ggdb3 -DGEMPBA_DEBUG_COMMENTS>
+        -pthread -fexceptions
+        $<$<CONFIG:Debug>:-Wall -Wextra -Wpedantic -g -O0 -ggdb3 -DGEMPBA_DEBUG_COMMENTS>
         $<$<CONFIG:Release>:-O3 -DNDEBUG>
 )
 
