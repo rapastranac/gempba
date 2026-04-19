@@ -10,7 +10,7 @@ add_subdirectory(external)
 # Static linking of Boost
 set(Boost_USE_STATIC_LIBS ON)
 
-find_package(Boost COMPONENTS system serialization fiber REQUIRED)
+find_package(Boost COMPONENTS serialization fiber REQUIRED)
 
 # Include Boost y argparse
 include_directories(${Boost_INCLUDE_DIRS})
@@ -28,7 +28,6 @@ foreach (EXAMPLE ${EXAMPLES})
             PRIVATE
             gempba
             example_libs
-            Boost::system
             Boost::serialization
             Boost::fiber
     )
@@ -49,7 +48,7 @@ foreach (EXAMPLE ${EXAMPLES})
 
     # Compilation options by mode
     target_compile_options(${EXAMPLE_NAME} PRIVATE
-            -Wall -Wextra -Wpedantic -pthread -fexceptions -fconcepts
+            -Wall -Wextra -Wpedantic -pthread -fexceptions
             $<$<CONFIG:Debug>:-g -O0 -ggdb3 -DGEMPBA_DEBUG_COMMENTS>
             $<$<CONFIG:Release>:-O3 -DNDEBUG>
     )
