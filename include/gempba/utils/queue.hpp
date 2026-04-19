@@ -30,33 +30,35 @@
     to this queue to be retrieved later in the order it is spawned.
  */
 
-template<class T>
-class Queue {
-public:
-    bool push(T const &p_value) {
-        std::unique_lock<std::mutex> lock(this->m_mtx);
-        this->m_q.push(p_value);
-        return true;
-    }
+namespace gempba {
+    template<class T>
+    class queue {
+    public:
+        bool push(T const &p_value) {
+            std::unique_lock<std::mutex> lock(this->m_mtx);
+            this->m_q.push(p_value);
+            return true;
+        }
 
-    // deletes the retrieved element, do not use for non-integral types
-    bool pop(T &p_v) {
-        std::unique_lock<std::mutex> lock(this->m_mtx);
-        if (this->m_q.empty())
-            return false;
-        p_v = this->m_q.front();
-        this->m_q.pop();
-        return true;
-    }
+        // deletes the retrieved element, do not use for non-integral types
+        bool pop(T &p_v) {
+            std::unique_lock<std::mutex> lock(this->m_mtx);
+            if (this->m_q.empty())
+                return false;
+            p_v = this->m_q.front();
+            this->m_q.pop();
+            return true;
+        }
 
-    bool empty() {
-        std::unique_lock<std::mutex> lock(this->m_mtx);
-        return this->m_q.empty();
-    }
+        bool empty() {
+            std::unique_lock<std::mutex> lock(this->m_mtx);
+            return this->m_q.empty();
+        }
 
-private:
-    std::queue<T> m_q;
-    std::mutex m_mtx;
-};
+    private:
+        std::queue<T> m_q;
+        std::mutex m_mtx;
+    };
+}
 
 #endif

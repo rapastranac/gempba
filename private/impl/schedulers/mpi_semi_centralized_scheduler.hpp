@@ -16,7 +16,7 @@
 #include <spdlog/spdlog.h>
 
 #include <gempba/core/scheduler.hpp>
-#include <gempba/utils/Queue.hpp>
+#include <gempba/utils/queue.hpp>
 #include <gempba/utils/gempba_utils.hpp>
 #include <gempba/utils/result.hpp>
 #include <gempba/utils/task_bundle.hpp>
@@ -796,8 +796,8 @@ namespace gempba {
         std::atomic<bool> m_transmitting{false};
         int m_destination_rank = -1;
 
-        Queue<task_packet *> m_tasks_queue;
-        Queue<std::shared_ptr<task_bundle> > m_tasks_bundle_queue;
+        queue<task_packet *> m_tasks_queue;
+        queue<std::shared_ptr<task_bundle> > m_tasks_bundle_queue;
 
         MPI_Comm m_global_score_communicator; // BIDIRECTIONAL
         MPI_Comm m_next_process_communicator; // CENTER TO WORKER (ONLY)
