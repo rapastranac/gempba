@@ -30,7 +30,12 @@
 #include <memory>
 #include <functional>
 #include <iostream>
-#include <stacktrace>
+#if __has_include(<stacktrace>)
+#  include <stacktrace>
+#  define GEMPBA_HAS_STACKTRACE 1
+#else
+#  define GEMPBA_HAS_STACKTRACE 0
+#endif
 
 #include <gempba/core/node_core.hpp>
 #include <gempba/core/node_traits.hpp>
@@ -57,9 +62,13 @@ namespace gempba {
         static void throw_if_null(const std::shared_ptr<node_core> &p_node) {
             if (!p_node) {
                 std::stringstream v_ss;
+                #if GEMPBA_HAS_STACKTRACE
                 v_ss << std::stacktrace::current() << std::endl;
+                #else
+                v_ss << "[stacktrace unavailable: std::stacktrace not implemented by this standard library]" << std::endl;
+                #endif
                 std::cerr << v_ss.str();
-                std::cerr.flush();  // Extra flush for paranoia
+                std::cerr.flush(); // Extra flush for paranoia
 
                 utils::log_and_throw("Attempted to access a null node");
             }
