@@ -11,32 +11,32 @@
  */
 
 #if defined(_WIN32)
-#define NOMINMAX
-#define WIN32_LEAN_AND_MEAN
-#define RPC_NO_WINDOWS_H
-#include <windows.h>
-#include <psapi.h>
+    #define NOMINMAX
+    #define WIN32_LEAN_AND_MEAN
+    #define RPC_NO_WINDOWS_H
+    #include <psapi.h>
+    #include <windows.h>
 
 #elif defined(__unix__) || defined(__unix) || defined(unix) || (defined(__APPLE__) && defined(__MACH__))
 
-#include <unistd.h>
-#include <sys/resource.h>
+    #include <sys/resource.h>
+    #include <unistd.h>
 
-#if defined(__APPLE__) && defined(__MACH__)
-#include <mach/mach.h>
+    #if defined(__APPLE__) && defined(__MACH__)
+        #include <mach/mach.h>
 
-#elif (defined(_AIX) || defined(__TOS__AIX__)) || (defined(__sun__) || defined(__sun) || defined(sun) && (defined(__SVR4) || defined(__svr4__)))
-#include <fcntl.h>
-#include <procfs.h>
+    #elif (defined(_AIX) || defined(__TOS__AIX__)) || (defined(__sun__) || defined(__sun) || defined(sun) && (defined(__SVR4) || defined(__svr4__)))
+        #include <fcntl.h>
+        #include <procfs.h>
 
-#elif defined(__linux__) || defined(__linux) || defined(linux) || defined(__gnu_linux__)
+    #elif defined(__linux__) || defined(__linux) || defined(linux) || defined(__gnu_linux__)
 
-#include <cstdio>
+        #include <cstdio>
 
-#endif
+    #endif
 
 #else
-#error "Cannot define getPeakRSS( ) or getCurrentRSS( ) for an unknown OS."
+    #error "Cannot define getPeakRSS( ) or getCurrentRSS( ) for an unknown OS."
 #endif
 
 #include <utility>
@@ -45,36 +45,36 @@
 /**
   Return number of bits that are set to 1
 **/
-inline int getNbSetBits(const char c) {
-    //all credits to https://stackoverflow.com/questions/697978/c-code-to-count-the-number-of-1-bits-in-an-unsigned-char
-    return (c * 01001001001ULL & 042104210421ULL) % 017;
+inline int get_nb_set_bits(const char p_c) {
+    // all credits to https://stackoverflow.com/questions/697978/c-code-to-count-the-number-of-1-bits-in-an-unsigned-char
+    return static_cast<int>((p_c * 01001001001ULL & 042104210421ULL) % 017);
 }
 
-inline int getNbSetBits(const gempba::task_packet &task) {
-    int nb = 0;
-    for (const std::byte &v_byte: task) {
-        nb += getNbSetBits(static_cast<char>(v_byte));
+inline int get_nb_set_bits(const gempba::task_packet &p_task) {
+    int v_nb = 0;
+    for (const std::byte &v_byte: p_task) {
+        v_nb += get_nb_set_bits(static_cast<char>(v_byte));
     }
-    return nb;
+    return v_nb;
 }
 
-class TaskComparator {
+class task_comparator {
 public:
-    bool operator()(const gempba::task_packet &t1, const gempba::task_packet &t2) const {
+    bool operator()(const gempba::task_packet &p_t1, const gempba::task_packet &p_t2) const {
 
-        const int n1 = getNbSetBits(t1);
-        const int n2 = getNbSetBits(t2);
+        const int v_n1 = get_nb_set_bits(p_t1);
+        const int v_n2 = get_nb_set_bits(p_t2);
 
-        return (n1 <= n2);
+        return (v_n1 <= v_n2);
     }
 };
 
 inline int get_nb_set_bits(const gempba::task_bundle &p_bundle) {
     const gempba::task_packet &v_packet = p_bundle.get_task_packet();
-    const int v_nb_set_bits = getNbSetBits(v_packet);
+    const int v_nb_set_bits = get_nb_set_bits(v_packet);
 
     const int v_runnable_id = p_bundle.get_runnable_id();
-    const int v_nb = v_nb_set_bits + getNbSetBits(static_cast<char>(v_runnable_id));
+    const int v_nb = v_nb_set_bits + get_nb_set_bits(static_cast<char>(v_runnable_id));
 
     return v_nb;
 }
@@ -95,14 +95,14 @@ public:
  * memory use) measured in bytes, or zero if the value cannot be
  * determined on this OS.
  */
-inline size_t getPeakRSS() {
-    #if defined(_WIN32)
+inline size_t get_peak_rss() {
+#if defined(_WIN32)
     /* Windows -------------------------------------------------- */
-    PROCESS_MEMORY_COUNTERS info;
-    GetProcessMemoryInfo(GetCurrentProcess(), &info, sizeof(info));
-    return (size_t) info.PeakWorkingSetSize;
+    PROCESS_MEMORY_COUNTERS v_info;
+    GetProcessMemoryInfo(GetCurrentProcess(), &v_info, sizeof(v_info));
+    return (size_t) v_info.PeakWorkingSetSize;
 
-    #elif (defined(_AIX) || defined(__TOS__AIX__)) || (defined(__sun__) || defined(__sun) || defined(sun) && (defined(__SVR4) || defined(__svr4__)))
+#elif (defined(_AIX) || defined(__TOS__AIX__)) || (defined(__sun__) || defined(__sun) || defined(sun) && (defined(__SVR4) || defined(__svr4__)))
     /* AIX and Solaris ------------------------------------------ */
     struct psinfo psinfo;
     int fd = -1;
@@ -115,59 +115,58 @@ inline size_t getPeakRSS() {
     close(fd);
     return (size_t) (psinfo.pr_rssize * 1024L);
 
-    #elif defined(__unix__) || defined(__unix) || defined(unix) || (defined(__APPLE__) && defined(__MACH__))
+#elif defined(__unix__) || defined(__unix) || defined(unix) || (defined(__APPLE__) && defined(__MACH__))
     /* BSD, Linux, and OSX -------------------------------------- */
-    struct rusage rusage;
-    getrusage(RUSAGE_SELF, &rusage);
+    struct rusage v_rusage{};
+    getrusage(RUSAGE_SELF, &v_rusage);
     #if defined(__APPLE__) && defined(__MACH__)
-    return (size_t) rusage.ru_maxrss;
+    return (size_t) v_rusage.ru_maxrss;
     #else
-    return (size_t) (rusage.ru_maxrss * 1024L);
+    return (size_t) (v_rusage.ru_maxrss * 1024L);
     #endif
 
-    #else
+#else
     /* Unknown OS ----------------------------------------------- */
     return (size_t) 0L; /* Unsupported. */
-    #endif
+#endif
 }
 
 /**
  * Returns the current resident set size (physical memory use) measured
  * in bytes, or zero if the value cannot be determined on this OS.
  */
-inline size_t getCurrentRSS() {
-    #if defined(_WIN32)
+inline size_t get_current_rss() {
+#if defined(_WIN32)
     /* Windows -------------------------------------------------- */
-    PROCESS_MEMORY_COUNTERS info;
-    GetProcessMemoryInfo(GetCurrentProcess(), &info, sizeof(info));
-    return (size_t) info.WorkingSetSize;
+    PROCESS_MEMORY_COUNTERS v_info;
+    GetProcessMemoryInfo(GetCurrentProcess(), &v_info, sizeof(v_info));
+    return (size_t) v_info.WorkingSetSize;
 
-    #elif defined(__APPLE__) && defined(__MACH__)
+#elif defined(__APPLE__) && defined(__MACH__)
     /* OSX ------------------------------------------------------ */
     struct mach_task_basic_info info;
     mach_msg_type_number_t infoCount = MACH_TASK_BASIC_INFO_COUNT;
-    if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO,
-                  (task_info_t) & info, &infoCount) != KERN_SUCCESS)
+    if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO, (task_info_t) &info, &infoCount) != KERN_SUCCESS)
         return (size_t) 0L; /* Can't access? */
     return (size_t) info.resident_size;
 
-    #elif defined(__linux__) || defined(__linux) || defined(linux) || defined(__gnu_linux__)
+#elif defined(__linux__) || defined(__linux) || defined(linux) || defined(__gnu_linux__)
     /* Linux ---------------------------------------------------- */
-    long rss = 0L;
-    FILE *fp = NULL;
-    if ((fp = fopen("/proc/self/statm", "r")) == NULL)
+    long v_rss = 0L;
+    FILE *v_fp = nullptr;
+    if ((v_fp = fopen("/proc/self/statm", "r")) == nullptr)
         return (size_t) 0L; /* Can't open? */
-    if (fscanf(fp, "%*s%ld", &rss) != 1) {
-        fclose(fp);
+    if (fscanf(v_fp, "%*s%ld", &v_rss) != 1) { // NOLINT(cert-err34-c)
+        fclose(v_fp);
         return (size_t) 0L; /* Can't read? */
     }
-    fclose(fp);
-    return (size_t) rss * (size_t) sysconf(_SC_PAGESIZE);
+    fclose(v_fp);
+    return (size_t) v_rss * (size_t) sysconf(_SC_PAGESIZE);
 
-    #else
+#else
     /* AIX, BSD, Solaris, and Unknown OS ------------------------ */
     return (size_t) 0L; /* Unsupported. */
-    #endif
+#endif
 }
 
-#endif //GEMPBA_CENTRALIZED_UTILS_HPP
+#endif // GEMPBA_CENTRALIZED_UTILS_HPP

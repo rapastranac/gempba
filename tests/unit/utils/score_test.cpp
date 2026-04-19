@@ -22,10 +22,10 @@
  * SOFTWARE.
  */
 #include <cmath>
+#include <gtest/gtest.h>
 #include <iomanip>
 #include <limits>
 #include <sstream>
-#include <gtest/gtest.h>
 
 #include <gempba/utils/score.hpp>
 
@@ -201,8 +201,8 @@ TEST(score_test, to_string) {
     const std::string v_actual_f32 = v_score_f32.to_string();
     EXPECT_EQ(v_expected_f32, v_actual_f32);
 
-    constexpr double pi_d = 3.1415926535897931;
-    const auto v_score_f64 = score::make(pi_d);
+    constexpr double v_pi_d = 3.1415926535897931;
+    const auto v_score_f64 = score::make(v_pi_d);
     const std::string v_expected_f64 = "3.1415926535897931";
     const std::string v_actual_f64 = v_score_f64.to_string();
     EXPECT_EQ(v_expected_f64, v_actual_f64);

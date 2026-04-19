@@ -41,23 +41,16 @@ namespace gempba {
 
     public:
         // Construct from std::vector<byte> (copy)
-        explicit task_packet(const std::vector<std::byte> &p_data) :
-            task_packet(std::vector(p_data)) {
-        }
+        explicit task_packet(const std::vector<std::byte> &p_data) : task_packet(std::vector(p_data)) {}
 
         // Construct from std::vector<byte> (move)
-        explicit task_packet(std::vector<std::byte> &&p_data) noexcept :
-            m_data(std::move(p_data)) {
-        }
+        explicit task_packet(std::vector<std::byte> &&p_data) noexcept : m_data(std::move(p_data)) {}
 
         // Construct from size only (uninitialized)
-        explicit task_packet(const std::size_t p_size) :
-            m_data(p_size) {
-        }
+        explicit task_packet(const std::size_t p_size) : m_data(p_size) {}
 
         // Construct from const char* + size (copy)
-        task_packet(const char *p_buffer, const std::size_t p_size) :
-            task_packet(p_size) {
+        task_packet(const char *p_buffer, const std::size_t p_size) : task_packet(p_size) {
             if (p_size > 0 && !p_buffer) {
                 throw std::invalid_argument("task_packet: null buffer with non-zero size");
             }
@@ -65,9 +58,7 @@ namespace gempba {
         }
 
         // Construct from std::string (copy)
-        explicit task_packet(const std::string &p_str) :
-            task_packet(p_str.data(), p_str.size()) {
-        }
+        explicit task_packet(const std::string &p_str) : task_packet(p_str.data(), p_str.size()) {}
 
         // Access the raw buffer
         std::byte *data() noexcept { return m_data.data(); }
@@ -75,9 +66,7 @@ namespace gempba {
 
         [[nodiscard]] std::size_t size() const noexcept { return m_data.size(); }
 
-        [[nodiscard]] bool empty() const noexcept {
-            return m_data.empty();
-        }
+        [[nodiscard]] bool empty() const noexcept { return m_data.empty(); }
 
         // Allow default copy constructor
         task_packet(const task_packet &) = default;
@@ -89,21 +78,13 @@ namespace gempba {
 
         task_packet &operator=(task_packet &&) noexcept = default;
 
-        [[nodiscard]] auto begin() const noexcept {
-            return std::cbegin(m_data);
-        }
+        [[nodiscard]] auto begin() const noexcept { return std::cbegin(m_data); }
 
-        [[nodiscard]] auto end() const noexcept {
-            return std::cend(m_data);
-        }
+        [[nodiscard]] auto end() const noexcept { return std::cend(m_data); }
 
-        bool operator==(const task_packet &p_other) const {
-            return m_data == p_other.m_data;
-        }
+        bool operator==(const task_packet &p_other) const { return m_data == p_other.m_data; }
 
-        bool operator!=(const task_packet &p_other) const {
-            return !(*this == p_other);
-        }
+        bool operator!=(const task_packet &p_other) const { return !(*this == p_other); }
 
         std::strong_ordering operator<=>(const task_packet &p_other) const {
             // First compare sizes
@@ -117,6 +98,6 @@ namespace gempba {
         // Singleton EMPTY instance
         const static task_packet EMPTY;
     };
-}
+} // namespace gempba
 
-#endif //TASK_PACKET_HPP
+#endif // TASK_PACKET_HPP

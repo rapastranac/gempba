@@ -29,8 +29,7 @@
 
 class tree {
     struct tree_node {
-        explicit tree_node(tree &p_tree, const int p_index) :
-            m_tree(p_tree) {
+        explicit tree_node(tree &p_tree, const int p_index) : m_tree(p_tree) {
             this->m_index = p_index;
             this->m_children_count = 0;
             this->m_parent = nullptr;
@@ -42,7 +41,7 @@ class tree {
         }
 
         // this method allows to add a next node,
-        void add_next(const int p_index);
+        void add_next(int p_index);
 
         // tell if this node is assigned to another one
         [[nodiscard]] bool is_assigned() const { return m_parent ? true : false; }
@@ -73,9 +72,7 @@ class tree {
 
             friend struct tree_node;
 
-            explicit m_iterator(tree_node *p_node) :
-                m_node(p_node) {
-            }
+            explicit m_iterator(tree_node *p_node) : m_node(p_node) {}
 
         public:
             int &operator*() const { return m_node->m_index; }
@@ -88,9 +85,9 @@ class tree {
 
             // overload post-increment operator
             m_iterator operator++(int) {
-                const m_iterator ret = *this;
+                const m_iterator v_ret = *this;
                 ++*(this);
-                return ret;
+                return v_ret;
             }
 
             bool operator==(const m_iterator &p_iter) const { return this->m_node == p_iter.m_node; }
@@ -165,15 +162,13 @@ public:
     }
 
 private:
-
-    void print_node(std::ostringstream& p_oss, const int p_index, const int p_indent) const {
-        const auto& v_node = m_c[p_index];
+    void print_node(std::ostringstream &p_oss, const int p_index, const int p_indent) const {
+        const auto &v_node = m_c[p_index];
         p_oss << std::string(p_indent * 2, ' ') << "- Node " << p_index << '\n';
-        for (const int & v_index : v_node) {
+        for (const int &v_index: v_node) {
             print_node(p_oss, v_index, p_indent + 1);
         }
     }
-
 };
 
 #endif

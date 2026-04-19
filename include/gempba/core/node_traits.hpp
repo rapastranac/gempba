@@ -29,8 +29,8 @@
 #include <list>
 #include <thread>
 
-#include <gempba/core/serializable.hpp>
 #include <gempba/core/scheduler.hpp>
+#include <gempba/core/serializable.hpp>
 #include <gempba/utils/task_packet.hpp>
 
 namespace gempba {
@@ -190,11 +190,11 @@ namespace gempba {
 
         virtual void prune() = 0;
 
-        //Delegable ↓↓↓
+        // Delegable ↓↓↓
 
         /**
-        * The underlying task is executed in the current thread.
-        */
+         * The underlying task is executed in the current thread.
+         */
         virtual void run() = 0;
 
         /**
@@ -204,18 +204,17 @@ namespace gempba {
         virtual void delegate_locally(load_balancer *p_load_balancer) = 0;
 
         /**
-        * The underlying task is delegated to a remote process by the means of the Scheduler
-        * @param p_scheduler
-        * @param p_runner_id the id of the runner that will execute the task remotely
-        *
-        * @return true if the task was successfully delegated, false otherwise.
-        */
+         * The underlying task is delegated to a remote process by the means of the Scheduler
+         * @param p_scheduler
+         * @param p_runner_id the id of the runner that will execute the task remotely
+         *
+         * @return true if the task was successfully delegated, false otherwise.
+         */
         virtual void delegate_remotely(scheduler::worker *p_scheduler, int p_runner_id) = 0;
 
         virtual void set_result(const task_packet &p_result) = 0;
 
         virtual task_packet get_result() = 0;
-
     };
 
 }; // namespace gempba

@@ -35,14 +35,14 @@ namespace gempba {
     class queue {
     public:
         bool push(T const &p_value) {
-            std::unique_lock<std::mutex> lock(this->m_mtx);
+            std::unique_lock<std::mutex> v_lock(this->m_mtx);
             this->m_q.push(p_value);
             return true;
         }
 
         // deletes the retrieved element, do not use for non-integral types
         bool pop(T &p_v) {
-            std::unique_lock<std::mutex> lock(this->m_mtx);
+            std::unique_lock<std::mutex> v_lock(this->m_mtx);
             if (this->m_q.empty())
                 return false;
             p_v = this->m_q.front();
@@ -51,7 +51,7 @@ namespace gempba {
         }
 
         bool empty() {
-            std::unique_lock<std::mutex> lock(this->m_mtx);
+            std::unique_lock<std::mutex> v_lock(this->m_mtx);
             return this->m_q.empty();
         }
 
@@ -59,6 +59,6 @@ namespace gempba {
         std::queue<T> m_q;
         std::mutex m_mtx;
     };
-}
+} // namespace gempba
 
 #endif

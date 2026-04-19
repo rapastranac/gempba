@@ -24,231 +24,231 @@
 
 #include <filesystem>
 #include <fstream>
-#include <gtest/gtest.h>
 #include <gempba/utils/tree.hpp>
+#include <gtest/gtest.h>
 
 TEST(tree_test, constructor) {
-    const tree instance;
-    EXPECT_EQ(instance.size(), 0);
+    const tree v_instance;
+    EXPECT_EQ(v_instance.size(), 0);
 }
 
 TEST(tree_test, constructor_with_size) {
-    const tree instance(10);
-    EXPECT_EQ(instance.size(), 10);
+    const tree v_instance(10);
+    EXPECT_EQ(v_instance.size(), 10);
 }
 
 TEST(tree_test, resize) {
-    tree instance;
-    instance.resize(5);
-    EXPECT_EQ(instance.size(), 5);
+    tree v_instance;
+    v_instance.resize(5);
+    EXPECT_EQ(v_instance.size(), 5);
 }
 
 TEST(tree_test, node_assignment) {
-    tree instance(2);
-    constexpr int idx1 = 0;
-    constexpr int idx2 = 1;
-    instance[idx1].add_next(idx2);
+    tree v_instance(2);
+    constexpr int v_idx1 = 0;
+    constexpr int v_idx2 = 1;
+    v_instance[v_idx1].add_next(v_idx2);
 
-    EXPECT_EQ(instance[idx2].get_parent(), idx1);
+    EXPECT_EQ(v_instance[v_idx2].get_parent(), v_idx1);
 }
 
 TEST(tree_test, node_unlinking) {
-    tree instance(3);
-    constexpr int idx1 = 0;
-    constexpr int idx2 = 1;
-    constexpr int idx3 = 2;
-    instance[idx1].add_next(idx2);
-    instance[idx2].add_next(idx3);
-    instance[idx1].pop_front();
-    EXPECT_EQ(instance[idx2].get_parent(), -1);
+    tree v_instance(3);
+    constexpr int v_idx1 = 0;
+    constexpr int v_idx2 = 1;
+    constexpr int v_idx3 = 2;
+    v_instance[v_idx1].add_next(v_idx2);
+    v_instance[v_idx2].add_next(v_idx3);
+    v_instance[v_idx1].pop_front();
+    EXPECT_EQ(v_instance[v_idx2].get_parent(), -1);
 }
 
 TEST(tree_test, pop_front_node) {
-    tree instance(3);
-    instance[0].add_next(1);
-    instance[0].add_next(2);
-    EXPECT_EQ(instance[0].get_next(), 1);
-    instance[0].pop_front();
-    EXPECT_EQ(instance[0].get_next(), 2);
-    EXPECT_EQ(instance[1].get_parent(), -1);
+    tree v_instance(3);
+    v_instance[0].add_next(1);
+    v_instance[0].add_next(2);
+    EXPECT_EQ(v_instance[0].get_next(), 1);
+    v_instance[0].pop_front();
+    EXPECT_EQ(v_instance[0].get_next(), 2);
+    EXPECT_EQ(v_instance[1].get_parent(), -1);
 }
 
 TEST(tree_test, clear_nodes) {
-    tree instance(3);
-    instance[0].add_next(1);
-    instance[0].add_next(2);
-    instance[0].clear();
-    EXPECT_EQ(instance[0].size(), 0);
-    EXPECT_EQ(instance[0].get_next(), -1);
+    tree v_instance(3);
+    v_instance[0].add_next(1);
+    v_instance[0].add_next(2);
+    v_instance[0].clear();
+    EXPECT_EQ(v_instance[0].size(), 0);
+    EXPECT_EQ(v_instance[0].get_next(), -1);
 }
 
 TEST(tree_test, node_releasing) {
     // Test 1: Release the only child
     {
-        tree instance(2);
-        instance[0].add_next(1);
-        EXPECT_EQ(instance[0].size(), 1);
-        EXPECT_EQ(instance[1].get_parent(), 0);
+        tree v_instance(2);
+        v_instance[0].add_next(1);
+        EXPECT_EQ(v_instance[0].size(), 1);
+        EXPECT_EQ(v_instance[1].get_parent(), 0);
 
-        instance[1].release();
+        v_instance[1].release();
 
-        EXPECT_EQ(instance[0].size(), 0);
-        EXPECT_EQ(instance[0].get_next(), -1);
-        EXPECT_EQ(instance[1].get_parent(), -1);
-        EXPECT_FALSE(instance[1].is_assigned());
+        EXPECT_EQ(v_instance[0].size(), 0);
+        EXPECT_EQ(v_instance[0].get_next(), -1);
+        EXPECT_EQ(v_instance[1].get_parent(), -1);
+        EXPECT_FALSE(v_instance[1].is_assigned());
     }
 
     // Test 2: Release the first child (when there are multiple children)
     {
-        tree instance(4);
-        instance[0].add_next(1);
-        instance[0].add_next(2);
-        instance[0].add_next(3);
-        EXPECT_EQ(instance[0].size(), 3);
-        EXPECT_EQ(instance[0].get_next(), 1);
+        tree v_instance(4);
+        v_instance[0].add_next(1);
+        v_instance[0].add_next(2);
+        v_instance[0].add_next(3);
+        EXPECT_EQ(v_instance[0].size(), 3);
+        EXPECT_EQ(v_instance[0].get_next(), 1);
 
-        instance[1].release();
+        v_instance[1].release();
 
-        EXPECT_EQ(instance[0].size(), 2);
-        EXPECT_EQ(instance[0].get_next(), 2); // Node 2 should now be first
-        EXPECT_EQ(instance[1].get_parent(), -1);
-        EXPECT_FALSE(instance[1].is_assigned());
-        EXPECT_EQ(instance[2].get_parent(), 0);
-        EXPECT_EQ(instance[3].get_parent(), 0);
+        EXPECT_EQ(v_instance[0].size(), 2);
+        EXPECT_EQ(v_instance[0].get_next(), 2); // Node 2 should now be first
+        EXPECT_EQ(v_instance[1].get_parent(), -1);
+        EXPECT_FALSE(v_instance[1].is_assigned());
+        EXPECT_EQ(v_instance[2].get_parent(), 0);
+        EXPECT_EQ(v_instance[3].get_parent(), 0);
     }
 
     // Test 3: Release the last child
     {
-        tree instance(4);
-        instance[0].add_next(1);
-        instance[0].add_next(2);
-        instance[0].add_next(3);
-        EXPECT_EQ(instance[0].size(), 3);
+        tree v_instance(4);
+        v_instance[0].add_next(1);
+        v_instance[0].add_next(2);
+        v_instance[0].add_next(3);
+        EXPECT_EQ(v_instance[0].size(), 3);
 
-        instance[3].release();
+        v_instance[3].release();
 
-        EXPECT_EQ(instance[0].size(), 2);
-        EXPECT_EQ(instance[3].get_parent(), -1);
-        EXPECT_FALSE(instance[3].is_assigned());
-        EXPECT_EQ(instance[1].get_parent(), 0);
-        EXPECT_EQ(instance[2].get_parent(), 0);
+        EXPECT_EQ(v_instance[0].size(), 2);
+        EXPECT_EQ(v_instance[3].get_parent(), -1);
+        EXPECT_FALSE(v_instance[3].is_assigned());
+        EXPECT_EQ(v_instance[1].get_parent(), 0);
+        EXPECT_EQ(v_instance[2].get_parent(), 0);
 
         // Verify that node 2 is now the last child
-        std::vector<int> children;
-        for (int &child: instance[0]) {
-            children.push_back(child);
+        std::vector<int> v_children;
+        for (int &v_child: v_instance[0]) {
+            v_children.push_back(v_child);
         }
-        EXPECT_EQ(children.back(), 2);
+        EXPECT_EQ(v_children.back(), 2);
     }
 
     // Test 4: Release a middle child
     {
-        tree instance(5);
-        instance[0].add_next(1);
-        instance[0].add_next(2);
-        instance[0].add_next(3);
-        instance[0].add_next(4);
-        EXPECT_EQ(instance[0].size(), 4);
+        tree v_instance(5);
+        v_instance[0].add_next(1);
+        v_instance[0].add_next(2);
+        v_instance[0].add_next(3);
+        v_instance[0].add_next(4);
+        EXPECT_EQ(v_instance[0].size(), 4);
 
-        instance[2].release(); // Release middle child
+        v_instance[2].release(); // Release middle child
 
-        EXPECT_EQ(instance[0].size(), 3);
-        EXPECT_EQ(instance[2].get_parent(), -1);
-        EXPECT_FALSE(instance[2].is_assigned());
+        EXPECT_EQ(v_instance[0].size(), 3);
+        EXPECT_EQ(v_instance[2].get_parent(), -1);
+        EXPECT_FALSE(v_instance[2].is_assigned());
 
         // Verify the remaining children are still properly linked
-        std::vector<int> expected = {1, 3, 4};
-        std::vector<int> result;
-        for (int &child: instance[0]) {
-            result.push_back(child);
+        std::vector<int> v_expected = {1, 3, 4};
+        std::vector<int> v_result;
+        for (int &v_child: v_instance[0]) {
+            v_result.push_back(v_child);
         }
-        EXPECT_EQ(result, expected);
+        EXPECT_EQ(v_result, v_expected);
     }
 
     // Test 5: Release another middle child to ensure sibling links are correct
     {
-        tree instance(6);
-        instance[0].add_next(1);
-        instance[0].add_next(2);
-        instance[0].add_next(3);
-        instance[0].add_next(4);
-        instance[0].add_next(5);
+        tree v_instance(6);
+        v_instance[0].add_next(1);
+        v_instance[0].add_next(2);
+        v_instance[0].add_next(3);
+        v_instance[0].add_next(4);
+        v_instance[0].add_next(5);
 
-        instance[3].release(); // Release middle child
+        v_instance[3].release(); // Release middle child
 
-        EXPECT_EQ(instance[0].size(), 4);
+        EXPECT_EQ(v_instance[0].size(), 4);
 
-        std::vector<int> expected = {1, 2, 4, 5};
-        std::vector<int> result;
-        for (int &child: instance[0]) {
-            result.push_back(child);
+        std::vector<int> v_expected = {1, 2, 4, 5};
+        std::vector<int> v_result;
+        for (int &v_child: v_instance[0]) {
+            v_result.push_back(v_child);
         }
-        EXPECT_EQ(result, expected);
+        EXPECT_EQ(v_result, v_expected);
     }
 
     // Test 6: Sequential releases
     {
-        tree instance(4);
-        instance[0].add_next(1);
-        instance[0].add_next(2);
-        instance[0].add_next(3);
+        tree v_instance(4);
+        v_instance[0].add_next(1);
+        v_instance[0].add_next(2);
+        v_instance[0].add_next(3);
 
-        instance[2].release(); // Release middle
-        EXPECT_EQ(instance[0].size(), 2);
+        v_instance[2].release(); // Release middle
+        EXPECT_EQ(v_instance[0].size(), 2);
 
-        instance[3].release(); // Release what's now the last
-        EXPECT_EQ(instance[0].size(), 1);
+        v_instance[3].release(); // Release what's now the last
+        EXPECT_EQ(v_instance[0].size(), 1);
 
-        instance[1].release(); // Release the only remaining child
-        EXPECT_EQ(instance[0].size(), 0);
-        EXPECT_EQ(instance[0].get_next(), -1);
+        v_instance[1].release(); // Release the only remaining child
+        EXPECT_EQ(v_instance[0].size(), 0);
+        EXPECT_EQ(v_instance[0].get_next(), -1);
     }
 
     // Test 7: Release and re-add
     {
-        tree instance(3);
-        instance[0].add_next(1);
-        instance[0].add_next(2);
+        tree v_instance(3);
+        v_instance[0].add_next(1);
+        v_instance[0].add_next(2);
 
-        instance[1].release();
-        EXPECT_EQ(instance[0].size(), 1);
-        EXPECT_FALSE(instance[1].is_assigned());
+        v_instance[1].release();
+        EXPECT_EQ(v_instance[0].size(), 1);
+        EXPECT_FALSE(v_instance[1].is_assigned());
 
         // Should be able to add it again
-        instance[0].add_next(1);
-        EXPECT_EQ(instance[0].size(), 2);
-        EXPECT_TRUE(instance[1].is_assigned());
-        EXPECT_EQ(instance[1].get_parent(), 0);
+        v_instance[0].add_next(1);
+        EXPECT_EQ(v_instance[0].size(), 2);
+        EXPECT_TRUE(v_instance[1].is_assigned());
+        EXPECT_EQ(v_instance[1].get_parent(), 0);
     }
 }
 
 TEST(tree_test, iterator_test) {
-    tree instance(3);
-    instance[0].add_next(1);
-    instance[0].add_next(2);
+    tree v_instance(3);
+    v_instance[0].add_next(1);
+    v_instance[0].add_next(2);
 
-    const std::vector expected = {1, 2};
-    std::vector<int> result;
-    for (int &it: instance[0]) {
-        result.push_back(it);
+    const std::vector v_expected = {1, 2};
+    std::vector<int> v_result;
+    for (int &it: v_instance[0]) {
+        v_result.push_back(it);
     }
-    EXPECT_EQ(result, expected);
+    EXPECT_EQ(v_result, v_expected);
 }
 
 TEST(tree_test, invalid_add_next) {
-    tree instance(3);
-    instance[0].add_next(1);
-    EXPECT_THROW(instance[0].add_next(1), std::runtime_error);
+    tree v_instance(3);
+    v_instance[0].add_next(1);
+    EXPECT_THROW(v_instance[0].add_next(1), std::runtime_error);
 }
 
 TEST(tree_test, invalid_pop_front) {
-    tree instance(1);
-    EXPECT_THROW(instance[0].pop_front(), std::runtime_error);
+    tree v_instance(1);
+    EXPECT_THROW(v_instance[0].pop_front(), std::runtime_error);
 }
 
 TEST(tree_test, invalid_release) {
-    tree instance(1);
-    EXPECT_THROW(instance[0].release(), std::runtime_error);
+    tree v_instance(1);
+    EXPECT_THROW(v_instance[0].release(), std::runtime_error);
 }
 
 std::string get_test_resource_path(const std::string &p_name) {
@@ -315,5 +315,4 @@ TEST(tree_test, to_string_test) {
 
         ASSERT_EQ(v_expected, v_output);
     }
-
 }

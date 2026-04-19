@@ -1,16 +1,16 @@
-#include <memory>
 #include <gempba/gempba.hpp>
 #include <gempba/node_manager.hpp>
 #include <impl/load_balancing/quasi_horizontal_load_balancer.hpp>
 #include <impl/load_balancing/work_stealing_load_balancer.hpp>
 #include <impl/schedulers/mpi_centralized_scheduler.hpp>
 #include <impl/schedulers/mpi_semi_centralized_scheduler.hpp>
+#include <memory>
 
 namespace {
     inline std::unique_ptr<gempba::scheduler> g_scheduler;
     inline std::unique_ptr<gempba::load_balancer> g_load_balancer;
     inline std::unique_ptr<gempba::node_manager> g_node_manager;
-}
+} // namespace
 
 #if GEMPBA_DEBUG_COMMENTS
 namespace {
@@ -40,13 +40,9 @@ gempba::load_balancer *gempba::mt::create_load_balancer(std::unique_ptr<load_bal
     return g_load_balancer.get();
 }
 
-gempba::load_balancer *gempba::mt::create_load_balancer(const balancing_policy &p_policy) {
-    return mp::create_load_balancer(p_policy, nullptr);
-}
+gempba::load_balancer *gempba::mt::create_load_balancer(const balancing_policy &p_policy) { return mp::create_load_balancer(p_policy, nullptr); }
 
-gempba::node_manager &gempba::mt::create_node_manager(load_balancer *p_load_balancer) {
-    return mp::create_node_manager(p_load_balancer, nullptr);
-}
+gempba::node_manager &gempba::mt::create_node_manager(load_balancer *p_load_balancer) { return mp::create_node_manager(p_load_balancer, nullptr); }
 
 gempba::scheduler *gempba::mp::create_scheduler(std::unique_ptr<scheduler> p_your_implementation) {
     if (g_scheduler != nullptr) {
@@ -73,9 +69,7 @@ gempba::scheduler *gempba::mp::create_scheduler(const scheduler_topology &p_topo
     return g_scheduler.get();
 }
 
-gempba::load_balancer *gempba::mp::create_load_balancer(std::unique_ptr<load_balancer> p_your_implementation) {
-    return mt::create_load_balancer(std::move(p_your_implementation));
-}
+gempba::load_balancer *gempba::mp::create_load_balancer(std::unique_ptr<load_balancer> p_your_implementation) { return mt::create_load_balancer(std::move(p_your_implementation)); }
 
 gempba::load_balancer *gempba::mp::create_load_balancer(const balancing_policy &p_policy, scheduler::worker *const p_scheduler_worker) {
     if (g_load_balancer != nullptr) {
@@ -94,9 +88,7 @@ gempba::load_balancer *gempba::mp::create_load_balancer(const balancing_policy &
     return g_load_balancer.get();
 }
 
-std::unique_ptr<gempba::default_mpi_stats_visitor> gempba::mp::get_default_mpi_stats_visitor() {
-    return std::make_unique<default_mpi_stats_visitor>();
-}
+std::unique_ptr<gempba::default_mpi_stats_visitor> gempba::mp::get_default_mpi_stats_visitor() { return std::make_unique<default_mpi_stats_visitor>(); }
 
 gempba::node_manager &gempba::mp::create_node_manager(load_balancer *p_load_balancer, scheduler::worker *p_worker) {
     if (g_node_manager != nullptr) {
@@ -113,17 +105,11 @@ gempba::scheduler *gempba::get_scheduler() {
     return g_scheduler.get();
 }
 
-void gempba::reset_scheduler() {
-    g_scheduler.reset();
-}
+void gempba::reset_scheduler() { g_scheduler.reset(); }
 
-gempba::load_balancer *gempba::get_load_balancer() {
-    return g_load_balancer.get();
-}
+gempba::load_balancer *gempba::get_load_balancer() { return g_load_balancer.get(); }
 
-void gempba::reset_load_balancer() {
-    g_load_balancer.reset();
-}
+void gempba::reset_load_balancer() { g_load_balancer.reset(); }
 
 gempba::node_manager &gempba::get_node_manager() {
     if (!g_node_manager) {
@@ -133,9 +119,7 @@ gempba::node_manager &gempba::get_node_manager() {
     return *g_node_manager;
 }
 
-void gempba::reset_node_manager() {
-    g_node_manager.reset();
-}
+void gempba::reset_node_manager() { g_node_manager.reset(); }
 
 int gempba::shutdown() {
     g_scheduler.reset();

@@ -247,55 +247,50 @@ namespace gempba {
         }
 
         [[nodiscard]] std::string to_string() const noexcept {
-            std::ostringstream oss;
+            std::ostringstream v_oss;
             switch (m_kind) {
                 case score_type::I32: {
-                    oss << get_loose<int32_t>();
+                    v_oss << get_loose<int32_t>();
                     break;
                 }
                 case score_type::U_I32: {
-                    oss << get_loose<uint32_t>();
+                    v_oss << get_loose<uint32_t>();
                     break;
                 }
                 case score_type::I64: {
-                    oss << get_loose<int64_t>();
+                    v_oss << get_loose<int64_t>();
                     break;
                 }
                 case score_type::U_I64: {
-                    oss << get_loose<uint64_t>();
+                    v_oss << get_loose<uint64_t>();
                     break;
                 }
                 case score_type::F32: {
-                    oss << std::setprecision(std::numeric_limits<float>::max_digits10) << get_loose<float>();
+                    v_oss << std::setprecision(std::numeric_limits<float>::max_digits10) << get_loose<float>();
                     break;
                 }
                 case score_type::F64: {
-                    oss << std::setprecision(std::numeric_limits<double>::max_digits10) << get_loose<double>();
+                    v_oss << std::setprecision(std::numeric_limits<double>::max_digits10) << get_loose<double>();
                     break;
                 }
                 case score_type::F128: {
-                    oss << std::setprecision(std::numeric_limits<long double>::max_digits10) << get_loose<long double>();
+                    v_oss << std::setprecision(std::numeric_limits<long double>::max_digits10) << get_loose<long double>();
                     break;
                 }
-
             }
-            return oss.str();
+            return v_oss.str();
         }
 
     private:
         template<typename T>
         static constexpr bool IS_SUPPORTED =
-                (std::is_integral_v<std::remove_cvref_t<T>> &&
-                 !std::same_as<std::remove_cvref_t<T>, bool> &&
-                 (sizeof(std::remove_cvref_t<T>) == 4 || sizeof(std::remove_cvref_t<T>) == 8)) ||
-                std::same_as<std::remove_cvref_t<T>, float> ||
-                std::same_as<std::remove_cvref_t<T>, double> ||
-                std::same_as<std::remove_cvref_t<T>, long double>;
+                (std::is_integral_v<std::remove_cvref_t<T>> && !std::same_as<std::remove_cvref_t<T>, bool> && (sizeof(std::remove_cvref_t<T>) == 4 || sizeof(std::remove_cvref_t<T>) == 8)) ||
+                std::same_as<std::remove_cvref_t<T>, float> || std::same_as<std::remove_cvref_t<T>, double> || std::same_as<std::remove_cvref_t<T>, long double>;
 
         template<typename T>
         static constexpr score_type TYPE_OF = []() consteval {
             using U = std::remove_cvref_t<T>;
-            if constexpr (std::is_integral_v<U> && sizeof(U) == 4 && std::is_signed_v<U>) {
+            if constexpr (std::is_integral_v<U> && sizeof(U) == 4 && std::is_signed_v<U>) { // NOLINT(bugprone-branch-clone)
                 return score_type::I32;
             } else if constexpr (std::is_integral_v<U> && sizeof(U) == 4 && std::is_unsigned_v<U>) {
                 return score_type::U_I32;
@@ -368,6 +363,6 @@ namespace gempba {
     static_assert(std::is_trivially_copyable_v<score>, "score must be trivially copyable");
     static_assert(std::is_standard_layout_v<score>, "score must be standard layout");
 
-}
+} // namespace gempba
 
 #endif // SCORE_HPP

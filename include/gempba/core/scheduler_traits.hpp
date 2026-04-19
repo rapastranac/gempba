@@ -63,9 +63,8 @@ namespace gempba {
          * @return A unique pointer to the stats object.
          */
         [[nodiscard]] virtual std::unique_ptr<stats> get_stats() const = 0;
-
     };
 
-}
+} // namespace gempba
 
-#endif //GEMPBA_SCHEDULER_TRAITS_HPP
+#endif // GEMPBA_SCHEDULER_TRAITS_HPP

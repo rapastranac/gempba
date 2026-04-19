@@ -1,8 +1,9 @@
 #include <gempba/utils/tree.hpp>
 #include <gempba/utils/utils.hpp>
+#include <utility>
 
 void tree::tree_node::add_next(const int p_index) {
-    if (p_index >= static_cast<int>(m_tree.m_c.size())) {
+    if (std::cmp_greater_equal(p_index, m_tree.m_c.size())) {
         utils::log_and_throw("node " + std::to_string(p_index) + " is out of bounds");
     }
     if (m_tree[p_index].m_parent) {
@@ -13,12 +14,12 @@ void tree::tree_node::add_next(const int p_index) {
     if (m_children_count == 0) {
         m_next = &m_tree[p_index];
     } else {
-        tree_node *tail = m_next;
-        while (tail->m_right_sibling) {
-            tail = tail->m_right_sibling;
+        tree_node *v_tail = m_next;
+        while (v_tail->m_right_sibling) {
+            v_tail = v_tail->m_right_sibling;
         }
-        m_tree[p_index].m_left_sibling = tail;
-        tail->m_right_sibling = &m_tree[p_index];
+        m_tree[p_index].m_left_sibling = v_tail;
+        v_tail->m_right_sibling = &m_tree[p_index];
     }
     m_last = &m_tree[p_index];
     m_children_count++;
@@ -30,13 +31,13 @@ void tree::tree_node::pop_front() {
     }
     if (m_next->m_right_sibling != nullptr) {
         // at least two nodes
-        const auto next_cpy = m_next;
+        const auto v_next_cpy = m_next;
         m_next = m_next->m_right_sibling;
         m_next->m_left_sibling = nullptr;
 
-        next_cpy->m_parent = nullptr;
-        next_cpy->m_left_sibling = nullptr;
-        next_cpy->m_right_sibling = nullptr;
+        v_next_cpy->m_parent = nullptr;
+        v_next_cpy->m_left_sibling = nullptr;
+        v_next_cpy->m_right_sibling = nullptr;
     } else {
         // the only available node
         m_next->m_parent = nullptr;

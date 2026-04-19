@@ -1,5 +1,5 @@
 /*
-* MIT License
+ * MIT License
  *
  * Copyright (c) 2025. Andrés Pastrana
  *
@@ -32,34 +32,22 @@ namespace gempba {
 
     public:
         // Explicit constructor
-        explicit task_bundle(task_packet p_data, const int p_function_id) noexcept :
-            m_data(std::move(p_data)), m_function_id(p_function_id) {
-        }
+        explicit task_bundle(task_packet p_data, const int p_function_id) noexcept : m_data(std::move(p_data)), m_function_id(p_function_id) {}
 
         [[nodiscard]] task_packet get_task_packet() const noexcept {
             return m_data; // returns by value intentionally
         }
 
-        [[nodiscard]] int get_runnable_id() const noexcept {
-            return m_function_id;
-        }
+        [[nodiscard]] int get_runnable_id() const noexcept { return m_function_id; }
 
-        [[nodiscard]] bool empty() const noexcept {
-            return m_data.empty();
-        }
+        [[nodiscard]] bool empty() const noexcept { return m_data.empty(); }
 
-        [[nodiscard]] std::size_t size() const noexcept {
-            return m_data.size();
-        }
+        [[nodiscard]] std::size_t size() const noexcept { return m_data.size(); }
 
         // Equality operators
-        bool operator==(const task_bundle &other) const {
-            return m_function_id == other.m_function_id && m_data == other.m_data;
-        }
+        bool operator==(const task_bundle &p_other) const { return m_function_id == p_other.m_function_id && m_data == p_other.m_data; }
 
-        bool operator!=(const task_bundle &other) const {
-            return !(*this == other);
-        }
+        bool operator!=(const task_bundle &p_other) const { return !(*this == p_other); }
 
         // Copy constructor and assignment
         task_bundle(const task_bundle &) = default;
@@ -74,6 +62,6 @@ namespace gempba {
         // Default destructor
         ~task_bundle() = default;
     };
-}
+} // namespace gempba
 
-#endif //GEMPBA_TASK_BUNDLE_HPP
+#endif // GEMPBA_TASK_BUNDLE_HPP

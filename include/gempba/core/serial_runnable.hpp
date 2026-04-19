@@ -41,7 +41,7 @@ namespace gempba {
 
         [[nodiscard]] virtual int get_id() const = 0;
 
-        virtual std::optional<std::shared_future<task_packet> > operator()(node_manager &p_node_manager, const task_packet &p_task) = 0;
+        virtual std::optional<std::shared_future<task_packet>> operator()(node_manager &p_node_manager, const task_packet &p_task) = 0;
     };
 } // namespace gempba
 
