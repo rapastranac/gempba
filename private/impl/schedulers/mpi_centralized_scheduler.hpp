@@ -158,12 +158,6 @@ namespace gempba {
             return (m_end_time - m_start_time) - static_cast<double>(m_timeout);
         }
 
-    private:
-        [[nodiscard]] int next_process() const {
-            return 0;
-        }
-
-    public:
         [[nodiscard]] int world_size() const override {
             return m_world_size;
         }
@@ -1020,9 +1014,7 @@ namespace gempba {
                 return m_parent.force_push(std::move(p_task), p_function_id);
             }
 
-            [[nodiscard]] unsigned int next_process() const override {
-                return m_parent.next_process();
-            }
+            [[nodiscard]] unsigned int next_process() const override { return 0; }
 
             std::optional<transmission_guard> try_open_transmission_channel() override {
                 return m_parent.try_open_transmission_channel();
