@@ -62,6 +62,7 @@ misc-non-copyable-objects,
 misc-throw-by-value-catch-by-reference,
 misc-uniqueptr-reset-release,
 modernize-*,
+-modernize-avoid-bind,
 -modernize-use-designated-initializers,
 -modernize-use-trailing-return-type,
 -modernize-avoid-c-arrays,
@@ -90,7 +91,7 @@ readability-make-member-function-const,
 readability-string-compare,
 readability-delete-null-pointer,
 readability-static-accessed-through-instance,
-readability-convert-member-functions-to-static,
+-readability-convert-member-functions-to-static,
 readability-redundant-function-ptr-dereference,
 readability-const-return-type,
 readability-misleading-indentation,
@@ -124,7 +125,7 @@ CheckOptions:
   - key: readability-identifier-naming.LocalVariablePrefix
     value: v_
   - key: readability-identifier-naming.LocalVariableIgnoredRegexp
-    value: '^(i|j|k|idx|index|it|iter)$'
+    value: '^([a-z]|idx|index|it|iter)$'
   - key: readability-identifier-naming.StaticLocalVariableCase
     value: lower_case
   - key: readability-identifier-naming.StaticLocalVariablePrefix
