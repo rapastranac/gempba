@@ -1,4 +1,4 @@
-name: C/C++ CI (Windows 2022)
+name: C/C++ CI (Windows 2025)
 
 on:
   push:
@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   build-and-test:
-    runs-on: windows-2022
+    runs-on: windows-2025
     timeout-minutes: 10
 
     steps:

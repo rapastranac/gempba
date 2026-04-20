@@ -1,5 +1,5 @@
 /*
-* MIT License
+ * MIT License
  *
  * Copyright (c) 2025. Andrés Pastrana
  *
@@ -56,9 +56,7 @@ namespace gempba {
         double m_elapsed_time = 0.0;
 
         // Original constructor
-        explicit default_mpi_stats(const int p_rank) :
-            m_rank(p_rank) {
-        }
+        explicit default_mpi_stats(const int p_rank) : m_rank(p_rank) {}
 
         default_mpi_stats(const default_mpi_stats &p_other) = default;
 
@@ -71,54 +69,28 @@ namespace gempba {
         default_mpi_stats &operator=(default_mpi_stats &&p_other) noexcept = default;
 
         friend bool operator==(const default_mpi_stats &p_lhs, const default_mpi_stats &p_rhs) {
-            return p_lhs.m_rank == p_rhs.m_rank
-                   && p_lhs.m_received_task_count == p_rhs.m_received_task_count
-                   && p_lhs.m_sent_task_count == p_rhs.m_sent_task_count
-                   && p_lhs.m_total_requested_tasks == p_rhs.m_total_requested_tasks
-                   && p_lhs.m_total_thread_requests == p_rhs.m_total_thread_requests
-                   && p_lhs.m_idle_time == p_rhs.m_idle_time
-                   && p_lhs.m_elapsed_time == p_rhs.m_elapsed_time;
+            return p_lhs.m_rank == p_rhs.m_rank && p_lhs.m_received_task_count == p_rhs.m_received_task_count && p_lhs.m_sent_task_count == p_rhs.m_sent_task_count &&
+                   p_lhs.m_total_requested_tasks == p_rhs.m_total_requested_tasks && p_lhs.m_total_thread_requests == p_rhs.m_total_thread_requests &&
+                   p_lhs.m_idle_time == p_rhs.m_idle_time && p_lhs.m_elapsed_time == p_rhs.m_elapsed_time;
         }
 
-        friend bool operator!=(const default_mpi_stats &p_lhs, const default_mpi_stats &p_rhs) {
-            return !(p_lhs == p_rhs);
-        }
+        friend bool operator!=(const default_mpi_stats &p_lhs, const default_mpi_stats &p_rhs) { return !(p_lhs == p_rhs); }
 
         auto operator<=>(const default_mpi_stats &p_other) const {
-            auto v_lhs = std::tie(m_rank, m_received_task_count, m_sent_task_count,
-                                  m_total_requested_tasks, m_total_thread_requests,
-                                  m_idle_time, m_elapsed_time);
-            auto v_rhs = std::tie(p_other.m_rank, p_other.m_received_task_count, p_other.m_sent_task_count,
-                                  p_other.m_total_requested_tasks, p_other.m_total_thread_requests,
+            auto v_lhs = std::tie(m_rank, m_received_task_count, m_sent_task_count, m_total_requested_tasks, m_total_thread_requests, m_idle_time, m_elapsed_time);
+            auto v_rhs = std::tie(p_other.m_rank, p_other.m_received_task_count, p_other.m_sent_task_count, p_other.m_total_requested_tasks, p_other.m_total_thread_requests,
                                   p_other.m_idle_time, p_other.m_elapsed_time);
             return v_lhs <=> v_rhs;
         }
 
 
         [[nodiscard]] task_packet serialize() const override {
-            const internal_data v_data{
-                    m_rank,
-                    m_received_task_count,
-                    m_sent_task_count,
-                    m_total_requested_tasks,
-                    m_total_thread_requests,
-                    m_idle_time,
-                    m_elapsed_time
-            };
+            const internal_data v_data{m_rank, m_received_task_count, m_sent_task_count, m_total_requested_tasks, m_total_thread_requests, m_idle_time, m_elapsed_time};
 
             return task_packet{reinterpret_cast<const char *>(&v_data), sizeof(internal_data)};
         }
 
-        [[nodiscard]] std::vector<std::string> labels() const override {
-            return {
-                    "rank",
-                    "received_task_count",
-                    "sent_task_count",
-                    "total_requested_tasks",
-                    "idle_time",
-                    "elapsed_time"
-            };
-        }
+        [[nodiscard]] std::vector<std::string> labels() const override { return {"rank", "received_task_count", "sent_task_count", "total_requested_tasks", "idle_time", "elapsed_time"}; }
 
         static default_mpi_stats from_packet(const task_packet &p_packet) {
             if (p_packet.size() != sizeof(internal_data)) {
@@ -148,10 +120,8 @@ namespace gempba {
             p_visitor("elapsed_time", std::make_any<double>(m_elapsed_time));
         }
 
-        void visit(stats_visitor *const p_visitor) const override {
-            p_visitor->visit(*this);
-        }
+        void visit(stats_visitor *const p_visitor) const override { p_visitor->visit(*this); }
     };
-}
+} // namespace gempba
 
-#endif //DEFAULT_MPI_STATS_HPP
+#endif // DEFAULT_MPI_STATS_HPP

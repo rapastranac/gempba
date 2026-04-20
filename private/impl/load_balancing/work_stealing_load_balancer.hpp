@@ -1,5 +1,5 @@
 /*
-* MIT License
+ * MIT License
  *
  * Copyright (c) 2025. Andrés Pastrana
  *
@@ -25,10 +25,10 @@
 #define GEMPBA_WORK_STEALING_LOAD_BALANCER_HPP
 
 #include <BS_thread_pool.hpp>
-#include <gempba/utils/transmission_guard.hpp>
-#include <gempba/utils/utils.hpp>
 #include <gempba/core/load_balancer.hpp>
 #include <gempba/core/node.hpp>
+#include <gempba/utils/transmission_guard.hpp>
+#include <gempba/utils/utils.hpp>
 #include <spdlog/spdlog.h>
 
 /**
@@ -47,17 +47,11 @@ namespace gempba {
         scheduler::worker *const m_scheduler_worker;
 
     public:
-        explicit work_stealing_load_balancer(scheduler::worker *const p_scheduler_worker = nullptr) :
-            m_scheduler_worker(p_scheduler_worker) {
-        }
+        explicit work_stealing_load_balancer(scheduler::worker *const p_scheduler_worker = nullptr) : m_scheduler_worker(p_scheduler_worker) {}
 
-        balancing_policy get_balancing_policy() override {
-            return WORK_STEALING;
-        }
+        balancing_policy get_balancing_policy() override { return WORK_STEALING; }
 
-        unsigned generate_unique_id() override {
-            return ++m_unique_id_counter;
-        }
+        unsigned generate_unique_id() override { return ++m_unique_id_counter; }
 
         std::future<std::any> force_local_submit(std::function<std::any()> &&p_function) override {
             ++m_thread_request_count;
@@ -90,11 +84,9 @@ namespace gempba {
             return false;
         }
 
-        [[nodiscard]] double get_idle_time() const override {
-            return m_thread_pool.get_wall_idle_time();
-        }
+        [[nodiscard]] double get_idle_time() const override { return m_thread_pool.get_wall_idle_time(); }
 
-        std::shared_ptr<std::shared_ptr<node_core> > get_root(std::thread::id) override {
+        std::shared_ptr<std::shared_ptr<node_core>> get_root(std::thread::id) override {
             // No-op for work stealing load balancer
             return {};
         }
@@ -105,28 +97,22 @@ namespace gempba {
 
         void set_thread_pool_size(const unsigned p_size) override {
             m_thread_pool.reset(p_size);
-            spdlog::debug("thread pool size: {}",  m_thread_pool.get_thread_count());
+            spdlog::debug("thread pool size: {}", m_thread_pool.get_thread_count());
         }
 
-        void wait() override {
-            m_thread_pool.wait();
-        }
+        void wait() override { m_thread_pool.wait(); }
 
-        bool is_done() const override {
-            return m_thread_pool.get_tasks_total() == 0;
-        }
+        bool is_done() const override { return m_thread_pool.get_tasks_total() == 0; }
 
-        std::size_t get_thread_request_count() const override {
-            return m_thread_request_count;
-        }
+        std::size_t get_thread_request_count() const override { return m_thread_request_count; }
 
     private:
         /**
-        * @brief Utility method to check if the thread_pool can receive another task. Always use within a lock_guard as
-        * it might change when attempting to submit a new task.
-        *
-        * @return Returns true if the thread pool is not full, false otherwise.
-        */
+         * @brief Utility method to check if the thread_pool can receive another task. Always use within a lock_guard as
+         * it might change when attempting to submit a new task.
+         *
+         * @return Returns true if the thread pool is not full, false otherwise.
+         */
         bool is_thread_pool_full() const {
             const unsigned int v_thread_count = m_thread_pool.get_thread_count();
             const unsigned int v_tasks_running = m_thread_pool.get_tasks_running();
@@ -189,9 +175,8 @@ namespace gempba {
             // p_node->set_root(nullptr);
             // p_node->set_parent(nullptr);
         }
-
     };
-}
+} // namespace gempba
 
 
-#endif //GEMPBA_WORK_STEALING_LOAD_BALANCER_HPP
+#endif // GEMPBA_WORK_STEALING_LOAD_BALANCER_HPP

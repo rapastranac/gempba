@@ -21,14 +21,14 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include <memory>
-#include <string>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <memory>
+#include <string>
 
-#include <gempba/node_manager.hpp>
 #include <gempba/core/node.hpp>
 #include <gempba/core/node_core.hpp>
+#include <gempba/node_manager.hpp>
 #include <impl/load_balancing/quasi_horizontal_load_balancer.hpp>
 #include <impl/nodes/node_factory.hpp>
 
@@ -451,16 +451,14 @@ TEST_F(node_test, delegate_locally_test) {
     int v_value = 0;
 
     {
-        auto v_dummy_function = [&v_value](std::thread::id, const int p_int, const double p_double, gempba::node p_parent) {
+        auto v_dummy_function = [&v_value](std::thread::id, const int p_int, const double p_double, const gempba::node &p_parent) {
             ASSERT_EQ(7, p_int);
             ASSERT_EQ(6.0, p_double);
             ASSERT_TRUE(p_parent == nullptr);
             v_value = p_int * static_cast<int>(p_double);
         };
 
-        const std::function<std::optional<std::tuple<int, double> >()> v_args_initializer = [] {
-            return std::make_tuple(7, 6.0);
-        };
+        const std::function<std::optional<std::tuple<int, double>>()> v_args_initializer = [] { return std::make_tuple(7, 6.0); };
         auto v_explicit_node = gempba::node_factory::create_lazy_node<void>(v_load_balancer, gempba::node(nullptr), v_dummy_function, v_args_initializer);
 
         const bool v_submitted = v_manager.try_local_submit(v_explicit_node);

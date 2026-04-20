@@ -21,16 +21,16 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include <memory>
+#include <gempba/utils/queue.hpp>
 #include <gtest/gtest.h>
-#include <gempba/utils/Queue.hpp>
+#include <memory>
 
 struct my_struct {
     int m_value;
 };
 
 TEST(queue_test, push_and_pop) {
-    Queue<my_struct *> q;
+    gempba::queue<my_struct *> q;
 
     auto *a = new my_struct{1};
     auto *b = new my_struct{2};
@@ -42,42 +42,42 @@ TEST(queue_test, push_and_pop) {
     ASSERT_TRUE(q.push(c));
 
     // Pop the values and ensure they are retrieved in the correct order
-    my_struct *result;
-    ASSERT_TRUE(q.pop(result));
-    EXPECT_EQ(a, result);
+    my_struct *v_result;
+    ASSERT_TRUE(q.pop(v_result));
+    EXPECT_EQ(a, v_result);
 
-    ASSERT_TRUE(q.pop(result));
-    EXPECT_EQ(b, result);
+    ASSERT_TRUE(q.pop(v_result));
+    EXPECT_EQ(b, v_result);
 
-    ASSERT_TRUE(q.pop(result));
-    EXPECT_EQ(c, result);
+    ASSERT_TRUE(q.pop(v_result));
+    EXPECT_EQ(c, v_result);
 
     // Ensure the queue is empty after popping all elements
     EXPECT_TRUE(q.empty());
 }
 
 TEST(queue_test, push_and_pop_with_shared_pointer) {
-    Queue<std::shared_ptr<my_struct> > q;
+    gempba::queue<std::shared_ptr<my_struct>> q;
 
-    const auto a = std::make_shared<my_struct>(1);
-    const auto b = std::make_shared<my_struct>(2);
-    const auto c = std::make_shared<my_struct>(3);
+    const auto v_a = std::make_shared<my_struct>(1);
+    const auto v_b = std::make_shared<my_struct>(2);
+    const auto v_c = std::make_shared<my_struct>(3);
 
     // Push some values into the queue
-    ASSERT_TRUE(q.push(a));
-    ASSERT_TRUE(q.push(b));
-    ASSERT_TRUE(q.push(c));
+    ASSERT_TRUE(q.push(v_a));
+    ASSERT_TRUE(q.push(v_b));
+    ASSERT_TRUE(q.push(v_c));
 
     // Pop the values and ensure they are retrieved in the correct order
-    std::shared_ptr<my_struct> result;
-    ASSERT_TRUE(q.pop(result));
-    EXPECT_EQ(a, result);
+    std::shared_ptr<my_struct> v_result;
+    ASSERT_TRUE(q.pop(v_result));
+    EXPECT_EQ(v_a, v_result);
 
-    ASSERT_TRUE(q.pop(result));
-    EXPECT_EQ(b, result);
+    ASSERT_TRUE(q.pop(v_result));
+    EXPECT_EQ(v_b, v_result);
 
-    ASSERT_TRUE(q.pop(result));
-    EXPECT_EQ(c, result);
+    ASSERT_TRUE(q.pop(v_result));
+    EXPECT_EQ(v_c, v_result);
 
     // Ensure the queue is empty after popping all elements
     EXPECT_TRUE(q.empty());
@@ -85,7 +85,7 @@ TEST(queue_test, push_and_pop_with_shared_pointer) {
 
 
 TEST(queue_test, empty) {
-    Queue<my_struct *> q;
+    gempba::queue<my_struct *> q;
 
     auto *a = new my_struct{1};
     auto *b = new my_struct{2};
@@ -101,9 +101,9 @@ TEST(queue_test, empty) {
     EXPECT_FALSE(q.empty());
 
     // Pop all elements
-    my_struct *instance;
-    ASSERT_TRUE(q.pop(instance));
-    ASSERT_TRUE(q.pop(instance));
+    my_struct *v_instance;
+    ASSERT_TRUE(q.pop(v_instance));
+    ASSERT_TRUE(q.pop(v_instance));
 
     // Queue should be empty again after popping all elements
     EXPECT_TRUE(q.empty());

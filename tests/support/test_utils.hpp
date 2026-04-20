@@ -1,7 +1,7 @@
 #ifndef GEMPBA_TEST_UTILS_HPP
 #define GEMPBA_TEST_UTILS_HPP
-#include <string>
 #include <sstream>
+#include <string>
 
 
 namespace gempba {
@@ -11,20 +11,20 @@ namespace gempba {
         test_utils() = default;
 
     public:
-        static std::string strip_boost_metadata(const std::string &archive) {
-            std::istringstream iss(archive);
-            std::ostringstream oss;
-            std::string token;
+        static std::string strip_boost_metadata(const std::string &p_archive) {
+            std::istringstream v_iss(p_archive);
+            std::ostringstream v_oss;
+            std::string v_token;
 
             // skip the header tokens (22 serialization::archive <version> 0 0 0 0)
             for (int i = 0; i < 6; ++i)
-                iss >> token;
+                v_iss >> v_token;
 
             // dump the rest
-            oss << iss.rdbuf();
-            return oss.str();
+            v_oss << v_iss.rdbuf();
+            return v_oss.str();
         }
     };
-}
+} // namespace gempba
 
-#endif //GEMPBA_TEST_UTILS_HPP
+#endif // GEMPBA_TEST_UTILS_HPP

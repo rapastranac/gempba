@@ -25,12 +25,17 @@
 #define GEMPBA_NODE_HPP
 
 #include <any>
-#include <list>
-#include <thread>
-#include <memory>
 #include <functional>
 #include <iostream>
-#include <stacktrace>
+#include <list>
+#include <memory>
+#include <thread>
+#if __has_include(<stacktrace>)
+    #include <stacktrace>
+    #define GEMPBA_HAS_STACKTRACE 1
+#else
+    #define GEMPBA_HAS_STACKTRACE 0
+#endif
 
 #include <gempba/core/node_core.hpp>
 #include <gempba/core/node_traits.hpp>
@@ -57,18 +62,20 @@ namespace gempba {
         static void throw_if_null(const std::shared_ptr<node_core> &p_node) {
             if (!p_node) {
                 std::stringstream v_ss;
+#if GEMPBA_HAS_STACKTRACE
                 v_ss << std::stacktrace::current() << std::endl;
+#else
+                v_ss << "[stacktrace unavailable: std::stacktrace not implemented by this standard library]" << std::endl;
+#endif
                 std::cerr << v_ss.str();
-                std::cerr.flush();  // Extra flush for paranoia
+                std::cerr.flush(); // Extra flush for paranoia
 
                 utils::log_and_throw("Attempted to access a null node");
             }
         }
 
     public:
-        static node create(const node &p_parent, const std::function<std::shared_ptr<node_core>(std::shared_ptr<node_core>)> &p_factory) {
-            return node(p_factory(p_parent.m_node_core));
-        }
+        static node create(const node &p_parent, const std::function<std::shared_ptr<node_core>(std::shared_ptr<node_core>)> &p_factory) { return node(p_factory(p_parent.m_node_core)); }
 
         static node create(const std::function<std::shared_ptr<node_core>(std::shared_ptr<node_core>)> &p_factory) { return node(p_factory(nullptr)); }
 
@@ -76,9 +83,7 @@ namespace gempba {
 
         ~node() override = default;
 
-        explicit node(const std::shared_ptr<node_core> &p_other) :
-            m_node_core(p_other) {
-        }
+        explicit node(const std::shared_ptr<node_core> &p_other) : m_node_core(p_other) {}
 
         // Copy Constructor
         node(const node &p_other) = default;
@@ -101,13 +106,9 @@ namespace gempba {
 
         bool operator!=(std::nullptr_t) const noexcept { return m_node_core != nullptr; }
 
-        node map_core(std::function<std::shared_ptr<node_core>(std::shared_ptr<node_core> &)> &&p_accessor) {
-            return node(p_accessor(m_node_core));
-        }
+        node map_core(std::function<std::shared_ptr<node_core>(std::shared_ptr<node_core> &)> &&p_accessor) { return node(p_accessor(m_node_core)); }
 
-        void apply_core(std::function<void(std::shared_ptr<node_core> &)> &&p_accessor) {
-            p_accessor(m_node_core);
-        }
+        void apply_core(std::function<void(std::shared_ptr<node_core> &)> &&p_accessor) { p_accessor(m_node_core); }
 
         void run() override {
             throw_if_null(m_node_core);
@@ -247,12 +248,12 @@ namespace gempba {
         [[deprecated]] std::list<node> get_children() override {
             throw_if_null(m_node_core);
             // TODO ... this could be removed
-            std::list<node> temp;
+            std::list<node> v_temp;
             // Not optimal
-            for (const auto &core: m_node_core->get_children()) {
-                temp.emplace_back(core);
+            for (const auto &v_core: m_node_core->get_children()) {
+                v_temp.emplace_back(v_core);
             }
-            return temp;
+            return v_temp;
         }
 
         [[nodiscard]] int get_children_count() const override {
@@ -286,13 +287,13 @@ namespace gempba {
     };
 
     // Non-member operator== for nullptr on the left-hand side
-    inline bool operator==(std::nullptr_t, const node &n) noexcept {
-        return n == nullptr; // Reuse the member function
+    inline bool operator==(std::nullptr_t, const node &p_n) noexcept {
+        return p_n == nullptr; // Reuse the member function
     }
 
     // Non-member operator!= for nullptr on the left-hand side
-    inline bool operator!=(std::nullptr_t, const node &n) noexcept {
-        return n != nullptr; // Reuse the member function
+    inline bool operator!=(std::nullptr_t, const node &p_n) noexcept {
+        return p_n != nullptr; // Reuse the member function
     }
 
     template<typename F, typename Ret, typename... Args>

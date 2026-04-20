@@ -99,8 +99,8 @@ message(STATUS "🔧 GEMPBA_BUILD_TESTS=${GEMPBA_BUILD_TESTS}")
 
 # 🏷️ Conditional compilation flags for Debug/Release
 target_compile_options(gempba PRIVATE
-        -Wall -Wextra -Wpedantic -pthread -fexceptions -fconcepts
-        $<$<CONFIG:Debug>:-g -O0 -ggdb3 -DGEMPBA_DEBUG_COMMENTS>
+        -pthread -fexceptions
+        $<$<CONFIG:Debug>:-Wall -Wextra -Wpedantic -g -O0 -ggdb3 -DGEMPBA_DEBUG_COMMENTS>
         $<$<CONFIG:Release>:-O3 -DNDEBUG>
 )
 
@@ -122,13 +122,12 @@ target_include_directories(gempba PRIVATE ${_spdlog_includes})
 target_compile_definitions(gempba PUBLIC SPDLOG_HEADER_ONLY)
 
 # C++23 stacktrace support (standard library, not external)
-if (NOT MSVC)
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_link_libraries(gempba PUBLIC stdc++exp)
+endif ()
 
-    # -rdynamic is Linux-only
-    if (UNIX)
-        target_link_options(gempba PUBLIC -rdynamic)
-    endif ()
+if (UNIX AND NOT APPLE)
+    target_link_options(gempba PUBLIC -rdynamic)
 endif ()
 
 # 📁 Executables output directory

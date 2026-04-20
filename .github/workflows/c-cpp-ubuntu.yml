@@ -63,7 +63,10 @@ jobs:
           cd ${{ github.workspace }}
           mkdir -p build
           cd build
-          cmake ..
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_FLAGS="--coverage" \
+            -DCMAKE_EXE_LINKER_FLAGS="--coverage"
           make -j$(nproc)
 
       # 6️⃣ Run tests with JUnit XML output
@@ -80,7 +83,14 @@ jobs:
           echo "🟢 Final check: non-flaky tests MUST be green"
           ctest --output-on-failure -E "FLAKY_"
 
-      # 7️⃣ Upload test results as artifacts
+      # 7️⃣ Upload coverage to Codecov
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
+
+      # 8️⃣ Upload test results as artifacts
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4

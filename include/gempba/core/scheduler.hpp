@@ -2,16 +2,16 @@
 #define GEMPBA_SCHEDULER_HPP
 
 #include <functional>
-#include <map>
-#include <memory>
+#include <gempba/core/scheduler_traits.hpp>
+#include <gempba/core/serial_runnable.hpp>
 #include <gempba/utils/gempba_utils.hpp>
 #include <gempba/utils/result.hpp>
 #include <gempba/utils/score.hpp>
 #include <gempba/utils/task_packet.hpp>
 #include <gempba/utils/transmission_guard.hpp>
 #include <gempba/utils/tree.hpp>
-#include <gempba/core/serial_runnable.hpp>
-#include <gempba/core/scheduler_traits.hpp>
+#include <map>
+#include <memory>
 
 namespace gempba {
 
@@ -24,7 +24,6 @@ namespace gempba {
         scheduler() = default;
 
     public:
-
         ~scheduler() override = default;
 
         [[nodiscard]] virtual double elapsed_time() const = 0;
@@ -39,7 +38,7 @@ namespace gempba {
          * @attention this method should be called only after synchronize_stats() to ensure that the stats are up-to-date, and should be called only by the root process (rank 0).
          * @return A vector of unique pointers to the stats objects of all processes.
          */
-        [[nodiscard]] virtual std::vector<std::unique_ptr<stats> > get_stats_vector() const = 0;
+        [[nodiscard]] virtual std::vector<std::unique_ptr<stats>> get_stats_vector() const = 0;
 
         /**
          * Synchronize the statistics across all processes. This method should be called to ensure that the stats are up-to-date.
@@ -82,7 +81,7 @@ namespace gempba {
         public:
             ~worker() override = default;
 
-            virtual void run(node_manager &p_node_manager, std::map<int, std::shared_ptr<serial_runnable> > p_runnables) = 0;
+            virtual void run(node_manager &p_node_manager, std::map<int, std::shared_ptr<serial_runnable>> p_runnables) = 0;
 
             virtual unsigned int force_push(task_packet &&p_task, int p_function_id) = 0;
 
@@ -107,8 +106,7 @@ namespace gempba {
         virtual center &center_view() = 0;
 
         virtual worker &worker_view() = 0;
-
     };
-}
+} // namespace gempba
 
-#endif //GEMPBA_SCHEDULER_HPP
+#endif // GEMPBA_SCHEDULER_HPP

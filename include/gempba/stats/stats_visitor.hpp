@@ -35,6 +35,6 @@ namespace gempba {
         virtual void visit(const stats &p_stats) = 0;
     };
 
-}
+} // namespace gempba
 
-#endif //GEMPBA_STATS_VISITOR_HPP
+#endif // GEMPBA_STATS_VISITOR_HPP

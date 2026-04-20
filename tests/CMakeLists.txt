@@ -3,8 +3,10 @@ cmake_minimum_required(VERSION 3.28)
 project(gempba_tests LANGUAGES CXX)
 
 # We need GTest and Boost
-cmake_policy(SET CMP0167 NEW)
-find_package(Boost COMPONENTS system serialization fiber REQUIRED)
+if(POLICY CMP0167)
+    cmake_policy(SET CMP0167 NEW)
+endif()
+find_package(Boost COMPONENTS serialization fiber REQUIRED)
 find_package(GTest REQUIRED)
 
 # Include GoogleTest module for test discovery
@@ -44,14 +46,13 @@ target_link_libraries(all_tests
         GTest::gtest
         GTest::gmock_main
         GTest::gtest_main
-        Boost::system
         Boost::serialization
         Boost::fiber
 )
 
 # Compilation options by mode
 target_compile_options(all_tests PRIVATE
-        -Wall -Wextra -Wpedantic -pthread -fexceptions -fconcepts
+        -Wall -Wextra -Wpedantic -pthread -fexceptions
         $<$<CONFIG:Debug>:-g -O0 -ggdb3 -DGEMPBA_DEBUG_COMMENTS>
         $<$<CONFIG:Release>:-O3 -DNDEBUG>
 )

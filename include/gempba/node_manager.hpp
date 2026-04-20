@@ -4,17 +4,16 @@
 #include <any>
 #include <atomic>
 #include <climits>
-#include <gempba/config.h>
 #include <functional>
+#include <gempba/config.h>
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <spdlog/spdlog.h>
 #include <thread>
 #include <tuple>
 #include <utility>
 #include <variant>
-#include <bits/stdc++.h>
-#include <spdlog/spdlog.h>
 
 #include <gempba/core/load_balancer.hpp>
 #include <gempba/core/scheduler.hpp>
@@ -52,8 +51,7 @@ namespace gempba {
     public:
         //<editor-fold desc="Construction/Destruction">
 
-        explicit node_manager(load_balancer *const p_load_balancer, scheduler::worker *p_scheduler) :
-            m_balancer(p_load_balancer), m_scheduler(p_scheduler) {
+        explicit node_manager(load_balancer *const p_load_balancer, scheduler::worker *p_scheduler) : m_balancer(p_load_balancer), m_scheduler(p_scheduler) {
 
             m_processor_count = std::thread::hardware_concurrency();
             m_idle_time = 0;
@@ -76,16 +74,14 @@ namespace gempba {
 
         //</editor-fold>
 
-        void set_balancing_policy(const balancing_policy p_strategy) {
-            this->m_balancing_policy = p_strategy;
-        };
+        void set_balancing_policy(const balancing_policy p_strategy) { this->m_balancing_policy = p_strategy; };
 
         /**
          * Updates the most up-to-date result. This method attempts to update the result, and should be used only in multithreading mode. (Not multiprocessing)
          * @tparam T Type of the result
          * @param p_new_result the most promising new result for the solution in the scope calling this method
          * @param p_new_score the most promising new score that represents the result
-        * @return True if the result was successfully updated, false otherwise.
+         * @return True if the result was successfully updated, false otherwise.
          */
         template<typename T>
         bool try_update_result(T &p_new_result, const score p_new_score) {
@@ -125,13 +121,13 @@ namespace gempba {
         }
 
         /**
-        * Warning: This is not meant to be used directly by the user. This is called only by the scheduler.
-        *
-        * This method is thread safe: Updates the most up-to-date score if the new score is better than the current one, and clears any previous result.
-        *
-        * @param p_new_score the most promising new score for the solution in the scope calling this method
-        * @return True if the score was successfully updated, false otherwise.
-        */
+         * Warning: This is not meant to be used directly by the user. This is called only by the scheduler.
+         *
+         * This method is thread safe: Updates the most up-to-date score if the new score is better than the current one, and clears any previous result.
+         *
+         * @param p_new_score the most promising new score for the solution in the scope calling this method
+         * @return True if the score was successfully updated, false otherwise.
+         */
         bool try_update_score_and_invalidate_result(const score &p_new_score) {
             std::scoped_lock<std::mutex> v_lock(m_mutex);
 
@@ -145,9 +141,7 @@ namespace gempba {
             return false;
         }
 
-        [[nodiscard]] size_t get_thread_request_count() const {
-            return m_balancer->get_thread_request_count();
-        }
+        [[nodiscard]] size_t get_thread_request_count() const { return m_balancer->get_thread_request_count(); }
 
         void set_goal(const goal p_goal, const score_type p_type) {
             m_goal = p_goal;
@@ -163,13 +157,9 @@ namespace gempba {
         }
 
         // wall time
-        static double get_wall_time() {
-            return utils::wall_time();
-        }
+        static double get_wall_time() { return utils::wall_time(); }
 
-        [[nodiscard]] score get_score() const {
-            return m_score;
-        }
+        [[nodiscard]] score get_score() const { return m_score; }
 
         std::optional<result> get_result_bytes() {
             std::unique_lock v_lock(m_mutex);
@@ -199,51 +189,29 @@ namespace gempba {
          * if multiprocessing is used, then every process should call this method before starting
          * @param p_score first approximation of the score that represents the best solution
          */
-        void set_score(const score &p_score) {
-            this->m_score = p_score;
-        }
+        void set_score(const score &p_score) { this->m_score = p_score; }
 
-        void set_thread_pool_size(const unsigned int p_size) const {
-            m_balancer->set_thread_pool_size(p_size);
-        }
+        void set_thread_pool_size(const unsigned int p_size) const { m_balancer->set_thread_pool_size(p_size); }
 
-        [[nodiscard]] balancing_policy get_balancing_policy() const {
-            return m_balancer->get_balancing_policy();
-        }
+        [[nodiscard]] balancing_policy get_balancing_policy() const { return m_balancer->get_balancing_policy(); }
 
-        [[nodiscard]] unsigned int generate_unique_id() const {
-            return m_balancer->generate_unique_id();
-        }
+        [[nodiscard]] unsigned int generate_unique_id() const { return m_balancer->generate_unique_id(); }
 
-        std::future<std::any> force_local_submit(std::function<std::any()> &&p_function) const {
-            return m_balancer->force_local_submit(std::move(p_function));
-        }
+        std::future<std::any> force_local_submit(std::function<std::any()> &&p_function) const { return m_balancer->force_local_submit(std::move(p_function)); }
 
-        void forward(node &p_node) const {
-            m_balancer->forward(p_node);
-        }
+        void forward(node &p_node) const { m_balancer->forward(p_node); }
 
-        bool try_local_submit(node &p_node) const {
-            return m_balancer->try_local_submit(p_node);
-        }
+        bool try_local_submit(node &p_node) const { return m_balancer->try_local_submit(p_node); }
 
-        bool try_remote_submit(node &p_node, const int p_runnable_id) const {
-            return m_balancer->try_remote_submit(p_node, p_runnable_id);
-        }
+        bool try_remote_submit(node &p_node, const int p_runnable_id) const { return m_balancer->try_remote_submit(p_node, p_runnable_id); }
 
-        [[nodiscard]] double get_idle_time() const {
-            return m_balancer->get_idle_time();
-        }
+        [[nodiscard]] double get_idle_time() const { return m_balancer->get_idle_time(); }
 
-        void wait() const {
-            m_balancer->wait();
-        }
+        void wait() const { m_balancer->wait(); }
 
-        [[nodiscard]] bool is_done() const {
-            return m_balancer->is_done();
-        }
+        [[nodiscard]] bool is_done() const { return m_balancer->is_done(); }
 
-        //——————— IPC related attributes and member functions ———————//
+        // ——————— IPC related attributes and member functions ———————//
     private:
         scheduler::worker *m_scheduler;
         std::mutex m_ipc_mutex; // mutex to ensure funnel access to IPC
@@ -258,6 +226,6 @@ namespace gempba {
             return v_new_max_is_better || v_new_min_is_better;
         }
     };
-}
+} // namespace gempba
 
 #endif

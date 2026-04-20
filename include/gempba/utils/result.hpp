@@ -32,17 +32,13 @@
 
 namespace gempba {
     class result {
-        result() :
-            m_score(score::make(-1)), m_task_packet(task_packet::EMPTY) {
-        }
+        result() : m_score(score::make(-1)), m_task_packet(task_packet::EMPTY) {}
 
         score m_score;
         task_packet m_task_packet;
 
     public:
-        result(const score &p_score, task_packet p_task_packet) :
-            m_score(p_score), m_task_packet(std::move(p_task_packet)) {
-        }
+        result(const score &p_score, task_packet p_task_packet) : m_score(p_score), m_task_packet(std::move(p_task_packet)) {}
 
         // Copy constructor
         result(const result &p_other) = default;
@@ -59,25 +55,15 @@ namespace gempba {
         // Destructor
         ~result() = default;
 
-        bool operator==(const result &p_other) const {
-            return m_score == p_other.m_score && m_task_packet == p_other.m_task_packet;
-        }
+        bool operator==(const result &p_other) const { return m_score == p_other.m_score && m_task_packet == p_other.m_task_packet; }
 
-        bool operator!=(const result &p_other) const {
-            return !(*this == p_other);
-        }
+        bool operator!=(const result &p_other) const { return !(*this == p_other); }
 
-        [[nodiscard]] int get_score_as_integer() const {
-            return m_score.get_loose<int>();
-        }
+        [[nodiscard]] int get_score_as_integer() const { return m_score.get_loose<int>(); }
 
-        [[nodiscard]] score get_score() const {
-            return m_score;
-        }
+        [[nodiscard]] score get_score() const { return m_score; }
 
-        [[nodiscard]] task_packet get_task_packet() const {
-            return m_task_packet;
-        }
+        [[nodiscard]] task_packet get_task_packet() const { return m_task_packet; }
 
         static const result EMPTY;
     };
