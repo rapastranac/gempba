@@ -23,7 +23,7 @@ makedepends=(
 )
 options=('staticlibs')
 source=("${_realname}-${pkgver}.tar.gz::https://github.com/rapastranac/gempba/archive/refs/tags/v${pkgver}.tar.gz")
-sha256sums=('d5558cd419c8d46bdc958064cb97f963d1ea793866414c025906ec15033512ed')
+sha256sums=('cd9b77d1d94b764b8e0d3a02f0ad57f9cd2f13c1580cfcf56a1f37a610cfa088')
 
 build() {
     mkdir -p "${srcdir}/build-${MSYSTEM}"
