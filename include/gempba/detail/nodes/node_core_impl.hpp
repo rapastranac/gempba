@@ -94,6 +94,20 @@ namespace gempba {
         //</editor-fold>
 
 
+        void ensure_args_initialized() {
+            if (m_initialization_flag == UNINITIALIZED) {
+                utils::log_and_throw("node arguments have not been initialized");
+            }
+            if (m_initialization_flag == LAZY) {
+                auto v_opt = m_initializer();
+                if (!v_opt.has_value()) {
+                    utils::log_and_throw("Attempted to initialize a non-worthy node: this should not happen!, node: {}, state: {}", m_node_id, get_state_string(m_state));
+                }
+                m_arguments = std::move(v_opt.value());
+                m_initialization_flag = INITIALIZED;
+            }
+        }
+
         template<typename T = Ret>
         std::any m_invoke(const bool p_delegated)
             requires(std::is_void_v<T>)
@@ -255,18 +269,7 @@ namespace gempba {
             if (m_state != UNUSED) {
                 utils::log_and_throw("node is already consumed, node: {}, state: {}", m_node_id, get_state_string(m_state));
             }
-            if (m_initialization_flag == UNINITIALIZED) {
-                utils::log_and_throw("node arguments have not been initialized");
-            }
-            if (m_initialization_flag == LAZY) {
-                auto v_opt = m_initializer();
-                if (!v_opt.has_value()) {
-                    utils::log_and_throw("Attempted to initialize a non-worthy node: this should not happen!, node: {}, state: {}", m_node_id, get_state_string(m_state));
-                }
-                m_arguments = std::move(v_opt.value());
-                m_initialization_flag = INITIALIZED;
-            }
-
+            ensure_args_initialized();
             m_result = m_invoke(false);
             m_state = FORWARDED;
         }
@@ -275,18 +278,7 @@ namespace gempba {
             if (m_state != UNUSED) {
                 utils::log_and_throw("node is already consumed, node: {}, state: {}", m_node_id, get_state_string(m_state));
             }
-            if (m_initialization_flag == UNINITIALIZED) {
-                utils::log_and_throw("Node arguments have not been initialized");
-            }
-            if (m_initialization_flag == LAZY) {
-                auto v_opt = m_initializer();
-                if (!v_opt.has_value()) {
-                    utils::log_and_throw("Attempted to initialize a non-worthy node: this should not happen!, node: {}, state: {}", m_node_id, get_state_string(m_state));
-                }
-                m_arguments = std::move(v_opt.value());
-                m_initialization_flag = INITIALIZED;
-            }
-
+            ensure_args_initialized();
             m_result = p_load_balancer->force_local_submit([v_copy = shared_from_this(), this] {
                 // IMPORTANT: "v_copy" keeps "this" alive until the pool thread executes the function
                 try {
@@ -304,17 +296,7 @@ namespace gempba {
             if (m_state != UNUSED) {
                 utils::log_and_throw("node is already consumed, node: {}, state: {}", m_node_id, get_state_string(m_state));
             }
-            if (m_initialization_flag == UNINITIALIZED) {
-                utils::log_and_throw("Node arguments have not been initialized");
-            }
-            if (m_initialization_flag == LAZY) {
-                auto v_opt = m_initializer();
-                if (!v_opt.has_value()) {
-                    utils::log_and_throw("Attempted to initialize a non-worthy node: this should not happen!, node: {}, state: {}", m_node_id, get_state_string(m_state));
-                }
-                m_arguments = std::move(v_opt.value());
-                m_initialization_flag = INITIALIZED;
-            }
+            ensure_args_initialized();
             m_remote_node = p_worker->force_push(serialize(), p_runner_id);
             m_state = SENT_TO_ANOTHER_PROCESS;
         }
@@ -422,22 +404,22 @@ namespace gempba {
                 m_should_branch_cached = true;
                 return true;
             }
-            if (m_initialization_flag == LAZY) {
-                auto v_args_opt = m_initializer();
-                utils::print_ipc_debug_comments("run_id: {}, should_branch() calling initializer", m_node_id);
-                if (!v_args_opt.has_value()) {
-                    utils::print_ipc_debug_comments("run_id: {}, should_branch() initializer returned nullopt", m_node_id);
-                    m_should_branch_cached = false;
-                    m_initialization_flag = INITIALIZED;
-                    return false;
-                }
-                m_arguments = std::move(v_args_opt.value());
-                m_initialization_flag = INITIALIZED;
+            if (m_initialization_flag != LAZY) {
                 m_should_branch_cached = true;
-                utils::print_ipc_debug_comments("run_id: {}, should_branch() initializer succeeded, returning true", m_node_id);
                 return true;
             }
+            auto v_args_opt = m_initializer();
+            utils::print_ipc_debug_comments("run_id: {}, should_branch() calling initializer", m_node_id);
+            if (!v_args_opt.has_value()) {
+                utils::print_ipc_debug_comments("run_id: {}, should_branch() initializer returned nullopt", m_node_id);
+                m_should_branch_cached = false;
+                m_initialization_flag = INITIALIZED;
+                return false;
+            }
+            m_arguments = std::move(v_args_opt.value());
+            m_initialization_flag = INITIALIZED;
             m_should_branch_cached = true;
+            utils::print_ipc_debug_comments("run_id: {}, should_branch() initializer succeeded", m_node_id);
             return true;
         }
 
@@ -547,18 +529,16 @@ namespace gempba {
         }
 
         std::any get_any_result() override {
-            if (std::holds_alternative<std::any>(m_result)) {
-                this->m_state = RETRIEVED;
-                return std::get<std::any>(m_result);
-            }
+            // m_result is a std::variant<std::any, std::future<std::any>> and is therefore
+            // never valueless: collapse the future variant to a std::any so the rest of the
+            // function has a single exit point.
             if (std::holds_alternative<std::future<std::any>>(m_result)) {
                 auto &v_future = std::get<std::future<std::any>>(m_result);
                 v_future.wait();
-                std::any v_any_result = v_future.get();
-                this->m_state = RETRIEVED;
-                return v_any_result;
+                m_result = v_future.get();
             }
-            utils::log_and_throw("Attempting to get result of node that has not been executed");
+            this->m_state = RETRIEVED;
+            return std::get<std::any>(m_result);
         }
 
         void remove_child(std::shared_ptr<node_core> &p_child) override { m_children.remove(p_child); }
