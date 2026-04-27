@@ -315,3 +315,70 @@ TEST(score_test, cross_type_not_equal_u_i32_and_u_i64) {
 
     EXPECT_NE(v_ui32, v_ui64);
 }
+
+TEST(score_test, kind_returns_score_type_tag) {
+    EXPECT_EQ(score_type::I32, score::make(std::int32_t{1}).kind());
+    EXPECT_EQ(score_type::U_I32, score::make(std::uint32_t{1}).kind());
+    EXPECT_EQ(score_type::I64, score::make(std::int64_t{1}).kind());
+    EXPECT_EQ(score_type::U_I64, score::make(std::uint64_t{1}).kind());
+    EXPECT_EQ(score_type::F32, score::make(1.0f).kind());
+    EXPECT_EQ(score_type::F64, score::make(1.0).kind());
+    EXPECT_EQ(score_type::F128, score::make(1.0L).kind());
+}
+
+TEST(score_test, to_raw_round_trip_for_each_supported_type) {
+    const auto v_round_trip = []<typename T>(T p_value) {
+        const auto v_original = score::make(p_value);
+        const auto v_reconstructed = score::from_raw(v_original.kind(), v_original.to_raw());
+        EXPECT_EQ(v_original, v_reconstructed);
+        EXPECT_EQ(p_value, v_reconstructed.template get<T>());
+    };
+    v_round_trip(std::int32_t{-12345});
+    v_round_trip(std::uint32_t{0xDEADBEEF});
+    v_round_trip(std::int64_t{-1234567890123LL});
+    v_round_trip(std::uint64_t{0xCAFEBABEDEADBEEFULL});
+    v_round_trip(3.1415927f);
+    v_round_trip(2.718281828459045);
+}
+
+TEST(score_test, to_raw_aborts_for_f128) {
+    const auto v_score = score::make(1.0L);
+    EXPECT_DEATH(static_cast<void>(v_score.to_raw()), "");
+}
+
+TEST(score_test, from_raw_aborts_for_f128) { EXPECT_DEATH(static_cast<void>(score::from_raw(score_type::F128, 0)), ""); }
+
+TEST(score_test, equality_within_unsigned_types) {
+    EXPECT_EQ(score::make(std::uint32_t{42}), score::make(std::uint32_t{42}));
+    EXPECT_NE(score::make(std::uint32_t{42}), score::make(std::uint32_t{43}));
+    EXPECT_EQ(score::make(std::uint64_t{42}), score::make(std::uint64_t{42}));
+    EXPECT_NE(score::make(std::uint64_t{42}), score::make(std::uint64_t{43}));
+}
+
+TEST(score_test, ordering_across_different_kinds_uses_long_double) {
+    // <=> falls back to long-double comparison when kinds differ. A monotonically
+    // increasing chain that touches every score_type drives all branches of
+    // to_long_double().
+    const auto v_i32 = score::make(std::int32_t{1});
+    const auto v_u32 = score::make(std::uint32_t{2});
+    const auto v_i64 = score::make(std::int64_t{3});
+    const auto v_u64 = score::make(std::uint64_t{4});
+    const auto v_f32 = score::make(5.0f);
+    const auto v_f64 = score::make(6.0);
+    const auto v_f128 = score::make(7.0L);
+    EXPECT_LT(v_i32, v_u32);
+    EXPECT_LT(v_u32, v_i64);
+    EXPECT_LT(v_i64, v_u64);
+    EXPECT_LT(v_u64, v_f32);
+    EXPECT_LT(v_f32, v_f64);
+    EXPECT_LT(v_f64, v_f128);
+    EXPECT_GT(v_f128, v_i32);
+}
+
+TEST(score_test, get_loose_converts_unsigned_integers_to_floating) {
+    // Drives the U_I32 / U_I64 → floating branches of get_loose
+    EXPECT_FLOAT_EQ(42.0f, score::make(std::uint32_t{42}).get_loose<float>());
+    EXPECT_DOUBLE_EQ(42.0, score::make(std::uint32_t{42}).get_loose<double>());
+    EXPECT_FLOAT_EQ(7.0f, score::make(std::uint64_t{7}).get_loose<float>());
+    EXPECT_DOUBLE_EQ(7.0, score::make(std::uint64_t{7}).get_loose<double>());
+}
