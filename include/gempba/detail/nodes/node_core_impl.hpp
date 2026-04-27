@@ -387,8 +387,6 @@ namespace gempba {
         [[nodiscard]] bool is_consumed() const override { return m_state != UNUSED; }
 
         bool should_branch() override {
-            utils::print_ipc_debug_comments("run_id: {}, should_branch() called, state={}, init_flag={}", m_node_id, get_state_string(m_state), m_initialization_flag);
-
             if (m_should_branch_cached.has_value()) {
                 utils::print_ipc_debug_comments("run_id: {}, should_branch() returning cached value: {}", m_node_id, m_should_branch_cached.value());
                 return m_should_branch_cached.value();
