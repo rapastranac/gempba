@@ -323,19 +323,8 @@ namespace gempba {
                 return v_second_child;
             }
 
-            // This conditions should be met:  v_root->get_children_count() == 2
-
-            if (v_root->get_children_count() != 2) {
-                utils::log_and_throw("Unexpected condition: root should have exactly two children");
-            }
-
-            // Last pending node - return it
+            // At this point children_count() must be exactly 2 (the < 2 and > 2 branches above already returned).
             std::shared_ptr<node_core> v_second = v_root->get_second_leftmost_child();
-
-            if (v_second == nullptr) {
-                utils::log_and_throw("Unexpected condition: second child is null");
-            }
-
             v_second->prune();
             // at this point, root should have only one child: the leftMost which was already resolved
             return v_second; // Just return it
