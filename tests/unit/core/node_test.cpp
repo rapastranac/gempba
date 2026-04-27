@@ -438,6 +438,38 @@ TEST_F(node_operator_test, edge_cases) {
 }
 
 
+TEST_F(node_test, set_parent_forwards_to_node_core) {
+    const auto v_parent_mock = std::make_shared<node_core_mock>();
+    EXPECT_CALL(*m_node_core_mock, set_parent(::testing::Eq(std::static_pointer_cast<gempba::node_core>(v_parent_mock)))).Times(1);
+
+    gempba::node v_node(m_node_core_mock);
+    const gempba::node v_parent(v_parent_mock);
+    v_node.set_parent(v_parent);
+}
+
+TEST_F(node_test, add_child_forwards_to_node_core) {
+    const auto v_child_mock = std::make_shared<node_core_mock>();
+    EXPECT_CALL(*m_node_core_mock, add_child(::testing::Eq(std::static_pointer_cast<gempba::node_core>(v_child_mock)))).Times(1);
+
+    gempba::node v_node(m_node_core_mock);
+    const gempba::node v_child(v_child_mock);
+    v_node.add_child(v_child);
+}
+
+TEST_F(node_test, remove_child_forwards_to_node_core) {
+    const auto v_child_mock = std::make_shared<node_core_mock>();
+    EXPECT_CALL(*m_node_core_mock, remove_child(::testing::_)).Times(1);
+
+    gempba::node v_node(m_node_core_mock);
+    gempba::node v_child(v_child_mock);
+    v_node.remove_child(v_child);
+}
+
+TEST_F(node_test, methods_throw_when_node_core_is_null) {
+    gempba::node v_null_node;
+    EXPECT_THROW(v_null_node.run(), std::runtime_error);
+}
+
 /**
  * @attention this is a very special test, the node instance could die before it gets executed by the internal
  * thread pool in the node manager, so we need to mimic a short lifespan of a node
