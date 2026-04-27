@@ -21,11 +21,15 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+#include <atomic>
 #include <chrono>
+#include <condition_variable>
+#include <future>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 
 #include <gempba/core/scheduler.hpp>
@@ -776,4 +780,401 @@ TEST_F(quasi_horizontal_load_balancer_test, FLAKY_stress_test_root_correction_un
     }
 
     delete v_balancer;
+}
+
+TEST_F(quasi_horizontal_load_balancer_test, forward_root_node_with_no_parent_only_prunes) {
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+
+    bool v_function_called = false;
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node &) { v_function_called = true; };
+
+    std::shared_ptr<gempba::node_core> v_no_parent;
+    auto v_root_node = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_no_parent, v_fn, std::make_tuple(0));
+
+    ASSERT_EQ(nullptr, v_root_node->get_parent());
+
+    gempba::node v_node(v_root_node);
+    v_balancer.forward(v_node);
+
+    EXPECT_TRUE(v_function_called);
+    EXPECT_EQ(nullptr, v_root_node->get_root());
+}
+
+TEST_F(quasi_horizontal_load_balancer_test, try_remote_submit_throws_without_scheduler) {
+    gempba::quasi_horizontal_load_balancer v_balancer(nullptr);
+
+    auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_balancer);
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node &) {};
+    auto v_child = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_parent, v_fn, std::make_tuple(0));
+
+    gempba::node v_node(v_child);
+    EXPECT_THROW(v_balancer.try_remote_submit(v_node, 0), std::runtime_error);
+}
+
+TEST_F(quasi_horizontal_load_balancer_test, try_remote_submit_falls_back_to_local_when_no_channel) {
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    v_balancer.set_thread_pool_size(2);
+
+    EXPECT_CALL(*m_scheduler_worker_mock, try_open_transmission_channel()).WillOnce(testing::Return(std::nullopt));
+
+    std::atomic<bool> v_fn_called{false};
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node &) { v_fn_called = true; };
+    auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_balancer);
+    auto v_child = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_parent, v_fn, std::make_tuple(0));
+
+    gempba::node v_node(v_child);
+    const bool v_result = v_balancer.try_remote_submit(v_node, 0);
+
+    v_balancer.wait();
+
+    EXPECT_FALSE(v_result);
+    EXPECT_TRUE(v_fn_called);
+}
+
+TEST_F(quasi_horizontal_load_balancer_test, get_root_returns_null_for_unknown_thread) {
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+
+    std::thread v_thread([] {});
+    const std::thread::id v_unknown_id = v_thread.get_id();
+    v_thread.join();
+
+    const auto v_root = v_balancer.get_root(v_unknown_id);
+    EXPECT_EQ(nullptr, v_root);
+}
+
+TEST_F(quasi_horizontal_load_balancer_test, send_local_throws_when_node_is_already_consumed) {
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node &) {};
+    auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_balancer);
+    auto v_child = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_parent, v_fn, std::make_tuple(0));
+    v_child->set_state(gempba::FORWARDED);
+
+    gempba::node v_node(v_child);
+    EXPECT_THROW(v_balancer.try_local_submit(v_node), std::runtime_error);
+}
+
+TEST_F(quasi_horizontal_load_balancer_test, send_local_discards_lazy_node_when_not_worthy) {
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+
+    bool v_fn_called = false;
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node &) { v_fn_called = true; };
+    const std::function<std::optional<std::tuple<int>>()> v_initializer = []() -> std::optional<std::tuple<int>> { return std::nullopt; };
+    const std::function<gempba::task_packet(int)> v_serializer = [](int) { return gempba::task_packet::EMPTY; };
+    const std::function<std::tuple<int>(gempba::task_packet)> v_deserializer = [](const gempba::task_packet &) { return std::make_tuple(0); };
+
+    auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_balancer);
+    auto v_child = gempba::node_core_impl<void(int)>::create_serializable_lazy(v_balancer, v_parent, v_fn, v_initializer, v_serializer, v_deserializer);
+
+    gempba::node v_node(v_child);
+    const bool v_result = v_balancer.try_local_submit(v_node);
+
+    EXPECT_TRUE(v_result);
+    EXPECT_FALSE(v_fn_called);
+    EXPECT_EQ(gempba::DISCARDED, v_child->get_state());
+}
+
+TEST_F(quasi_horizontal_load_balancer_test, send_remote_throws_when_node_is_already_consumed) {
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+
+    std::mutex v_channel_mutex;
+    EXPECT_CALL(*m_scheduler_worker_mock, try_open_transmission_channel()).WillOnce([&]() -> std::optional<gempba::transmission_guard> {
+        std::unique_lock v_lock(v_channel_mutex);
+        return gempba::transmission_guard(std::move(v_lock));
+    });
+
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node &) {};
+    auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_balancer);
+    auto v_child = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_parent, v_fn, std::make_tuple(0));
+    v_child->set_state(gempba::FORWARDED);
+
+    gempba::node v_node(v_child);
+    EXPECT_THROW(v_balancer.try_remote_submit(v_node, 0), std::runtime_error);
+}
+
+TEST_F(quasi_horizontal_load_balancer_test, send_remote_discards_lazy_node_when_not_worthy) {
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+
+    std::mutex v_channel_mutex;
+    EXPECT_CALL(*m_scheduler_worker_mock, try_open_transmission_channel()).WillOnce([&]() -> std::optional<gempba::transmission_guard> {
+        std::unique_lock v_lock(v_channel_mutex);
+        return gempba::transmission_guard(std::move(v_lock));
+    });
+
+    bool v_fn_called = false;
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node &) { v_fn_called = true; };
+    const std::function<std::optional<std::tuple<int>>()> v_initializer = []() -> std::optional<std::tuple<int>> { return std::nullopt; };
+    const std::function<gempba::task_packet(int)> v_serializer = [](int) { return gempba::task_packet::EMPTY; };
+    const std::function<std::tuple<int>(gempba::task_packet)> v_deserializer = [](const gempba::task_packet &) { return std::make_tuple(0); };
+
+    auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_balancer);
+    auto v_child = gempba::node_core_impl<void(int)>::create_serializable_lazy(v_balancer, v_parent, v_fn, v_initializer, v_serializer, v_deserializer);
+
+    gempba::node v_node(v_child);
+    const bool v_result = v_balancer.try_remote_submit(v_node, 0);
+
+    EXPECT_TRUE(v_result);
+    EXPECT_FALSE(v_fn_called);
+    EXPECT_EQ(gempba::DISCARDED, v_child->get_state());
+}
+
+TEST_F(quasi_horizontal_load_balancer_test, send_remote_continues_after_top_level_push) {
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+
+    std::mutex v_channel_mutex;
+    EXPECT_CALL(*m_scheduler_worker_mock, try_open_transmission_channel()).Times(3).WillRepeatedly([&]() -> std::optional<gempba::transmission_guard> {
+        std::unique_lock v_lock(v_channel_mutex);
+        return gempba::transmission_guard(std::move(v_lock));
+    });
+    EXPECT_CALL(*m_scheduler_worker_mock, force_push(testing::_, testing::_)).Times(3).WillRepeatedly([](gempba::task_packet &&, int) { return 1u; });
+
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node &) { FAIL(); };
+    const std::function<gempba::task_packet(int)> v_serializer = [](int) { return gempba::task_packet::EMPTY; };
+    const std::function<std::tuple<int>(gempba::task_packet)> v_deserializer = [](const gempba::task_packet &) { return std::make_tuple(0); };
+
+    auto v_root = gempba::node_core_impl<void()>::create_dummy(v_balancer);
+    auto v_child1 = gempba::node_core_impl<void(int)>::create_serializable_explicit(v_balancer, v_root, v_fn, std::make_tuple(0), v_serializer, v_deserializer);
+    auto v_child2 = gempba::node_core_impl<void(int)>::create_serializable_explicit(v_balancer, v_root, v_fn, std::make_tuple(0), v_serializer, v_deserializer);
+    auto v_child3 = gempba::node_core_impl<void(int)>::create_serializable_explicit(v_balancer, v_root, v_fn, std::make_tuple(0), v_serializer, v_deserializer);
+    v_child1->set_state(gempba::FORWARDED);
+    auto v_grandchild = gempba::node_core_impl<void(int)>::create_serializable_explicit(v_balancer, v_child1, v_fn, std::make_tuple(0), v_serializer, v_deserializer);
+
+    gempba::node v_node(v_grandchild);
+    const bool v_result = v_balancer.try_remote_submit(v_node, 0);
+
+    EXPECT_TRUE(v_result);
+    EXPECT_EQ(gempba::SENT_TO_ANOTHER_PROCESS, v_grandchild->get_state());
+    EXPECT_EQ(gempba::SENT_TO_ANOTHER_PROCESS, v_child2->get_state());
+    EXPECT_EQ(gempba::SENT_TO_ANOTHER_PROCESS, v_child3->get_state());
+}
+
+TEST_F(quasi_horizontal_load_balancer_test, send_local_returns_false_on_mutex_contention) {
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+
+    bool v_fn_b_called = false;
+    std::function<void(std::thread::id, int, gempba::node)> v_fn_b = [&](std::thread::id, int, const gempba::node &) { v_fn_b_called = true; };
+    std::shared_ptr<gempba::node_core> v_no_parent_b;
+    auto v_child_b = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_no_parent_b, v_fn_b, std::make_tuple(0));
+
+    std::function<void(std::thread::id, int, gempba::node)> v_fn_a = [](std::thread::id, int, const gempba::node &) {};
+    std::shared_ptr<gempba::node_core> v_no_parent_a;
+    auto v_child_a = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_no_parent_a, v_fn_a, std::make_tuple(0));
+
+    std::mutex v_started_mutex;
+    std::condition_variable v_started_cv;
+    bool v_started = false;
+    std::promise<void> v_release;
+    const auto v_release_future = v_release.get_future().share();
+
+    EXPECT_CALL(*m_scheduler_worker_mock, try_open_transmission_channel()).WillOnce([&]() -> std::optional<gempba::transmission_guard> {
+        {
+            std::scoped_lock v_lk(v_started_mutex);
+            v_started = true;
+        }
+        v_started_cv.notify_one();
+        v_release_future.wait();
+        return std::nullopt;
+    });
+
+    gempba::node v_node_a(v_child_a);
+    auto v_future_a = std::async(std::launch::async, [&] { v_balancer.try_remote_submit(v_node_a, 0); });
+
+    {
+        std::unique_lock v_lk(v_started_mutex);
+        v_started_cv.wait(v_lk, [&] { return v_started; });
+    }
+
+    gempba::node v_node_b(v_child_b);
+    const bool v_result = v_balancer.try_local_submit(v_node_b);
+
+    v_release.set_value();
+    v_future_a.wait();
+    v_balancer.wait();
+
+    EXPECT_FALSE(v_result);
+    EXPECT_TRUE(v_fn_b_called);
+}
+
+TEST_F(quasi_horizontal_load_balancer_test, send_remote_returns_false_on_mutex_contention) {
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+
+    bool v_fn_b_called = false;
+    std::function<void(std::thread::id, int, gempba::node)> v_fn_b = [&](std::thread::id, int, const gempba::node &) { v_fn_b_called = true; };
+    std::shared_ptr<gempba::node_core> v_no_parent_b;
+    auto v_child_b = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_no_parent_b, v_fn_b, std::make_tuple(0));
+
+    std::function<void(std::thread::id, int, gempba::node)> v_fn_a = [](std::thread::id, int, const gempba::node &) {};
+    std::shared_ptr<gempba::node_core> v_no_parent_a;
+    auto v_child_a = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_no_parent_a, v_fn_a, std::make_tuple(0));
+
+    std::mutex v_started_mutex;
+    std::condition_variable v_started_cv;
+    bool v_started = false;
+    std::promise<void> v_release;
+    const auto v_release_future = v_release.get_future().share();
+
+    EXPECT_CALL(*m_scheduler_worker_mock, try_open_transmission_channel()).WillOnce([&]() -> std::optional<gempba::transmission_guard> {
+        {
+            std::scoped_lock v_lk(v_started_mutex);
+            v_started = true;
+        }
+        v_started_cv.notify_one();
+        v_release_future.wait();
+        return std::nullopt;
+    });
+
+    gempba::node v_node_a(v_child_a);
+    auto v_future_a = std::async(std::launch::async, [&] { v_balancer.try_remote_submit(v_node_a, 0); });
+
+    {
+        std::unique_lock v_lk(v_started_mutex);
+        v_started_cv.wait(v_lk, [&] { return v_started; });
+    }
+
+    gempba::node v_node_b(v_child_b);
+    const bool v_result = v_balancer.try_remote_submit(v_node_b, 0);
+
+    v_release.set_value();
+    v_future_a.wait();
+    v_balancer.wait();
+
+    EXPECT_FALSE(v_result);
+    EXPECT_TRUE(v_fn_b_called);
+}
+
+TEST_F(quasi_horizontal_load_balancer_test, try_push_root_level_node_locally_throws_on_consumed_top) {
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node &) {};
+    auto v_root = gempba::node_core_impl<void()>::create_dummy(v_balancer);
+    auto v_child1 = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_root, v_fn, std::make_tuple(0));
+    auto v_child2 = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_root, v_fn, std::make_tuple(0));
+    auto v_child3 = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_root, v_fn, std::make_tuple(0));
+    auto v_grandchild = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_child1, v_fn, std::make_tuple(0));
+
+    v_child1->set_state(gempba::FORWARDED);
+    v_child2->set_state(gempba::FORWARDED); // second-leftmost is consumed — abnormal state
+
+    gempba::node v_node(v_grandchild);
+    EXPECT_THROW(v_balancer.try_push_root_level_node_locally(v_node), std::runtime_error);
+}
+
+TEST_F(quasi_horizontal_load_balancer_test, try_push_root_level_node_locally_discards_lazy_top) {
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node &) { FAIL(); };
+    const std::function<std::optional<std::tuple<int>>()> v_initializer = []() -> std::optional<std::tuple<int>> { return std::nullopt; };
+    const std::function<gempba::task_packet(int)> v_serializer = [](int) { return gempba::task_packet::EMPTY; };
+    const std::function<std::tuple<int>(gempba::task_packet)> v_deserializer = [](const gempba::task_packet &) { return std::make_tuple(0); };
+
+    auto v_root = gempba::node_core_impl<void()>::create_dummy(v_balancer);
+    auto v_child1 = gempba::node_core_impl<void(int)>::create_serializable_explicit(v_balancer, v_root, v_fn, std::make_tuple(0), v_serializer, v_deserializer);
+    auto v_child2 = gempba::node_core_impl<void(int)>::create_serializable_lazy(v_balancer, v_root, v_fn, v_initializer, v_serializer, v_deserializer);
+    auto v_child3 = gempba::node_core_impl<void(int)>::create_serializable_explicit(v_balancer, v_root, v_fn, std::make_tuple(0), v_serializer, v_deserializer);
+    auto v_grandchild = gempba::node_core_impl<void(int)>::create_serializable_explicit(v_balancer, v_child1, v_fn, std::make_tuple(0), v_serializer, v_deserializer);
+    v_child1->set_state(gempba::FORWARDED);
+
+    gempba::node v_node(v_grandchild);
+    const bool v_result = v_balancer.try_push_root_level_node_locally(v_node);
+
+    EXPECT_TRUE(v_result);
+    EXPECT_EQ(gempba::DISCARDED, v_child2->get_state());
+}
+
+TEST_F(quasi_horizontal_load_balancer_test, try_push_root_level_node_remotely_throws_on_consumed_top) {
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+
+    const std::function<gempba::task_packet(int)> v_serializer = [](int) { return gempba::task_packet::EMPTY; };
+    const std::function<std::tuple<int>(gempba::task_packet)> v_deserializer = [](const gempba::task_packet &) { return std::make_tuple(0); };
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node &) {};
+
+    auto v_root = gempba::node_core_impl<void()>::create_dummy(v_balancer);
+    auto v_child1 = gempba::node_core_impl<void(int)>::create_serializable_explicit(v_balancer, v_root, v_fn, std::make_tuple(0), v_serializer, v_deserializer);
+    auto v_child2 = gempba::node_core_impl<void(int)>::create_serializable_explicit(v_balancer, v_root, v_fn, std::make_tuple(0), v_serializer, v_deserializer);
+    auto v_child3 = gempba::node_core_impl<void(int)>::create_serializable_explicit(v_balancer, v_root, v_fn, std::make_tuple(0), v_serializer, v_deserializer);
+    auto v_grandchild = gempba::node_core_impl<void(int)>::create_serializable_explicit(v_balancer, v_child1, v_fn, std::make_tuple(0), v_serializer, v_deserializer);
+
+    v_child1->set_state(gempba::FORWARDED);
+    v_child2->set_state(gempba::FORWARDED);
+
+    gempba::node v_node(v_grandchild);
+    EXPECT_THROW(v_balancer.try_push_root_level_node_remotely(v_node, 0), std::runtime_error);
+}
+
+TEST_F(quasi_horizontal_load_balancer_test, try_push_root_level_node_remotely_discards_lazy_top) {
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node &) { FAIL(); };
+    const std::function<std::optional<std::tuple<int>>()> v_initializer = []() -> std::optional<std::tuple<int>> { return std::nullopt; };
+    const std::function<gempba::task_packet(int)> v_serializer = [](int) { return gempba::task_packet::EMPTY; };
+    const std::function<std::tuple<int>(gempba::task_packet)> v_deserializer = [](const gempba::task_packet &) { return std::make_tuple(0); };
+
+    auto v_root = gempba::node_core_impl<void()>::create_dummy(v_balancer);
+    auto v_child1 = gempba::node_core_impl<void(int)>::create_serializable_explicit(v_balancer, v_root, v_fn, std::make_tuple(0), v_serializer, v_deserializer);
+    auto v_child2 = gempba::node_core_impl<void(int)>::create_serializable_lazy(v_balancer, v_root, v_fn, v_initializer, v_serializer, v_deserializer);
+    auto v_child3 = gempba::node_core_impl<void(int)>::create_serializable_explicit(v_balancer, v_root, v_fn, std::make_tuple(0), v_serializer, v_deserializer);
+    auto v_grandchild = gempba::node_core_impl<void(int)>::create_serializable_explicit(v_balancer, v_child1, v_fn, std::make_tuple(0), v_serializer, v_deserializer);
+    v_child1->set_state(gempba::FORWARDED);
+
+    gempba::node v_node(v_grandchild);
+    const bool v_result = v_balancer.try_push_root_level_node_remotely(v_node, 0);
+
+    EXPECT_TRUE(v_result);
+    EXPECT_EQ(gempba::DISCARDED, v_child2->get_state());
+}
+
+TEST_F(quasi_horizontal_load_balancer_test, get_root_level_pending_node_returns_null_when_root_is_null) {
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node &) {};
+    auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_balancer);
+    auto v_child = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_parent, v_fn, std::make_tuple(0));
+
+    // Override the parent thread's root entry with a null pointer; child's m_root then
+    // dereferences to nullptr while child still has a non-null parent.
+    std::shared_ptr<gempba::node_core> v_null;
+    v_balancer.set_root(v_parent->get_thread_id(), v_null);
+
+    ASSERT_NE(nullptr, v_child->get_parent());
+    ASSERT_EQ(nullptr, v_child->get_root());
+
+    const auto v_top_node = gempba::quasi_horizontal_load_balancer::get_root_level_pending_node(v_child);
+    EXPECT_EQ(nullptr, v_top_node);
+}
+
+TEST_F(quasi_horizontal_load_balancer_test, try_correct_root_is_a_noop_when_root_is_null) {
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node &) {};
+    auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_balancer);
+    auto v_child = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_parent, v_fn, std::make_tuple(0));
+    v_child->prune(); // clears parent and root
+
+    ASSERT_EQ(nullptr, v_child->get_parent());
+    ASSERT_EQ(nullptr, v_child->get_root());
+
+    gempba::node v_node(v_child);
+    v_balancer.try_correct_root(v_node);
+
+    EXPECT_EQ(nullptr, v_child->get_parent());
+    EXPECT_EQ(nullptr, v_child->get_root());
+    EXPECT_EQ(0, v_child->get_children_count());
+}
+
+TEST_F(quasi_horizontal_load_balancer_test, try_correct_root_is_a_noop_when_node_is_root_and_leaf) {
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node &) {};
+    std::shared_ptr<gempba::node_core> v_no_parent;
+    auto v_root_node = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_no_parent, v_fn, std::make_tuple(0));
+
+    ASSERT_EQ(v_root_node, v_root_node->get_root());
+    ASSERT_EQ(0, v_root_node->get_children_count());
+
+    gempba::node v_node(v_root_node);
+    v_balancer.try_correct_root(v_node);
+
+    EXPECT_EQ(v_root_node, v_root_node->get_root());
+    EXPECT_EQ(nullptr, v_root_node->get_parent());
+    EXPECT_EQ(0, v_root_node->get_children_count());
 }
