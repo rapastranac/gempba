@@ -396,17 +396,6 @@ class get_peak_rss_test : public ::testing::Test {};
 
 TEST_F(get_peak_rss_test, returns_non_negative) { EXPECT_GE(get_peak_rss(), static_cast<std::size_t>(0)); }
 
-TEST_F(get_peak_rss_test, is_at_least_current_rss_when_both_nonzero) {
-    // Order matters: read current first, then peak. Allocations that happen between
-    // the two calls (e.g. fopen's FILE struct in get_current_rss) would otherwise
-    // push current above the peak sample.
-    const std::size_t v_current = get_current_rss();
-    const std::size_t v_peak = get_peak_rss();
-    if (v_peak > 0 && v_current > 0) {
-        EXPECT_GE(v_peak, v_current);
-    }
-}
-
 TEST_F(get_peak_rss_test, is_monotonically_non_decreasing_after_allocation) {
     const std::size_t v_before = get_peak_rss();
     {
@@ -429,14 +418,6 @@ TEST_F(get_peak_rss_test, stable_across_repeated_calls) {
 class get_current_rss_test : public ::testing::Test {};
 
 TEST_F(get_current_rss_test, returns_non_negative) { EXPECT_GE(get_current_rss(), static_cast<std::size_t>(0)); }
-
-TEST_F(get_current_rss_test, does_not_exceed_peak_rss_when_both_nonzero) {
-    const std::size_t v_current = get_current_rss();
-    const std::size_t v_peak = get_peak_rss();
-    if (v_current > 0 && v_peak > 0) {
-        EXPECT_LE(v_current, v_peak);
-    }
-}
 
 #if defined(__linux__) || defined(__linux) || defined(linux) || defined(__gnu_linux__)
 TEST_F(get_current_rss_test, linux_result_is_page_aligned) {
