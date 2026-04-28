@@ -20,6 +20,29 @@ set -euo pipefail
 WORKSPACE="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$WORKSPACE"
 
+# ANSI styling. Order: NO_COLOR wins; FORCE_COLOR forces on; CI runners
+# (GitHub Actions, generic CI=true) get colour because their log viewer
+# renders ANSI even though stdout is not a TTY; otherwise honour TTY.
+if [[ -n "${NO_COLOR:-}" ]]; then
+    USE_COLOR=0
+elif [[ -n "${FORCE_COLOR:-}" || "${GITHUB_ACTIONS:-}" == "true" || "${CI:-}" == "true" ]]; then
+    USE_COLOR=1
+elif [[ -t 1 ]]; then
+    USE_COLOR=1
+else
+    USE_COLOR=0
+fi
+
+if [[ $USE_COLOR -eq 1 ]]; then
+    C_RED=$'\033[1;31m'           # bold red
+    C_ORN=$'\033[1;38;5;208m'     # bold true-orange (256-colour, not the brown-ish ANSI yellow)
+    C_DIM=$'\033[2m'              # dim
+    C_OFF=$'\033[0m'              # reset
+    C_BOLD=$'\033[1m'             # bold
+else
+    C_RED='' C_ORN='' C_DIM='' C_OFF='' C_BOLD=''
+fi
+
 BUILD_DIR="${BUILD_DIR:-$WORKSPACE/.build-lint}"
 
 resolve_tool() {
@@ -163,16 +186,53 @@ if [[ $DO_TIDY -eq 1 ]]; then
     if command -v "$RUN_CLANG_TIDY" >/dev/null 2>&1; then
         # run-clang-tidy exits 0 even when warnings are emitted; scan its
         # output for any ": warning:" / ": error:" line to detect findings.
-        TIDY_LOG="$(mktemp)"
-        "$RUN_CLANG_TIDY" "${TIDY_ARGS[@]}" "$FILE_FILTER" 2>&1 | tee "$TIDY_LOG"
+        TIDY_LOG="$(mktemp -t gempba-tidy.XXXXXX.log)"
+        # Stream progress to the user but drop the "NNN warnings generated."
+        # noise lines (those are clang-internal counts before -header-filter
+        # culls system headers, not real diagnostics). The full raw log stays
+        # in TIDY_LOG without ANSI codes for later grepping.
+        "$RUN_CLANG_TIDY" "${TIDY_ARGS[@]}" "$FILE_FILTER" 2>&1 \
+            | tee "$TIDY_LOG" \
+            | grep -vE '^[[:space:]]*[0-9]+ warnings? generated\.' \
+            | sed -E \
+                -e "s|^([^[:space:]][^:]*):([0-9]+):([0-9]+):|${C_BOLD}\1:\2:\3:${C_OFF}|" \
+                -e "s| warning: | ${C_ORN}warning:${C_OFF} |g" \
+                -e "s| error: | ${C_RED}error:${C_OFF} |g" \
+                -e "s| (\[[a-zA-Z0-9._/-]+\])$| ${C_DIM}\1${C_OFF}|" || true
         TIDY_RC=${PIPESTATUS[0]}
-        if [[ $TIDY_RC -ne 0 ]] || grep -qE ': (warning|error): ' "$TIDY_LOG"; then
-            echo "❌ clang-tidy reported issues" >&2
+
+        ISSUES_FILE="$(mktemp -t gempba-tidy-issues.XXXXXX.txt)"
+        grep -E ': (warning|error): ' "$TIDY_LOG" \
+            | sed -E "s|^${FILTER_ROOT}/||" \
+            | sort -u > "$ISSUES_FILE" || true
+        ISSUE_COUNT=$(wc -l < "$ISSUES_FILE" | tr -d ' ')
+
+        if [[ "$ISSUE_COUNT" -gt 0 ]]; then
+            echo
+            printf '%s━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n' "$C_RED" "$C_OFF"
+            printf '%s🚨 clang-tidy diagnostics (%d) — must be fixed%s\n' "$C_RED" "$ISSUE_COUNT" "$C_OFF"
+            printf '%s━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n' "$C_RED" "$C_OFF"
+            echo
+            # Per-line styling: file:L:C bold, "warning:" red+bold, "error:" red+bold,
+            # trailing [check-name] dimmed.
+            nl -ba -w2 -s'. ' "$ISSUES_FILE" \
+                | sed -E \
+                    -e "s|^([[:space:]]*[0-9]+\. )([^:]+):([0-9]+):([0-9]+):|\1${C_BOLD}\2:\3:\4:${C_OFF}|" \
+                    -e "s| warning: | ${C_ORN}warning:${C_OFF} |g" \
+                    -e "s| error: | ${C_RED}error:${C_OFF} |g" \
+                    -e "s| (\[[a-zA-Z0-9._/-]+\])$| ${C_DIM}\1${C_OFF}|" \
+                | sed 's/^/  /'
+            echo
+            printf '  Full log: %s%s%s\n' "$C_DIM" "$TIDY_LOG" "$C_OFF"
+            EXIT_STATUS=1
+        elif [[ $TIDY_RC -ne 0 ]]; then
+            printf '%s❌ clang-tidy exited with status %d%s (full log: %s)\n' "$C_RED" "$TIDY_RC" "$C_OFF" "$TIDY_LOG" >&2
             EXIT_STATUS=1
         else
             echo "✅ clang-tidy clean"
+            rm -f "$TIDY_LOG"
         fi
-        rm -f "$TIDY_LOG"
+        rm -f "$ISSUES_FILE"
     else
         echo "ℹ️  run-clang-tidy not found; falling back to sequential clang-tidy"
         TIDY_FAILED=0
