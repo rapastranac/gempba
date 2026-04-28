@@ -86,7 +86,7 @@ jobs:
   publish-test-results:
     needs: build-and-test
     runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-24.04' }}
-    if: always()
+    if: ${{ !cancelled() }}
 
     steps:
       # Download the test results
