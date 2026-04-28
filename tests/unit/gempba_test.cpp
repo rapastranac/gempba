@@ -38,30 +38,26 @@
  */
 class scheduler_stub final : public gempba::scheduler {
     struct center_stub final : center {
-        void barrier() override {
-        }
+        void barrier() override {}
 
         [[nodiscard]] int rank_me() const override { return 0; }
         [[nodiscard]] int world_size() const override { return 1; }
         [[nodiscard]] std::unique_ptr<gempba::stats> get_stats() const override { return nullptr; }
 
-        void run(gempba::task_packet, int) override {
-        }
+        void run(gempba::task_packet, int) override {}
 
         gempba::task_packet get_result() override { return gempba::task_packet::EMPTY; }
         std::vector<gempba::result> get_all_results() override { return {}; }
     };
 
     struct worker_stub final : worker {
-        void barrier() override {
-        }
+        void barrier() override {}
 
         [[nodiscard]] int rank_me() const override { return 0; }
         [[nodiscard]] int world_size() const override { return 1; }
         [[nodiscard]] std::unique_ptr<gempba::stats> get_stats() const override { return nullptr; }
 
-        void run(gempba::node_manager &, std::map<int, std::shared_ptr<gempba::serial_runnable>>) override {
-        }
+        void run(gempba::node_manager &, std::map<int, std::shared_ptr<gempba::serial_runnable>>) override {}
 
         unsigned int force_push(gempba::task_packet &&, int) override { return 0; }
         [[nodiscard]] unsigned int next_process() const override { return 0; }
@@ -72,24 +68,20 @@ class scheduler_stub final : public gempba::scheduler {
     worker_stub m_worker;
 
 public:
-    void barrier() override {
-    }
+    void barrier() override {}
 
     [[nodiscard]] int rank_me() const override { return 0; }
     [[nodiscard]] int world_size() const override { return 1; }
     [[nodiscard]] std::unique_ptr<gempba::stats> get_stats() const override { return nullptr; }
     [[nodiscard]] double elapsed_time() const override { return 0.0; }
 
-    void set_goal(gempba::goal, gempba::score_type) override {
-    }
+    void set_goal(gempba::goal, gempba::score_type) override {}
 
-    void set_custom_initial_topology(tree &&) override {
-    }
+    void set_custom_initial_topology(tree &&) override {}
 
     [[nodiscard]] std::vector<std::unique_ptr<gempba::stats>> get_stats_vector() const override { return {}; }
 
-    void synchronize_stats() override {
-    }
+    void synchronize_stats() override {}
 
     center &center_view() override { return m_center; }
     worker &worker_view() override { return m_worker; }
@@ -302,8 +294,8 @@ namespace {
 } // namespace
 
 TEST_F(gempba_test, create_custom_node_wraps_user_provided_core) {
-    auto v_custom_core = std::make_unique<minimal_node_core>();
-    gempba::node v_node = gempba::create_custom_node(std::move(v_custom_core));
+    auto v_custom_core = std::make_shared<minimal_node_core>();
+    gempba::node v_node = gempba::create_custom_node(v_custom_core);
 
     EXPECT_NE(nullptr, v_node);
     EXPECT_TRUE(v_node.should_branch()); // forwarded to minimal_node_core::should_branch()
