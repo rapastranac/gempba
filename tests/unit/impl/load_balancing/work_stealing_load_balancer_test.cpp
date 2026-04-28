@@ -204,6 +204,8 @@ TEST_F(work_stealing_load_balancer_test, forward_lazy_node_with_nullopt_initiali
 
 TEST_F(work_stealing_load_balancer_test, try_local_submit_with_available_pool_executes_node) {
     gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    v_load_balancer.set_thread_pool_size(2);
+    v_load_balancer.wait();
 
     std::atomic<bool> v_function_called{false};
     std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node &) { v_function_called = true; };
@@ -333,6 +335,8 @@ TEST_F(work_stealing_load_balancer_test, try_remote_submit_delegates_remotely_wh
 
 TEST_F(work_stealing_load_balancer_test, send_local_throws_when_node_is_already_consumed) {
     gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    v_load_balancer.set_thread_pool_size(2); // guarantee pool is ready before send() inspects it
+    v_load_balancer.wait();
 
     std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node &) {};
     auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_load_balancer);
@@ -345,6 +349,8 @@ TEST_F(work_stealing_load_balancer_test, send_local_throws_when_node_is_already_
 
 TEST_F(work_stealing_load_balancer_test, send_local_discards_lazy_node_when_not_worthy) {
     gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    v_load_balancer.set_thread_pool_size(2); // guarantee pool is ready before send() inspects it
+    v_load_balancer.wait();
 
     bool v_fn_called = false;
     std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node &) { v_fn_called = true; };
