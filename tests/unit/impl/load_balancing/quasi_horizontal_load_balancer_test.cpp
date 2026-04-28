@@ -82,10 +82,26 @@ TEST_F(quasi_horizontal_load_balancer_test, generate_unique_id) {
     EXPECT_NE(v_id1, v_id2);
 }
 
-TEST_F(quasi_horizontal_load_balancer_test, set_thread_pool_size) {
+TEST_F(quasi_horizontal_load_balancer_test, set_thread_pool_size_resizes_pool_and_keeps_it_usable) {
     gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_worker_mock);
+
+    std::atomic<int> v_runs{0};
+    const auto v_submit = [&] {
+        return v_load_balancer.force_local_submit([&v_runs]() -> std::any {
+            ++v_runs;
+            return std::any{};
+        });
+    };
+
     v_load_balancer.set_thread_pool_size(4);
-    EXPECT_NO_THROW(v_load_balancer.set_thread_pool_size(2));
+    auto v_first = v_submit();
+    v_first.wait();
+    EXPECT_EQ(1, v_runs.load());
+
+    v_load_balancer.set_thread_pool_size(2);
+    auto v_second = v_submit();
+    v_second.wait();
+    EXPECT_EQ(2, v_runs.load());
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, get_idle_time) {
@@ -93,9 +109,17 @@ TEST_F(quasi_horizontal_load_balancer_test, get_idle_time) {
     EXPECT_EQ(v_load_balancer.get_idle_time(), 0);
 }
 
-TEST_F(quasi_horizontal_load_balancer_test, wait_and_is_done) {
+TEST_F(quasi_horizontal_load_balancer_test, wait_blocks_until_submitted_task_completes) {
     gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_worker_mock);
-    EXPECT_NO_THROW(v_load_balancer.wait());
+
+    std::atomic<bool> v_ran{false};
+    auto v_future = v_load_balancer.force_local_submit([&v_ran]() -> std::any {
+        v_ran = true;
+        return std::any{};
+    });
+
+    v_load_balancer.wait();
+    EXPECT_TRUE(v_ran.load());
     EXPECT_TRUE(v_load_balancer.is_done());
 }
 
