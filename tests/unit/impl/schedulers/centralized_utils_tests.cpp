@@ -56,8 +56,11 @@
     #ifndef RPC_NO_WINDOWS_H
         #define RPC_NO_WINDOWS_H
     #endif
-    #include <psapi.h>
+    // psapi.h depends on Win32 types defined by windows.h, so order is significant.
+    // clang-format off
     #include <windows.h>
+    #include <psapi.h>
+// clang-format on
 #endif
 // -----------------------------------------------------------------------------
 
