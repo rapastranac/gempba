@@ -47,7 +47,10 @@
 **/
 inline int get_nb_set_bits(const char p_c) {
     // all credits to https://stackoverflow.com/questions/697978/c-code-to-count-the-number-of-1-bits-in-an-unsigned-char
-    return static_cast<int>((p_c * 01001001001ULL & 042104210421ULL) % 017);
+    // Cast to unsigned char first: on platforms where char is signed, bytes >= 0x80 are negative,
+    // causing the signed multiplication to produce wrong results.
+    const auto v_uc = static_cast<unsigned char>(p_c);
+    return static_cast<int>((v_uc * 01001001001ULL & 042104210421ULL) % 017);
 }
 
 inline int get_nb_set_bits(const gempba::task_packet &p_task) {

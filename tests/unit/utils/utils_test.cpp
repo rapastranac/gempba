@@ -22,6 +22,8 @@
  * SOFTWARE.
  */
 #include <any>
+#include <cfloat>
+#include <climits>
 #include <future>
 #include <gempba/utils/tree.hpp>
 #include <gempba/utils/utils.hpp>
@@ -163,3 +165,33 @@ TEST(utils_test, shift_left) {
         EXPECT_STREQ(e.what(), "Attempted to shift an empty vector");
     }
 }
+
+TEST(utils_test, diff_time_returns_difference) {
+    EXPECT_DOUBLE_EQ(0.0, utils::diff_time(10.0, 10.0));
+    EXPECT_DOUBLE_EQ(2.5, utils::diff_time(1.0, 3.5));
+    EXPECT_DOUBLE_EQ(-1.0, utils::diff_time(5.0, 4.0));
+}
+
+TEST(utils_test, get_default_score_returns_min_for_maximise_and_max_for_minimise) {
+    using gempba::MAXIMISE;
+    using gempba::MINIMISE;
+    using gempba::score;
+    using gempba::score_type;
+
+    EXPECT_EQ(score::make(INT_MIN), utils::get_default_score(MAXIMISE, score_type::I32));
+    EXPECT_EQ(score::make(INT_MAX), utils::get_default_score(MINIMISE, score_type::I32));
+
+    EXPECT_EQ(score::make(LONG_MIN), utils::get_default_score(MAXIMISE, score_type::I64));
+    EXPECT_EQ(score::make(LONG_MAX), utils::get_default_score(MINIMISE, score_type::I64));
+
+    EXPECT_EQ(score::make(FLT_MIN), utils::get_default_score(MAXIMISE, score_type::F32));
+    EXPECT_EQ(score::make(FLT_MAX), utils::get_default_score(MINIMISE, score_type::F32));
+
+    EXPECT_EQ(score::make(DBL_MIN), utils::get_default_score(MAXIMISE, score_type::F64));
+    EXPECT_EQ(score::make(DBL_MAX), utils::get_default_score(MINIMISE, score_type::F64));
+
+    EXPECT_EQ(score::make(LDBL_MIN), utils::get_default_score(MAXIMISE, score_type::F128));
+    EXPECT_EQ(score::make(LDBL_MAX), utils::get_default_score(MINIMISE, score_type::F128));
+}
+
+TEST(utils_test, get_default_score_throws_for_invalid_type) { EXPECT_THROW(utils::get_default_score(gempba::MAXIMISE, static_cast<gempba::score_type>(99)), std::runtime_error); }

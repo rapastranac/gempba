@@ -168,13 +168,6 @@ namespace gempba {
             }
             return true; // signalize that node was consumed
         }
-
-
-        void prune(const std::shared_ptr<node_core> &p_core) {
-            p_core->prune();
-            // p_node->set_root(nullptr);
-            // p_node->set_parent(nullptr);
-        }
     };
 } // namespace gempba
 

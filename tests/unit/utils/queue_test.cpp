@@ -84,6 +84,14 @@ TEST(queue_test, push_and_pop_with_shared_pointer) {
 }
 
 
+TEST(queue_test, pop_returns_false_when_empty) {
+    gempba::queue<my_struct *> q;
+
+    my_struct *v_result = nullptr;
+    EXPECT_FALSE(q.pop(v_result));
+    EXPECT_EQ(nullptr, v_result); // pop must not touch the out-parameter when it returns false
+}
+
 TEST(queue_test, empty) {
     gempba::queue<my_struct *> q;
 

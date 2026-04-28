@@ -81,8 +81,6 @@ namespace gempba {
 
         node() = default;
 
-        ~node() override = default;
-
         explicit node(const std::shared_ptr<node_core> &p_other) : m_node_core(p_other) {}
 
         // Copy Constructor

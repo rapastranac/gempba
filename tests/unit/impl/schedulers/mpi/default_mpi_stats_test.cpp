@@ -292,6 +292,45 @@ TEST(stats_interface_test, visitor_comparison_identical_objects) {
     }
 }
 
+TEST(default_mpi_stats_test, labels_returns_expected_column_names) {
+    const gempba::default_mpi_stats v_stats(0);
+    const auto v_labels = v_stats.labels();
+    ASSERT_EQ(6u, v_labels.size());
+    EXPECT_EQ("rank", v_labels[0]);
+    EXPECT_EQ("received_task_count", v_labels[1]);
+    EXPECT_EQ("sent_task_count", v_labels[2]);
+    EXPECT_EQ("total_requested_tasks", v_labels[3]);
+    EXPECT_EQ("idle_time", v_labels[4]);
+    EXPECT_EQ("elapsed_time", v_labels[5]);
+}
+
+TEST(default_mpi_stats_test, equality_operator_equal_objects) {
+    gempba::default_mpi_stats v_a(1);
+    v_a.m_received_task_count = 5;
+    v_a.m_idle_time = 0.5;
+
+    gempba::default_mpi_stats v_b(1);
+    v_b.m_received_task_count = 5;
+    v_b.m_idle_time = 0.5;
+
+    EXPECT_TRUE(v_a == v_b);
+}
+
+TEST(default_mpi_stats_test, equality_operator_different_objects) {
+    const gempba::default_mpi_stats v_a(1);
+    const gempba::default_mpi_stats v_b(2);
+    EXPECT_FALSE(v_a == v_b);
+    EXPECT_TRUE(v_a != v_b);
+}
+
+TEST(default_mpi_stats_test, spaceship_operator_orders_by_rank) {
+    const gempba::default_mpi_stats v_low(1);
+    const gempba::default_mpi_stats v_high(2);
+    EXPECT_TRUE((v_low <=> v_high) < 0);
+    EXPECT_TRUE((v_high <=> v_low) > 0);
+    EXPECT_TRUE((v_low <=> v_low) == 0);
+}
+
 TEST(stats_interface_test, polymorphic_behavior_through_interface) {
     std::vector<std::unique_ptr<gempba::stats>> v_stats_objects;
 

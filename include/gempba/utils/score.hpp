@@ -35,6 +35,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <type_traits>
+#include <utility>
 
 // Compatible with C++23 and laters
 
@@ -78,6 +79,65 @@ namespace gempba {
         }
 
     public:
+        /**
+         * Returns the score_type tag.
+         */
+        [[nodiscard]] score_type kind() const noexcept { return m_kind; }
+
+        /**
+         * Serialises the payload to a 64-bit raw integer for JNI transport. The same bit
+         * pattern is produced for all types ≤ 64 bits; F128 aborts (long double exceeds
+         * 64 bits — use a separate byte-array path instead).
+         */
+        [[nodiscard]] std::int64_t to_raw() const noexcept {
+            std::int64_t v_raw = 0;
+            switch (m_kind) {
+                case score_type::I32:
+                case score_type::U_I32:
+                case score_type::F32:
+                    std::memcpy(&v_raw, m_payload.data(), 4);
+                    return v_raw;
+                case score_type::I64:
+                case score_type::U_I64:
+                case score_type::F64:
+                    std::memcpy(&v_raw, m_payload.data(), 8);
+                    return v_raw;
+                case score_type::F128:
+                    std::abort();
+            }
+            std::unreachable();
+        }
+
+        /**
+         * Reconstructs a score from its raw 64-bit bit pattern and type tag. Used for
+         * JNI interop where Java passes raw bits as a jlong. F128 aborts for the same
+         * reason as to_raw().
+         *
+         * @param p_kind  the score_type enum value
+         * @param p_raw   raw 64-bit payload (bit-cast, not numeric conversion)
+         * @return reconstructed score
+         */
+        static score from_raw(score_type p_kind, std::int64_t p_raw) noexcept {
+            // value-initialised — m_payload is already zeroed
+            score v_score{};
+            v_score.m_kind = p_kind;
+            switch (p_kind) {
+                case score_type::I32:
+                case score_type::U_I32:
+                case score_type::F32:
+                    std::memcpy(v_score.m_payload.data(), &p_raw, 4);
+                    return v_score;
+                case score_type::I64:
+                case score_type::U_I64:
+                case score_type::F64:
+                    std::memcpy(v_score.m_payload.data(), &p_raw, 8);
+                    return v_score;
+                case score_type::F128:
+                    std::abort();
+            }
+            std::unreachable();
+        }
+
         /**
          * Factory for supported numeric types
          * @tparam T supported numeric type
@@ -146,7 +206,7 @@ namespace gempba {
                 case score_type::F128:
                     return read_as<long double>(p_lhs) == read_as<long double>(p_rhs);
             }
-            return false;
+            std::unreachable();
         }
 
         /**
@@ -243,7 +303,7 @@ namespace gempba {
                     return static_cast<T>(v_value);
                 }
             }
-            std::abort(); // std::unreachable in C++23
+            std::unreachable();
         }
 
         [[nodiscard]] std::string to_string() const noexcept {
@@ -352,7 +412,7 @@ namespace gempba {
                     return v_value;
                 }
             }
-            std::abort(); // std::unreachable in C++23
+            std::unreachable();
         }
     };
 

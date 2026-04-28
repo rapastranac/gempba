@@ -29,6 +29,9 @@
 #include <future>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <map>
+#include <memory>
+#include <optional>
 #include <test_utils.hpp>
 #include <thread>
 #include <tuple>
@@ -36,7 +39,11 @@
 #include <vector>
 
 #include <gempba/core/load_balancer.hpp>
+#include <gempba/core/scheduler.hpp>
+#include <gempba/core/serial_runnable.hpp>
 #include <gempba/node_manager.hpp>
+#include <gempba/stats/stats.hpp>
+#include <gempba/utils/transmission_guard.hpp>
 #include <impl/nodes/node_factory.hpp>
 
 
@@ -976,4 +983,411 @@ TEST_F(node_core_impl_test, get_siblings) {
     ASSERT_EQ(v_child1, v_child5.get_leftmost_sibling());
     ASSERT_EQ(v_child4, v_child5.get_left_sibling());
     ASSERT_EQ(nullptr, v_child5.get_right_sibling());
+}
+
+class scheduler_worker_mock final : public gempba::scheduler::worker {
+public:
+    MOCK_METHOD(void, barrier, (), (override));
+    MOCK_METHOD(int, rank_me, (), (const, override));
+    MOCK_METHOD(int, world_size, (), (const, override));
+    MOCK_METHOD(void, run, (gempba::node_manager & p_node_manager, (std::map<int, std::shared_ptr<gempba::serial_runnable>> p_runnables)), (override));
+    MOCK_METHOD(unsigned int, force_push, (gempba::task_packet && p_task, int p_function_id), (override));
+    MOCK_METHOD(std::optional<gempba::transmission_guard>, try_open_transmission_channel, (), (override));
+    MOCK_METHOD(std::unique_ptr<gempba::stats>, get_stats, (), (const, override));
+    MOCK_METHOD(unsigned int, next_process, (), (const, override));
+};
+
+namespace {
+    using v_void_fn = std::function<void(std::thread::id, int, gempba::node)>;
+    using v_lazy_init = std::function<std::optional<std::tuple<int>>()>;
+    using v_int_serializer = std::function<gempba::task_packet(int)>;
+    using v_int_deserializer = std::function<std::tuple<int>(gempba::task_packet)>;
+
+    v_void_fn make_noop_fn() {
+        return [](std::thread::id, int, const gempba::node &) {};
+    }
+
+    v_int_serializer make_empty_serializer() {
+        return [](int) { return gempba::task_packet::EMPTY; };
+    }
+
+    v_int_deserializer make_zero_deserializer() {
+        return [](const gempba::task_packet &) { return std::make_tuple(0); };
+    }
+} // namespace
+
+TEST_F(node_core_impl_test, run_throws_on_each_consumed_state) {
+    gempba::node_state v_consumed_states[] = {gempba::FORWARDED, gempba::PUSHED, gempba::DISCARDED, gempba::RETRIEVED, gempba::SENT_TO_ANOTHER_PROCESS, static_cast<gempba::node_state>(99)};
+    for (const auto v_state: v_consumed_states) {
+        auto v_dummy = gempba::node();
+        v_void_fn v_fn = make_noop_fn();
+        auto v_node = gempba::node_factory::create_explicit_node<void>(m_balancer_mock, v_dummy, v_fn, std::make_tuple(0));
+        v_node.set_state(v_state);
+        EXPECT_THROW(v_node.run(), std::runtime_error);
+    }
+}
+
+TEST_F(node_core_impl_test, run_throws_when_lazy_initializer_returns_nullopt) {
+    auto v_dummy = gempba::node();
+    v_void_fn v_fn = make_noop_fn();
+    v_lazy_init v_init = []() -> std::optional<std::tuple<int>> { return std::nullopt; };
+    auto v_node = gempba::node_factory::create_lazy_node<void>(m_balancer_mock, v_dummy, v_fn, v_init);
+    EXPECT_THROW(v_node.run(), std::runtime_error);
+}
+
+TEST_F(node_core_impl_test, delegate_locally_throws_when_already_consumed) {
+    auto v_dummy = gempba::node();
+    v_void_fn v_fn = make_noop_fn();
+    auto v_node = gempba::node_factory::create_explicit_node<void>(m_balancer_mock, v_dummy, v_fn, std::make_tuple(0));
+    v_node.set_state(gempba::FORWARDED);
+    EXPECT_THROW(v_node.delegate_locally(&m_balancer_mock), std::runtime_error);
+}
+
+TEST_F(node_core_impl_test, delegate_locally_throws_when_uninitialized) {
+    auto v_dummy = gempba::node();
+    v_void_fn v_fn = make_noop_fn();
+    v_int_serializer v_ser = make_empty_serializer();
+    v_int_deserializer v_deser = make_zero_deserializer();
+    auto v_node = gempba::node_factory::create_serializable_node<void>(m_balancer_mock, v_dummy, v_fn, v_ser, v_deser);
+    EXPECT_THROW(v_node.delegate_locally(&m_balancer_mock), std::runtime_error);
+}
+
+TEST_F(node_core_impl_test, delegate_locally_throws_when_lazy_initializer_returns_nullopt) {
+    auto v_dummy = gempba::node();
+    v_void_fn v_fn = make_noop_fn();
+    v_lazy_init v_init = []() -> std::optional<std::tuple<int>> { return std::nullopt; };
+    auto v_node = gempba::node_factory::create_lazy_node<void>(m_balancer_mock, v_dummy, v_fn, v_init);
+    EXPECT_THROW(v_node.delegate_locally(&m_balancer_mock), std::runtime_error);
+}
+
+TEST_F(node_core_impl_test, delegate_locally_initializes_lazy_arguments_on_success) {
+    EXPECT_CALL(m_balancer_mock, force_local_submit(testing::_)).WillOnce([](std::function<std::any()> &&) {
+        std::promise<std::any> v_promise;
+        v_promise.set_value(std::any{});
+        return v_promise.get_future();
+    });
+
+    auto v_dummy = gempba::node();
+    v_void_fn v_fn = make_noop_fn();
+    v_lazy_init v_init = []() -> std::optional<std::tuple<int>> { return std::make_optional(std::make_tuple(42)); };
+    auto v_node = gempba::node_factory::create_lazy_node<void>(m_balancer_mock, v_dummy, v_fn, v_init);
+
+    v_node.delegate_locally(&m_balancer_mock);
+    EXPECT_EQ(gempba::PUSHED, v_node.get_state());
+}
+
+TEST_F(node_core_impl_test, delegate_remotely_throws_when_already_consumed) {
+    scheduler_worker_mock v_worker;
+    auto v_dummy = gempba::node();
+    v_void_fn v_fn = make_noop_fn();
+    v_int_serializer v_ser = make_empty_serializer();
+    v_int_deserializer v_deser = make_zero_deserializer();
+    auto v_node = gempba::node_factory::create_serializable_explicit_node<void>(m_balancer_mock, v_dummy, v_fn, std::make_tuple(0), v_ser, v_deser);
+    v_node.set_state(gempba::FORWARDED);
+    EXPECT_THROW(v_node.delegate_remotely(&v_worker, 0), std::runtime_error);
+}
+
+TEST_F(node_core_impl_test, delegate_remotely_throws_when_uninitialized) {
+    scheduler_worker_mock v_worker;
+    auto v_dummy = gempba::node();
+    v_void_fn v_fn = make_noop_fn();
+    v_int_serializer v_ser = make_empty_serializer();
+    v_int_deserializer v_deser = make_zero_deserializer();
+    auto v_node = gempba::node_factory::create_serializable_node<void>(m_balancer_mock, v_dummy, v_fn, v_ser, v_deser);
+    EXPECT_THROW(v_node.delegate_remotely(&v_worker, 0), std::runtime_error);
+}
+
+TEST_F(node_core_impl_test, delegate_remotely_throws_when_lazy_initializer_returns_nullopt) {
+    scheduler_worker_mock v_worker;
+    auto v_dummy = gempba::node();
+    v_void_fn v_fn = make_noop_fn();
+    v_int_serializer v_ser = make_empty_serializer();
+    v_int_deserializer v_deser = make_zero_deserializer();
+    v_lazy_init v_init = []() -> std::optional<std::tuple<int>> { return std::nullopt; };
+    auto v_node = gempba::node_factory::create_serializable_lazy_node<void>(m_balancer_mock, v_dummy, v_fn, v_init, v_ser, v_deser);
+    EXPECT_THROW(v_node.delegate_remotely(&v_worker, 0), std::runtime_error);
+}
+
+TEST_F(node_core_impl_test, delegate_remotely_initializes_lazy_arguments_on_success) {
+    scheduler_worker_mock v_worker;
+    EXPECT_CALL(v_worker, force_push(testing::_, testing::_)).WillOnce([](gempba::task_packet &&, int) { return 0u; });
+
+    auto v_dummy = gempba::node();
+    v_void_fn v_fn = make_noop_fn();
+    v_int_serializer v_ser = make_empty_serializer();
+    v_int_deserializer v_deser = make_zero_deserializer();
+    v_lazy_init v_init = []() -> std::optional<std::tuple<int>> { return std::make_optional(std::make_tuple(42)); };
+    auto v_node = gempba::node_factory::create_serializable_lazy_node<void>(m_balancer_mock, v_dummy, v_fn, v_init, v_ser, v_deser);
+
+    v_node.delegate_remotely(&v_worker, 0);
+    EXPECT_EQ(gempba::SENT_TO_ANOTHER_PROCESS, v_node.get_state());
+}
+
+TEST_F(node_core_impl_test, serialize_throws_when_uninitialized) {
+    auto v_dummy = gempba::node();
+    v_void_fn v_fn = make_noop_fn();
+    v_int_serializer v_ser = make_empty_serializer();
+    v_int_deserializer v_deser = make_zero_deserializer();
+    auto v_node = gempba::node_factory::create_serializable_node<void>(m_balancer_mock, v_dummy, v_fn, v_ser, v_deser);
+    EXPECT_THROW(v_node.serialize(), std::runtime_error);
+}
+
+TEST_F(node_core_impl_test, serialize_throws_when_lazy_not_yet_initialized) {
+    auto v_dummy = gempba::node();
+    v_void_fn v_fn = make_noop_fn();
+    v_int_serializer v_ser = make_empty_serializer();
+    v_int_deserializer v_deser = make_zero_deserializer();
+    v_lazy_init v_init = []() -> std::optional<std::tuple<int>> { return std::make_optional(std::make_tuple(42)); };
+    auto v_node = gempba::node_factory::create_serializable_lazy_node<void>(m_balancer_mock, v_dummy, v_fn, v_init, v_ser, v_deser);
+    EXPECT_THROW(v_node.serialize(), std::runtime_error);
+}
+
+TEST_F(node_core_impl_test, serialize_throws_when_serializer_is_null) {
+    auto v_dummy = gempba::node();
+    v_void_fn v_fn = make_noop_fn();
+    auto v_node = gempba::node_factory::create_explicit_node<void>(m_balancer_mock, v_dummy, v_fn, std::make_tuple(0));
+    EXPECT_THROW(v_node.serialize(), std::runtime_error);
+}
+
+TEST_F(node_core_impl_test, deserialize_throws_when_already_initialized) {
+    auto v_dummy = gempba::node();
+    v_void_fn v_fn = make_noop_fn();
+    auto v_node = gempba::node_factory::create_explicit_node<void>(m_balancer_mock, v_dummy, v_fn, std::make_tuple(0));
+    EXPECT_THROW(v_node.deserialize(gempba::task_packet::EMPTY), std::runtime_error);
+}
+
+TEST_F(node_core_impl_test, deserialize_throws_when_deserializer_is_null) {
+    // An UNINITIALIZED node without deserializer cannot be created via the factory; build it
+    // through create_seed_node — which leaves the deserializer null on the void() form.
+    v_void_fn v_fn = make_noop_fn();
+    auto v_seed = gempba::node_factory::create_seed_node<void>(m_balancer_mock, v_fn, std::make_tuple(0));
+    // Forcibly mark as UNINITIALIZED via state manipulation isn't exposed; instead use a
+    // serializable_node whose deserializer happens to be left intact would not throw.
+    // Rely on a node created from create_serializable with a null deserializer to hit line 340.
+    // create_serializable_node accepts the deserializer as parameter; pass nullptr.
+    auto v_dummy = gempba::node();
+    v_int_serializer v_ser = make_empty_serializer();
+    v_int_deserializer v_deser_null;
+    auto v_node = gempba::node_factory::create_serializable_node<void>(m_balancer_mock, v_dummy, v_fn, v_ser, v_deser_null);
+    EXPECT_THROW(v_node.deserialize(gempba::task_packet::EMPTY), std::runtime_error);
+}
+
+TEST_F(node_core_impl_test, set_result_throws_when_result_deserializer_is_null) {
+    auto v_dummy = gempba::node();
+    v_void_fn v_fn = make_noop_fn();
+    auto v_node = gempba::node_factory::create_explicit_node<void>(m_balancer_mock, v_dummy, v_fn, std::make_tuple(0));
+    EXPECT_THROW(v_node.set_result(gempba::task_packet::EMPTY), std::runtime_error);
+}
+
+TEST_F(node_core_impl_test, get_result_throws_when_result_serializer_is_null) {
+    auto v_dummy = gempba::node();
+    v_void_fn v_fn = make_noop_fn();
+    auto v_node = gempba::node_factory::create_explicit_node<void>(m_balancer_mock, v_dummy, v_fn, std::make_tuple(0));
+    v_node.run();
+    EXPECT_THROW(v_node.get_result(), std::runtime_error);
+}
+
+TEST_F(node_core_impl_test, set_parent_throws_self_as_parent) {
+    auto v_dummy = gempba::node();
+    v_void_fn v_fn = make_noop_fn();
+    auto v_node = gempba::node_factory::create_explicit_node<void>(m_balancer_mock, v_dummy, v_fn, std::make_tuple(0));
+    EXPECT_THROW(v_node.set_parent(v_node), std::runtime_error);
+}
+
+TEST_F(node_core_impl_test, set_parent_throws_when_node_has_children_and_new_parent_non_null) {
+    v_void_fn v_fn = make_noop_fn();
+    auto v_dummy = gempba::node_factory::create_dummy_node(m_balancer_mock);
+    auto v_parent = gempba::node_factory::create_explicit_node<void>(m_balancer_mock, v_dummy, v_fn, std::make_tuple(0));
+    auto v_child = gempba::node_factory::create_explicit_node<void>(m_balancer_mock, v_parent, v_fn, std::make_tuple(0));
+    auto v_other = gempba::node_factory::create_explicit_node<void>(m_balancer_mock, v_dummy, v_fn, std::make_tuple(0));
+
+    EXPECT_THROW(v_parent.set_parent(v_other), std::runtime_error);
+}
+
+TEST_F(node_core_impl_test, get_second_leftmost_child_throws_when_less_than_two_children) {
+    auto v_dummy = gempba::node_factory::create_dummy_node(m_balancer_mock);
+    EXPECT_THROW(v_dummy.get_second_leftmost_child(), std::runtime_error);
+}
+
+TEST_F(node_core_impl_test, add_child_throws_when_child_is_null) {
+    v_void_fn v_fn = make_noop_fn();
+    auto v_dummy = gempba::node();
+    auto v_node = gempba::node_factory::create_explicit_node<void>(m_balancer_mock, v_dummy, v_fn, std::make_tuple(0));
+    gempba::node v_null_child;
+    EXPECT_THROW(v_node.add_child(v_null_child), std::runtime_error);
+}
+
+TEST_F(node_core_impl_test, add_child_throws_when_child_is_self) {
+    v_void_fn v_fn = make_noop_fn();
+    auto v_dummy = gempba::node();
+    auto v_node = gempba::node_factory::create_explicit_node<void>(m_balancer_mock, v_dummy, v_fn, std::make_tuple(0));
+    EXPECT_THROW(v_node.add_child(v_node), std::runtime_error);
+}
+
+TEST_F(node_core_impl_test, add_child_sets_parent_when_child_has_different_parent) {
+    v_void_fn v_fn = make_noop_fn();
+    auto v_dummy = gempba::node_factory::create_dummy_node(m_balancer_mock);
+    auto v_new_parent = gempba::node_factory::create_explicit_node<void>(m_balancer_mock, v_dummy, v_fn, std::make_tuple(0));
+    // Floating child: built from a seed node so it starts with no parent.
+    auto v_child_seed = gempba::node_factory::create_seed_node<void>(m_balancer_mock, v_fn, std::make_tuple(0));
+    EXPECT_EQ(nullptr, v_child_seed.get_parent());
+
+    v_new_parent.add_child(v_child_seed);
+
+    EXPECT_EQ(v_new_parent, v_child_seed.get_parent());
+    EXPECT_EQ(1, v_new_parent.get_children_count());
+}
+
+TEST_F(node_core_impl_test, get_any_result_returns_future_value_after_delegate_locally) {
+    EXPECT_CALL(m_balancer_mock, force_local_submit(testing::_)).WillOnce([](std::function<std::any()> &&p_function) {
+        std::promise<std::any> v_promise;
+        v_promise.set_value(p_function());
+        return v_promise.get_future();
+    });
+
+    auto v_dummy = gempba::node();
+    v_void_fn v_fn = make_noop_fn();
+    auto v_node = gempba::node_factory::create_explicit_node<void>(m_balancer_mock, v_dummy, v_fn, std::make_tuple(0));
+
+    v_node.delegate_locally(&m_balancer_mock);
+    EXPECT_EQ(gempba::PUSHED, v_node.get_state());
+
+    const std::any v_result = v_node.get_any_result();
+    EXPECT_EQ(gempba::RETRIEVED, v_node.get_state());
+}
+
+TEST_F(node_core_impl_test, should_branch_returns_cached_value_on_subsequent_calls) {
+    auto v_dummy = gempba::node();
+    v_void_fn v_fn = make_noop_fn();
+    auto v_node = gempba::node_factory::create_explicit_node<void>(m_balancer_mock, v_dummy, v_fn, std::make_tuple(0));
+
+    EXPECT_TRUE(v_node.should_branch()); // computes and caches
+    EXPECT_TRUE(v_node.should_branch()); // returns cached value
+}
+
+TEST_F(node_core_impl_test, should_branch_returns_false_for_consumed_state) {
+    auto v_dummy = gempba::node();
+    v_void_fn v_fn = make_noop_fn();
+    auto v_node = gempba::node_factory::create_explicit_node<void>(m_balancer_mock, v_dummy, v_fn, std::make_tuple(0));
+    v_node.set_state(gempba::FORWARDED);
+    EXPECT_FALSE(v_node.should_branch());
+}
+
+TEST_F(node_core_impl_test, should_branch_returns_true_for_lazy_initializer_with_value) {
+    auto v_dummy = gempba::node();
+    v_void_fn v_fn = make_noop_fn();
+    v_lazy_init v_init = []() -> std::optional<std::tuple<int>> { return std::make_optional(std::make_tuple(42)); };
+    auto v_node = gempba::node_factory::create_lazy_node<void>(m_balancer_mock, v_dummy, v_fn, v_init);
+
+    EXPECT_TRUE(v_node.should_branch());
+}
+
+TEST_F(node_core_impl_test, should_branch_returns_false_for_lazy_initializer_with_nullopt) {
+    auto v_dummy = gempba::node();
+    v_void_fn v_fn = make_noop_fn();
+    v_lazy_init v_init = []() -> std::optional<std::tuple<int>> { return std::nullopt; };
+    auto v_node = gempba::node_factory::create_lazy_node<void>(m_balancer_mock, v_dummy, v_fn, v_init);
+
+    EXPECT_FALSE(v_node.should_branch());
+}
+
+TEST_F(node_core_impl_test, should_branch_returns_true_for_deserialized_node) {
+    auto v_dummy = gempba::node();
+    v_void_fn v_fn = make_noop_fn();
+    v_int_serializer v_ser = make_empty_serializer();
+    v_int_deserializer v_deser = [](const gempba::task_packet &) { return std::make_tuple(7); };
+    auto v_node = gempba::node_factory::create_serializable_node<void>(m_balancer_mock, v_dummy, v_fn, v_ser, v_deser);
+    v_node.deserialize(gempba::task_packet::EMPTY); // sets init flag to DESERIALIZED
+    EXPECT_TRUE(v_node.should_branch());
+}
+
+namespace {
+    using v_int_int_fn = std::function<int(std::thread::id, int, gempba::node)>;
+    using v_int_int_serializer = std::function<gempba::task_packet(int)>;
+    using v_int_int_deserializer = std::function<std::tuple<int>(gempba::task_packet)>;
+} // namespace
+
+// The non-void Ret + int(int) specialisation has its own template instantiation; these
+// tests drive the methods that the existing my_struct/custom_object specialisations leave
+// uncovered for this simpler signature.
+
+TEST_F(node_core_impl_test, int_specialization_run_returns_value_via_get_any_result) {
+    auto v_dummy = gempba::node();
+    v_int_int_fn v_fn = [](std::thread::id, int p_x, const gempba::node &) { return p_x * 2; };
+    auto v_node = gempba::node_factory::create_explicit_node<int>(m_balancer_mock, v_dummy, v_fn, std::make_tuple(21));
+
+    v_node.run();
+    EXPECT_EQ(gempba::FORWARDED, v_node.get_state());
+    const std::any v_any = v_node.get_any_result();
+    EXPECT_EQ(42, std::any_cast<int>(v_any));
+}
+
+TEST_F(node_core_impl_test, int_specialization_delegate_locally_pushes_to_pool) {
+    EXPECT_CALL(m_balancer_mock, force_local_submit(testing::_)).WillOnce([](std::function<std::any()> &&p_function) {
+        std::promise<std::any> v_promise;
+        v_promise.set_value(p_function());
+        return v_promise.get_future();
+    });
+
+    auto v_dummy = gempba::node();
+    v_int_int_fn v_fn = [](std::thread::id, int p_x, const gempba::node &) { return p_x + 1; };
+    auto v_node = gempba::node_factory::create_explicit_node<int>(m_balancer_mock, v_dummy, v_fn, std::make_tuple(7));
+
+    v_node.delegate_locally(&m_balancer_mock);
+    EXPECT_EQ(gempba::PUSHED, v_node.get_state());
+    EXPECT_EQ(8, std::any_cast<int>(v_node.get_any_result()));
+}
+
+TEST_F(node_core_impl_test, int_specialization_delegate_remotely_serialises_and_pushes) {
+    scheduler_worker_mock v_worker;
+    EXPECT_CALL(v_worker, force_push(testing::_, testing::_)).WillOnce([](gempba::task_packet &&, int) { return 7u; });
+
+    auto v_dummy = gempba::node();
+    v_int_int_fn v_fn = [](std::thread::id, int, const gempba::node &) { return 0; };
+    v_int_int_serializer v_ser = make_empty_serializer();
+    v_int_int_deserializer v_deser = make_zero_deserializer();
+    auto v_node = gempba::node_factory::create_serializable_explicit_node<int>(m_balancer_mock, v_dummy, v_fn, std::make_tuple(0), v_ser, v_deser);
+
+    v_node.delegate_remotely(&v_worker, 0);
+    EXPECT_EQ(gempba::SENT_TO_ANOTHER_PROCESS, v_node.get_state());
+}
+
+TEST_F(node_core_impl_test, int_specialization_get_result_round_trips_through_serializers) {
+    std::function<gempba::task_packet(std::any)> v_result_ser = [](const std::any &p_any) {
+        const auto v_value = std::any_cast<int>(p_any);
+        return gempba::task_packet(std::to_string(v_value));
+    };
+    std::function<std::any(gempba::task_packet)> v_result_deser = [](const gempba::task_packet &p_packet) -> std::any {
+        const std::string v_str(reinterpret_cast<const char *>(p_packet.data()), p_packet.size());
+        return std::stoi(v_str);
+    };
+
+    auto v_dummy = gempba::node();
+    v_int_int_fn v_fn = [](std::thread::id, int p_x, const gempba::node &) { return p_x * 10; };
+    v_int_int_serializer v_ser = make_empty_serializer();
+    v_int_int_deserializer v_deser = make_zero_deserializer();
+    auto v_node = gempba::node_factory::create_serializable_explicit_node<int>(m_balancer_mock, v_dummy, v_fn, std::make_tuple(5), v_ser, v_deser);
+
+    v_node.set_result_serializer(v_result_ser);
+    v_node.set_result_deserializer(v_result_deser);
+
+    v_node.run();
+    const gempba::task_packet v_serialised = v_node.get_result();
+    const std::string v_str(reinterpret_cast<const char *>(v_serialised.data()), v_serialised.size());
+    EXPECT_EQ("50", v_str);
+
+    // round-trip back via set_result
+    v_node.set_result(v_serialised);
+    EXPECT_EQ(50, std::any_cast<int>(v_node.get_any_result()));
+}
+
+TEST_F(node_core_impl_test, int_specialization_lazy_node_initializes_and_runs) {
+    auto v_dummy = gempba::node();
+    v_int_int_fn v_fn = [](std::thread::id, int p_x, const gempba::node &) { return p_x; };
+    std::function<std::optional<std::tuple<int>>()> v_init = [] { return std::make_optional(std::make_tuple(99)); };
+    auto v_node = gempba::node_factory::create_lazy_node<int>(m_balancer_mock, v_dummy, v_fn, v_init);
+
+    v_node.run();
+    EXPECT_EQ(gempba::FORWARDED, v_node.get_state());
+    EXPECT_EQ(99, std::any_cast<int>(v_node.get_any_result()));
 }

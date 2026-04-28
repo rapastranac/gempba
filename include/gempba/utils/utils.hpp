@@ -26,12 +26,12 @@
 
 #include <any>
 #include <cfloat>
+#include <chrono>
 #include <future>
 #include <gempba/utils/gempba_utils.hpp>
 #include <gempba/utils/score.hpp>
 #include <gempba/utils/tree.hpp>
 #include <spdlog/spdlog.h>
-#include <sys/time.h>
 
 
 /**
@@ -45,13 +45,13 @@ namespace utils {
 #endif
     }
 
-    inline void log_and_throw(const std::string &p_v_message) {
+    [[noreturn]] inline void log_and_throw(const std::string &p_v_message) {
         spdlog::error(p_v_message);
         throw std::runtime_error(p_v_message);
     }
 
     template<typename... T>
-    void log_and_throw(const fmt::format_string<T...> &p_format_string, T &&...p_args) {
+    [[noreturn]] void log_and_throw(const fmt::format_string<T...> &p_format_string, T &&...p_args) {
         const std::string v_message = fmt::format(p_format_string, std::forward<T>(p_args)...);
         log_and_throw(v_message);
     }
@@ -115,11 +115,8 @@ namespace utils {
     }
 
     static double wall_time() {
-        timeval v_time{};
-        if (gettimeofday(&v_time, nullptr)) {
-            return -1.0;
-        }
-        return static_cast<double>(v_time.tv_sec) + static_cast<double>(v_time.tv_usec) * .000001;
+        const auto v_since_epoch = std::chrono::system_clock::now().time_since_epoch();
+        return std::chrono::duration<double>(v_since_epoch).count();
     }
 
 
