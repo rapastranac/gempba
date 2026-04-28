@@ -45,13 +45,13 @@ namespace utils {
 #endif
     }
 
-    inline void log_and_throw(const std::string &p_v_message) {
+    [[noreturn]] inline void log_and_throw(const std::string &p_v_message) {
         spdlog::error(p_v_message);
         throw std::runtime_error(p_v_message);
     }
 
     template<typename... T>
-    void log_and_throw(const fmt::format_string<T...> &p_format_string, T &&...p_args) {
+    [[noreturn]] void log_and_throw(const fmt::format_string<T...> &p_format_string, T &&...p_args) {
         const std::string v_message = fmt::format(p_format_string, std::forward<T>(p_args)...);
         log_and_throw(v_message);
     }
