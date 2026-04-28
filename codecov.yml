@@ -16,3 +16,10 @@ ignore:
   - "build*/**"
   - ".build*/**"
   - "cmake-build-*/**"
+  # MPI scheduler interface and implementations are exercised through MPI runtime,
+  # not unit tests; coverage figures here are misleading.
+  - "include/gempba/core/scheduler.hpp"
+  - "include/gempba/core/scheduler_traits.hpp"
+  - "private/impl/schedulers/mpi_centralized_scheduler.hpp"
+  - "private/impl/schedulers/mpi_semi_centralized_scheduler.hpp"
+  - "src/schedulers/mpi/**"
