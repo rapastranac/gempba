@@ -39,7 +39,7 @@
  */
 namespace utils {
     template<typename... T>
-    void print_ipc_debug_comments(const fmt::format_string<T...> &p_format_string, T &&...p_args) {
+    void print_ipc_debug_comments([[maybe_unused]] const fmt::format_string<T...> &p_format_string, [[maybe_unused]] T &&...p_args) {
 #if GEMPBA_DEBUG_COMMENTS
         spdlog::debug(p_format_string, std::forward<T>(p_args)...);
 #endif
@@ -85,7 +85,7 @@ namespace utils {
         }
     }
 
-    static double diff_time(const double p_w_time0, const double p_w_time1) { return p_w_time1 - p_w_time0; }
+    [[maybe_unused]] static double diff_time(const double p_w_time0, const double p_w_time1) { return p_w_time1 - p_w_time0; }
 
     /**
      * @brief Shifts elements of the vector to the left by one position.
@@ -97,7 +97,7 @@ namespace utils {
      * @param vector_ The vector to be shifted. It should have been initialized with at least
      *            the required number of elements.
      */
-    static void shift_left(std::vector<int> &p_vector) {
+    [[maybe_unused]] static void shift_left(std::vector<int> &p_vector) {
         const int v_size = static_cast<int>(p_vector.size());
         if (v_size == 0) {
             utils::log_and_throw("Attempted to shift an empty vector");

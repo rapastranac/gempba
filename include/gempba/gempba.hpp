@@ -69,7 +69,7 @@ namespace gempba {
         return node(v_core);
     }
 
-    static node create_custom_node(const std::shared_ptr<node_core> &p_core) noexcept { return node(p_core); }
+    [[maybe_unused]] static node create_custom_node(const std::shared_ptr<node_core> &p_core) noexcept { return node(p_core); }
 
     void check_not_null([[maybe_unused]] const node &p_parent);
 

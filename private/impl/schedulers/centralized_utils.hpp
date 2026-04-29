@@ -14,8 +14,11 @@
     #define NOMINMAX
     #define WIN32_LEAN_AND_MEAN
     #define RPC_NO_WINDOWS_H
-    #include <psapi.h>
+    // psapi.h depends on Win32 types defined by windows.h, so order is significant.
+    // clang-format off
     #include <windows.h>
+    #include <psapi.h>
+    // clang-format on
 
 #elif defined(__unix__) || defined(__unix) || defined(unix) || (defined(__APPLE__) && defined(__MACH__))
 

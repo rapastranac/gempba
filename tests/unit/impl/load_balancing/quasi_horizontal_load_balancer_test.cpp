@@ -868,6 +868,8 @@ TEST_F(quasi_horizontal_load_balancer_test, get_root_returns_null_for_unknown_th
 
 TEST_F(quasi_horizontal_load_balancer_test, send_local_throws_when_node_is_already_consumed) {
     gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    v_balancer.set_thread_pool_size(2); // guarantee pool is ready before send() inspects it
+    v_balancer.wait();
 
     std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node &) {};
     auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_balancer);
@@ -880,6 +882,8 @@ TEST_F(quasi_horizontal_load_balancer_test, send_local_throws_when_node_is_alrea
 
 TEST_F(quasi_horizontal_load_balancer_test, send_local_discards_lazy_node_when_not_worthy) {
     gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    v_balancer.set_thread_pool_size(2); // guarantee pool is ready before send() inspects it
+    v_balancer.wait();
 
     bool v_fn_called = false;
     std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node &) { v_fn_called = true; };

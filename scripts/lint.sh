@@ -125,13 +125,47 @@ if [[ $DO_FORMAT -eq 1 ]]; then
             | xargs -0 -n 32 -P "$JOBS" "$CLANG_FORMAT" -i --style=file
         echo "✅ clang-format applied in place"
     else
-        if ! printf '%s\0' "${SOURCE_FILES[@]}" \
-            | xargs -0 -n 32 -P "$JOBS" "$CLANG_FORMAT" --dry-run --Werror --style=file; then
-            echo "❌ clang-format reported formatting issues" >&2
+        FORMAT_LOG="$(mktemp -t gempba-fmt.XXXXXX.log)"
+        printf '%s\0' "${SOURCE_FILES[@]}" \
+            | xargs -0 -n 32 -P "$JOBS" "$CLANG_FORMAT" --dry-run --Werror --style=file 2>&1 \
+            | tee "$FORMAT_LOG" \
+            | sed -E \
+                -e "s|^([^[:space:]][^:]*):([0-9]+):([0-9]+):|${C_BOLD}\1:\2:\3:${C_OFF}|" \
+                -e "s| warning: | ${C_ORN}warning:${C_OFF} |g" \
+                -e "s| error: | ${C_RED}error:${C_OFF} |g" \
+                -e "s| (\[-W[a-zA-Z0-9.+/-]+\])$| ${C_DIM}\1${C_OFF}|" || true
+        FMT_RC=${PIPESTATUS[1]}
+
+        FORMAT_ISSUES_FILE="$(mktemp -t gempba-fmt-issues.XXXXXX.txt)"
+        grep -E ': (warning|error): ' "$FORMAT_LOG" \
+            | sed -E "s|^${WORKSPACE}/||" \
+            | sort -u > "$FORMAT_ISSUES_FILE" || true
+        FORMAT_ISSUE_COUNT=$(wc -l < "$FORMAT_ISSUES_FILE" | tr -d ' ')
+
+        if [[ "$FORMAT_ISSUE_COUNT" -gt 0 ]]; then
+            echo
+            printf '%s━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n' "$C_RED" "$C_OFF"
+            printf '%s🚨 clang-format violations (%d) — run scripts/lint.sh --fix to auto-format%s\n' "$C_RED" "$FORMAT_ISSUE_COUNT" "$C_OFF"
+            printf '%s━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n' "$C_RED" "$C_OFF"
+            echo
+            nl -ba -w2 -s'. ' "$FORMAT_ISSUES_FILE" \
+                | sed -E \
+                    -e "s|^([[:space:]]*[0-9]+\. )([^:]+):([0-9]+):([0-9]+):|\1${C_BOLD}\2:\3:\4:${C_OFF}|" \
+                    -e "s| warning: | ${C_ORN}warning:${C_OFF} |g" \
+                    -e "s| error: | ${C_RED}error:${C_OFF} |g" \
+                    -e "s| (\[-W[a-zA-Z0-9.+/-]+\])$| ${C_DIM}\1${C_OFF}|" \
+                | sed 's/^/  /'
+            echo
+            printf '  Full log: %s%s%s\n' "$C_DIM" "$FORMAT_LOG" "$C_OFF"
+            EXIT_STATUS=1
+        elif [[ $FMT_RC -ne 0 ]]; then
+            printf '%s❌ clang-format exited with status %d%s (full log: %s)\n' "$C_RED" "$FMT_RC" "$C_OFF" "$FORMAT_LOG" >&2
             EXIT_STATUS=1
         else
             echo "✅ clang-format clean"
+            rm -f "$FORMAT_LOG"
         fi
+        rm -f "$FORMAT_ISSUES_FILE"
     fi
     echo
 fi

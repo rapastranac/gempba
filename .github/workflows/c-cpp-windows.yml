@@ -41,6 +41,13 @@ jobs:
             mingw-w64-x86_64-spdlog
             mingw-w64-x86_64-fmt
 
+      # 2️⃣b Install MS-MPI runtime (msmpi.dll lives in System32 and is not part
+      # of the MSYS2 mingw-w64-x86_64-msmpi package, which only ships the SDK).
+      - name: Install MS-MPI runtime
+        uses: mpi4py/setup-mpi@v1
+        with:
+          mpi: msmpi
+
       # 3️⃣ Echo versions of installed dependencies
       - name: Echo Dependencies Version
         shell: msys2 {0}
