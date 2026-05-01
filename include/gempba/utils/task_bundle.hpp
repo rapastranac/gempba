@@ -45,19 +45,19 @@ namespace gempba {
         [[nodiscard]] std::size_t size() const noexcept { return m_data.size(); }
 
         // Equality operators
-        bool operator==(const task_bundle &p_other) const { return m_function_id == p_other.m_function_id && m_data == p_other.m_data; }
+        bool operator==(const task_bundle& p_other) const { return m_function_id == p_other.m_function_id && m_data == p_other.m_data; }
 
-        bool operator!=(const task_bundle &p_other) const { return !(*this == p_other); }
+        bool operator!=(const task_bundle& p_other) const { return !(*this == p_other); }
 
         // Copy constructor and assignment
-        task_bundle(const task_bundle &) = default;
+        task_bundle(const task_bundle&) = default;
 
-        task_bundle &operator=(const task_bundle &) = default;
+        task_bundle& operator=(const task_bundle&) = default;
 
         // Move constructor and assignment
-        task_bundle(task_bundle &&) noexcept = default;
+        task_bundle(task_bundle&&) noexcept = default;
 
-        task_bundle &operator=(task_bundle &&) noexcept = default;
+        task_bundle& operator=(task_bundle&&) noexcept = default;
 
         // Default destructor
         ~task_bundle() = default;

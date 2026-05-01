@@ -26,7 +26,7 @@
 #include <gtest/gtest.h>
 
 TEST(result_test, empty_singleton_has_expected_defaults) {
-    const gempba::result &v_empty = gempba::result::EMPTY;
+    const gempba::result& v_empty = gempba::result::EMPTY;
 
     EXPECT_EQ(v_empty.get_score_as_integer(), -1);
     EXPECT_TRUE(v_empty.get_task_packet().empty());
@@ -51,7 +51,7 @@ TEST(result_test, copy_constructor_copies_values) {
     const gempba::task_packet v_packet("abc");
     const gempba::score v_score = gempba::score::make(7);
     const gempba::result v_original(v_score, v_packet);
-    const gempba::result &v_copy(v_original);
+    const gempba::result& v_copy(v_original);
 
     EXPECT_EQ(v_copy.get_score_as_integer(), 7);
     EXPECT_EQ(v_copy.get_task_packet().size(), 3);

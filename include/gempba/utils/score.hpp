@@ -146,25 +146,25 @@ namespace gempba {
          */
         template<typename T>
         static constexpr score make(T p_value) noexcept {
-            using U = std::remove_cvref_t<T>;
+            using u = std::remove_cvref_t<T>;
 
-            if constexpr (std::is_integral_v<U> && sizeof(U) == 4 && std::is_signed_v<U>) {
+            if constexpr (std::is_integral_v<u> && sizeof(u) == 4 && std::is_signed_v<u>) {
                 return make_raw<std::int32_t>(static_cast<std::int32_t>(p_value));
-            } else if constexpr (std::is_integral_v<U> && sizeof(U) == 4 && std::is_unsigned_v<U>) {
+            } else if constexpr (std::is_integral_v<u> && sizeof(u) == 4 && std::is_unsigned_v<u>) {
                 return make_raw<std::uint32_t>(static_cast<std::uint32_t>(p_value));
-            } else if constexpr (std::is_integral_v<U> && sizeof(U) == 8 && std::is_signed_v<U>) {
+            } else if constexpr (std::is_integral_v<u> && sizeof(u) == 8 && std::is_signed_v<u>) {
                 return make_raw<std::int64_t>(static_cast<std::int64_t>(p_value));
-            } else if constexpr (std::is_integral_v<U> && sizeof(U) == 8 && std::is_unsigned_v<U>) {
+            } else if constexpr (std::is_integral_v<u> && sizeof(u) == 8 && std::is_unsigned_v<u>) {
                 return make_raw<std::uint64_t>(static_cast<std::uint64_t>(p_value));
-            } else if constexpr (std::same_as<U, float> || std::same_as<U, double> || std::same_as<U, long double>) {
-                return make_raw<U>(p_value);
+            } else if constexpr (std::same_as<u, float> || std::same_as<u, double> || std::same_as<u, long double>) {
+                return make_raw<u>(p_value);
             } else {
-                static_assert(IS_SUPPORTED<U>, "unsupported score type");
+                static_assert(IS_SUPPORTED<u>, "unsupported score type");
             }
             std::unreachable();
         }
 
-        friend constexpr std::partial_ordering operator<=>(const score &p_lhs, const score &p_rhs) noexcept {
+        friend constexpr std::partial_ordering operator<=>(const score& p_lhs, const score& p_rhs) noexcept {
             if (p_lhs.m_kind == p_rhs.m_kind) {
                 switch (p_lhs.m_kind) {
                     case score_type::I32:
@@ -186,7 +186,7 @@ namespace gempba {
             return to_long_double(p_lhs) <=> to_long_double(p_rhs);
         }
 
-        friend constexpr bool operator==(const score &p_lhs, const score &p_rhs) noexcept {
+        friend constexpr bool operator==(const score& p_lhs, const score& p_rhs) noexcept {
             if (p_lhs.m_kind != p_rhs.m_kind) {
                 return false;
             }
@@ -233,7 +233,7 @@ namespace gempba {
          * @return true if the type matches and the value was copied, false otherwise
          */
         template<typename T>
-        [[nodiscard]] bool try_get(T &p_out) const noexcept {
+        [[nodiscard]] bool try_get(T& p_out) const noexcept {
             static_assert(IS_SUPPORTED<T>, "unsupported score type");
             static_assert(sizeof(T) <= PAYLOAD_SIZE, "requested type too large for score payload");
             if (m_kind != TYPE_OF<T>) {
@@ -349,18 +349,18 @@ namespace gempba {
 
         template<typename T>
         static constexpr score_type TYPE_OF = []() consteval {
-            using U = std::remove_cvref_t<T>;
-            if constexpr (std::is_integral_v<U> && sizeof(U) == 4 && std::is_signed_v<U>) { // NOLINT(bugprone-branch-clone)
+            using u = std::remove_cvref_t<T>;
+            if constexpr (std::is_integral_v<u> && sizeof(u) == 4 && std::is_signed_v<u>) { // NOLINT(bugprone-branch-clone)
                 return score_type::I32;
-            } else if constexpr (std::is_integral_v<U> && sizeof(U) == 4 && std::is_unsigned_v<U>) {
+            } else if constexpr (std::is_integral_v<u> && sizeof(u) == 4 && std::is_unsigned_v<u>) {
                 return score_type::U_I32;
-            } else if constexpr (std::is_integral_v<U> && sizeof(U) == 8 && std::is_signed_v<U>) {
+            } else if constexpr (std::is_integral_v<u> && sizeof(u) == 8 && std::is_signed_v<u>) {
                 return score_type::I64;
-            } else if constexpr (std::is_integral_v<U> && sizeof(U) == 8 && std::is_unsigned_v<U>) {
+            } else if constexpr (std::is_integral_v<u> && sizeof(u) == 8 && std::is_unsigned_v<u>) {
                 return score_type::U_I64;
-            } else if constexpr (std::same_as<U, float>) {
+            } else if constexpr (std::same_as<u, float>) {
                 return score_type::F32;
-            } else if constexpr (std::same_as<U, double>) {
+            } else if constexpr (std::same_as<u, double>) {
                 return score_type::F64;
             } else {
                 return score_type::F128;
@@ -368,13 +368,13 @@ namespace gempba {
         }();
 
         template<typename T>
-        static constexpr T read_as(const score &p_score) noexcept {
+        static constexpr T read_as(const score& p_score) noexcept {
             T v_value{};
             std::memcpy(&v_value, p_score.m_payload.data(), sizeof(T));
             return v_value;
         }
 
-        static constexpr long double to_long_double(const score &p_score) noexcept {
+        static constexpr long double to_long_double(const score& p_score) noexcept {
             switch (p_score.m_kind) {
                 case score_type::I32: {
                     std::int32_t v_value{};

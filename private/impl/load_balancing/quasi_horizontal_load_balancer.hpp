@@ -45,24 +45,24 @@ namespace gempba {
         BS::thread_pool<> m_thread_pool;
         unsigned int m_unique_id_counter = 0;
         std::recursive_mutex m_recursive_mutex;
-        scheduler::worker *const m_scheduler_worker;
+        scheduler::worker* const m_scheduler_worker;
         std::map<std::thread::id, std::shared_ptr<std::shared_ptr<node_core>>> m_roots; // every thread will be solving a subtree, this point to their roots
         unsigned int m_thread_count = std::thread::hardware_concurrency();
         std::size_t m_thread_request_count = 0;
 
     public:
-        explicit quasi_horizontal_load_balancer(scheduler::worker *const p_scheduler_worker = nullptr) : m_scheduler_worker(p_scheduler_worker) {}
+        explicit quasi_horizontal_load_balancer(scheduler::worker* const p_scheduler_worker = nullptr) : m_scheduler_worker(p_scheduler_worker) {}
 
         balancing_policy get_balancing_policy() override { return QUASI_HORIZONTAL; }
 
         unsigned generate_unique_id() override { return ++m_unique_id_counter; }
 
-        std::future<std::any> force_local_submit(std::function<std::any()> &&p_function) override {
+        std::future<std::any> force_local_submit(std::function<std::any()>&& p_function) override {
             ++m_thread_request_count;
             return m_thread_pool.submit_task(p_function);
         }
 
-        void prune_and_correct_root_after_forward(node &p_node) {
+        void prune_and_correct_root_after_forward(node& p_node) {
             node v_parent = p_node.get_parent();
             if (v_parent == nullptr) {
                 // p_node is a root (or was just made root), just prune it
@@ -73,14 +73,14 @@ namespace gempba {
             try_correct_root(v_parent);
         }
 
-        void forward(node &p_node) override {
+        void forward(node& p_node) override {
             if (p_node.get_state() == UNUSED && p_node.should_branch()) {
                 p_node.run();
             }
             prune_and_correct_root_after_forward(p_node);
         }
 
-        bool try_local_submit(node &p_node) override {
+        bool try_local_submit(node& p_node) override {
             if (send(p_node)) {
                 return true;
             }
@@ -88,7 +88,7 @@ namespace gempba {
             return false;
         }
 
-        bool try_remote_submit(node &p_node, const int p_runnable_id) override {
+        bool try_remote_submit(node& p_node, const int p_runnable_id) override {
             if (!m_scheduler_worker) {
                 utils::log_and_throw("Attempted to do remote submission without a scheduler worker");
             }
@@ -101,7 +101,7 @@ namespace gempba {
 
         [[nodiscard]] double get_idle_time() const override { return m_thread_pool.get_wall_idle_time(); }
 
-        void set_root(const std::thread::id p_thread_id, std::shared_ptr<node_core> &p_root) override {
+        void set_root(const std::thread::id p_thread_id, std::shared_ptr<node_core>& p_root) override {
             std::scoped_lock v_lock(m_recursive_mutex);
             if (m_roots.contains(p_thread_id)) {
                 const auto v_ptr = m_roots.at(p_thread_id);
@@ -151,7 +151,7 @@ namespace gempba {
         }
 
 
-        void prune_and_fix_parent_root_if_needed(node &p_node) {
+        void prune_and_fix_parent_root_if_needed(node& p_node) {
             node v_parent = p_node.get_parent();
             const node v_root = p_node.get_root();
             if (p_node == v_root && p_node.get_children_count() == 0) {
@@ -181,7 +181,7 @@ namespace gempba {
             try_correct_root(v_parent);
         }
 
-        bool send(node &p_node) {
+        bool send(node& p_node) {
             while (true) {
                 const std::unique_lock v_lock(m_recursive_mutex, std::try_to_lock);
                 if (!v_lock.owns_lock()) {
@@ -213,7 +213,7 @@ namespace gempba {
             }
         }
 
-        bool send(node &p_node, const int p_runnable_id) {
+        bool send(node& p_node, const int p_runnable_id) {
             while (true) {
                 const std::unique_lock v_lock(m_recursive_mutex, std::try_to_lock);
                 if (!v_lock.owns_lock()) {
@@ -245,9 +245,9 @@ namespace gempba {
             }
         }
 
-        bool try_push_root_level_node_locally(node &p_node) {
+        bool try_push_root_level_node_locally(node& p_node) {
 
-            node v_top_node = p_node.map_core([&](const std::shared_ptr<node_core> &p_core) { return get_root_level_pending_node(p_core); });
+            node v_top_node = p_node.map_core([&](const std::shared_ptr<node_core>& p_core) { return get_root_level_pending_node(p_core); });
             if (v_top_node != nullptr) {
                 if (v_top_node.is_consumed()) {
                     utils::log_and_throw("Attempt to push a consumed node");
@@ -265,9 +265,9 @@ namespace gempba {
             return false;
         }
 
-        bool try_push_root_level_node_remotely(node &p_node, const int p_runnable_id) {
+        bool try_push_root_level_node_remotely(node& p_node, const int p_runnable_id) {
 
-            node v_top_node = p_node.map_core([&](const std::shared_ptr<node_core> &p_core) { return get_root_level_pending_node(p_core); });
+            node v_top_node = p_node.map_core([&](const std::shared_ptr<node_core>& p_core) { return get_root_level_pending_node(p_core); });
             if (v_top_node != nullptr) {
                 if (v_top_node.is_consumed()) {
                     utils::log_and_throw("Attempt to push a consumed node");
@@ -291,7 +291,7 @@ namespace gempba {
          * @param p_node The node from which to start the search.
          * @return The pending node at the root level, or nullptr if none found.
          */
-        static std::shared_ptr<node_core> get_root_level_pending_node(const std::shared_ptr<node_core> &p_node) {
+        static std::shared_ptr<node_core> get_root_level_pending_node(const std::shared_ptr<node_core>& p_node) {
             if (p_node->get_parent() == nullptr) {
                 return nullptr; // there is no parent — node is a root
             }
@@ -362,7 +362,7 @@ namespace gempba {
          * the deepest node_
          * </pre>
          **/
-        void try_correct_root(node &p_node) {
+        void try_correct_root(node& p_node) {
             node v_root = p_node.get_root();
             // Check if root is null (shouldn't happen with new prune(), but defensive)
             if (v_root == nullptr) {
@@ -395,8 +395,8 @@ namespace gempba {
             // - has 2+ children (has pending work) - it's already the root
         }
 
-        void make_root(node &p_node) {
-            p_node.map_core([this](std::shared_ptr<node_core> &p_core) {
+        void make_root(node& p_node) {
+            p_node.map_core([this](std::shared_ptr<node_core>& p_core) {
                 this->set_root(p_core->get_thread_id(), p_core);
                 p_core->set_parent(nullptr);
                 return p_core;

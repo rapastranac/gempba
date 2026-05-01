@@ -160,19 +160,19 @@ TEST(score_test, exhaustive_get_loose_matrix_test) {
 }
 
 TEST(score_test, performance_benchmark_test) {
-    constexpr std::size_t v_number_of_samples = 500'000;
+    constexpr std::size_t NUMBER_OF_SAMPLES = 500'000;
     std::vector<score> v_scores;
-    v_scores.reserve(v_number_of_samples);
+    v_scores.reserve(NUMBER_OF_SAMPLES);
 
     const auto v_start_make = std::chrono::high_resolution_clock::now();
-    for (std::size_t i = 0; i < v_number_of_samples; ++i) {
+    for (std::size_t i = 0; i < NUMBER_OF_SAMPLES; ++i) {
         v_scores.push_back(score::make<int32_t>(static_cast<int32_t>(i)));
     }
     const auto v_end_make = std::chrono::high_resolution_clock::now();
 
     volatile int64_t v_sum = 0;
     const auto v_start_get = std::chrono::high_resolution_clock::now();
-    for (const auto &v_score: v_scores) {
+    for (const auto& v_score: v_scores) {
         v_sum += v_score.get_loose<int64_t>();
     }
     const auto v_end_get = std::chrono::high_resolution_clock::now();
@@ -180,7 +180,7 @@ TEST(score_test, performance_benchmark_test) {
     const auto v_make_ms = std::chrono::duration_cast<std::chrono::milliseconds>(v_end_make - v_start_make).count();
     const auto v_get_ms = std::chrono::duration_cast<std::chrono::milliseconds>(v_end_get - v_start_get).count();
 
-    std::cout << "[ PERF ] Created " << v_number_of_samples << " scores in " << v_make_ms << " ms\n";
+    std::cout << "[ PERF ] Created " << NUMBER_OF_SAMPLES << " scores in " << v_make_ms << " ms\n";
     std::cout << "[ PERF ] Retrieved & summed in " << v_get_ms << " ms\n";
     std::cout << "[ PERF ] Sum(ignore): " << v_sum << "\n";
 }
@@ -195,23 +195,23 @@ TEST(score_test, to_string) {
     EXPECT_EQ(v_score_i64.to_string(), "9223372036854775807");
 
     // Floating-point tests
-    constexpr float v_pi_float = 3.14159274f; // max precision float
-    const auto v_score_f32 = score::make(v_pi_float);
+    constexpr float PI_FLOAT = 3.14159274f; // max precision float
+    const auto v_score_f32 = score::make(PI_FLOAT);
     const std::string v_expected_f32 = "3.14159274";
     const std::string v_actual_f32 = v_score_f32.to_string();
     EXPECT_EQ(v_expected_f32, v_actual_f32);
 
-    constexpr double v_pi_d = 3.1415926535897931;
-    const auto v_score_f64 = score::make(v_pi_d);
+    constexpr double PI_DOUBLE = 3.1415926535897931;
+    const auto v_score_f64 = score::make(PI_DOUBLE);
     const std::string v_expected_f64 = "3.1415926535897931";
     const std::string v_actual_f64 = v_score_f64.to_string();
     EXPECT_EQ(v_expected_f64, v_actual_f64);
 
     // Long double / F128 test
-    constexpr long double v_pi_ld = 3.14159265358979323851L;
-    const auto v_score_f128 = score::make(v_pi_ld);
+    constexpr long double PI_LD = 3.14159265358979323851L;
+    const auto v_score_f128 = score::make(PI_LD);
     std::ostringstream v_oss_f128;
-    v_oss_f128 << std::setprecision(std::numeric_limits<long double>::max_digits10) << v_pi_ld;
+    v_oss_f128 << std::setprecision(std::numeric_limits<long double>::max_digits10) << PI_LD;
     const std::string v_expected_f128 = v_oss_f128.str();
     const std::string v_actual_f128 = v_score_f128.to_string();
     EXPECT_EQ(v_expected_f128, v_actual_f128);
@@ -219,8 +219,8 @@ TEST(score_test, to_string) {
 
 
 TEST(score_test, make_and_get_u_i32) {
-    constexpr auto v_value = std::uint32_t{1'234'567'890};
-    const auto v_score = score::make(v_value);
+    constexpr auto VALUE = std::uint32_t{1'234'567'890};
+    const auto v_score = score::make(VALUE);
 
     // direct get
     EXPECT_EQ(v_score.get<std::uint32_t>(), 1'234'567'890);
@@ -239,8 +239,8 @@ TEST(score_test, make_and_get_u_i32) {
 }
 
 TEST(score_test, make_and_get_u_i64) {
-    constexpr auto v_value = std::uint64_t{12'345'678'901'234'567'890ULL};
-    const auto v_score = score::make(v_value);
+    constexpr auto VALUE = std::uint64_t{12'345'678'901'234'567'890ULL};
+    const auto v_score = score::make(VALUE);
 
     // direct get
     EXPECT_EQ(v_score.get<std::uint64_t>(), 12'345'678'901'234'567'890ULL);
@@ -260,8 +260,8 @@ TEST(score_test, make_and_get_u_i64) {
 
 // copy/paste of make_and_get_u_i64, just to be explicit
 TEST(score_test, make_and_get_size_t) {
-    constexpr auto v_value = std::size_t{12'345'678'901'234'567'890ULL};
-    const auto v_score = score::make(v_value);
+    constexpr auto VALUE = std::size_t{12'345'678'901'234'567'890ULL};
+    const auto v_score = score::make(VALUE);
 
     // direct get
     EXPECT_EQ(v_score.get<std::size_t>(), 12'345'678'901'234'567'890ULL);

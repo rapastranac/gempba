@@ -46,12 +46,12 @@ namespace gempba {
         unsigned int m_processor_count;
         std::atomic<long long> m_idle_time;
         std::mutex m_mutex; // local mutex
-        load_balancer *const m_balancer;
+        load_balancer* const m_balancer;
 
     public:
         //<editor-fold desc="Construction/Destruction">
 
-        explicit node_manager(load_balancer *const p_load_balancer, scheduler::worker *p_scheduler) : m_balancer(p_load_balancer), m_scheduler(p_scheduler) {
+        explicit node_manager(load_balancer* const p_load_balancer, scheduler::worker* p_scheduler) : m_balancer(p_load_balancer), m_scheduler(p_scheduler) {
 
             m_processor_count = std::thread::hardware_concurrency();
             m_idle_time = 0;
@@ -64,13 +64,13 @@ namespace gempba {
 
         ~node_manager() = default;
 
-        node_manager(const node_manager &) = delete;
+        node_manager(const node_manager&) = delete;
 
-        node_manager(node_manager &&) = delete;
+        node_manager(node_manager&&) = delete;
 
-        node_manager &operator=(const node_manager &) = delete;
+        node_manager& operator=(const node_manager&) = delete;
 
-        node_manager &operator=(node_manager &&) = delete;
+        node_manager& operator=(node_manager&&) = delete;
 
         //</editor-fold>
 
@@ -84,7 +84,7 @@ namespace gempba {
          * @return True if the result was successfully updated, false otherwise.
          */
         template<typename T>
-        bool try_update_result(T &p_new_result, const score p_new_score) {
+        bool try_update_result(T& p_new_result, const score p_new_score) {
             std::unique_lock v_lock(m_mutex);
             if (!should_update_result(p_new_score)) {
                 return false;
@@ -106,7 +106,7 @@ namespace gempba {
          * @return True if the result was successfully updated, false otherwise.
          */
         template<typename T>
-        bool try_update_result(T &p_new_result, score p_new_score, std::function<task_packet(T &)> &p_serializer) {
+        bool try_update_result(T& p_new_result, score p_new_score, std::function<task_packet(T&)>& p_serializer) {
             std::unique_lock v_lock(m_mutex);
 
             if (!should_update_result(p_new_score)) {
@@ -128,7 +128,7 @@ namespace gempba {
          * @param p_new_score the most promising new score for the solution in the scope calling this method
          * @return True if the score was successfully updated, false otherwise.
          */
-        bool try_update_score_and_invalidate_result(const score &p_new_score) {
+        bool try_update_score_and_invalidate_result(const score& p_new_score) {
             std::scoped_lock<std::mutex> v_lock(m_mutex);
 
             if (should_update_result(p_new_score)) {
@@ -189,7 +189,7 @@ namespace gempba {
          * if multiprocessing is used, then every process should call this method before starting
          * @param p_score first approximation of the score that represents the best solution
          */
-        void set_score(const score &p_score) { this->m_score = p_score; }
+        void set_score(const score& p_score) { this->m_score = p_score; }
 
         void set_thread_pool_size(const unsigned int p_size) const { m_balancer->set_thread_pool_size(p_size); }
 
@@ -197,13 +197,13 @@ namespace gempba {
 
         [[nodiscard]] unsigned int generate_unique_id() const { return m_balancer->generate_unique_id(); }
 
-        std::future<std::any> force_local_submit(std::function<std::any()> &&p_function) const { return m_balancer->force_local_submit(std::move(p_function)); }
+        std::future<std::any> force_local_submit(std::function<std::any()>&& p_function) const { return m_balancer->force_local_submit(std::move(p_function)); }
 
-        void forward(node &p_node) const { m_balancer->forward(p_node); }
+        void forward(node& p_node) const { m_balancer->forward(p_node); }
 
-        bool try_local_submit(node &p_node) const { return m_balancer->try_local_submit(p_node); }
+        bool try_local_submit(node& p_node) const { return m_balancer->try_local_submit(p_node); }
 
-        bool try_remote_submit(node &p_node, const int p_runnable_id) const { return m_balancer->try_remote_submit(p_node, p_runnable_id); }
+        bool try_remote_submit(node& p_node, const int p_runnable_id) const { return m_balancer->try_remote_submit(p_node, p_runnable_id); }
 
         [[nodiscard]] double get_idle_time() const { return m_balancer->get_idle_time(); }
 
@@ -213,14 +213,14 @@ namespace gempba {
 
         // ——————— IPC related attributes and member functions ———————//
     private:
-        scheduler::worker *m_scheduler;
+        scheduler::worker* m_scheduler;
         std::mutex m_ipc_mutex; // mutex to ensure funnel access to IPC
         int m_world_rank = -1; // get the rank of the process
         int m_world_size = -1; // get the number of processes/nodes
         char m_processor_name[128]{}; // name of the node
 
 
-        [[nodiscard]] bool should_update_result(const score &p_new_score) const {
+        [[nodiscard]] bool should_update_result(const score& p_new_score) const {
             const bool v_new_max_is_better = m_goal == MAXIMISE && p_new_score > m_score;
             const bool v_new_min_is_better = m_goal == MINIMISE && p_new_score < m_score;
             return v_new_max_is_better || v_new_min_is_better;

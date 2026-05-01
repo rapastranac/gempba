@@ -59,7 +59,7 @@ namespace gempba {
     class node final : public node_traits<node> {
         std::shared_ptr<node_core> m_node_core;
 
-        static void throw_if_null(const std::shared_ptr<node_core> &p_node) {
+        static void throw_if_null(const std::shared_ptr<node_core>& p_node) {
             if (!p_node) {
                 std::stringstream v_ss;
 #if GEMPBA_HAS_STACKTRACE
@@ -75,28 +75,28 @@ namespace gempba {
         }
 
     public:
-        static node create(const node &p_parent, const std::function<std::shared_ptr<node_core>(std::shared_ptr<node_core>)> &p_factory) { return node(p_factory(p_parent.m_node_core)); }
+        static node create(const node& p_parent, const std::function<std::shared_ptr<node_core>(std::shared_ptr<node_core>)>& p_factory) { return node(p_factory(p_parent.m_node_core)); }
 
-        static node create(const std::function<std::shared_ptr<node_core>(std::shared_ptr<node_core>)> &p_factory) { return node(p_factory(nullptr)); }
+        static node create(const std::function<std::shared_ptr<node_core>(std::shared_ptr<node_core>)>& p_factory) { return node(p_factory(nullptr)); }
 
         node() = default;
 
-        explicit node(const std::shared_ptr<node_core> &p_other) : m_node_core(p_other) {}
+        explicit node(const std::shared_ptr<node_core>& p_other) : m_node_core(p_other) {}
 
         // Copy Constructor
-        node(const node &p_other) = default;
+        node(const node& p_other) = default;
 
         // Copy Assignment
-        node &operator=(const node &p_other) = default;
+        node& operator=(const node& p_other) = default;
 
         // Move Constructor
-        node(node &&p_other) noexcept = default;
+        node(node&& p_other) noexcept = default;
 
         // Move Assignment
-        node &operator=(node &&p_other) noexcept = default;
+        node& operator=(node&& p_other) noexcept = default;
 
         // Operators
-        friend bool operator==(const node &p_lhs, const node &p_rhs) { return p_lhs.m_node_core == p_rhs.m_node_core; }
+        friend bool operator==(const node& p_lhs, const node& p_rhs) { return p_lhs.m_node_core == p_rhs.m_node_core; }
 
         explicit operator bool() const { return m_node_core != nullptr; }
 
@@ -104,26 +104,26 @@ namespace gempba {
 
         bool operator!=(std::nullptr_t) const noexcept { return m_node_core != nullptr; }
 
-        node map_core(std::function<std::shared_ptr<node_core>(std::shared_ptr<node_core> &)> &&p_accessor) { return node(p_accessor(m_node_core)); }
+        node map_core(std::function<std::shared_ptr<node_core>(std::shared_ptr<node_core>&)>&& p_accessor) { return node(p_accessor(m_node_core)); }
 
-        void apply_core(std::function<void(std::shared_ptr<node_core> &)> &&p_accessor) { p_accessor(m_node_core); }
+        void apply_core(std::function<void(std::shared_ptr<node_core>&)>&& p_accessor) { p_accessor(m_node_core); }
 
         void run() override {
             throw_if_null(m_node_core);
             m_node_core->run();
         }
 
-        void delegate_locally(load_balancer *p_load_balancer) override {
+        void delegate_locally(load_balancer* p_load_balancer) override {
             throw_if_null(m_node_core);
             m_node_core->delegate_locally(p_load_balancer);
         }
 
-        void delegate_remotely(scheduler::worker *p_worker, const int p_runner_id) override {
+        void delegate_remotely(scheduler::worker* p_worker, const int p_runner_id) override {
             throw_if_null(m_node_core);
             m_node_core->delegate_remotely(p_worker, p_runner_id);
         }
 
-        void set_result(const task_packet &p_result) override {
+        void set_result(const task_packet& p_result) override {
             throw_if_null(m_node_core);
             m_node_core->set_result(p_result);
         }
@@ -138,17 +138,17 @@ namespace gempba {
             return m_node_core->serialize();
         }
 
-        void deserialize(const task_packet &p_buffer) override {
+        void deserialize(const task_packet& p_buffer) override {
             throw_if_null(m_node_core);
             m_node_core->deserialize(p_buffer);
         }
 
-        void set_result_serializer(const std::function<task_packet(std::any)> &p_result_serializer) override {
+        void set_result_serializer(const std::function<task_packet(std::any)>& p_result_serializer) override {
             throw_if_null(m_node_core);
             m_node_core->set_result_serializer(p_result_serializer);
         }
 
-        void set_result_deserializer(const std::function<std::any(task_packet)> &p_result_deserializer) override {
+        void set_result_deserializer(const std::function<std::any(task_packet)>& p_result_deserializer) override {
             throw_if_null(m_node_core);
             m_node_core->set_result_deserializer(p_result_deserializer);
         }
@@ -198,7 +198,7 @@ namespace gempba {
             return node(m_node_core->get_root());
         }
 
-        void set_parent(const node &p_parent) override {
+        void set_parent(const node& p_parent) override {
             throw_if_null(m_node_core);
             m_node_core->set_parent(p_parent.m_node_core);
         }
@@ -248,7 +248,7 @@ namespace gempba {
             // TODO ... this could be removed
             std::list<node> v_temp;
             // Not optimal
-            for (const auto &v_core: m_node_core->get_children()) {
+            for (const auto& v_core: m_node_core->get_children()) {
                 v_temp.emplace_back(v_core);
             }
             return v_temp;
@@ -259,7 +259,7 @@ namespace gempba {
             return m_node_core->get_children_count();
         }
 
-        void add_child(const node &p_child) override {
+        void add_child(const node& p_child) override {
             throw_if_null(m_node_core);
             m_node_core->add_child(p_child.m_node_core);
         }
@@ -279,18 +279,18 @@ namespace gempba {
             return m_node_core->should_branch();
         }
 
-        void remove_child(node &p_node) override { m_node_core->remove_child(p_node.m_node_core); }
+        void remove_child(node& p_node) override { m_node_core->remove_child(p_node.m_node_core); }
 
         void prune() override { m_node_core->prune(); }
     };
 
     // Non-member operator== for nullptr on the left-hand side
-    inline bool operator==(std::nullptr_t, const node &p_n) noexcept {
+    inline bool operator==(std::nullptr_t, const node& p_n) noexcept {
         return p_n == nullptr; // Reuse the member function
     }
 
     // Non-member operator!= for nullptr on the left-hand side
-    inline bool operator!=(std::nullptr_t, const node &p_n) noexcept {
+    inline bool operator!=(std::nullptr_t, const node& p_n) noexcept {
         return p_n != nullptr; // Reuse the member function
     }
 

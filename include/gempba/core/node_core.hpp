@@ -40,32 +40,32 @@ namespace gempba {
         // Disable Copy
         // node_core(const node_core&) = delete;
         // node_core& operator=(const node_core&) = delete;
-        node_core(const node_core &) = default;
+        node_core(const node_core&) = default;
 
-        node_core &operator=(const node_core &) = default;
+        node_core& operator=(const node_core&) = default;
 
         // Allow Move
-        node_core(node_core &&) noexcept = default;
+        node_core(node_core&&) noexcept = default;
 
-        node_core &operator=(node_core &&) noexcept = default;
+        node_core& operator=(node_core&&) noexcept = default;
 
         void run() override = 0;
 
-        void delegate_locally(load_balancer *p_load_balancer) override = 0;
+        void delegate_locally(load_balancer* p_load_balancer) override = 0;
 
-        void delegate_remotely(scheduler::worker *p_scheduler, int p_runner_id) override = 0;
+        void delegate_remotely(scheduler::worker* p_scheduler, int p_runner_id) override = 0;
 
-        void set_result(const task_packet &p_result) override = 0;
+        void set_result(const task_packet& p_result) override = 0;
 
         task_packet get_result() override = 0;
 
         task_packet serialize() override = 0;
 
-        void deserialize(const task_packet &p_buffer) override = 0;
+        void deserialize(const task_packet& p_buffer) override = 0;
 
-        void set_result_serializer(const std::function<task_packet(std::any)> &p_result_serializer) override = 0;
+        void set_result_serializer(const std::function<task_packet(std::any)>& p_result_serializer) override = 0;
 
-        void set_result_deserializer(const std::function<std::any(task_packet)> &p_result_deserializer) override = 0;
+        void set_result_deserializer(const std::function<std::any(task_packet)>& p_result_deserializer) override = 0;
 
         [[nodiscard]] bool is_dummy() const override = 0;
 
@@ -85,7 +85,7 @@ namespace gempba {
 
         [[nodiscard]] std::shared_ptr<node_core> get_root() override = 0;
 
-        void set_parent(const std::shared_ptr<node_core> &p_parent) override = 0;
+        void set_parent(const std::shared_ptr<node_core>& p_parent) override = 0;
 
         [[nodiscard]] std::shared_ptr<node_core> get_parent() override = 0;
 
@@ -107,7 +107,7 @@ namespace gempba {
 
         [[nodiscard]] int get_children_count() const override = 0;
 
-        void add_child(const std::shared_ptr<node_core> &p_child) override = 0;
+        void add_child(const std::shared_ptr<node_core>& p_child) override = 0;
 
         std::any get_any_result() override = 0;
 
@@ -115,7 +115,7 @@ namespace gempba {
 
         bool should_branch() override = 0;
 
-        void remove_child(std::shared_ptr<node_core> &p_child) override = 0;
+        void remove_child(std::shared_ptr<node_core>& p_child) override = 0;
 
         void prune() override = 0;
     };

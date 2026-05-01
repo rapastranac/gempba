@@ -44,11 +44,11 @@ namespace gempba {
         std::function<R(std::thread::id, Args..., node)> m_f;
 
 
-        std::function<std::tuple<Args...>(const task_packet &&)> m_args_deserializer;
+        std::function<std::tuple<Args...>(const task_packet&&)> m_args_deserializer;
         std::function<task_packet(R)> m_result_serializer;
 
     public:
-        serial_runnable_non_void(const int p_id, invokable<R, Args...> auto &&p_f, std::function<std::tuple<Args...>(const task_packet &&)> p_args_deserializer,
+        serial_runnable_non_void(const int p_id, invokable<R, Args...> auto&& p_f, std::function<std::tuple<Args...>(const task_packet&&)> p_args_deserializer,
                                  std::function<task_packet(R)> p_result_serializer) :
             m_id(p_id), m_f(p_f), m_args_deserializer(std::move(std::move(p_args_deserializer))), m_result_serializer(std::move(std::move(p_result_serializer))) {}
 
@@ -56,7 +56,7 @@ namespace gempba {
 
         [[nodiscard]] int get_id() const override { return m_id; }
 
-        std::optional<std::shared_future<task_packet>> operator()(node_manager &p_node_manager, const task_packet &p_args) override {
+        std::optional<std::shared_future<task_packet>> operator()(node_manager& p_node_manager, const task_packet& p_args) override {
             std::tuple<Args...> v_user_args = m_args_deserializer(std::move(p_args)); // NOLINT(performance-move-const-arg)
 
             std::future<std::any> v_fut = p_node_manager.force_local_submit([this, v_user_args = std::move(v_user_args)] {

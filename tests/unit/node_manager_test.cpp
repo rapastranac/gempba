@@ -52,13 +52,13 @@ public:
     MOCK_METHOD(gempba::balancing_policy, get_balancing_policy, (), (override));
     MOCK_METHOD(unsigned int, generate_unique_id, (), (override));
     MOCK_METHOD(double, get_idle_time, (), (const override));
-    MOCK_METHOD(void, set_root, (std::thread::id, std::shared_ptr<gempba::node_core> &), (override));
+    MOCK_METHOD(void, set_root, (std::thread::id, std::shared_ptr<gempba::node_core>&), (override));
     MOCK_METHOD(std::shared_ptr<std::shared_ptr<gempba::node_core>>, get_root, (std::thread::id), (override));
     MOCK_METHOD(void, set_thread_pool_size, (unsigned int), (override));
-    MOCK_METHOD(std::future<std::any>, force_local_submit, (std::function<std::any()> &&), (override));
-    MOCK_METHOD(void, forward, (gempba::node &), (override));
-    MOCK_METHOD(bool, try_local_submit, (gempba::node &), (override));
-    MOCK_METHOD(bool, try_remote_submit, (gempba::node &, int), (override));
+    MOCK_METHOD(std::future<std::any>, force_local_submit, (std::function<std::any()>&&), (override));
+    MOCK_METHOD(void, forward, (gempba::node&), (override));
+    MOCK_METHOD(bool, try_local_submit, (gempba::node&), (override));
+    MOCK_METHOD(bool, try_remote_submit, (gempba::node&, int), (override));
     MOCK_METHOD(void, wait, (), (override));
     MOCK_METHOD(bool, is_done, (), (const, override));
     MOCK_METHOD(std::size_t, get_thread_request_count, (), (const, override));
@@ -80,7 +80,7 @@ public:
 class node_manager_test : public ::testing::Test {
 protected:
     testing::NiceMock<load_balancer_mock_nm> m_balancer_mock;
-    gempba::node_manager *m_node_manager = nullptr;
+    gempba::node_manager* m_node_manager = nullptr;
 
     void SetUp() override { m_node_manager = new gempba::node_manager(&m_balancer_mock, nullptr); }
 
@@ -136,7 +136,7 @@ TEST_F(node_manager_test, try_update_result_minimise_rejects_larger_score) {
 TEST_F(node_manager_test, try_update_result_with_serializer_accepts_better_score) {
     std::string v_result = "hello";
     const gempba::score v_better = gempba::score::make(10);
-    std::function<gempba::task_packet(std::string &)> v_serializer = [](std::string &p_s) { return gempba::task_packet(p_s); };
+    std::function<gempba::task_packet(std::string&)> v_serializer = [](std::string& p_s) { return gempba::task_packet(p_s); };
 
     EXPECT_TRUE(m_node_manager->try_update_result(v_result, v_better, v_serializer));
 }
@@ -144,7 +144,7 @@ TEST_F(node_manager_test, try_update_result_with_serializer_accepts_better_score
 TEST_F(node_manager_test, try_update_result_with_serializer_rejects_worse_score) {
     std::string v_first = "first";
     const gempba::score v_better = gempba::score::make(10);
-    std::function<gempba::task_packet(std::string &)> v_serializer = [](std::string &p_s) { return gempba::task_packet(p_s); };
+    std::function<gempba::task_packet(std::string&)> v_serializer = [](std::string& p_s) { return gempba::task_packet(p_s); };
     m_node_manager->try_update_result(v_first, v_better, v_serializer);
 
     std::string v_second = "second";
@@ -169,7 +169,7 @@ TEST_F(node_manager_test, get_result_returns_value_after_update) {
 TEST_F(node_manager_test, get_result_returns_nullopt_when_stored_as_bytes) {
     std::string v_val = "data";
     const gempba::score v_score = gempba::score::make(5);
-    std::function<gempba::task_packet(std::string &)> v_serializer = [](std::string &p_s) { return gempba::task_packet(p_s); };
+    std::function<gempba::task_packet(std::string&)> v_serializer = [](std::string& p_s) { return gempba::task_packet(p_s); };
     m_node_manager->try_update_result(v_val, v_score, v_serializer);
 
     const auto v_result = m_node_manager->get_result<std::string>();
@@ -187,7 +187,7 @@ TEST_F(node_manager_test, get_result_bytes_returns_nullopt_when_stored_as_any) {
 TEST_F(node_manager_test, get_result_bytes_returns_value_after_serializer_update) {
     std::string v_val = "test_data";
     const gempba::score v_score = gempba::score::make(10);
-    std::function<gempba::task_packet(std::string &)> v_serializer = [](std::string &p_s) { return gempba::task_packet(p_s); };
+    std::function<gempba::task_packet(std::string&)> v_serializer = [](std::string& p_s) { return gempba::task_packet(p_s); };
     m_node_manager->try_update_result(v_val, v_score, v_serializer);
 
     const auto v_bytes = m_node_manager->get_result_bytes();
@@ -289,7 +289,7 @@ TEST(node_manager_with_real_balancer_test, forward_runs_unused_node_and_marks_it
     gempba::node_manager v_node_manager(&v_balancer, nullptr);
 
     bool v_was_invoked = false;
-    std::function<void(std::thread::id, int, gempba::node)> v_fn = [&v_was_invoked](std::thread::id, int, const gempba::node &) { v_was_invoked = true; };
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [&v_was_invoked](std::thread::id, int, const gempba::node&) { v_was_invoked = true; };
     auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_balancer);
     auto v_child = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_parent, v_fn, std::make_tuple(0));
     gempba::node v_node(v_child);
@@ -305,7 +305,7 @@ TEST(node_manager_with_real_balancer_test, forward_skips_already_consumed_node) 
     gempba::node_manager v_node_manager(&v_balancer, nullptr);
 
     bool v_was_invoked = false;
-    std::function<void(std::thread::id, int, gempba::node)> v_fn = [&v_was_invoked](std::thread::id, int, const gempba::node &) { v_was_invoked = true; };
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [&v_was_invoked](std::thread::id, int, const gempba::node&) { v_was_invoked = true; };
     auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_balancer);
     auto v_child = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_parent, v_fn, std::make_tuple(0));
     v_child->set_state(gempba::FORWARDED); // already consumed

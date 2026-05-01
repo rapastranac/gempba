@@ -194,11 +194,11 @@ TEST_F(get_nb_set_bits_packet_test, constructed_from_char_buffer_matches_expecte
 }
 
 TEST_F(get_nb_set_bits_packet_test, large_packet_matches_naive_sum) {
-    constexpr int v_n = 1024;
+    constexpr int SAMPLES = 1024;
     std::vector<std::byte> v_bytes;
-    v_bytes.reserve(v_n);
+    v_bytes.reserve(SAMPLES);
     int v_expected = 0;
-    for (int i = 0; i < v_n; ++i) {
+    for (int i = 0; i < SAMPLES; ++i) {
         auto v_uc = static_cast<unsigned char>(i % 256);
         v_bytes.push_back(static_cast<std::byte>(v_uc));
         v_expected += naive_popcount(v_uc);
@@ -209,7 +209,7 @@ TEST_F(get_nb_set_bits_packet_test, large_packet_matches_naive_sum) {
 
 TEST_F(get_nb_set_bits_packet_test, copy_constructed_packet_gives_same_result) {
     auto v_original = make_packet({0xAA, 0x55});
-    const gempba::task_packet &v_copy{v_original};
+    const gempba::task_packet& v_copy{v_original};
     EXPECT_EQ(get_nb_set_bits(v_original), get_nb_set_bits(v_copy));
 }
 
@@ -266,7 +266,7 @@ TEST_F(task_comparator_test, usable_in_std_sort_produces_ascending_order) {
     v_pkts.push_back(make_packet({0x01})); // 1 bit
     v_pkts.push_back(make_packet({0x0F})); // 4 bits
 
-    std::ranges::sort(v_pkts, [](const auto &p_a, const auto &p_b) { return get_nb_set_bits(p_a) < get_nb_set_bits(p_b); });
+    std::ranges::sort(v_pkts, [](const auto& p_a, const auto& p_b) { return get_nb_set_bits(p_a) < get_nb_set_bits(p_b); });
 
     EXPECT_LE(get_nb_set_bits(v_pkts[0]), get_nb_set_bits(v_pkts[1]));
     EXPECT_LE(get_nb_set_bits(v_pkts[1]), get_nb_set_bits(v_pkts[2]));

@@ -11,7 +11,7 @@ namespace gempba {
         test_utils() = default;
 
     public:
-        static std::string strip_boost_metadata(const std::string &p_archive) {
+        static std::string strip_boost_metadata(const std::string& p_archive) {
             std::istringstream v_iss(p_archive);
             std::ostringstream v_oss;
             std::string v_token;

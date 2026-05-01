@@ -34,14 +34,14 @@ namespace gempba {
     template<class T>
     class queue {
     public:
-        bool push(T const &p_value) {
+        bool push(T const& p_value) {
             std::unique_lock<std::mutex> v_lock(this->m_mtx);
             this->m_q.push(p_value);
             return true;
         }
 
         // deletes the retrieved element, do not use for non-integral types
-        bool pop(T &p_v) {
+        bool pop(T& p_v) {
             std::unique_lock<std::mutex> v_lock(this->m_mtx);
             if (this->m_q.empty())
                 return false;

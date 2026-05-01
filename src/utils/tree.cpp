@@ -14,7 +14,7 @@ void tree::tree_node::add_next(const int p_index) {
     if (m_children_count == 0) {
         m_next = &m_tree[p_index];
     } else {
-        tree_node *v_tail = m_next;
+        tree_node* v_tail = m_next;
         while (v_tail->m_right_sibling) {
             v_tail = v_tail->m_right_sibling;
         }

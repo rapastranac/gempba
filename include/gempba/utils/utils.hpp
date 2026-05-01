@@ -39,25 +39,25 @@
  */
 namespace utils {
     template<typename... T>
-    void print_ipc_debug_comments([[maybe_unused]] const fmt::format_string<T...> &p_format_string, [[maybe_unused]] T &&...p_args) {
+    void print_ipc_debug_comments([[maybe_unused]] const fmt::format_string<T...>& p_format_string, [[maybe_unused]] T&&... p_args) {
 #if GEMPBA_DEBUG_COMMENTS
         spdlog::debug(p_format_string, std::forward<T>(p_args)...);
 #endif
     }
 
-    [[noreturn]] inline void log_and_throw(const std::string &p_v_message) {
+    [[noreturn]] inline void log_and_throw(const std::string& p_v_message) {
         spdlog::error(p_v_message);
         throw std::runtime_error(p_v_message);
     }
 
     template<typename... T>
-    [[noreturn]] void log_and_throw(const fmt::format_string<T...> &p_format_string, T &&...p_args) {
+    [[noreturn]] void log_and_throw(const fmt::format_string<T...>& p_format_string, T&&... p_args) {
         const std::string v_message = fmt::format(p_format_string, std::forward<T>(p_args)...);
         log_and_throw(v_message);
     }
 
     template<typename T>
-    std::future<std::any> convert_to_any_future(std::future<T> &&p_future) {
+    std::future<std::any> convert_to_any_future(std::future<T>&& p_future) {
         std::future<std::any> v_any_future = std::async(std::launch::async, [v_fut = std::move(p_future)]() mutable {
             v_fut.wait();
             T v_result = v_fut.get();
@@ -71,7 +71,7 @@ namespace utils {
         return p_child * static_cast<int>(pow(p_children_per_node, p_depth)) + p_parent;
     }
 
-    static void build_topology(tree &p_tree, int p_parent, const int p_depth_start, const int p_children_per_node, const int p_total) {
+    static void build_topology(tree& p_tree, int p_parent, const int p_depth_start, const int p_children_per_node, const int p_total) {
         for (int v_depth = p_depth_start; v_depth < log2(p_total); v_depth++) {
             for (int v_child = 1; v_child < p_children_per_node; v_child++) {
                 int v_next_child = get_next_child(v_child, p_parent, p_children_per_node, v_depth);
@@ -97,7 +97,7 @@ namespace utils {
      * @param vector_ The vector to be shifted. It should have been initialized with at least
      *            the required number of elements.
      */
-    [[maybe_unused]] static void shift_left(std::vector<int> &p_vector) {
+    [[maybe_unused]] static void shift_left(std::vector<int>& p_vector) {
         const int v_size = static_cast<int>(p_vector.size());
         if (v_size == 0) {
             utils::log_and_throw("Attempted to shift an empty vector");

@@ -31,11 +31,11 @@
 TEST(task_bundle_test, construct_with_task_packet_and_function_id) {
     const std::vector v_data = {std::byte{0x01}, std::byte{0x02}, std::byte{0x03}};
     const gempba::task_packet v_packet(v_data);
-    constexpr int v_function_id = 42;
+    constexpr int FUNCTION_ID = 42;
 
-    const gempba::task_bundle v_bundle(v_packet, v_function_id);
+    const gempba::task_bundle v_bundle(v_packet, FUNCTION_ID);
 
-    EXPECT_EQ(v_bundle.get_runnable_id(), v_function_id);
+    EXPECT_EQ(v_bundle.get_runnable_id(), FUNCTION_ID);
     EXPECT_EQ(v_bundle.get_task_packet().size(), v_data.size());
     EXPECT_EQ(v_bundle.size(), v_data.size());
     EXPECT_FALSE(v_bundle.empty());
@@ -44,32 +44,32 @@ TEST(task_bundle_test, construct_with_task_packet_and_function_id) {
 TEST(task_bundle_test, construct_with_move_semantics) {
     std::vector v_data = {std::byte{0xAA}, std::byte{0xBB}};
     gempba::task_packet v_packet(std::move(v_data));
-    constexpr int v_function_id = 123;
+    constexpr int FUNCTION_ID = 123;
 
-    const gempba::task_bundle v_bundle(std::move(v_packet), v_function_id);
+    const gempba::task_bundle v_bundle(std::move(v_packet), FUNCTION_ID);
 
-    EXPECT_EQ(v_bundle.get_runnable_id(), v_function_id);
+    EXPECT_EQ(v_bundle.get_runnable_id(), FUNCTION_ID);
     EXPECT_EQ(v_bundle.size(), 2);
     EXPECT_FALSE(v_bundle.empty());
 }
 
 TEST(task_bundle_test, construct_with_empty_packet) {
     const gempba::task_packet v_empty_packet(0);
-    constexpr int v_function_id = 999;
+    constexpr int FUNCTION_ID = 999;
 
-    const gempba::task_bundle v_bundle(v_empty_packet, v_function_id);
+    const gempba::task_bundle v_bundle(v_empty_packet, FUNCTION_ID);
 
-    EXPECT_EQ(v_bundle.get_runnable_id(), v_function_id);
+    EXPECT_EQ(v_bundle.get_runnable_id(), FUNCTION_ID);
     EXPECT_EQ(v_bundle.size(), 0);
     EXPECT_TRUE(v_bundle.empty());
 }
 
 TEST(task_bundle_test, construct_with_static_empty_packet) {
-    constexpr int v_function_id = 0;
+    constexpr int FUNCTION_ID = 0;
 
-    const gempba::task_bundle v_bundle(gempba::task_packet::EMPTY, v_function_id);
+    const gempba::task_bundle v_bundle(gempba::task_packet::EMPTY, FUNCTION_ID);
 
-    EXPECT_EQ(v_bundle.get_runnable_id(), v_function_id);
+    EXPECT_EQ(v_bundle.get_runnable_id(), FUNCTION_ID);
     EXPECT_EQ(v_bundle.size(), 0);
     EXPECT_TRUE(v_bundle.empty());
 }
@@ -79,7 +79,7 @@ TEST(task_bundle_test, data_getter_returns_const_reference) {
     const gempba::task_packet v_packet(v_expected);
     const gempba::task_bundle v_bundle(v_packet, 456);
 
-    const gempba::task_packet &v_data_ref = v_bundle.get_task_packet();
+    const gempba::task_packet& v_data_ref = v_bundle.get_task_packet();
 
     EXPECT_EQ(v_data_ref.size(), v_expected.size());
     for (std::size_t i = 0; i < v_expected.size(); ++i) {
@@ -92,13 +92,13 @@ TEST(task_bundle_test, immutability_const_members) {
     const gempba::task_bundle v_bundle(v_packet, 789);
 
     // This should compile - getters should work on const bundle
-    const gempba::task_bundle &v_const_ref = v_bundle;
+    const gempba::task_bundle& v_const_ref = v_bundle;
     EXPECT_EQ(v_const_ref.get_runnable_id(), 789);
     EXPECT_EQ(v_const_ref.size(), 1);
     EXPECT_FALSE(v_const_ref.empty());
 
     // Data should be accessible through const reference
-    const gempba::task_packet &v_const_data = v_const_ref.get_task_packet();
+    const gempba::task_packet& v_const_data = v_const_ref.get_task_packet();
     EXPECT_EQ(v_const_data.size(), 1);
 }
 
@@ -107,7 +107,7 @@ TEST(task_bundle_test, copy_constructor_creates_deep_copy) {
     const gempba::task_packet v_packet(v_data);
     const gempba::task_bundle v_original(v_packet, 100);
 
-    const gempba::task_bundle &v_copy(v_original);
+    const gempba::task_bundle& v_copy(v_original);
 
     EXPECT_EQ(v_copy.get_runnable_id(), v_original.get_runnable_id());
     EXPECT_EQ(v_copy.size(), v_original.size());
@@ -195,9 +195,9 @@ TEST(task_bundle_test, zero_function_id_is_valid) {
 
 TEST(task_bundle_test, max_uint_function_id_is_valid) {
     const gempba::task_packet v_packet(std::vector{std::byte{0x88}});
-    constexpr int v_max_uint = std::numeric_limits<int>::max();
-    const gempba::task_bundle v_bundle(v_packet, v_max_uint);
+    constexpr int MAX_UINT = std::numeric_limits<int>::max();
+    const gempba::task_bundle v_bundle(v_packet, MAX_UINT);
 
-    EXPECT_EQ(v_bundle.get_runnable_id(), v_max_uint);
+    EXPECT_EQ(v_bundle.get_runnable_id(), MAX_UINT);
     EXPECT_EQ(v_bundle.size(), 1);
 }

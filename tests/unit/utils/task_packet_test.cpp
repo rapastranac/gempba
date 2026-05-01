@@ -53,7 +53,7 @@ TEST(task_packet_test, construct_from_vector_copy) {
 
 TEST(task_packet_test, construct_from_vector_move) {
     std::vector v_bytes = {std::byte{10}, std::byte{20}};
-    const auto *v_original_data_ptr = v_bytes.data();
+    const auto* v_original_data_ptr = v_bytes.data();
 
     gempba::task_packet v_packet(std::move(v_bytes));
 
@@ -64,11 +64,11 @@ TEST(task_packet_test, construct_from_vector_move) {
 }
 
 TEST(task_packet_test, construct_from_cstring) {
-    constexpr char v_raw[] = {'A', 'B', 'C'};
-    gempba::task_packet v_packet(v_raw, sizeof(v_raw));
+    constexpr char RAW[] = {'A', 'B', 'C'};
+    gempba::task_packet v_packet(RAW, sizeof(RAW));
 
-    EXPECT_EQ(v_packet.size(), sizeof(v_raw));
-    EXPECT_EQ(std::memcmp(v_packet.data(), v_raw, sizeof(v_raw)), 0);
+    EXPECT_EQ(v_packet.size(), sizeof(RAW));
+    EXPECT_EQ(std::memcmp(v_packet.data(), RAW, sizeof(RAW)), 0);
 }
 
 TEST(task_packet_test, construct_from_string) {
@@ -120,8 +120,8 @@ TEST(task_packet_test, empty_query) {
     gempba::task_packet v_non_empty_packet(8);
     EXPECT_FALSE(v_non_empty_packet.empty());
 
-    constexpr std::vector<std::byte> v_empty_vec;
-    EXPECT_TRUE(v_empty_vec.empty());
+    constexpr std::vector<std::byte> EMPTY_VEC;
+    EXPECT_TRUE(EMPTY_VEC.empty());
 
     const gempba::task_packet v_moved_packet(std::move(v_non_empty_packet));
     EXPECT_EQ(8, v_moved_packet.size());
@@ -138,7 +138,7 @@ TEST(task_packet_test, const_iterator_yields_correct_bytes) {
     const gempba::task_packet v_packet(v_expected_data);
 
     std::vector<std::byte> v_iterated_data;
-    for (const std::byte &v_byte: v_packet) {
+    for (const std::byte& v_byte: v_packet) {
         v_iterated_data.push_back(v_byte);
     }
 
@@ -148,10 +148,10 @@ TEST(task_packet_test, const_iterator_yields_correct_bytes) {
 
 
 TEST(task_packet_test, empty_packet_yields_nothing) {
-    const gempba::task_packet &v_packet = gempba::task_packet::EMPTY;
+    const gempba::task_packet& v_packet = gempba::task_packet::EMPTY;
 
     int v_count = 0;
-    for ([[maybe_unused]] const std::byte &v_byte: v_packet) {
+    for ([[maybe_unused]] const std::byte& v_byte: v_packet) {
         ++v_count;
     }
 
@@ -162,7 +162,7 @@ TEST(task_packet_test, empty_packet_yields_nothing) {
 TEST(task_packet_test, basic_equality_and_inequality) {
     // Equal packets with same data
     const std::vector<std::byte> v_data1 = {std::byte{0x01}, std::byte{0x02}, std::byte{0x03}};
-    const std::vector<std::byte> &v_data2 = v_data1; // copy
+    const std::vector<std::byte>& v_data2 = v_data1; // copy
 
     gempba::task_packet v_packet1(v_data1);
     gempba::task_packet v_packet2(v_data2);
@@ -196,7 +196,7 @@ TEST(task_packet_test, basic_equality_and_inequality) {
 
 
 TEST(task_packet_test, empty_static_instance) {
-    const gempba::task_packet &v_empty1 = gempba::task_packet::EMPTY;
+    const gempba::task_packet& v_empty1 = gempba::task_packet::EMPTY;
     const gempba::task_packet v_manual_empty(0);
 
     // EMPTY should be equal to manually created empty packets

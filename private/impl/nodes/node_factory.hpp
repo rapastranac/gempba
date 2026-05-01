@@ -38,7 +38,7 @@
  */
 namespace gempba {
     class node_factory {
-        static void check_not_null([[maybe_unused]] const node &p_parent) {
+        static void check_not_null([[maybe_unused]] const node& p_parent) {
 #ifdef GEMPBA_TEST_MODE
             if (p_parent == nullptr) {
                 utils::log_and_throw("Node creation cannot have a nullptr for a parent");
@@ -58,7 +58,7 @@ namespace gempba {
          * @return The created Node
          */
         template<typename Ret, typename... Args>
-        static node create_explicit_node(load_balancer &p_load_balancer, node &p_parent, invokable<Ret, Args...> auto &&p_runnable, std::tuple<Args...> &&p_args) {
+        static node create_explicit_node(load_balancer& p_load_balancer, node& p_parent, invokable<Ret, Args...> auto&& p_runnable, std::tuple<Args...>&& p_args) {
 
             check_not_null(p_parent);
 
@@ -70,7 +70,7 @@ namespace gempba {
         }
 
         template<typename Ret, typename... Args>
-        static node create_serializable_explicit_node(load_balancer &p_load_balancer, const node &p_parent, invokable<Ret, Args...> auto &&p_runnable, std::tuple<Args...> &&p_args,
+        static node create_serializable_explicit_node(load_balancer& p_load_balancer, const node& p_parent, invokable<Ret, Args...> auto&& p_runnable, std::tuple<Args...>&& p_args,
                                                       std::function<task_packet(Args...)> p_args_serializer, std::function<std::tuple<Args...>(task_packet)> p_args_deserializer) {
             check_not_null(p_parent);
 
@@ -93,7 +93,7 @@ namespace gempba {
          * @return A shared pointer to the created Node
          */
         template<typename Ret, typename... Args>
-        static node create_lazy_node(load_balancer &p_load_balancer, const node &p_parent, invokable<Ret, Args...> auto &&p_runnable,
+        static node create_lazy_node(load_balancer& p_load_balancer, const node& p_parent, invokable<Ret, Args...> auto&& p_runnable,
                                      std::function<std::optional<std::tuple<Args...>>()> p_args_initializer) {
 
             check_not_null(p_parent);
@@ -107,7 +107,7 @@ namespace gempba {
 
 
         template<typename Ret, typename... Args>
-        static node create_serializable_lazy_node(load_balancer &p_load_balancer, const node &p_parent, invokable<Ret, Args...> auto &&p_runnable,
+        static node create_serializable_lazy_node(load_balancer& p_load_balancer, const node& p_parent, invokable<Ret, Args...> auto&& p_runnable,
                                                   std::function<std::optional<std::tuple<Args...>>()> p_args_initializer, std::function<task_packet(Args...)> p_args_serializer,
                                                   std::function<std::tuple<Args...>(task_packet)> p_args_deserializer) {
 
@@ -122,7 +122,7 @@ namespace gempba {
         }
 
         template<typename Ret, typename... Args>
-        static node create_seed_node(load_balancer &p_load_balancer, invokable<Ret, Args...> auto &&p_runnable, std::tuple<Args...> p_args) {
+        static node create_seed_node(load_balancer& p_load_balancer, invokable<Ret, Args...> auto&& p_runnable, std::tuple<Args...> p_args) {
 
             std::shared_ptr<node_core> v_null;
             auto v_seed = node_core_impl<Ret(Args...)>::create_explicit(p_load_balancer, v_null, p_runnable, std::move(p_args));
@@ -141,7 +141,7 @@ namespace gempba {
          * @return A shared pointer to the created Node
          */
         template<typename Ret, typename... Args>
-        static node create_serializable_node(load_balancer &p_load_balancer, const node &p_parent, invokable<Ret, Args...> auto &&p_f, std::function<task_packet(Args...)> p_args_serializer,
+        static node create_serializable_node(load_balancer& p_load_balancer, const node& p_parent, invokable<Ret, Args...> auto&& p_f, std::function<task_packet(Args...)> p_args_serializer,
                                              std::function<std::tuple<Args...>(task_packet)> p_args_deserializer) {
             check_not_null(p_parent);
 
@@ -158,7 +158,7 @@ namespace gempba {
          * @param p_load_balancer
          * @return A shared pointer to the created Node
          */
-        static node create_dummy_node(load_balancer &p_load_balancer) {
+        static node create_dummy_node(load_balancer& p_load_balancer) {
             const auto v_core = node_core_impl<void()>::create_dummy(p_load_balancer);
             return node(v_core);
         }

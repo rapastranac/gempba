@@ -44,28 +44,28 @@ namespace gempba {
         std::recursive_mutex m_recursive_mutex;
         std::size_t m_thread_request_count = 0;
 
-        scheduler::worker *const m_scheduler_worker;
+        scheduler::worker* const m_scheduler_worker;
 
     public:
-        explicit work_stealing_load_balancer(scheduler::worker *const p_scheduler_worker = nullptr) : m_scheduler_worker(p_scheduler_worker) {}
+        explicit work_stealing_load_balancer(scheduler::worker* const p_scheduler_worker = nullptr) : m_scheduler_worker(p_scheduler_worker) {}
 
         balancing_policy get_balancing_policy() override { return WORK_STEALING; }
 
         unsigned generate_unique_id() override { return ++m_unique_id_counter; }
 
-        std::future<std::any> force_local_submit(std::function<std::any()> &&p_function) override {
+        std::future<std::any> force_local_submit(std::function<std::any()>&& p_function) override {
             ++m_thread_request_count;
             return m_thread_pool.submit_task(p_function);
         }
 
-        void forward(node &p_node) override {
+        void forward(node& p_node) override {
             if (p_node.get_state() == UNUSED && p_node.should_branch()) {
                 p_node.run();
             }
             p_node.prune();
         }
 
-        bool try_local_submit(node &p_node) override {
+        bool try_local_submit(node& p_node) override {
             if (send(p_node)) {
                 return true;
             }
@@ -73,7 +73,7 @@ namespace gempba {
             return false;
         }
 
-        bool try_remote_submit(node &p_node, const int p_runnable_id) override {
+        bool try_remote_submit(node& p_node, const int p_runnable_id) override {
             if (!m_scheduler_worker) {
                 utils::log_and_throw("Attempted to do remote submission without a scheduler worker");
             }
@@ -91,7 +91,7 @@ namespace gempba {
             return {};
         }
 
-        void set_root(std::thread::id, std::shared_ptr<node_core> &) override {
+        void set_root(std::thread::id, std::shared_ptr<node_core>&) override {
             // No-op for work stealing load balancer
         }
 
@@ -120,7 +120,7 @@ namespace gempba {
         }
 
 
-        bool send(node &p_node) {
+        bool send(node& p_node) {
             const std::unique_lock v_lock(m_recursive_mutex, std::try_to_lock);
             if (!v_lock.owns_lock()) {
                 return false;
@@ -144,7 +144,7 @@ namespace gempba {
             return true; // signalize that node was consumed
         }
 
-        bool send(node &p_node, const int p_runnable_id) {
+        bool send(node& p_node, const int p_runnable_id) {
             const std::unique_lock v_lock(m_recursive_mutex, std::try_to_lock);
             if (!v_lock.owns_lock()) {
                 return false;

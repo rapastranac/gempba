@@ -39,12 +39,12 @@ public:
     MOCK_METHOD(void, run, (), (override));
     MOCK_METHOD(void, delegate_locally, (gempba::load_balancer * p_manager), (override));
     MOCK_METHOD(void, delegate_remotely, (gempba::scheduler::worker * p_scheduler, int p_runner_id), (override));
-    MOCK_METHOD(void, set_result, (const gempba::task_packet &p_result), (override));
+    MOCK_METHOD(void, set_result, (const gempba::task_packet& p_result), (override));
     MOCK_METHOD(gempba::task_packet, get_result, (), (override));
     MOCK_METHOD(gempba::task_packet, serialize, (), (override));
-    MOCK_METHOD(void, deserialize, (const gempba::task_packet &p_buffer), (override));
-    MOCK_METHOD(void, set_result_serializer, (const std::function<gempba::task_packet(std::any)> &p_result_serializer), (override));
-    MOCK_METHOD(void, set_result_deserializer, (const std::function<std::any(gempba::task_packet)> &p_result_deserializer), (override));
+    MOCK_METHOD(void, deserialize, (const gempba::task_packet& p_buffer), (override));
+    MOCK_METHOD(void, set_result_serializer, (const std::function<gempba::task_packet(std::any)>& p_result_serializer), (override));
+    MOCK_METHOD(void, set_result_deserializer, (const std::function<std::any(gempba::task_packet)>& p_result_deserializer), (override));
     MOCK_METHOD(bool, is_dummy, (), (const override));
     MOCK_METHOD(std::thread::id, get_thread_id, (), (const override));
     MOCK_METHOD(int, get_node_id, (), (const override));
@@ -54,7 +54,7 @@ public:
     MOCK_METHOD(void, set_state, (gempba::node_state p_state), (override));
     MOCK_METHOD(bool, is_consumed, (), (const override));
     MOCK_METHOD(std::shared_ptr<node_core>, get_root, (), (override));
-    MOCK_METHOD(void, set_parent, (const std::shared_ptr<node_core> &p_parent), (override));
+    MOCK_METHOD(void, set_parent, (const std::shared_ptr<node_core>& p_parent), (override));
     MOCK_METHOD(std::shared_ptr<node_core>, get_parent, (), (override));
     MOCK_METHOD(std::shared_ptr<node_core>, get_leftmost_child, (), (override));
     MOCK_METHOD(std::shared_ptr<node_core>, get_second_leftmost_child, (), (override));
@@ -65,7 +65,7 @@ public:
     MOCK_METHOD(std::shared_ptr<node_core>, get_right_sibling, (), (override));
     MOCK_METHOD(std::list<std::shared_ptr<node_core>>, get_children, (), (override));
     MOCK_METHOD(int, get_children_count, (), (const override));
-    MOCK_METHOD(void, add_child, (const std::shared_ptr<node_core> &p_child), (override));
+    MOCK_METHOD(void, add_child, (const std::shared_ptr<node_core>& p_child), (override));
     MOCK_METHOD(std::any, get_any_result, (), (override));
     MOCK_METHOD(bool, is_result_ready, (), (const override));
     MOCK_METHOD(bool, should_branch, (), (override));
@@ -146,7 +146,7 @@ TEST_F(node_test, all_methods_test) {
     });
 
 
-    gempba::load_balancer *v_dummy{};
+    gempba::load_balancer* v_dummy{};
     gempba::node v_node(m_node_core_mock);
     v_node.run();
 
@@ -163,12 +163,12 @@ TEST_F(node_test, all_methods_test) {
 
     const gempba::task_packet v_result = v_node.get_result();
     EXPECT_EQ(5, v_value.load());
-    const std::string v_result_str(reinterpret_cast<const char *>(v_result.data()), v_result.size());
+    const std::string v_result_str(reinterpret_cast<const char*>(v_result.data()), v_result.size());
     EXPECT_EQ(v_result_str, "5");
 
     const gempba::task_packet v_serialized = v_node.serialize();
     EXPECT_EQ(6, v_value.load());
-    const std::string v_serialized_str(reinterpret_cast<const char *>(v_serialized.data()), v_serialized.size());
+    const std::string v_serialized_str(reinterpret_cast<const char*>(v_serialized.data()), v_serialized.size());
     EXPECT_EQ(v_serialized_str, "6");
 
     v_node.deserialize(gempba::task_packet::EMPTY);
@@ -483,7 +483,7 @@ TEST_F(node_test, delegate_locally_test) {
     int v_value = 0;
 
     {
-        auto v_dummy_function = [&v_value](std::thread::id, const int p_int, const double p_double, const gempba::node &p_parent) {
+        auto v_dummy_function = [&v_value](std::thread::id, const int p_int, const double p_double, const gempba::node& p_parent) {
             ASSERT_EQ(7, p_int);
             ASSERT_EQ(6.0, p_double);
             ASSERT_TRUE(p_parent == nullptr);

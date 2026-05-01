@@ -30,11 +30,11 @@ struct my_struct {
 };
 
 TEST(queue_test, push_and_pop) {
-    gempba::queue<my_struct *> q;
+    gempba::queue<my_struct*> q;
 
-    auto *a = new my_struct{1};
-    auto *b = new my_struct{2};
-    auto *c = new my_struct{3};
+    auto* a = new my_struct{1};
+    auto* b = new my_struct{2};
+    auto* c = new my_struct{3};
 
     // Push some values into the queue
     ASSERT_TRUE(q.push(a));
@@ -42,7 +42,7 @@ TEST(queue_test, push_and_pop) {
     ASSERT_TRUE(q.push(c));
 
     // Pop the values and ensure they are retrieved in the correct order
-    my_struct *v_result;
+    my_struct* v_result;
     ASSERT_TRUE(q.pop(v_result));
     EXPECT_EQ(a, v_result);
 
@@ -85,18 +85,18 @@ TEST(queue_test, push_and_pop_with_shared_pointer) {
 
 
 TEST(queue_test, pop_returns_false_when_empty) {
-    gempba::queue<my_struct *> q;
+    gempba::queue<my_struct*> q;
 
-    my_struct *v_result = nullptr;
+    my_struct* v_result = nullptr;
     EXPECT_FALSE(q.pop(v_result));
     EXPECT_EQ(nullptr, v_result); // pop must not touch the out-parameter when it returns false
 }
 
 TEST(queue_test, empty) {
-    gempba::queue<my_struct *> q;
+    gempba::queue<my_struct*> q;
 
-    auto *a = new my_struct{1};
-    auto *b = new my_struct{2};
+    auto* a = new my_struct{1};
+    auto* b = new my_struct{2};
 
     // Queue should be empty initially
     EXPECT_TRUE(q.empty());
@@ -109,7 +109,7 @@ TEST(queue_test, empty) {
     EXPECT_FALSE(q.empty());
 
     // Pop all elements
-    my_struct *v_instance;
+    my_struct* v_instance;
     ASSERT_TRUE(q.pop(v_instance));
     ASSERT_TRUE(q.pop(v_instance));
 

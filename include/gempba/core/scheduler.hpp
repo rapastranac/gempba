@@ -30,7 +30,7 @@ namespace gempba {
 
         virtual void set_goal(goal p_goal, score_type p_type) = 0;
 
-        virtual void set_custom_initial_topology(tree &&p_tree) = 0;
+        virtual void set_custom_initial_topology(tree&& p_tree) = 0;
 
         /**
          * Get the statistics of all processes as a vector of unique pointers. This is useful for gathering stats from all processes.
@@ -81,9 +81,9 @@ namespace gempba {
         public:
             ~worker() override = default;
 
-            virtual void run(node_manager &p_node_manager, std::map<int, std::shared_ptr<serial_runnable>> p_runnables) = 0;
+            virtual void run(node_manager& p_node_manager, std::map<int, std::shared_ptr<serial_runnable>> p_runnables) = 0;
 
-            virtual unsigned int force_push(task_packet &&p_task, int p_function_id) = 0;
+            virtual unsigned int force_push(task_packet&& p_task, int p_function_id) = 0;
 
 
             [[nodiscard]] virtual unsigned int next_process() const = 0;
@@ -103,9 +103,9 @@ namespace gempba {
             virtual std::optional<transmission_guard> try_open_transmission_channel() = 0;
         };
 
-        virtual center &center_view() = 0;
+        virtual center& center_view() = 0;
 
-        virtual worker &worker_view() = 0;
+        virtual worker& worker_view() = 0;
     };
 } // namespace gempba
 

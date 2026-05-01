@@ -45,22 +45,22 @@ TEST(tree_test, resize) {
 
 TEST(tree_test, node_assignment) {
     tree v_instance(2);
-    constexpr int v_idx1 = 0;
-    constexpr int v_idx2 = 1;
-    v_instance[v_idx1].add_next(v_idx2);
+    constexpr int IDX_1 = 0;
+    constexpr int IDX_2 = 1;
+    v_instance[IDX_1].add_next(IDX_2);
 
-    EXPECT_EQ(v_instance[v_idx2].get_parent(), v_idx1);
+    EXPECT_EQ(v_instance[IDX_2].get_parent(), IDX_1);
 }
 
 TEST(tree_test, node_unlinking) {
     tree v_instance(3);
-    constexpr int v_idx1 = 0;
-    constexpr int v_idx2 = 1;
-    constexpr int v_idx3 = 2;
-    v_instance[v_idx1].add_next(v_idx2);
-    v_instance[v_idx2].add_next(v_idx3);
-    v_instance[v_idx1].pop_front();
-    EXPECT_EQ(v_instance[v_idx2].get_parent(), -1);
+    constexpr int IDX_1 = 0;
+    constexpr int IDX_2 = 1;
+    constexpr int IDX_3 = 2;
+    v_instance[IDX_1].add_next(IDX_2);
+    v_instance[IDX_2].add_next(IDX_3);
+    v_instance[IDX_1].pop_front();
+    EXPECT_EQ(v_instance[IDX_2].get_parent(), -1);
 }
 
 TEST(tree_test, pop_front_node) {
@@ -135,7 +135,7 @@ TEST(tree_test, node_releasing) {
 
         // Verify that node 2 is now the last child
         std::vector<int> v_children;
-        for (int &v_child: v_instance[0]) {
+        for (int& v_child: v_instance[0]) {
             v_children.push_back(v_child);
         }
         EXPECT_EQ(v_children.back(), 2);
@@ -159,7 +159,7 @@ TEST(tree_test, node_releasing) {
         // Verify the remaining children are still properly linked
         std::vector<int> v_expected = {1, 3, 4};
         std::vector<int> v_result;
-        for (int &v_child: v_instance[0]) {
+        for (int& v_child: v_instance[0]) {
             v_result.push_back(v_child);
         }
         EXPECT_EQ(v_result, v_expected);
@@ -180,7 +180,7 @@ TEST(tree_test, node_releasing) {
 
         std::vector<int> v_expected = {1, 2, 4, 5};
         std::vector<int> v_result;
-        for (int &v_child: v_instance[0]) {
+        for (int& v_child: v_instance[0]) {
             v_result.push_back(v_child);
         }
         EXPECT_EQ(v_result, v_expected);
@@ -229,7 +229,7 @@ TEST(tree_test, iterator_test) {
 
     const std::vector v_expected = {1, 2};
     std::vector<int> v_result;
-    for (int &it: v_instance[0]) {
+    for (int& it: v_instance[0]) {
         v_result.push_back(it);
     }
     EXPECT_EQ(v_result, v_expected);
@@ -251,13 +251,13 @@ TEST(tree_test, invalid_release) {
     EXPECT_THROW(v_instance[0].release(), std::runtime_error);
 }
 
-std::string get_test_resource_path(const std::string &p_name) {
+std::string get_test_resource_path(const std::string& p_name) {
     namespace fs = std::filesystem;
     const fs::path v_file_path = __FILE__; // expands to something like /path/to/tests/test_tree.cpp
     return (v_file_path.parent_path().parent_path().parent_path() / "resources" / p_name).string();
 }
 
-std::string load_resource(const std::string &p_filename) {
+std::string load_resource(const std::string& p_filename) {
     std::ifstream v_file(get_test_resource_path(p_filename));
     if (!v_file.is_open()) {
         throw std::runtime_error("Could not open resource: " + p_filename);

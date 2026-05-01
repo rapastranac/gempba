@@ -66,7 +66,7 @@ protected:
 
     void TearDown() override { delete m_scheduler_worker_mock; }
 
-    scheduler_worker_mock *m_scheduler_worker_mock = nullptr;
+    scheduler_worker_mock* m_scheduler_worker_mock = nullptr;
 };
 
 
@@ -143,7 +143,7 @@ TEST_F(work_stealing_load_balancer_test, forward_unused_initialized_node_calls_r
     gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
 
     bool v_function_called = false;
-    std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node &) { v_function_called = true; };
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node&) { v_function_called = true; };
     int v_arg = 0;
 
     auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_load_balancer);
@@ -164,7 +164,7 @@ TEST_F(work_stealing_load_balancer_test, forward_consumed_node_only_prunes_no_ru
     gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
 
     bool v_function_called = false;
-    std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node &) { v_function_called = true; };
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node&) { v_function_called = true; };
     int v_arg = 0;
 
     auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_load_balancer);
@@ -183,11 +183,11 @@ TEST_F(work_stealing_load_balancer_test, forward_lazy_node_with_nullopt_initiali
     gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
 
     bool v_function_called = false;
-    std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node &) { v_function_called = true; };
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node&) { v_function_called = true; };
 
     std::function<std::optional<std::tuple<int>>()> v_initializer = []() -> std::optional<std::tuple<int>> { return std::nullopt; };
     const std::function<gempba::task_packet(int)> v_serializer = [](int) { return gempba::task_packet::EMPTY; };
-    const std::function<std::tuple<int>(gempba::task_packet)> v_deserializer = [](const gempba::task_packet &) { return std::make_tuple(0); };
+    const std::function<std::tuple<int>(gempba::task_packet)> v_deserializer = [](const gempba::task_packet&) { return std::make_tuple(0); };
 
     auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_load_balancer);
     auto v_child = gempba::node_core_impl<void(int)>::create_serializable_lazy(v_load_balancer, v_parent, v_fn, v_initializer, v_serializer, v_deserializer);
@@ -208,7 +208,7 @@ TEST_F(work_stealing_load_balancer_test, try_local_submit_with_available_pool_ex
     v_load_balancer.wait();
 
     std::atomic<bool> v_function_called{false};
-    std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node &) { v_function_called = true; };
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node&) { v_function_called = true; };
     int v_arg = 0;
 
     auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_load_balancer);
@@ -252,7 +252,7 @@ TEST_F(work_stealing_load_balancer_test, try_local_submit_when_pool_full_falls_b
 
     // Single thread is now occupied — pool is full
     bool v_forward_fn_called = false;
-    std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node &) { v_forward_fn_called = true; };
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node&) { v_forward_fn_called = true; };
     int v_arg = 0;
     auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_load_balancer);
     auto v_child = gempba::node_core_impl<void(int)>::create_explicit(v_load_balancer, v_parent, v_fn, std::make_tuple(v_arg));
@@ -273,7 +273,7 @@ TEST_F(work_stealing_load_balancer_test, try_remote_submit_throws_without_schedu
     gempba::work_stealing_load_balancer v_load_balancer(nullptr);
 
     auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_load_balancer);
-    std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node &) {};
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node&) {};
     int v_arg = 0;
     auto v_child = gempba::node_core_impl<void(int)>::create_explicit(v_load_balancer, v_parent, v_fn, std::make_tuple(v_arg));
 
@@ -288,7 +288,7 @@ TEST_F(work_stealing_load_balancer_test, try_remote_submit_falls_back_to_local_w
     EXPECT_CALL(*m_scheduler_worker_mock, try_open_transmission_channel()).WillOnce(testing::Return(std::nullopt));
 
     std::atomic<bool> v_fn_called{false};
-    std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node &) { v_fn_called = true; };
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node&) { v_fn_called = true; };
     int v_arg = 0;
     auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_load_balancer);
     auto v_child = gempba::node_core_impl<void(int)>::create_explicit(v_load_balancer, v_parent, v_fn, std::make_tuple(v_arg));
@@ -313,12 +313,12 @@ TEST_F(work_stealing_load_balancer_test, try_remote_submit_delegates_remotely_wh
         return gempba::transmission_guard(std::move(v_lock));
     });
 
-    EXPECT_CALL(*m_scheduler_worker_mock, force_push(testing::_, testing::_)).WillOnce([](gempba::task_packet &&, int) { return 1u; });
+    EXPECT_CALL(*m_scheduler_worker_mock, force_push(testing::_, testing::_)).WillOnce([](gempba::task_packet&&, int) { return 1u; });
 
     const std::function<gempba::task_packet(int)> v_serializer = [](int) { return gempba::task_packet::EMPTY; };
-    const std::function<std::tuple<int>(gempba::task_packet)> v_deserializer = [](const gempba::task_packet &) { return std::make_tuple(0); };
+    const std::function<std::tuple<int>(gempba::task_packet)> v_deserializer = [](const gempba::task_packet&) { return std::make_tuple(0); };
 
-    std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node &) { FAIL(); };
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node&) { FAIL(); };
     int v_arg = 0;
     auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_load_balancer);
     auto v_child = gempba::node_core_impl<void(int)>::create_serializable_explicit(v_load_balancer, v_parent, v_fn, std::make_tuple(v_arg), v_serializer, v_deserializer);
@@ -338,7 +338,7 @@ TEST_F(work_stealing_load_balancer_test, send_local_throws_when_node_is_already_
     v_load_balancer.set_thread_pool_size(2); // guarantee pool is ready before send() inspects it
     v_load_balancer.wait();
 
-    std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node &) {};
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node&) {};
     auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_load_balancer);
     auto v_child = gempba::node_core_impl<void(int)>::create_explicit(v_load_balancer, v_parent, v_fn, std::make_tuple(0));
     v_child->set_state(gempba::FORWARDED); // mark as already consumed
@@ -353,10 +353,10 @@ TEST_F(work_stealing_load_balancer_test, send_local_discards_lazy_node_when_not_
     v_load_balancer.wait();
 
     bool v_fn_called = false;
-    std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node &) { v_fn_called = true; };
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node&) { v_fn_called = true; };
     const std::function<std::optional<std::tuple<int>>()> v_initializer = []() -> std::optional<std::tuple<int>> { return std::nullopt; };
     const std::function<gempba::task_packet(int)> v_serializer = [](int) { return gempba::task_packet::EMPTY; };
-    const std::function<std::tuple<int>(gempba::task_packet)> v_deserializer = [](const gempba::task_packet &) { return std::make_tuple(0); };
+    const std::function<std::tuple<int>(gempba::task_packet)> v_deserializer = [](const gempba::task_packet&) { return std::make_tuple(0); };
 
     auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_load_balancer);
     auto v_child = gempba::node_core_impl<void(int)>::create_serializable_lazy(v_load_balancer, v_parent, v_fn, v_initializer, v_serializer, v_deserializer);
@@ -391,7 +391,7 @@ TEST_F(work_stealing_load_balancer_test, send_local_returns_false_on_mutex_conte
         return std::nullopt;
     });
 
-    std::function<void(std::thread::id, int, gempba::node)> v_fn_a = [](std::thread::id, int, const gempba::node &) {};
+    std::function<void(std::thread::id, int, gempba::node)> v_fn_a = [](std::thread::id, int, const gempba::node&) {};
     auto v_parent_a = gempba::node_core_impl<void()>::create_dummy(v_load_balancer);
     auto v_child_a = gempba::node_core_impl<void(int)>::create_explicit(v_load_balancer, v_parent_a, v_fn_a, std::make_tuple(0));
     gempba::node v_node_a(v_child_a);
@@ -405,7 +405,7 @@ TEST_F(work_stealing_load_balancer_test, send_local_returns_false_on_mutex_conte
 
     // Thread A holds m_recursive_mutex — send(node) must fail try_to_lock and fall back to forward()
     bool v_fn_b_called = false;
-    std::function<void(std::thread::id, int, gempba::node)> v_fn_b = [&](std::thread::id, int, const gempba::node &) { v_fn_b_called = true; };
+    std::function<void(std::thread::id, int, gempba::node)> v_fn_b = [&](std::thread::id, int, const gempba::node&) { v_fn_b_called = true; };
     auto v_parent_b = gempba::node_core_impl<void()>::create_dummy(v_load_balancer);
     auto v_child_b = gempba::node_core_impl<void(int)>::create_explicit(v_load_balancer, v_parent_b, v_fn_b, std::make_tuple(0));
     gempba::node v_node_b(v_child_b);
@@ -431,7 +431,7 @@ TEST_F(work_stealing_load_balancer_test, send_remote_throws_when_node_is_already
         return gempba::transmission_guard(std::move(v_lock));
     });
 
-    std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node &) {};
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node&) {};
     auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_load_balancer);
     auto v_child = gempba::node_core_impl<void(int)>::create_explicit(v_load_balancer, v_parent, v_fn, std::make_tuple(0));
     v_child->set_state(gempba::FORWARDED); // mark as already consumed
@@ -450,10 +450,10 @@ TEST_F(work_stealing_load_balancer_test, send_remote_discards_lazy_node_when_not
     });
 
     bool v_fn_called = false;
-    std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node &) { v_fn_called = true; };
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node&) { v_fn_called = true; };
     const std::function<std::optional<std::tuple<int>>()> v_initializer = []() -> std::optional<std::tuple<int>> { return std::nullopt; };
     const std::function<gempba::task_packet(int)> v_serializer = [](int) { return gempba::task_packet::EMPTY; };
-    const std::function<std::tuple<int>(gempba::task_packet)> v_deserializer = [](const gempba::task_packet &) { return std::make_tuple(0); };
+    const std::function<std::tuple<int>(gempba::task_packet)> v_deserializer = [](const gempba::task_packet&) { return std::make_tuple(0); };
 
     auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_load_balancer);
     auto v_child = gempba::node_core_impl<void(int)>::create_serializable_lazy(v_load_balancer, v_parent, v_fn, v_initializer, v_serializer, v_deserializer);
@@ -488,7 +488,7 @@ TEST_F(work_stealing_load_balancer_test, send_remote_returns_false_on_mutex_cont
         return std::nullopt;
     });
 
-    std::function<void(std::thread::id, int, gempba::node)> v_fn_a = [](std::thread::id, int, const gempba::node &) {};
+    std::function<void(std::thread::id, int, gempba::node)> v_fn_a = [](std::thread::id, int, const gempba::node&) {};
     auto v_parent_a = gempba::node_core_impl<void()>::create_dummy(v_load_balancer);
     auto v_child_a = gempba::node_core_impl<void(int)>::create_explicit(v_load_balancer, v_parent_a, v_fn_a, std::make_tuple(0));
     gempba::node v_node_a(v_child_a);
@@ -502,7 +502,7 @@ TEST_F(work_stealing_load_balancer_test, send_remote_returns_false_on_mutex_cont
 
     // Thread A holds the lock — both send(node_b, id) and its fallback send(node_b) fail try_to_lock
     bool v_fn_b_called = false;
-    std::function<void(std::thread::id, int, gempba::node)> v_fn_b = [&](std::thread::id, int, const gempba::node &) { v_fn_b_called = true; };
+    std::function<void(std::thread::id, int, gempba::node)> v_fn_b = [&](std::thread::id, int, const gempba::node&) { v_fn_b_called = true; };
     auto v_parent_b = gempba::node_core_impl<void()>::create_dummy(v_load_balancer);
     auto v_child_b = gempba::node_core_impl<void(int)>::create_explicit(v_load_balancer, v_parent_b, v_fn_b, std::make_tuple(0));
     gempba::node v_node_b(v_child_b);

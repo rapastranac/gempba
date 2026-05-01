@@ -32,17 +32,17 @@ namespace gempba {
 
     public:
         // Construct by taking ownership of a unique_lock
-        explicit transmission_guard(std::unique_lock<std::mutex> &&p_lock) : m_lock(std::move(p_lock)) {}
+        explicit transmission_guard(std::unique_lock<std::mutex>&& p_lock) : m_lock(std::move(p_lock)) {}
 
         // Disable everything: no copying, no assignment
-        transmission_guard(const transmission_guard &) = delete;
+        transmission_guard(const transmission_guard&) = delete;
 
-        transmission_guard &operator=(const transmission_guard &) = delete;
+        transmission_guard& operator=(const transmission_guard&) = delete;
 
         // Allow move semantics
-        transmission_guard(transmission_guard &&) = default;
+        transmission_guard(transmission_guard&&) = default;
 
-        transmission_guard &operator=(transmission_guard &&) = default;
+        transmission_guard& operator=(transmission_guard&&) = default;
 
         // Destructor automatically unlocks the mutex
         ~transmission_guard() = default;

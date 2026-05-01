@@ -161,7 +161,7 @@ TEST(utils_test, shift_left) {
     try {
         std::vector<int> v_vec2;
         utils::shift_left(v_vec2);
-    } catch (const std::exception &e) {
+    } catch (const std::exception& e) {
         EXPECT_STREQ(e.what(), "Attempted to shift an empty vector");
     }
 }

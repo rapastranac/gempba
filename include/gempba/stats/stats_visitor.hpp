@@ -32,7 +32,7 @@ namespace gempba {
     public:
         virtual ~stats_visitor() = default;
 
-        virtual void visit(const stats &p_stats) = 0;
+        virtual void visit(const stats& p_stats) = 0;
     };
 
 } // namespace gempba

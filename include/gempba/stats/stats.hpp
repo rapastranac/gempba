@@ -39,7 +39,7 @@ namespace gempba {
         stats() = default;
 
     public:
-        stats(const stats &) = default;
+        stats(const stats&) = default;
 
         virtual ~stats() = default;
 
@@ -61,13 +61,13 @@ namespace gempba {
          * The visitor function should accept a string (the name of the member) and a std::any (the value of the member).
          * @param p_visitor A function that takes a string and a std::any, used to visit each member of the stats object.
          */
-        virtual void visit(std::function<void(const std::string &, std::any &&)> p_visitor) const = 0;
+        virtual void visit(std::function<void(const std::string&, std::any&&)> p_visitor) const = 0;
 
         /**
          * Accepts a stats_visitor to visit the stats object.
          * @param p_visitor A pointer to a stats_visitor that will visit the stats object.
          */
-        virtual void visit(stats_visitor *p_visitor) const = 0;
+        virtual void visit(stats_visitor* p_visitor) const = 0;
     };
 
 } // namespace gempba

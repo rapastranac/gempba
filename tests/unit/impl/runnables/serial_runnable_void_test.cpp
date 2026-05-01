@@ -35,13 +35,13 @@
 
 
 TEST(serial_runnable_void_test, test) {
-    std::function<void(std::thread::id, int, double, gempba::node)> v_function = [](std::thread::id, int p_integer, double p_double, const gempba::node &) {
+    std::function<void(std::thread::id, int, double, gempba::node)> v_function = [](std::thread::id, int p_integer, double p_double, const gempba::node&) {
         ASSERT_EQ(7, p_integer);
         ASSERT_DOUBLE_EQ(1.6825127784311510, p_double);
     };
-    const std::function<std::tuple<int, double>(const gempba::task_packet &&p_task)> v_args_deserializer = [](const gempba::task_packet &&p_buffer) {
+    const std::function<std::tuple<int, double>(const gempba::task_packet&& p_task)> v_args_deserializer = [](const gempba::task_packet&& p_buffer) {
         std::stringstream v_ss;
-        v_ss.write(reinterpret_cast<const char *>(p_buffer.data()), static_cast<int>(p_buffer.size()));
+        v_ss.write(reinterpret_cast<const char*>(p_buffer.data()), static_cast<int>(p_buffer.size()));
         std::string v_token;
 
         std::vector<std::string> v_tokens;
@@ -54,13 +54,13 @@ TEST(serial_runnable_void_test, test) {
 
         return std::make_tuple(v_ival, v_dval);
     };
-    constexpr int v_id = 314;
+    constexpr int ID = 314;
 
-    const std::shared_ptr<gempba::serial_runnable> v_runnable = gempba::mp::runnables::return_none::create(v_id, v_function, v_args_deserializer);
+    const std::shared_ptr<gempba::serial_runnable> v_runnable = gempba::mp::runnables::return_none::create(ID, v_function, v_args_deserializer);
 
     ASSERT_EQ(314, v_runnable->get_id());
 
-    gempba::load_balancer *v_load_balancer = new gempba::work_stealing_load_balancer(nullptr);
+    gempba::load_balancer* v_load_balancer = new gempba::work_stealing_load_balancer(nullptr);
     gempba::node_manager v_node_manager(v_load_balancer, nullptr);
     const auto v_bytes = gempba::task_packet("7,1.6825127784311510");
     const std::optional<std::shared_future<gempba::task_packet>> v_optional = (*v_runnable)(v_node_manager, v_bytes);

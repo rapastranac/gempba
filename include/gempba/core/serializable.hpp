@@ -46,7 +46,7 @@ namespace gempba {
          * Deserialize the incoming bytes to the underlying task.
          * @param p_task The bytes to deserialize.
          */
-        virtual void deserialize(const task_packet &p_task) = 0;
+        virtual void deserialize(const task_packet& p_task) = 0;
     };
 } // namespace gempba
 

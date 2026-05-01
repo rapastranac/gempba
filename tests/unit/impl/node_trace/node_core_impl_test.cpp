@@ -57,7 +57,7 @@ public:
     MOCK_METHOD(gempba::balancing_policy, get_balancing_policy, (), (override));
     MOCK_METHOD(unsigned int, generate_unique_id, (), (override));
     MOCK_METHOD(double, get_idle_time, (), (const override));
-    MOCK_METHOD(void, set_root, (const std::thread::id p_thread_id, std::shared_ptr<gempba::node_core> &p_root), (override));
+    MOCK_METHOD(void, set_root, (const std::thread::id p_thread_id, std::shared_ptr<gempba::node_core>& p_root), (override));
     MOCK_METHOD(std::shared_ptr<std::shared_ptr<gempba::node_core>>, get_root, (const std::thread::id p_thread_id), (override));
     MOCK_METHOD(void, set_thread_pool_size, (unsigned p_size), (override));
     MOCK_METHOD(std::future<std::any>, force_local_submit, (std::function<std::any()> && p_function), (override));
@@ -79,7 +79,7 @@ public:
     // & operator is defined similar to <<.  Likewise, when the class Archive
     // is a type of input archive the & operator is defined similar to >>.
     template<class Archive>
-    void serialize(Archive &p_ar, const unsigned int p_version) {
+    void serialize(Archive& p_ar, const unsigned int p_version) {
         p_ar & m_value;
     }
 
@@ -88,13 +88,13 @@ public:
 
     explicit my_struct(const int p_value) : m_value(p_value) {}
 
-    my_struct(const my_struct &p_other) = default;
+    my_struct(const my_struct& p_other) = default;
 
-    my_struct(my_struct &&p_other) noexcept : m_value(std::exchange(p_other.m_value, 0)) {}
+    my_struct(my_struct&& p_other) noexcept : m_value(std::exchange(p_other.m_value, 0)) {}
 
-    bool operator==(const my_struct &p_other) const { return m_value == p_other.m_value; }
+    bool operator==(const my_struct& p_other) const { return m_value == p_other.m_value; }
 
-    my_struct &operator=(my_struct &&p_other) noexcept {
+    my_struct& operator=(my_struct&& p_other) noexcept {
         if (this != &p_other) {
             m_value = std::exchange(p_other.m_value, 0);
         }
@@ -102,7 +102,7 @@ public:
     }
 };
 
-gempba::node foo(gempba::load_balancer &p_balancer, auto p_dummy_function) {
+gempba::node foo(gempba::load_balancer& p_balancer, auto p_dummy_function) {
     my_struct v_ins{7};
     float v_f1 = 1.0f;
     double v_d1 = 3.0;
@@ -122,11 +122,11 @@ protected:
 
         EXPECT_CALL(m_balancer_mock, get_balancing_policy()).WillRepeatedly([]() { return gempba::balancing_policy::QUASI_HORIZONTAL; });
         EXPECT_CALL(m_balancer_mock, generate_unique_id()).WillRepeatedly([this]() { return ++m_unique_id; });
-        EXPECT_CALL(m_balancer_mock, set_root(testing::_, testing::_)).WillRepeatedly([this](const std::thread::id p_id, std::shared_ptr<gempba::node_core> &p_node) {
+        EXPECT_CALL(m_balancer_mock, set_root(testing::_, testing::_)).WillRepeatedly([this](const std::thread::id p_id, std::shared_ptr<gempba::node_core>& p_node) {
             m_roots.emplace(p_id, std::make_shared<std::shared_ptr<gempba::node_core>>(p_node));
         });
         EXPECT_CALL(m_balancer_mock, get_root(testing::_)).WillRepeatedly([this](const std::thread::id p_id) { return m_roots[p_id]; });
-        EXPECT_CALL(m_balancer_mock, try_remote_submit(testing::_, testing::_)).WillRepeatedly([](gempba::node &p_node, int) {
+        EXPECT_CALL(m_balancer_mock, try_remote_submit(testing::_, testing::_)).WillRepeatedly([](gempba::node& p_node, int) {
             p_node.prune();
             p_node.set_state(gempba::SENT_TO_ANOTHER_PROCESS);
             return false;
@@ -142,7 +142,7 @@ TEST_F(node_core_impl_test, explicit_initialization) {
     double v_d_val;
     std::vector<float> v_vec;
 
-    auto v_dummy_function = [&](std::thread::id, my_struct p_my_struct, float p_f, double p_d, std::vector<float> p_v, const gempba::node &) {
+    auto v_dummy_function = [&](std::thread::id, my_struct p_my_struct, float p_f, double p_d, std::vector<float> p_v, const gempba::node&) {
         v_object = std::move(p_my_struct);
         v_f_val = p_f;
         v_d_val = p_d;
@@ -171,7 +171,7 @@ TEST_F(node_core_impl_test, lazily_initialization) {
     std::vector<float> v_vec;
 
     std::function<void(std::thread::id, my_struct, float, double, std::vector<float>, gempba::node)> v_dummy_function = [&](std::thread::id, my_struct p_my_struct, const float p_f,
-                                                                                                                            double p_d, std::vector<float> p_v, const gempba::node &) {
+                                                                                                                            double p_d, std::vector<float> p_v, const gempba::node&) {
         v_object = std::move(p_my_struct);
         v_float = p_f;
         v_double = p_d;
@@ -208,7 +208,7 @@ TEST_F(node_core_impl_test, serializable_void) {
     std::vector<float> v_actual_vector;
 
     std::function<void(std::thread::id, my_struct, float, double, std::vector<float>, gempba::node)> v_dummy_function = [&](std::thread::id, my_struct p_my_struct, float p_f, double p_d,
-                                                                                                                            std::vector<float> p_vec, const gempba::node &) {
+                                                                                                                            std::vector<float> p_vec, const gempba::node&) {
         v_actual_struct = std::move(p_my_struct);
         v_actual_float = p_f;
         v_actual_double = p_d;
@@ -216,8 +216,8 @@ TEST_F(node_core_impl_test, serializable_void) {
     };
 
 
-    std::function<gempba::task_packet(my_struct, float, double, std::vector<float>)> v_args_serializer = [](const my_struct &p_ins, float p_f_val, double p_d_val,
-                                                                                                            const std::vector<float> &p_vec) {
+    std::function<gempba::task_packet(my_struct, float, double, std::vector<float>)> v_args_serializer = [](const my_struct& p_ins, float p_f_val, double p_d_val,
+                                                                                                            const std::vector<float>& p_vec) {
         std::stringstream v_ss;
         boost::archive::text_oarchive v_archive(v_ss);
         v_archive << p_ins;
@@ -234,7 +234,7 @@ TEST_F(node_core_impl_test, serializable_void) {
         std::vector<float> v_vec;
 
         std::stringstream v_ss;
-        v_ss.write(reinterpret_cast<const char *>(p_task.data()), static_cast<int>(p_task.size()));
+        v_ss.write(reinterpret_cast<const char*>(p_task.data()), static_cast<int>(p_task.size()));
         boost::archive::text_iarchive v_archive(v_ss);
         v_archive >> v_ins;
         v_archive >> v_f_val;
@@ -249,15 +249,15 @@ TEST_F(node_core_impl_test, serializable_void) {
     try {
         v_node.run();
         FAIL();
-    } catch (std::exception &e) {
+    } catch (std::exception& e) {
         ASSERT_STREQ("node arguments have not been initialized", e.what());
     };
 
-    const my_struct &v_expected_struct = my_struct{7};
-    constexpr float v_expected_float = 1.0f;
-    constexpr double v_expected_double = 3.0;
-    const std::vector<float> &v_expected_vector = std::vector<float>{1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f, 10.0f};
-    const gempba::task_packet v_buffer = v_args_serializer(v_expected_struct, v_expected_float, v_expected_double, v_expected_vector);
+    const my_struct& v_expected_struct = my_struct{7};
+    constexpr float EXPECTED_FLOAT = 1.0f;
+    constexpr double EXPECTED_DOUBLE = 3.0;
+    const std::vector<float>& v_expected_vector = std::vector<float>{1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f, 10.0f};
+    const gempba::task_packet v_buffer = v_args_serializer(v_expected_struct, EXPECTED_FLOAT, EXPECTED_DOUBLE, v_expected_vector);
 
     v_node.deserialize(gempba::task_packet(v_buffer));
     v_node.run();
@@ -266,8 +266,8 @@ TEST_F(node_core_impl_test, serializable_void) {
     ASSERT_EQ(gempba::node_state::FORWARDED, v_state);
 
     ASSERT_EQ(v_expected_struct, v_actual_struct);
-    ASSERT_FLOAT_EQ(v_expected_float, v_actual_float);
-    ASSERT_DOUBLE_EQ(v_expected_double, v_actual_double);
+    ASSERT_FLOAT_EQ(EXPECTED_FLOAT, v_actual_float);
+    ASSERT_DOUBLE_EQ(EXPECTED_DOUBLE, v_actual_double);
     ASSERT_EQ(v_expected_vector, v_actual_vector);
 }
 
@@ -283,7 +283,7 @@ struct custom_object {
     // & operator is defined similar to <<.  Likewise, when the class Archive
     // is a type of input archive the & operator is defined similar to >>.
     template<class Archive>
-    void serialize(Archive &p_ar, const unsigned int p_version) {
+    void serialize(Archive& p_ar, const unsigned int p_version) {
         p_ar & m_my_struct;
         p_ar & m_f_value;
         p_ar & m_d_value;
@@ -293,23 +293,23 @@ struct custom_object {
 
     custom_object() = default;
 
-    explicit custom_object(my_struct p_my_struct, float p_f_value, double p_d_value, std::vector<float> &p_vector) :
+    explicit custom_object(my_struct p_my_struct, float p_f_value, double p_d_value, std::vector<float>& p_vector) :
         m_my_struct(std::move(p_my_struct)), m_f_value(p_f_value), m_d_value(p_d_value), m_vector(std::move(p_vector)) {}
 
-    custom_object(const custom_object &p_other) = default;
+    custom_object(const custom_object& p_other) = default;
 
-    custom_object(custom_object &&p_other) noexcept {
+    custom_object(custom_object&& p_other) noexcept {
         m_my_struct = std::exchange(p_other.m_my_struct, my_struct{});
         m_f_value = std::exchange(p_other.m_f_value, 0.0f);
         m_d_value = std::exchange(p_other.m_d_value, 0.0);
         m_vector = std::exchange(p_other.m_vector, std::vector<float>{});
     }
 
-    bool operator==(const custom_object &p_other) const {
+    bool operator==(const custom_object& p_other) const {
         return m_my_struct == p_other.m_my_struct && m_f_value == p_other.m_f_value && m_d_value == p_other.m_d_value && m_vector == p_other.m_vector;
     }
 
-    custom_object &operator=(custom_object &&p_other) noexcept {
+    custom_object& operator=(custom_object&& p_other) noexcept {
         if (this != &p_other) {
             m_my_struct = std::exchange(p_other.m_my_struct, my_struct{});
             m_f_value = std::exchange(p_other.m_f_value, 0.0f);
@@ -322,11 +322,11 @@ struct custom_object {
 
 TEST_F(node_core_impl_test, serializable_non_void) {
     std::function<custom_object(std::thread::id, my_struct, float, double, std::vector<float>, gempba::node)> v_dummy_function =
-            [](std::thread::id, const my_struct &p_my_struct, float p_f, double p_d, std::vector<float> p_v, const gempba::node &) { return custom_object{p_my_struct, p_f, p_d, p_v}; };
+            [](std::thread::id, const my_struct& p_my_struct, float p_f, double p_d, std::vector<float> p_v, const gempba::node&) { return custom_object{p_my_struct, p_f, p_d, p_v}; };
 
 
-    std::function<gempba::task_packet(my_struct, float, double, std::vector<float>)> v_args_serializer = [](const my_struct &p_ins, float p_f_val, double p_d_val,
-                                                                                                            const std::vector<float> &p_vec) {
+    std::function<gempba::task_packet(my_struct, float, double, std::vector<float>)> v_args_serializer = [](const my_struct& p_ins, float p_f_val, double p_d_val,
+                                                                                                            const std::vector<float>& p_vec) {
         std::stringstream v_ss;
         boost::archive::text_oarchive v_archive(v_ss);
         v_archive << p_ins;
@@ -336,14 +336,14 @@ TEST_F(node_core_impl_test, serializable_non_void) {
         return gempba::task_packet(v_ss.str());
     };
 
-    std::function<std::tuple<my_struct, float, double, std::vector<float>>(gempba::task_packet)> v_deserializer = [](const gempba::task_packet &p_task) {
+    std::function<std::tuple<my_struct, float, double, std::vector<float>>(gempba::task_packet)> v_deserializer = [](const gempba::task_packet& p_task) {
         my_struct v_ins;
         float v_f_val;
         double v_d_val;
         std::vector<float> v_vec;
 
         std::stringstream v_ss;
-        v_ss.write(reinterpret_cast<const char *>(p_task.data()), static_cast<int>(p_task.size()));
+        v_ss.write(reinterpret_cast<const char*>(p_task.data()), static_cast<int>(p_task.size()));
         boost::archive::text_iarchive v_archive(v_ss);
         v_archive >> v_ins;
         v_archive >> v_f_val;
@@ -359,7 +359,7 @@ TEST_F(node_core_impl_test, serializable_non_void) {
     try {
         v_node.run();
         FAIL();
-    } catch (std::exception &v_e) {
+    } catch (std::exception& v_e) {
         ASSERT_STREQ("node arguments have not been initialized", v_e.what());
     };
 
@@ -374,7 +374,7 @@ TEST_F(node_core_impl_test, serializable_non_void) {
     std::function<std::any(gempba::task_packet)> v_result_deserializer = [](gempba::task_packet p_task) -> std::any {
         custom_object v_object;
         std::stringstream v_ss;
-        v_ss.write(reinterpret_cast<const char *>(p_task.data()), static_cast<int>(p_task.size()));
+        v_ss.write(reinterpret_cast<const char*>(p_task.data()), static_cast<int>(p_task.size()));
         boost::archive::text_iarchive v_iarchive(v_ss);
         v_iarchive >> v_object;
 
@@ -385,10 +385,10 @@ TEST_F(node_core_impl_test, serializable_non_void) {
     v_node.set_result_deserializer(v_result_deserializer);
 
 
-    const my_struct &v_expected_struct = my_struct{7};
+    const my_struct& v_expected_struct = my_struct{7};
     float v_expected_float = 1.0f;
     double v_expected_double = 3.0;
-    const std::vector<float> &v_expected_vector = std::vector<float>{1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f, 10.0f};
+    const std::vector<float>& v_expected_vector = std::vector<float>{1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f, 10.0f};
     gempba::task_packet v_buffer = v_args_serializer(v_expected_struct, v_expected_float, v_expected_double, v_expected_vector);
 
     v_node.deserialize(gempba::task_packet(v_buffer));
@@ -396,7 +396,7 @@ TEST_F(node_core_impl_test, serializable_non_void) {
 
     std::any v_any_result = v_node.get_any_result();
     gempba::task_packet v_serialized_result = v_node.get_result();
-    std::string v_serialized_result_str(reinterpret_cast<const char *>(v_serialized_result.data()), v_serialized_result.size());
+    std::string v_serialized_result_str(reinterpret_cast<const char*>(v_serialized_result.data()), v_serialized_result.size());
 
     std::string v_expected = "22 serialization::archive 20 0 0 0 0 7 1.000000000e+00 3.00000000000000000e+00 10 0 1.000000000e+00 2.000000000e+00 3.000000000e+00 4.000000000e+00 "
                              "5.000000000e+00 6.000000000e+00 7.000000000e+00 8.000000000e+00 9.000000000e+00 1.000000000e+01";
@@ -415,7 +415,7 @@ TEST_F(node_core_impl_test, serializable_non_void) {
 
 TEST_F(node_core_impl_test, remote_result_non_void) {
     std::function<custom_object(std::thread::id, my_struct, float, double, std::vector<float>, gempba::node)> v_dummy_function =
-            [](std::thread::id, const my_struct &p_my_struct, float p_f, double p_d, std::vector<float> p_v, const gempba::node &) { return custom_object{p_my_struct, p_f, p_d, p_v}; };
+            [](std::thread::id, const my_struct& p_my_struct, float p_f, double p_d, std::vector<float> p_v, const gempba::node&) { return custom_object{p_my_struct, p_f, p_d, p_v}; };
 
 
     std::function<std::optional<std::tuple<my_struct, float, double, std::vector<float>>>()> v_args_initializer = [] {
@@ -425,7 +425,7 @@ TEST_F(node_core_impl_test, remote_result_non_void) {
         std::vector<float> v_vector{1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f, 10.0f};
         return std::make_tuple(v_my_struct, v_f_value, v_d_value, v_vector);
     };
-    std::function<gempba::task_packet(my_struct, float, double, std::vector<float>)> v_args_serializer = [](my_struct p_ins, float p_f_val, double p_d_val, const std::vector<float> &p_vec) {
+    std::function<gempba::task_packet(my_struct, float, double, std::vector<float>)> v_args_serializer = [](my_struct p_ins, float p_f_val, double p_d_val, const std::vector<float>& p_vec) {
         std::stringstream v_ss;
         boost::archive::text_oarchive v_archive(v_ss);
         v_archive << p_ins;
@@ -434,14 +434,14 @@ TEST_F(node_core_impl_test, remote_result_non_void) {
         v_archive << p_vec;
         return gempba::task_packet(v_ss.str());
     };
-    std::function<std::tuple<my_struct, float, double, std::vector<float>>(gempba::task_packet)> v_args_deserializer = [](const gempba::task_packet &p_task) {
+    std::function<std::tuple<my_struct, float, double, std::vector<float>>(gempba::task_packet)> v_args_deserializer = [](const gempba::task_packet& p_task) {
         my_struct v_ins;
         float v_f_val;
         double v_d_val;
         std::vector<float> v_vec;
 
         std::stringstream v_ss;
-        v_ss.write(reinterpret_cast<const char *>(p_task.data()), static_cast<int>(p_task.size()));
+        v_ss.write(reinterpret_cast<const char*>(p_task.data()), static_cast<int>(p_task.size()));
         boost::archive::text_iarchive v_archive(v_ss);
         v_archive >> v_ins;
         v_archive >> v_f_val;
@@ -466,7 +466,7 @@ TEST_F(node_core_impl_test, remote_result_non_void) {
     std::function<std::any(gempba::task_packet)> v_result_deserializer = [](gempba::task_packet p_task) -> std::any {
         custom_object v_object;
         std::stringstream v_ss;
-        v_ss.write(reinterpret_cast<const char *>(p_task.data()), static_cast<int>(p_task.size()));
+        v_ss.write(reinterpret_cast<const char*>(p_task.data()), static_cast<int>(p_task.size()));
 
         boost::archive::text_iarchive v_iarchive(v_ss);
         v_iarchive >> v_object;
@@ -481,8 +481,8 @@ TEST_F(node_core_impl_test, remote_result_non_void) {
     ASSERT_EQ(v_node, v_node.get_root());
     ASSERT_EQ(nullptr, v_node.get_parent());
 
-    constexpr int v_runner_id = -1;
-    bool v_is_submitted = v_node_manager.try_remote_submit(v_node, v_runner_id); // mimics a remote call
+    constexpr int RUNNER_ID = -1;
+    bool v_is_submitted = v_node_manager.try_remote_submit(v_node, RUNNER_ID); // mimics a remote call
     ASSERT_FALSE(v_is_submitted);
 
     // It should be pruned
@@ -492,7 +492,7 @@ TEST_F(node_core_impl_test, remote_result_non_void) {
     try {
         v_node.run();
         FAIL();
-    } catch (std::exception &e) {
+    } catch (std::exception& e) {
         ASSERT_STREQ("node is already consumed, node: 1, state: SENT_TO_ANOTHER_PROCESS", e.what());
     };
     {
@@ -501,7 +501,7 @@ TEST_F(node_core_impl_test, remote_result_non_void) {
     }
 
 
-    const my_struct &v_expected_struct = my_struct{7};
+    const my_struct& v_expected_struct = my_struct{7};
     float v_expected_float = 1.0f;
     double v_expected_double = 3.0;
     std::vector<float> v_expected_vector{1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f, 10.0f};
@@ -532,7 +532,7 @@ TEST_F(node_core_impl_test, dummy_node) {
 }
 
 TEST_F(node_core_impl_test, get_pointers_non_dummy_node) {
-    std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int p_val, const gempba::node &) {};
+    std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int p_val, const gempba::node&) {};
     int v_dummy_value = 7;
 
     gempba::node v_empty_node = gempba::node();
@@ -553,7 +553,7 @@ TEST_F(node_core_impl_test, three_level_nodes_with_dummy_node) {
      *           /  \     /  \
      *          n21  n22  n23  n24
      */
-    std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int p_val, const gempba::node &p_node) {};
+    std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int p_val, const gempba::node& p_node) {};
     int v_dummy_value = 7;
 
     auto v_n11 = gempba::node_factory::create_explicit_node<void>(m_balancer_mock, v_parent, v_dummy_function, std::make_tuple(v_dummy_value));
@@ -600,10 +600,10 @@ TEST_F(node_core_impl_test, get_root_test) {
     try {
         v_parent.set_parent(v_parent);
         FAIL();
-    } catch ([[maybe_unused]] std::exception &e) {
+    } catch ([[maybe_unused]] std::exception& e) {
     };
 
-    std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int p_val, const gempba::node &p_node) {};
+    std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int p_val, const gempba::node& p_node) {};
     int v_dummy_value = 7;
 
     /**
@@ -624,7 +624,7 @@ TEST_F(node_core_impl_test, get_root_test) {
             v_nodes.emplace_back(gempba::node_factory::create_explicit_node<void>(m_balancer_mock, v_dummy, v_dummy_function, std::make_tuple(v_dummy_value)));
         });
     }
-    for (auto &v_thread: v_threads) {
+    for (auto& v_thread: v_threads) {
         v_thread.join();
     }
 
@@ -658,10 +658,10 @@ TEST_F(node_core_impl_test, add_child_and_set_parent_test) {
     try {
         v_parent.set_parent(v_parent);
         FAIL();
-    } catch ([[maybe_unused]] std::exception &e) {
+    } catch ([[maybe_unused]] std::exception& e) {
     };
 
-    std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int p_val, const gempba::node &p_node) {};
+    std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int p_val, const gempba::node& p_node) {};
     int v_dummy_value = 7;
 
     auto v_n11 = gempba::node_factory::create_explicit_node<void>(m_balancer_mock, v_parent, v_dummy_function, std::make_tuple(v_dummy_value));
@@ -698,7 +698,7 @@ TEST_F(node_core_impl_test, add_child_and_set_parent_test) {
 }
 
 TEST_F(node_core_impl_test, set_get_states) {
-    std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int p_val, const gempba::node &p_node) {};
+    std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int p_val, const gempba::node& p_node) {};
     int v_dummy_value = 7;
 
     auto v_dummy = gempba::node();
@@ -721,7 +721,7 @@ TEST_F(node_core_impl_test, set_get_states) {
 }
 
 TEST_F(node_core_impl_test, is_result_retrievable) {
-    std::function<int(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int p_val, const gempba::node &p_node) { return 5; };
+    std::function<int(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int p_val, const gempba::node& p_node) { return 5; };
     int v_dummy_value = 7;
 
     auto v_dummy = gempba::node();
@@ -739,7 +739,7 @@ TEST_F(node_core_impl_test, is_result_retrievable) {
 }
 
 TEST_F(node_core_impl_test, forward_push_count_and_thread_id) {
-    std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int p_val, const gempba::node &p_node) {};
+    std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int p_val, const gempba::node& p_node) {};
     int v_dummy_value = 7;
 
     std::thread::id v_expected_thread_id = std::this_thread::get_id();
@@ -759,7 +759,7 @@ TEST_F(node_core_impl_test, forward_push_count_and_thread_id) {
 }
 
 TEST_F(node_core_impl_test, get_node_id) {
-    std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int p_val, const gempba::node &p_node) {};
+    std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int p_val, const gempba::node& p_node) {};
     int v_dummy_value = 7;
 
     auto v_dummy = gempba::node();
@@ -773,16 +773,16 @@ TEST_F(node_core_impl_test, get_node_id) {
 TEST_F(node_core_impl_test, serialize_deserialize) {
     custom_object v_expected_after_deserialized;
     std::function<void(std::thread::id, custom_object, gempba::node)> v_dummy_function =
-            [&v_expected_after_deserialized](std::thread::id, custom_object p_object, const gempba::node &p_node) { v_expected_after_deserialized = std::move(p_object); };
+            [&v_expected_after_deserialized](std::thread::id, custom_object p_object, const gempba::node& p_node) { v_expected_after_deserialized = std::move(p_object); };
     const my_struct v_ins{7};
-    constexpr float v_f1 = 1.0f;
-    constexpr double v_d1 = 3.0;
+    constexpr float F_1 = 1.0f;
+    constexpr double D_1 = 3.0;
     const std::vector v_vec{1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f, 10.0f};
     auto v_temp = v_vec;
 
-    custom_object v_object(v_ins, v_f1, v_d1, v_temp); // argument to be sent remotely
+    custom_object v_object(v_ins, F_1, D_1, v_temp); // argument to be sent remotely
 
-    std::function<gempba::task_packet(custom_object)> v_args_serializer = [](const custom_object &p_object) {
+    std::function<gempba::task_packet(custom_object)> v_args_serializer = [](const custom_object& p_object) {
         std::stringstream v_ss;
         boost::archive::text_oarchive v_archive(v_ss);
         v_archive << p_object;
@@ -792,7 +792,7 @@ TEST_F(node_core_impl_test, serialize_deserialize) {
         custom_object v_object;
 
         std::stringstream v_ss;
-        v_ss.write(reinterpret_cast<const char *>(p_task.data()), static_cast<int>(p_task.size()));
+        v_ss.write(reinterpret_cast<const char*>(p_task.data()), static_cast<int>(p_task.size()));
         boost::archive::text_iarchive v_archive(v_ss);
         v_archive >> v_object;
 
@@ -805,7 +805,7 @@ TEST_F(node_core_impl_test, serialize_deserialize) {
                                                                                 v_args_deserializer);
     // this simulates serializing the arguments that will be sent remotely
     const gempba::task_packet v_args_serialized = v_node.serialize();
-    const std::string v_args_serialized_str(reinterpret_cast<const char *>(v_args_serialized.data()), v_args_serialized.size());
+    const std::string v_args_serialized_str(reinterpret_cast<const char*>(v_args_serialized.data()), v_args_serialized.size());
 
     const std::string v_expected_args_serialized = "22 serialization::archive 20 0 0 0 0 7 1.000000000e+00 3.00000000000000000e+00 10 0 1.000000000e+00 2.000000000e+00 "
                                                    "3.000000000e+00 4.000000000e+00 5.000000000e+00 6.000000000e+00 7.000000000e+00 8.000000000e+00 9.000000000e+00 1.000000000e+01";
@@ -823,7 +823,7 @@ TEST_F(node_core_impl_test, serialize_deserialize) {
 
 
 TEST_F(node_core_impl_test, get_children) {
-    std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int p_val, const gempba::node &p_node) {};
+    std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int p_val, const gempba::node& p_node) {};
     int v_dummy_value = 7;
 
     auto v_dummy_parent = gempba::node_factory::create_dummy_node(m_balancer_mock);
@@ -842,7 +842,7 @@ TEST_F(node_core_impl_test, get_children) {
 }
 
 TEST_F(node_core_impl_test, remove_leftmost_child) {
-    std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int p_val, const gempba::node &p_node) {};
+    std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int p_val, const gempba::node& p_node) {};
     int v_dummy_value = 7;
 
     auto v_dummy_parent = gempba::node_factory::create_dummy_node(m_balancer_mock);
@@ -880,7 +880,7 @@ TEST_F(node_core_impl_test, remove_leftmost_child) {
 }
 
 TEST_F(node_core_impl_test, remove_second_leftmost_child) {
-    std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int p_val, const gempba::node &p_node) {};
+    std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int p_val, const gempba::node& p_node) {};
     int v_dummy_value = 7;
 
     auto v_dummy_parent = gempba::node_factory::create_dummy_node(m_balancer_mock);
@@ -916,13 +916,13 @@ TEST_F(node_core_impl_test, remove_second_leftmost_child) {
     try {
         v_dummy_parent.remove_second_leftmost_child();
         FAIL() << "Expected exception";
-    } catch (const std::exception &e) {
+    } catch (const std::exception& e) {
         ASSERT_STREQ("Cannot prune second child when there are less than 2 children", e.what());
     }
 }
 
 TEST_F(node_core_impl_test, get_second_leftmost_child) {
-    std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int p_val, const gempba::node &p_node) {};
+    std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int p_val, const gempba::node& p_node) {};
     int v_dummy_value = 7;
 
     auto v_dummy_parent = gempba::node_factory::create_dummy_node(m_balancer_mock);
@@ -943,7 +943,7 @@ TEST_F(node_core_impl_test, get_second_leftmost_child) {
 }
 
 TEST_F(node_core_impl_test, get_siblings) {
-    std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int p_val, const gempba::node &p_node) {};
+    std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int p_val, const gempba::node& p_node) {};
     int v_dummy_value = 7;
 
     auto v_dummy0 = gempba::node_factory::create_dummy_node(m_balancer_mock);
@@ -1004,7 +1004,7 @@ namespace {
     using v_int_deserializer = std::function<std::tuple<int>(gempba::task_packet)>;
 
     v_void_fn make_noop_fn() {
-        return [](std::thread::id, int, const gempba::node &) {};
+        return [](std::thread::id, int, const gempba::node&) {};
     }
 
     v_int_serializer make_empty_serializer() {
@@ -1012,7 +1012,7 @@ namespace {
     }
 
     v_int_deserializer make_zero_deserializer() {
-        return [](const gempba::task_packet &) { return std::make_tuple(0); };
+        return [](const gempba::task_packet&) { return std::make_tuple(0); };
     }
 } // namespace
 
@@ -1061,7 +1061,7 @@ TEST_F(node_core_impl_test, delegate_locally_throws_when_lazy_initializer_return
 }
 
 TEST_F(node_core_impl_test, delegate_locally_initializes_lazy_arguments_on_success) {
-    EXPECT_CALL(m_balancer_mock, force_local_submit(testing::_)).WillOnce([](std::function<std::any()> &&) {
+    EXPECT_CALL(m_balancer_mock, force_local_submit(testing::_)).WillOnce([](std::function<std::any()>&&) {
         std::promise<std::any> v_promise;
         v_promise.set_value(std::any{});
         return v_promise.get_future();
@@ -1110,7 +1110,7 @@ TEST_F(node_core_impl_test, delegate_remotely_throws_when_lazy_initializer_retur
 
 TEST_F(node_core_impl_test, delegate_remotely_initializes_lazy_arguments_on_success) {
     scheduler_worker_mock v_worker;
-    EXPECT_CALL(v_worker, force_push(testing::_, testing::_)).WillOnce([](gempba::task_packet &&, int) { return 0u; });
+    EXPECT_CALL(v_worker, force_push(testing::_, testing::_)).WillOnce([](gempba::task_packet&&, int) { return 0u; });
 
     auto v_dummy = gempba::node();
     v_void_fn v_fn = make_noop_fn();
@@ -1239,7 +1239,7 @@ TEST_F(node_core_impl_test, add_child_sets_parent_when_child_has_different_paren
 }
 
 TEST_F(node_core_impl_test, get_any_result_returns_future_value_after_delegate_locally) {
-    EXPECT_CALL(m_balancer_mock, force_local_submit(testing::_)).WillOnce([](std::function<std::any()> &&p_function) {
+    EXPECT_CALL(m_balancer_mock, force_local_submit(testing::_)).WillOnce([](std::function<std::any()>&& p_function) {
         std::promise<std::any> v_promise;
         v_promise.set_value(p_function());
         return v_promise.get_future();
@@ -1295,7 +1295,7 @@ TEST_F(node_core_impl_test, should_branch_returns_true_for_deserialized_node) {
     auto v_dummy = gempba::node();
     v_void_fn v_fn = make_noop_fn();
     v_int_serializer v_ser = make_empty_serializer();
-    v_int_deserializer v_deser = [](const gempba::task_packet &) { return std::make_tuple(7); };
+    v_int_deserializer v_deser = [](const gempba::task_packet&) { return std::make_tuple(7); };
     auto v_node = gempba::node_factory::create_serializable_node<void>(m_balancer_mock, v_dummy, v_fn, v_ser, v_deser);
     v_node.deserialize(gempba::task_packet::EMPTY); // sets init flag to DESERIALIZED
     EXPECT_TRUE(v_node.should_branch());
@@ -1313,7 +1313,7 @@ namespace {
 
 TEST_F(node_core_impl_test, int_specialization_run_returns_value_via_get_any_result) {
     auto v_dummy = gempba::node();
-    v_int_int_fn v_fn = [](std::thread::id, int p_x, const gempba::node &) { return p_x * 2; };
+    v_int_int_fn v_fn = [](std::thread::id, int p_x, const gempba::node&) { return p_x * 2; };
     auto v_node = gempba::node_factory::create_explicit_node<int>(m_balancer_mock, v_dummy, v_fn, std::make_tuple(21));
 
     v_node.run();
@@ -1323,14 +1323,14 @@ TEST_F(node_core_impl_test, int_specialization_run_returns_value_via_get_any_res
 }
 
 TEST_F(node_core_impl_test, int_specialization_delegate_locally_pushes_to_pool) {
-    EXPECT_CALL(m_balancer_mock, force_local_submit(testing::_)).WillOnce([](std::function<std::any()> &&p_function) {
+    EXPECT_CALL(m_balancer_mock, force_local_submit(testing::_)).WillOnce([](std::function<std::any()>&& p_function) {
         std::promise<std::any> v_promise;
         v_promise.set_value(p_function());
         return v_promise.get_future();
     });
 
     auto v_dummy = gempba::node();
-    v_int_int_fn v_fn = [](std::thread::id, int p_x, const gempba::node &) { return p_x + 1; };
+    v_int_int_fn v_fn = [](std::thread::id, int p_x, const gempba::node&) { return p_x + 1; };
     auto v_node = gempba::node_factory::create_explicit_node<int>(m_balancer_mock, v_dummy, v_fn, std::make_tuple(7));
 
     v_node.delegate_locally(&m_balancer_mock);
@@ -1340,10 +1340,10 @@ TEST_F(node_core_impl_test, int_specialization_delegate_locally_pushes_to_pool) 
 
 TEST_F(node_core_impl_test, int_specialization_delegate_remotely_serialises_and_pushes) {
     scheduler_worker_mock v_worker;
-    EXPECT_CALL(v_worker, force_push(testing::_, testing::_)).WillOnce([](gempba::task_packet &&, int) { return 7u; });
+    EXPECT_CALL(v_worker, force_push(testing::_, testing::_)).WillOnce([](gempba::task_packet&&, int) { return 7u; });
 
     auto v_dummy = gempba::node();
-    v_int_int_fn v_fn = [](std::thread::id, int, const gempba::node &) { return 0; };
+    v_int_int_fn v_fn = [](std::thread::id, int, const gempba::node&) { return 0; };
     v_int_int_serializer v_ser = make_empty_serializer();
     v_int_int_deserializer v_deser = make_zero_deserializer();
     auto v_node = gempba::node_factory::create_serializable_explicit_node<int>(m_balancer_mock, v_dummy, v_fn, std::make_tuple(0), v_ser, v_deser);
@@ -1353,17 +1353,17 @@ TEST_F(node_core_impl_test, int_specialization_delegate_remotely_serialises_and_
 }
 
 TEST_F(node_core_impl_test, int_specialization_get_result_round_trips_through_serializers) {
-    std::function<gempba::task_packet(std::any)> v_result_ser = [](const std::any &p_any) {
+    std::function<gempba::task_packet(std::any)> v_result_ser = [](const std::any& p_any) {
         const auto v_value = std::any_cast<int>(p_any);
         return gempba::task_packet(std::to_string(v_value));
     };
-    std::function<std::any(gempba::task_packet)> v_result_deser = [](const gempba::task_packet &p_packet) -> std::any {
-        const std::string v_str(reinterpret_cast<const char *>(p_packet.data()), p_packet.size());
+    std::function<std::any(gempba::task_packet)> v_result_deser = [](const gempba::task_packet& p_packet) -> std::any {
+        const std::string v_str(reinterpret_cast<const char*>(p_packet.data()), p_packet.size());
         return std::stoi(v_str);
     };
 
     auto v_dummy = gempba::node();
-    v_int_int_fn v_fn = [](std::thread::id, int p_x, const gempba::node &) { return p_x * 10; };
+    v_int_int_fn v_fn = [](std::thread::id, int p_x, const gempba::node&) { return p_x * 10; };
     v_int_int_serializer v_ser = make_empty_serializer();
     v_int_int_deserializer v_deser = make_zero_deserializer();
     auto v_node = gempba::node_factory::create_serializable_explicit_node<int>(m_balancer_mock, v_dummy, v_fn, std::make_tuple(5), v_ser, v_deser);
@@ -1373,7 +1373,7 @@ TEST_F(node_core_impl_test, int_specialization_get_result_round_trips_through_se
 
     v_node.run();
     const gempba::task_packet v_serialised = v_node.get_result();
-    const std::string v_str(reinterpret_cast<const char *>(v_serialised.data()), v_serialised.size());
+    const std::string v_str(reinterpret_cast<const char*>(v_serialised.data()), v_serialised.size());
     EXPECT_EQ("50", v_str);
 
     // round-trip back via set_result
@@ -1383,7 +1383,7 @@ TEST_F(node_core_impl_test, int_specialization_get_result_round_trips_through_se
 
 TEST_F(node_core_impl_test, int_specialization_lazy_node_initializes_and_runs) {
     auto v_dummy = gempba::node();
-    v_int_int_fn v_fn = [](std::thread::id, int p_x, const gempba::node &) { return p_x; };
+    v_int_int_fn v_fn = [](std::thread::id, int p_x, const gempba::node&) { return p_x; };
     std::function<std::optional<std::tuple<int>>()> v_init = [] { return std::make_optional(std::make_tuple(99)); };
     auto v_node = gempba::node_factory::create_lazy_node<int>(m_balancer_mock, v_dummy, v_fn, v_init);
 

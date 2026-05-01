@@ -2,7 +2,7 @@
 #include <impl/schedulers/mpi_semi_centralized_scheduler.hpp>
 
 namespace gempba {
-    void mpi_semi_centralized_scheduler::send_final_solution_to_center(node_manager &p_node_manager) const {
+    void mpi_semi_centralized_scheduler::send_final_solution_to_center(node_manager& p_node_manager) const {
         auto v_bytes_opt = p_node_manager.get_result_bytes();
 
         if (!v_bytes_opt.has_value()) {
@@ -10,7 +10,7 @@ namespace gempba {
             return;
         }
 
-        const result &v_result = v_bytes_opt.value();
+        const result& v_result = v_bytes_opt.value();
         const task_packet v_bytes = v_result.get_task_packet();
 
         if (v_bytes.empty()) {
@@ -20,17 +20,17 @@ namespace gempba {
 
         MPI_Send(v_bytes.data(), static_cast<int>(v_bytes.size()), MPI_BYTE, CENTER_NODE, HAS_RESULT, m_world_communicator);
 
-        const score &v_score = v_result.get_score();
+        const score& v_score = v_result.get_score();
         MPI_Send(&v_score, sizeof(score), MPI_BYTE, CENTER_NODE, HAS_RESULT, m_world_communicator);
     }
 
-    void mpi_semi_centralized_scheduler::collect_stats_data(const node_manager &p_node_manager) {
+    void mpi_semi_centralized_scheduler::collect_stats_data(const node_manager& p_node_manager) {
         m_idle_time = p_node_manager.get_idle_time();
         m_stats.m_idle_time = p_node_manager.get_idle_time();
         m_stats.m_total_thread_requests = p_node_manager.get_thread_request_count();
     }
 
-    void mpi_semi_centralized_scheduler::task_funneling(node_manager &p_node_manager) {
+    void mpi_semi_centralized_scheduler::task_funneling(node_manager& p_node_manager) {
         std::shared_ptr<task_bundle> v_bundle;
         bool v_is_pop = m_tasks_bundle_queue.pop(v_bundle);
 
@@ -85,7 +85,7 @@ namespace gempba {
         }
     }
 
-    void mpi_semi_centralized_scheduler::update_score(node_manager &p_node_manager) {
+    void mpi_semi_centralized_scheduler::update_score(node_manager& p_node_manager) {
         const score v_global_score_temp = m_global_score; // constant within this scope
         const score v_local_score_temp = p_node_manager.get_score(); // constant within this scope
 

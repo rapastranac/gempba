@@ -56,9 +56,9 @@ inline int get_nb_set_bits(const char p_c) {
     return static_cast<int>((v_uc * 01001001001ULL & 042104210421ULL) % 017);
 }
 
-inline int get_nb_set_bits(const gempba::task_packet &p_task) {
+inline int get_nb_set_bits(const gempba::task_packet& p_task) {
     int v_nb = 0;
-    for (const std::byte &v_byte: p_task) {
+    for (const std::byte& v_byte: p_task) {
         v_nb += get_nb_set_bits(static_cast<char>(v_byte));
     }
     return v_nb;
@@ -66,7 +66,7 @@ inline int get_nb_set_bits(const gempba::task_packet &p_task) {
 
 class task_comparator {
 public:
-    bool operator()(const gempba::task_packet &p_t1, const gempba::task_packet &p_t2) const {
+    bool operator()(const gempba::task_packet& p_t1, const gempba::task_packet& p_t2) const {
 
         const int v_n1 = get_nb_set_bits(p_t1);
         const int v_n2 = get_nb_set_bits(p_t2);
@@ -75,8 +75,8 @@ public:
     }
 };
 
-inline int get_nb_set_bits(const gempba::task_bundle &p_bundle) {
-    const gempba::task_packet &v_packet = p_bundle.get_task_packet();
+inline int get_nb_set_bits(const gempba::task_bundle& p_bundle) {
+    const gempba::task_packet& v_packet = p_bundle.get_task_packet();
     const int v_nb_set_bits = get_nb_set_bits(v_packet);
 
     const int v_runnable_id = p_bundle.get_runnable_id();
@@ -87,7 +87,7 @@ inline int get_nb_set_bits(const gempba::task_bundle &p_bundle) {
 
 class task_bundle_comparator {
 public:
-    bool operator()(const gempba::task_bundle &p_bundle1, const gempba::task_bundle &p_bundle2) const {
+    bool operator()(const gempba::task_bundle& p_bundle1, const gempba::task_bundle& p_bundle2) const {
 
         const int v_n1 = get_nb_set_bits(p_bundle1);
         const int v_n2 = get_nb_set_bits(p_bundle2);
@@ -159,7 +159,7 @@ inline size_t get_current_rss() {
 #elif defined(__linux__) || defined(__linux) || defined(linux) || defined(__gnu_linux__)
     /* Linux ---------------------------------------------------- */
     long v_rss = 0L;
-    FILE *v_fp = nullptr;
+    FILE* v_fp = nullptr;
     if ((v_fp = fopen("/proc/self/statm", "r")) == nullptr)
         return (size_t) 0L; /* Can't open? */
     if (fscanf(v_fp, "%*s%ld", &v_rss) != 1) { // NOLINT(cert-err34-c)

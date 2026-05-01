@@ -38,26 +38,26 @@ namespace gempba {
         task_packet m_task_packet;
 
     public:
-        result(const score &p_score, task_packet p_task_packet) : m_score(p_score), m_task_packet(std::move(p_task_packet)) {}
+        result(const score& p_score, task_packet p_task_packet) : m_score(p_score), m_task_packet(std::move(p_task_packet)) {}
 
         // Copy constructor
-        result(const result &p_other) = default;
+        result(const result& p_other) = default;
 
         // Move constructor
-        result(result &&p_other) noexcept = default;
+        result(result&& p_other) noexcept = default;
 
         // Copy assignment (deleted because of const member)
-        result &operator=(const result &p_other) = default;
+        result& operator=(const result& p_other) = default;
 
         // Move assignment (deleted because of const member)
-        result &operator=(result &&p_other) noexcept = default;
+        result& operator=(result&& p_other) noexcept = default;
 
         // Destructor
         ~result() = default;
 
-        bool operator==(const result &p_other) const { return m_score == p_other.m_score && m_task_packet == p_other.m_task_packet; }
+        bool operator==(const result& p_other) const { return m_score == p_other.m_score && m_task_packet == p_other.m_task_packet; }
 
-        bool operator!=(const result &p_other) const { return !(*this == p_other); }
+        bool operator!=(const result& p_other) const { return !(*this == p_other); }
 
         [[nodiscard]] int get_score_as_integer() const { return m_score.get_loose<int>(); }
 

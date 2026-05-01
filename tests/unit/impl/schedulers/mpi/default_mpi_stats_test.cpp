@@ -51,7 +51,7 @@ TEST(default_mpi_stats_test, visitor_returns_all_fields_correctly) {
 
     std::unordered_map<std::string, std::any> v_collected;
 
-    v_stats_impl.visit([&](const std::string &p_key, std::any &&p_value) { v_collected[p_key] = std::move(p_value); });
+    v_stats_impl.visit([&](const std::string& p_key, std::any&& p_value) { v_collected[p_key] = std::move(p_value); });
 
     EXPECT_EQ(7, v_collected.size());
     EXPECT_EQ(3, std::any_cast<int>(v_collected["rank"]));
@@ -238,8 +238,8 @@ TEST(stats_interface_test, serialize_deserialize_comparison_identical_objects) {
     v_stats_impl2.m_idle_time = 2.5;
     v_stats_impl2.m_elapsed_time = 3.5;
 
-    const gempba::stats &v_stats_ref1 = v_stats_impl1;
-    const gempba::stats &v_stats_ref2 = v_stats_impl2;
+    const gempba::stats& v_stats_ref1 = v_stats_impl1;
+    const gempba::stats& v_stats_ref2 = v_stats_impl2;
 
     const gempba::task_packet v_packet1 = v_stats_ref1.serialize();
     const gempba::task_packet v_packet2 = v_stats_ref2.serialize();
@@ -265,22 +265,22 @@ TEST(stats_interface_test, visitor_comparison_identical_objects) {
     v_stats_impl2.m_idle_time = 10.5;
     v_stats_impl2.m_elapsed_time = 20.5;
 
-    const gempba::stats &v_stats_ref1 = v_stats_impl1;
-    const gempba::stats &v_stats_ref2 = v_stats_impl2;
+    const gempba::stats& v_stats_ref1 = v_stats_impl1;
+    const gempba::stats& v_stats_ref2 = v_stats_impl2;
 
     std::unordered_map<std::string, std::any> v_collected1;
     std::unordered_map<std::string, std::any> v_collected2;
 
-    v_stats_ref1.visit([&](const std::string &p_key, std::any &&p_value) { v_collected1[p_key] = std::move(p_value); });
+    v_stats_ref1.visit([&](const std::string& p_key, std::any&& p_value) { v_collected1[p_key] = std::move(p_value); });
 
-    v_stats_ref2.visit([&](const std::string &p_key, std::any &&p_value) { v_collected2[p_key] = std::move(p_value); });
+    v_stats_ref2.visit([&](const std::string& p_key, std::any&& p_value) { v_collected2[p_key] = std::move(p_value); });
 
     EXPECT_EQ(v_collected2.size(), v_collected1.size());
     EXPECT_EQ(7, v_collected1.size());
 
-    for (const auto &[v_key, v_value]: v_collected1) {
+    for (const auto& [v_key, v_value]: v_collected1) {
         EXPECT_TRUE(v_collected2.contains(v_key));
-        const auto &v_other_value = v_collected2.at(v_key);
+        const auto& v_other_value = v_collected2.at(v_key);
 
         if (v_key == "rank") {
             EXPECT_EQ(std::any_cast<int>(v_other_value), std::any_cast<int>(v_value));
@@ -346,7 +346,7 @@ TEST(stats_interface_test, polymorphic_behavior_through_interface) {
     v_stats_objects.push_back(std::move(v_stats2));
 
     std::set<gempba::task_packet> v_packet_set;
-    for (const auto &v_stats: v_stats_objects) {
+    for (const auto& v_stats: v_stats_objects) {
         gempba::task_packet v_packet = v_stats->serialize();
         auto [v_iterator, v_inserted] = v_packet_set.insert(v_packet);
         EXPECT_TRUE(v_inserted) << "Packet collision detected - two different objects produced identical packets";
@@ -357,8 +357,8 @@ TEST(stats_interface_test, polymorphic_behavior_through_interface) {
     int v_rank_sum = 0;
     std::size_t v_task_count_sum = 0;
 
-    for (const auto &v_stats: v_stats_objects) {
-        v_stats->visit([&](const std::string &p_key, std::any &&p_value) {
+    for (const auto& v_stats: v_stats_objects) {
+        v_stats->visit([&](const std::string& p_key, std::any&& p_value) {
             if (p_key == "rank") {
                 v_rank_sum += std::any_cast<int>(p_value);
             } else if (p_key == "received_task_count") {

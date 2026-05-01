@@ -37,62 +37,62 @@ namespace gempba {
     /////////////////////////////////////////////////////////////////////////////////////////////////
     /// SCHEDULING
     /// /////////////////////////////////////////////////////////////////////////////////////////////
-    scheduler *get_scheduler();
+    scheduler* get_scheduler();
 
     void reset_scheduler();
 
     /////////////////////////////////////////////////////////////////////////////////////////////////
     /// LOAD BALANCING
     /// /////////////////////////////////////////////////////////////////////////////////////////////
-    load_balancer *get_load_balancer();
+    load_balancer* get_load_balancer();
 
     void reset_load_balancer();
 
     /////////////////////////////////////////////////////////////////////////////////////////////////
     /// BRANCH HANDLING
     /// /////////////////////////////////////////////////////////////////////////////////////////////
-    node_manager &get_node_manager();
+    node_manager& get_node_manager();
 
     void reset_node_manager();
 
     int shutdown();
 
     template<typename Ret, typename... Args>
-    static node create_seed_node(load_balancer &p_load_balancer, invokable<Ret, Args...> auto &&p_runnable, std::tuple<Args...> p_args) {
+    static node create_seed_node(load_balancer& p_load_balancer, invokable<Ret, Args...> auto&& p_runnable, std::tuple<Args...> p_args) {
         std::shared_ptr<node_core> v_null;
         auto v_seed = node_core_impl<Ret(Args...)>::create_explicit(p_load_balancer, v_null, p_runnable, std::move(p_args));
         return node(v_seed);
     }
 
-    static node create_dummy_node(load_balancer &p_load_balancer) {
+    static node create_dummy_node(load_balancer& p_load_balancer) {
         const auto v_core = node_core_impl<void()>::create_dummy(p_load_balancer);
         return node(v_core);
     }
 
-    [[maybe_unused]] static node create_custom_node(const std::shared_ptr<node_core> &p_core) noexcept { return node(p_core); }
+    [[maybe_unused]] static node create_custom_node(const std::shared_ptr<node_core>& p_core) noexcept { return node(p_core); }
 
-    void check_not_null([[maybe_unused]] const node &p_parent);
+    void check_not_null([[maybe_unused]] const node& p_parent);
 
     namespace mt {
         /////////////////////////////////////////////////////////////////////////////////////////////////
         /// LOAD BALANCING
         /// /////////////////////////////////////////////////////////////////////////////////////////////
-        load_balancer *create_load_balancer(std::unique_ptr<load_balancer> p_your_implementation);
+        load_balancer* create_load_balancer(std::unique_ptr<load_balancer> p_your_implementation);
 
-        load_balancer *create_load_balancer(const balancing_policy &p_policy);
+        load_balancer* create_load_balancer(const balancing_policy& p_policy);
 
         /////////////////////////////////////////////////////////////////////////////////////////////////
         /// BRANCH HANDLING
         /// /////////////////////////////////////////////////////////////////////////////////////////////
 
-        node_manager &create_node_manager(load_balancer *p_load_balancer);
+        node_manager& create_node_manager(load_balancer* p_load_balancer);
 
         /////////////////////////////////////////////////////////////////////////////////////////////////
         /// NODES
         /// /////////////////////////////////////////////////////////////////////////////////////////////
 
         template<typename Ret, typename... Args>
-        static node create_explicit_node(load_balancer &p_load_balancer, node &p_parent, invokable<Ret, Args...> auto &&p_runnable, std::tuple<Args...> &&p_args) {
+        static node create_explicit_node(load_balancer& p_load_balancer, node& p_parent, invokable<Ret, Args...> auto&& p_runnable, std::tuple<Args...>&& p_args) {
             check_not_null(p_parent);
 
             const std::function<std::shared_ptr<node_core>(std::shared_ptr<node_core>)> v_factory = [&](std::shared_ptr<node_core> p_core_parent) {
@@ -103,7 +103,7 @@ namespace gempba {
         }
 
         template<typename Ret, typename... Args>
-        static node create_lazy_node(load_balancer &p_load_balancer, const node &p_parent, invokable<Ret, Args...> auto &&p_runnable,
+        static node create_lazy_node(load_balancer& p_load_balancer, const node& p_parent, invokable<Ret, Args...> auto&& p_runnable,
                                      std::function<std::optional<std::tuple<Args...>>()> p_args_initializer) {
             check_not_null(p_parent);
 
@@ -127,17 +127,17 @@ namespace gempba {
             CENTRALIZED,
         };
 
-        scheduler *create_scheduler(std::unique_ptr<scheduler> p_your_implementation);
+        scheduler* create_scheduler(std::unique_ptr<scheduler> p_your_implementation);
 
-        scheduler *create_scheduler(const scheduler_topology &p_topology, double p_timeout = 3.0);
+        scheduler* create_scheduler(const scheduler_topology& p_topology, double p_timeout = 3.0);
 
         /////////////////////////////////////////////////////////////////////////////////////////////////
         /// LOAD BALANCING
         /// /////////////////////////////////////////////////////////////////////////////////////////////
 
-        load_balancer *create_load_balancer(std::unique_ptr<load_balancer> p_your_implementation);
+        load_balancer* create_load_balancer(std::unique_ptr<load_balancer> p_your_implementation);
 
-        load_balancer *create_load_balancer(const balancing_policy &p_policy, scheduler::worker *p_scheduler_worker);
+        load_balancer* create_load_balancer(const balancing_policy& p_policy, scheduler::worker* p_scheduler_worker);
 
         /////////////////////////////////////////////////////////////////////////////////////////////////
         /// STATISTICS
@@ -148,7 +148,7 @@ namespace gempba {
         /////////////////////////////////////////////////////////////////////////////////////////////////
         /// BRANCH HANDLING
         /// /////////////////////////////////////////////////////////////////////////////////////////////
-        node_manager &create_node_manager(load_balancer *p_load_balancer, scheduler::worker *p_worker);
+        node_manager& create_node_manager(load_balancer* p_load_balancer, scheduler::worker* p_worker);
 
         /////////////////////////////////////////////////////////////////////////////////////////////////
         /// SERIAL RUNNABLES
@@ -156,17 +156,17 @@ namespace gempba {
 
         namespace runnables::return_none {
             template<typename... Args>
-            std::shared_ptr<serial_runnable> create(const int p_id, invokable<void, Args...> auto &&p_invokable,
-                                                    const std::function<std::tuple<Args...>(const task_packet &&)> &p_args_deserializer) {
+            std::shared_ptr<serial_runnable> create(const int p_id, invokable<void, Args...> auto&& p_invokable,
+                                                    const std::function<std::tuple<Args...>(const task_packet&&)>& p_args_deserializer) {
                 return std::make_shared<serial_runnable_void<void(Args...)>>(p_id, p_invokable, p_args_deserializer);
             }
         } // namespace runnables::return_none
 
         namespace runnables::return_value {
             template<typename R, typename... Args>
-            std::shared_ptr<serial_runnable> create(const int p_id, invokable<R, Args...> auto &&p_invokable,
-                                                    const std::function<std::tuple<Args...>(const task_packet &&)> &p_args_deserializer,
-                                                    const std::function<task_packet(R)> &p_result_serializer) {
+            std::shared_ptr<serial_runnable> create(const int p_id, invokable<R, Args...> auto&& p_invokable,
+                                                    const std::function<std::tuple<Args...>(const task_packet&&)>& p_args_deserializer,
+                                                    const std::function<task_packet(R)>& p_result_serializer) {
                 return std::make_shared<serial_runnable_non_void<R(Args...)>>(p_id, p_invokable, p_args_deserializer, p_result_serializer);
             }
         } // namespace runnables::return_value
@@ -177,7 +177,7 @@ namespace gempba {
         /// /////////////////////////////////////////////////////////////////////////////////////////////
 
         template<typename Ret, typename... Args>
-        static node create_explicit_node(load_balancer &p_load_balancer, const node &p_parent, invokable<Ret, Args...> auto &&p_runnable, std::tuple<Args...> &&p_args,
+        static node create_explicit_node(load_balancer& p_load_balancer, const node& p_parent, invokable<Ret, Args...> auto&& p_runnable, std::tuple<Args...>&& p_args,
                                          std::function<task_packet(Args...)> p_args_serializer, std::function<std::tuple<Args...>(task_packet)> p_args_deserializer) {
             check_not_null(p_parent);
 
@@ -190,7 +190,7 @@ namespace gempba {
         }
 
         template<typename Ret, typename... Args>
-        static node create_lazy_node(load_balancer &p_load_balancer, const node &p_parent, invokable<Ret, Args...> auto &&p_runnable,
+        static node create_lazy_node(load_balancer& p_load_balancer, const node& p_parent, invokable<Ret, Args...> auto&& p_runnable,
                                      std::function<std::optional<std::tuple<Args...>>()> p_args_initializer, std::function<task_packet(Args...)> p_args_serializer,
                                      std::function<std::tuple<Args...>(task_packet)> p_args_deserializer) {
             check_not_null(p_parent);
@@ -204,7 +204,7 @@ namespace gempba {
         }
 
         template<typename Ret, typename... Args>
-        static node create_from_bytes_node(load_balancer &p_load_balancer, const node &p_parent, invokable<Ret, Args...> auto &&p_f, std::function<task_packet(Args...)> p_args_serializer,
+        static node create_from_bytes_node(load_balancer& p_load_balancer, const node& p_parent, invokable<Ret, Args...> auto&& p_f, std::function<task_packet(Args...)> p_args_serializer,
                                            std::function<std::tuple<Args...>(task_packet)> p_args_deserializer) {
             check_not_null(p_parent);
 

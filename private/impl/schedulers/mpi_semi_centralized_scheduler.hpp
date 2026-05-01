@@ -69,7 +69,7 @@ namespace gempba {
 
         [[nodiscard]] int rank_me() const override { return m_world_rank; }
 
-        void set_custom_initial_topology(tree &&p_tree) override {
+        void set_custom_initial_topology(tree&& p_tree) override {
             m_process_tree = std::move(p_tree);
             m_custom_initial_topology = true;
         }
@@ -92,7 +92,7 @@ namespace gempba {
         [[nodiscard]] std::vector<std::unique_ptr<stats>> get_stats_vector() const override {
             std::vector<std::unique_ptr<stats>> v_stats_vector;
             v_stats_vector.reserve(m_stats_vector.size());
-            for (const auto &v_stats: m_stats_vector) {
+            for (const auto& v_stats: m_stats_vector) {
                 v_stats_vector.emplace_back(std::make_unique<default_mpi_stats>(v_stats));
             }
             return v_stats_vector;
@@ -100,12 +100,12 @@ namespace gempba {
 
         void synchronize_stats() override {
             barrier();
-            constexpr int v_dummy_tag = 999;
+            constexpr int DUMMY_TAG = 999;
             if (m_world_rank == 0) {
                 m_stats_vector.push_back(m_stats);
                 for (int v_src_rank = 1; v_src_rank < m_world_size; ++v_src_rank) {
                     MPI_Status v_status;
-                    const int v_probe_err = MPI_Probe(v_src_rank, v_dummy_tag, m_world_communicator, &v_status);
+                    const int v_probe_err = MPI_Probe(v_src_rank, DUMMY_TAG, m_world_communicator, &v_status);
                     if (v_probe_err != MPI_SUCCESS) {
                         spdlog::error("rank {} failed to probe message from rank {}\n", m_world_rank, v_src_rank);
                         continue;
@@ -114,7 +114,7 @@ namespace gempba {
                     int v_count{};
                     MPI_Get_count(&v_status, MPI_BYTE, &v_count);
                     task_packet v_rank_packet(v_count);
-                    const int v_recv_err = MPI_Recv(v_rank_packet.data(), v_count, MPI_BYTE, v_src_rank, v_dummy_tag, m_world_communicator, &v_status);
+                    const int v_recv_err = MPI_Recv(v_rank_packet.data(), v_count, MPI_BYTE, v_src_rank, DUMMY_TAG, m_world_communicator, &v_status);
                     if (v_recv_err != MPI_SUCCESS) {
                         spdlog::error("rank {} failed to receive stats from rank {}\n", m_world_rank, v_src_rank);
                         continue;
@@ -124,7 +124,7 @@ namespace gempba {
                 }
             } else {
                 auto v_bytes = m_stats.serialize();
-                const int v_err = MPI_Ssend(v_bytes.data(), static_cast<int>(v_bytes.size()), MPI_BYTE, CENTER_NODE, v_dummy_tag, m_world_communicator);
+                const int v_err = MPI_Ssend(v_bytes.data(), static_cast<int>(v_bytes.size()), MPI_BYTE, CENTER_NODE, DUMMY_TAG, m_world_communicator);
                 if (v_err != MPI_SUCCESS) {
                     spdlog::error("rank {} failed to send stats to rank 0\n", m_world_rank);
                 }
@@ -173,7 +173,7 @@ namespace gempba {
         }
 
     private:
-        void run(node_manager &p_node_manager, std::map<int, std::shared_ptr<serial_runnable>> p_runnables) {
+        void run(node_manager& p_node_manager, std::map<int, std::shared_ptr<serial_runnable>> p_runnables) {
             MPI_Barrier(m_world_communicator);
             m_start_time = MPI_Wtime();
 
@@ -220,9 +220,9 @@ namespace gempba {
             m_stats.m_elapsed_time = m_end_time - m_start_time;
         }
 
-        void send_final_solution_to_center(node_manager &p_node_manager) const;
+        void send_final_solution_to_center(node_manager& p_node_manager) const;
 
-        unsigned int force_push(task_packet &&p_task_packet, const unsigned int p_function_id) {
+        unsigned int force_push(task_packet&& p_task_packet, const unsigned int p_function_id) {
             if (p_task_packet.empty()) {
                 throw std::runtime_error(fmt::format("rank {}, attempted to send empty buffer \n", m_world_rank));
             }
@@ -282,7 +282,7 @@ namespace gempba {
             MPI_Barrier(m_world_communicator);
         }
 
-        void collect_stats_data(const node_manager &p_node_manager);
+        void collect_stats_data(const node_manager& p_node_manager);
 
         void receive_score_from_center(MPI_Status p_status) {
             utils::print_ipc_debug_comments("rank {}, about to receive global score from Center\n", m_world_rank);
@@ -299,7 +299,7 @@ namespace gempba {
         }
 
 
-        void process_message(MPI_Status &p_status, node_manager &p_node_manager, std::map<int, std::shared_ptr<serial_runnable>> &p_runnables) {
+        void process_message(MPI_Status& p_status, node_manager& p_node_manager, std::map<int, std::shared_ptr<serial_runnable>>& p_runnables) {
             // Receives the task  -------------------------------------------------------------------------------------------
             int v_count; // count to be received
             MPI_Get_count(&p_status, MPI_BYTE, &v_count); // receives total number of datatype elements of the message
@@ -331,7 +331,7 @@ namespace gempba {
             notify_available_state();
         }
 
-        void task_funneling(node_manager &p_node_manager);
+        void task_funneling(node_manager& p_node_manager);
 
         [[nodiscard]] std::optional<MPI_Status> probe_score_comm_at_node() const {
             int v_is_message_received = 0; // logical
@@ -383,20 +383,20 @@ namespace gempba {
 
         // if score is received, it attempts updating local value
         // if local value is better than the one in center, then the local best value is sent to center
-        void update_score(node_manager &p_node_manager);
+        void update_score(node_manager& p_node_manager);
 
         void notify_available_state() {
             utils::print_ipc_debug_comments("rank {} entered notify_available_state()\n", m_world_rank);
-            constexpr int v_buffer = 0;
-            MPI_Send(&v_buffer, 1, MPI_INT, CENTER_NODE, AVAILABLE_STATE, m_world_communicator);
+            constexpr int BUFFER = 0;
+            MPI_Send(&BUFFER, 1, MPI_INT, CENTER_NODE, AVAILABLE_STATE, m_world_communicator);
         }
 
         void notify_running_state() const {
-            constexpr int v_buffer = 0;
-            MPI_Send(&v_buffer, 1, MPI_INT, CENTER_NODE, RUNNING_STATE, m_world_communicator);
+            constexpr int BUFFER = 0;
+            MPI_Send(&BUFFER, 1, MPI_INT, CENTER_NODE, RUNNING_STATE, m_world_communicator);
         }
 
-        void send_task(const task_bundle &p_task_bundle) {
+        void send_task(const task_bundle& p_task_bundle) {
             if (p_task_bundle.size() > std::numeric_limits<int>::max()) {
                 throw std::runtime_error("message is to long to be sent in a single message, currently not supported");
             }
@@ -431,7 +431,7 @@ namespace gempba {
 
     public:
     private:
-        static int consume_int_flag(MPI_Status p_status, const MPI_Comm &p_communicator) {
+        static int consume_int_flag(MPI_Status p_status, const MPI_Comm& p_communicator) {
             int v_buffer;
             MPI_Recv(&v_buffer, 1, MPI_INT, p_status.MPI_SOURCE, p_status.MPI_TAG, p_communicator, &p_status);
             return v_buffer;
@@ -443,7 +443,7 @@ namespace gempba {
             return v_score;
         }
 
-        void run(const task_packet &p_seed, const int p_runnable_id) {
+        void run(const task_packet& p_seed, const int p_runnable_id) {
             task_packet v_task_packet = p_seed;
             MPI_Barrier(m_world_communicator);
             m_start_time = MPI_Wtime();
@@ -565,7 +565,7 @@ namespace gempba {
             return std::nullopt;
         }
 
-        void process_running(const MPI_Status &p_status) {
+        void process_running(const MPI_Status& p_status) {
             m_process_state[p_status.MPI_SOURCE] = RUNNING_STATE; // node was assigned, now it's running
             ++m_nodes_running;
             utils::print_ipc_debug_comments("rank {} reported running, nRunning :{}\n", p_status.MPI_SOURCE, m_nodes_running);
@@ -588,7 +588,7 @@ namespace gempba {
             m_stats.m_total_requested_tasks++;
         }
 
-        void process_available(const MPI_Status &p_status) {
+        void process_available(const MPI_Status& p_status) {
             m_process_state[p_status.MPI_SOURCE] = AVAILABLE_STATE;
             ++m_nodes_available;
             --m_nodes_running;
@@ -634,7 +634,7 @@ namespace gempba {
          * if center reaches this point, for sure workers have attained a better score,
          * or they are not up-to-date, thus it is required to broadcast it whether this value changes or not
          */
-        void maybe_broadcast_global_score(const score &p_new_global_score, MPI_Status p_status) {
+        void maybe_broadcast_global_score(const score& p_new_global_score, MPI_Status p_status) {
             utils::print_ipc_debug_comments("center received global score {} from rank {}\n", p_new_global_score.to_string(), p_status.MPI_SOURCE);
 
             const bool v_should_broadcast = should_broadcast_global(m_goal, m_global_score, p_new_global_score);
@@ -665,7 +665,7 @@ namespace gempba {
             // send initial topology to each process
             for (int v_rank = 1; v_rank < m_world_size; v_rank++) {
                 std::vector<int> v_buffer_tmp;
-                for (auto &v_child: m_process_tree[v_rank]) {
+                for (auto& v_child: m_process_tree[v_rank]) {
                     v_buffer_tmp.push_back(v_child);
 
                     m_process_state[v_child] = ASSIGNED_STATE;
@@ -732,19 +732,19 @@ namespace gempba {
             }
         }
 
-        void send_seed(task_packet &p_packet, const int p_runnable_id) {
-            constexpr int v_dest = 1;
+        void send_seed(task_packet& p_packet, const int p_runnable_id) {
+            constexpr int DEST = 1;
             // global synchronisation **********************
             --m_nodes_available;
-            m_process_state[v_dest] = RUNNING_STATE;
+            m_process_state[DEST] = RUNNING_STATE;
             // *********************************************
 
-            const int v_err1 = MPI_Ssend(p_packet.data(), static_cast<int>(p_packet.size()), MPI_BYTE, v_dest, TASK, m_world_communicator); // send buffer
+            const int v_err1 = MPI_Ssend(p_packet.data(), static_cast<int>(p_packet.size()), MPI_BYTE, DEST, TASK, m_world_communicator); // send buffer
             if (v_err1 != MPI_SUCCESS) {
                 spdlog::debug("buffer failed to send! \n");
             }
 
-            const int v_err2 = MPI_Ssend(&p_runnable_id, 1, MPI_INT, v_dest, RUNNABLE_ID, m_world_communicator);
+            const int v_err2 = MPI_Ssend(&p_runnable_id, 1, MPI_INT, DEST, RUNNABLE_ID, m_world_communicator);
             if (v_err2 != MPI_SUCCESS) {
                 spdlog::debug("runnable id failed to send! \n");
             }
@@ -778,7 +778,7 @@ namespace gempba {
         std::atomic<bool> m_transmitting{false};
         int m_destination_rank = -1;
 
-        queue<task_packet *> m_tasks_queue;
+        queue<task_packet*> m_tasks_queue;
         queue<std::shared_ptr<task_bundle>> m_tasks_bundle_queue;
 
         MPI_Comm m_global_score_communicator{}; // BIDIRECTIONAL
@@ -811,8 +811,8 @@ namespace gempba {
 
         void set_thread_support_level() {
             // Initialize MPI and ask for thread support
-            int *v_argc = nullptr;
-            char **v_argv = nullptr;
+            int* v_argc = nullptr;
+            char** v_argv = nullptr;
             int v_provided;
             MPI_Init_thread(v_argc, &v_argv, MPI_THREAD_FUNNELED, &v_provided);
 
@@ -867,13 +867,13 @@ namespace gempba {
          * utility functions to determine whether to update global or local score
          * ---------------------------------------------------------------------------------*/
 
-        static bool should_update_global(const goal p_goal, const score &p_global_score, const score &p_local_score) { return should_update(p_goal, p_global_score, p_local_score); }
+        static bool should_update_global(const goal p_goal, const score& p_global_score, const score& p_local_score) { return should_update(p_goal, p_global_score, p_local_score); }
 
-        static bool should_update_local(const goal p_goal, const score &p_global_score, const score &p_local_score) { return should_update(p_goal, p_local_score, p_global_score); }
+        static bool should_update_local(const goal p_goal, const score& p_global_score, const score& p_local_score) { return should_update(p_goal, p_local_score, p_global_score); }
 
-        static bool should_broadcast_global(const goal p_goal, const score &p_old_global, const score &p_new_global) { return should_update(p_goal, p_old_global, p_new_global); }
+        static bool should_broadcast_global(const goal p_goal, const score& p_old_global, const score& p_new_global) { return should_update(p_goal, p_old_global, p_new_global); }
 
-        static bool should_update(const goal p_goal, const score &p_old_value, const score &p_new_value) {
+        static bool should_update(const goal p_goal, const score& p_old_value, const score& p_new_value) {
             const bool v_new_max_is_better = p_goal == MAXIMISE && p_new_value > p_old_value;
             const bool v_new_min_is_better = p_goal == MINIMISE && p_new_value < p_old_value;
             return v_new_max_is_better || v_new_min_is_better;
@@ -882,10 +882,10 @@ namespace gempba {
 
         class center_view final : public center {
 
-            mpi_semi_centralized_scheduler &m_parent;
+            mpi_semi_centralized_scheduler& m_parent;
 
         public:
-            explicit center_view(mpi_semi_centralized_scheduler &p_parent) : m_parent(p_parent) {}
+            explicit center_view(mpi_semi_centralized_scheduler& p_parent) : m_parent(p_parent) {}
 
             ~center_view() override = default;
 
@@ -905,10 +905,10 @@ namespace gempba {
         };
 
         class worker_view final : public worker {
-            mpi_semi_centralized_scheduler &m_parent;
+            mpi_semi_centralized_scheduler& m_parent;
 
         public:
-            explicit worker_view(mpi_semi_centralized_scheduler &p_parent) : m_parent(p_parent) {}
+            explicit worker_view(mpi_semi_centralized_scheduler& p_parent) : m_parent(p_parent) {}
 
             ~worker_view() override = default;
 
@@ -920,9 +920,9 @@ namespace gempba {
 
             [[nodiscard]] std::unique_ptr<stats> get_stats() const override { return m_parent.get_stats(); }
 
-            void run(node_manager &p_node_manager, std::map<int, std::shared_ptr<serial_runnable>> p_runnables) override { m_parent.run(p_node_manager, p_runnables); }
+            void run(node_manager& p_node_manager, std::map<int, std::shared_ptr<serial_runnable>> p_runnables) override { m_parent.run(p_node_manager, p_runnables); }
 
-            unsigned int force_push(task_packet &&p_task, const int p_function_id) override { return m_parent.force_push(std::move(p_task), p_function_id); }
+            unsigned int force_push(task_packet&& p_task, const int p_function_id) override { return m_parent.force_push(std::move(p_task), p_function_id); }
 
             [[nodiscard]] unsigned int next_process() const override { return m_parent.next_process(); }
 
@@ -935,14 +935,14 @@ namespace gempba {
 
     public:
         // ————————— ↓↓↓↓  New development ↓↓↓↓ ——————————
-        center &center_view() override {
+        center& center_view() override {
             if (m_world_rank != 0) {
                 utils::log_and_throw("Only rank 0 can access center_view()");
             }
             return m_center_view;
         }
 
-        worker &worker_view() override {
+        worker& worker_view() override {
             if (m_world_rank == 0) {
                 utils::log_and_throw("Rank 0 cannot access worker_view()");
             }

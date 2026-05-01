@@ -42,8 +42,8 @@ namespace gempba {
         double m_elapsed_time{};
 
 
-        void visit(const stats &p_stats) override {
-            p_stats.visit([this](const std::string &p_key, std::any &&p_value) {
+        void visit(const stats& p_stats) override {
+            p_stats.visit([this](const std::string& p_key, std::any&& p_value) {
                 if (p_key == "received_task_count") {
                     m_received_task_count = std::any_cast<std::size_t>(p_value);
                 } else if (p_key == "sent_task_count") {

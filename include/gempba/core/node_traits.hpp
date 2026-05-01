@@ -54,9 +54,9 @@ namespace gempba {
     public:
         ~node_traits() override = default;
 
-        virtual void set_result_serializer(const std::function<task_packet(std::any)> &p_result_serializer) = 0;
+        virtual void set_result_serializer(const std::function<task_packet(std::any)>& p_result_serializer) = 0;
 
-        virtual void set_result_deserializer(const std::function<std::any(task_packet)> &p_result_deserializer) = 0;
+        virtual void set_result_deserializer(const std::function<std::any(task_packet)>& p_result_deserializer) = 0;
 
         [[nodiscard]] virtual bool is_dummy() const = 0;
 
@@ -104,7 +104,7 @@ namespace gempba {
          *
          * @brief This is visible to allow hierarchy manipulation between implementations
          */
-        virtual void set_parent(const T &p_parent) = 0;
+        virtual void set_parent(const T& p_parent) = 0;
 
         /**
          * Get the parent of this node, if it is not a dummy (i.e., it has arguments). If it is a dummy,
@@ -160,7 +160,7 @@ namespace gempba {
 
         [[nodiscard]] virtual int get_children_count() const = 0;
 
-        virtual void add_child(const T &p_child) = 0;
+        virtual void add_child(const T& p_child) = 0;
 
         virtual std::any get_any_result() = 0;
 
@@ -186,7 +186,7 @@ namespace gempba {
          */
         virtual bool should_branch() = 0;
 
-        virtual void remove_child(T &p_node) = 0;
+        virtual void remove_child(T& p_node) = 0;
 
         virtual void prune() = 0;
 
@@ -201,7 +201,7 @@ namespace gempba {
          * The underlying task is delegated to another thread by the means of the load_balancer.
          * @param p_load_balancer
          */
-        virtual void delegate_locally(load_balancer *p_load_balancer) = 0;
+        virtual void delegate_locally(load_balancer* p_load_balancer) = 0;
 
         /**
          * The underlying task is delegated to a remote process by the means of the Scheduler
@@ -210,9 +210,9 @@ namespace gempba {
          *
          * @return true if the task was successfully delegated, false otherwise.
          */
-        virtual void delegate_remotely(scheduler::worker *p_scheduler, int p_runner_id) = 0;
+        virtual void delegate_remotely(scheduler::worker* p_scheduler, int p_runner_id) = 0;
 
-        virtual void set_result(const task_packet &p_result) = 0;
+        virtual void set_result(const task_packet& p_result) = 0;
 
         virtual task_packet get_result() = 0;
     };

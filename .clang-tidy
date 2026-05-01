@@ -109,12 +109,20 @@ readability-inconsistent-declaration-parameter-name,
 readability-identifier-naming,
 readability-container-size-empty'
 
+FormatStyle: file
+HeaderFilterRegex: '.*/(public|private|tests)/.*'
 
 CheckOptions:
   # Naming rules for different elements
+  - key: readability-identifier-naming.NamespaceCase
+    value: lower_case
   - key: readability-identifier-naming.ClassCase
     value: lower_case
   - key: readability-identifier-naming.StructCase
+    value: lower_case
+  - key: readability-identifier-naming.TypeAliasCase
+    value: lower_case
+  - key: readability-identifier-naming.TypedefCase
     value: lower_case
   - key: readability-identifier-naming.FunctionCase
     value: lower_case
@@ -134,6 +142,14 @@ CheckOptions:
     value: lower_case
   - key: readability-identifier-naming.ConstantPrefix
     value: v_
+  - key: readability-identifier-naming.GlobalConstantCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.GlobalConstantPrefix
+    value: ''
+  - key: readability-identifier-naming.StaticConstantCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.StaticConstantPrefix
+    value: ''
   - key: readability-identifier-naming.StaticVariableCase
     value: lower_case
   - key: readability-identifier-naming.MemberCase
@@ -154,7 +170,21 @@ CheckOptions:
     value: lower_case
   - key: readability-identifier-naming.EnumConstantCase
     value: UPPER_CASE
-  - key: readability-identifier-naming.ConstantCase
-    value: lower_case
   - key: readability-identifier-naming.ClassConstantCase
     value: UPPER_CASE
+  - key: readability-identifier-naming.TypeTemplateParameterCase
+    value: CamelCase
+  - key: readability-identifier-naming.TypeTemplateParameterIgnoredRegexp
+    value: '^[A-Z]$'
+  - key: readability-identifier-naming.ValueTemplateParameterCase
+    value: CamelCase
+  # constexpr variables are the C++ analogue of Java's `static final`
+  # constants — keep them UPPER_CASE without the `v_` prefix. The
+  # IgnoredRegexp grandfathers in the existing `k_` style for local /
+  # anonymous-namespace constexpr (e.g. `k_pump_resolution`).
+  - key: readability-identifier-naming.ConstexprVariableCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.ConstexprVariablePrefix
+    value: ''
+  - key: readability-identifier-naming.ConstexprVariableIgnoredRegexp
+    value: '^k_.*'
