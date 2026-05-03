@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   build-and-test:
-    runs-on: ${{ vars.RUNNER_WINDOWS || 'windows-2025' }}
+    runs-on: ${{ fromJSON(vars.RUNNER_WINDOWS || '["windows-2025"]') }}
     timeout-minutes: 10
 
     steps:
@@ -94,7 +94,7 @@ jobs:
 
   publish-msys2:
     needs: build-and-test
-    runs-on: ${{ vars.RUNNER_WINDOWS || 'windows-2025' }}
+    runs-on: ${{ fromJSON(vars.RUNNER_WINDOWS || '["windows-2025"]') }}
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'pull_request'
     permissions:
       contents: write
@@ -164,7 +164,7 @@ jobs:
 
   publish-test-results:
     needs: build-and-test
-    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-24.04' }}
+    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
     if: ${{ !cancelled() }}
 
     steps:

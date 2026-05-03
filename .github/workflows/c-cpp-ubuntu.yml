@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   build-and-test:
-    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-24.04' }}
+    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
     timeout-minutes: 10
     env:
       CC: gcc-14
@@ -104,7 +104,7 @@ jobs:
 
   publish-deb:
     needs: build-and-test
-    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-24.04' }}
+    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'pull_request'
     permissions:
       contents: write
@@ -164,7 +164,7 @@ jobs:
 
   publish-apt-repo:
     needs: publish-deb
-    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-24.04' }}
+    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'pull_request'
     # No github-pages environment here — environment protection rules apply at
     # the job level, so even guarded steps are blocked on PRs. Deployment is
@@ -235,7 +235,7 @@ jobs:
 
   deploy-apt-pages:
     needs: publish-apt-repo
-    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-24.04' }}
+    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
     # Environment protection rules only apply here — PRs never reach this job
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
@@ -252,7 +252,7 @@ jobs:
 
   publish-test-results:
     needs: build-and-test
-    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-24.04' }}
+    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
     if: ${{ !cancelled() }}
 
     steps:
