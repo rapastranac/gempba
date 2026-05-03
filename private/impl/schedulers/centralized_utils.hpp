@@ -11,9 +11,15 @@
  */
 
 #if defined(_WIN32)
-    #define NOMINMAX
-    #define WIN32_LEAN_AND_MEAN
-    #define RPC_NO_WINDOWS_H
+    #ifndef NOMINMAX
+        #define NOMINMAX
+    #endif
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN
+    #endif
+    #ifndef RPC_NO_WINDOWS_H
+        #define RPC_NO_WINDOWS_H
+    #endif
     // psapi.h depends on Win32 types defined by windows.h, so order is significant.
     // clang-format off
     #include <windows.h>

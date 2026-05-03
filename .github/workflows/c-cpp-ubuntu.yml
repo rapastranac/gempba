@@ -16,6 +16,9 @@ jobs:
   build-and-test:
     runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-24.04' }}
     timeout-minutes: 10
+    env:
+      CC: gcc-14
+      CXX: g++-14
 
     steps:
       # 1️⃣ Checkout the repository
@@ -31,7 +34,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential
           sudo apt-get install -y cmake
-          sudo apt-get install -y gcc
+          sudo apt-get install -y gcc-14 g++-14
           sudo apt-get install -y make
           sudo apt-get install -y libboost-all-dev
           sudo apt-get install -y libopenmpi-dev
@@ -49,7 +52,7 @@ jobs:
       # 4️⃣ Echo versions of installed dependencies
       - name: Echo Dependencies Version
         run: |
-          echo "g++: $(g++ --version | head -1 | awk '{print $4}')"
+          echo "g++: $($CXX --version | head -1 | awk '{print $4}')"
           echo "cmake: $(cmake --version | head -1 | awk '{print $3}')"
           echo "make: $(make --version | head -1 | awk '{print $3}')"
           echo "libboost-dev: $(dpkg -s libboost-dev | grep 'Version' | awk '{print $2}')"
@@ -105,6 +108,9 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'pull_request'
     permissions:
       contents: write
+    env:
+      CC: gcc-14
+      CXX: g++-14
 
     steps:
       # 1️⃣ Checkout the repository
@@ -117,7 +123,7 @@ jobs:
       - name: Setup Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake gcc make libopenmpi-dev libspdlog-dev libfmt-dev
+          sudo apt-get install -y build-essential cmake gcc-14 g++-14 make libopenmpi-dev libspdlog-dev libfmt-dev
 
       # 3️⃣ Configure for Release, targeting /usr prefix
       - name: Configure (Release)

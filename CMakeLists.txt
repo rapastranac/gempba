@@ -122,7 +122,7 @@ target_include_directories(gempba PRIVATE ${_spdlog_includes})
 target_compile_definitions(gempba PUBLIC SPDLOG_HEADER_ONLY)
 
 # C++23 stacktrace support (standard library, not external)
-if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 14)
     target_link_libraries(gempba PUBLIC stdc++exp)
 endif ()
 

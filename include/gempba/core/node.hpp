@@ -32,6 +32,8 @@
 #include <thread>
 #if __has_include(<stacktrace>)
     #include <stacktrace>
+#endif
+#ifdef __cpp_lib_stacktrace
     #define GEMPBA_HAS_STACKTRACE 1
 #else
     #define GEMPBA_HAS_STACKTRACE 0
