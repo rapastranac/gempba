@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   build-and-test:
-    runs-on: ${{ fromJSON(vars.RUNNER_MACOS || '["macos-14"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_MACOS || '["macos-26"]') }}
     timeout-minutes: 10
 
     steps:
