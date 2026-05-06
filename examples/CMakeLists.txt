@@ -49,9 +49,7 @@ foreach (EXAMPLE ${EXAMPLES})
     endif ()
 
     # Compilation options by mode
-    target_compile_options(${EXAMPLE_NAME} PRIVATE
-            -Wall -Wextra -Wpedantic -pthread -fexceptions
-            $<$<CONFIG:Debug>:-g -O0 -ggdb3 -DGEMPBA_DEBUG_COMMENTS>
-            $<$<CONFIG:Release>:-O3 -DNDEBUG>
-    )
+    target_compile_options(${EXAMPLE_NAME} PRIVATE -Wall -Wextra -Wpedantic $<$<CONFIG:Debug>:-O0 -ggdb3>)
+    target_compile_definitions(${EXAMPLE_NAME} PRIVATE $<$<CONFIG:Debug>:GEMPBA_DEBUG_COMMENTS>)
+
 endforeach ()

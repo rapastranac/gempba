@@ -1,5 +1,7 @@
+#include <cstdint>
 #include <gempba/gempba.hpp>
 #include <gempba/node_manager.hpp>
+#include <gempba/telemetry/telemetry_hub.hpp>
 #include <impl/load_balancing/quasi_horizontal_load_balancer.hpp>
 #include <impl/load_balancing/work_stealing_load_balancer.hpp>
 #include <impl/schedulers/mpi_centralized_scheduler.hpp>
@@ -95,6 +97,19 @@ gempba::node_manager& gempba::mp::create_node_manager(load_balancer* p_load_bala
         throw std::runtime_error("node_manager already exist!");
     }
     g_node_manager = std::make_unique<node_manager>(p_load_balancer, p_worker);
+
+#if GEMPBA_TELEMETRY
+    if (telemetry::get() == nullptr) {
+        auto v_hub = std::make_unique<telemetry::telemetry_hub>();
+        if (g_scheduler) {
+            v_hub->on_runtime_ready(telemetry::runtime_mode::MPI, static_cast<std::uint32_t>(g_scheduler->rank_me()), static_cast<std::uint32_t>(g_scheduler->world_size()));
+        } else {
+            v_hub->on_runtime_ready(telemetry::runtime_mode::MT_ONLY, 0, 1);
+        }
+        telemetry::install(std::move(v_hub));
+    }
+#endif
+
     return *g_node_manager;
 }
 
@@ -104,6 +119,8 @@ gempba::scheduler* gempba::get_scheduler() {
     }
     return g_scheduler.get();
 }
+
+gempba::scheduler* gempba::try_get_scheduler() noexcept { return g_scheduler.get(); }
 
 void gempba::reset_scheduler() { g_scheduler.reset(); }
 
@@ -122,6 +139,9 @@ gempba::node_manager& gempba::get_node_manager() {
 void gempba::reset_node_manager() { g_node_manager.reset(); }
 
 int gempba::shutdown() {
+#if GEMPBA_TELEMETRY
+    telemetry::uninstall();
+#endif
     g_scheduler.reset();
     g_load_balancer.reset();
     g_node_manager.reset();

@@ -50,12 +50,13 @@ target_link_libraries(all_tests
         Boost::fiber
 )
 
+if (WIN32)
+    target_link_libraries(all_tests PRIVATE ws2_32)
+endif ()
+
 # Compilation options by mode
-target_compile_options(all_tests PRIVATE
-        -Wall -Wextra -Wpedantic -pthread -fexceptions
-        $<$<CONFIG:Debug>:-g -O0 -ggdb3 -DGEMPBA_DEBUG_COMMENTS>
-        $<$<CONFIG:Release>:-O3 -DNDEBUG>
-)
+target_compile_options(all_tests PRIVATE -Wall -Wextra -Wpedantic $<$<CONFIG:Debug>:-O0 -ggdb3>)
+target_compile_definitions(all_tests PRIVATE $<$<CONFIG:Debug>:GEMPBA_DEBUG_COMMENTS>)
 
 # 🔥 CRITICAL: Discover individual GTest tests and register them with CTest
 # This allows CTest to see each test case individually

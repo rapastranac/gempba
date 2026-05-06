@@ -32,7 +32,7 @@
 
 namespace gempba {
     class result {
-        result() : m_score(score::make(-1)), m_task_packet(task_packet::EMPTY) {}
+        result() noexcept : m_score(score::make(-1)), m_task_packet(task_packet::EMPTY) {}
 
         score m_score;
         task_packet m_task_packet;

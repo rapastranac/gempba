@@ -23,6 +23,8 @@ if (CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
     option(GEMPBA_BUILD_TESTS      "Build gempba unit tests"              ON)
     option(GEMPBA_BUILD_EXAMPLES   "Build gempba examples"                ON)
     option(GEMPBA_MULTIPROCESSING  "Enable multiprocessing support"       ON)
+    option(GEMPBA_TELEMETRY        "Enable runtime telemetry"             OFF)
+    option(GEMPBA_HWLOC            "Use hwloc for hardware topology"      ON)
     option(GEMPBA_DEBUG_COMMENTS   "Enable debug comments in gempba"      OFF)
 
     message(STATUS "GEMPBA_BUILD_TESTS=${GEMPBA_BUILD_TESTS}, GEMPBA_BUILD_EXAMPLES=${GEMPBA_BUILD_EXAMPLES}")
@@ -42,6 +44,8 @@ else ()
     option(GEMPBA_BUILD_TESTS      "Build gempba unit tests"              OFF)
     option(GEMPBA_BUILD_EXAMPLES   "Build gempba examples"                OFF)
     option(GEMPBA_MULTIPROCESSING  "Enable multiprocessing support"       OFF)
+    option(GEMPBA_TELEMETRY        "Enable runtime telemetry"             OFF)
+    option(GEMPBA_HWLOC            "Use hwloc for hardware topology"      OFF)
     option(GEMPBA_DEBUG_COMMENTS   "Enable debug comments in gempba"      OFF)
 
     message(STATUS "GEMPBA_BUILD_TESTS=${GEMPBA_BUILD_TESTS}, GEMPBA_BUILD_EXAMPLES=${GEMPBA_BUILD_EXAMPLES}")
@@ -56,6 +60,12 @@ find_package(Threads REQUIRED)
 find_package(MPI REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(fmt REQUIRED)
+
+if (GEMPBA_HWLOC)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(HWLOC REQUIRED IMPORTED_TARGET hwloc)
+    message(STATUS "Found hwloc ${HWLOC_VERSION}")
+endif ()
 
 # 📂 Includes
 include_directories(${MPI_INCLUDE_PATH})
@@ -84,7 +94,9 @@ add_library(gempba STATIC ${Sources})
 target_compile_definitions(gempba PRIVATE
         $<$<BOOL:${GEMPBA_DEV_MODE}>:GEMPBA_DEV_MODE>
         $<$<BOOL:${GEMPBA_MULTIPROCESSING}>:GEMPBA_MULTIPROCESSING>
-        $<$<BOOL:${GEMPBA_DEBUG_COMMENTS}>:GEMPBA_DEBUG_COMMENTS>
+        $<$<BOOL:${GEMPBA_TELEMETRY}>:GEMPBA_TELEMETRY>
+        $<$<BOOL:${GEMPBA_HWLOC}>:GEMPBA_HWLOC>
+        $<$<OR:$<BOOL:${GEMPBA_DEBUG_COMMENTS}>,$<CONFIG:Debug>>:GEMPBA_DEBUG_COMMENTS>
         $<$<BOOL:${GEMPBA_BUILD_EXAMPLES}>:GEMPBA_BUILD_EXAMPLES>
         $<$<BOOL:${GEMPBA_BUILD_TESTS}>:GEMPBA_BUILD_TESTS>
 )
@@ -92,17 +104,15 @@ target_compile_definitions(gempba PRIVATE
 # Print messages to confirm the flags
 message(STATUS "🔧 GEMPBA_DEV_MODE=${GEMPBA_DEV_MODE}")
 message(STATUS "🔧 GEMPBA_MULTIPROCESSING=${GEMPBA_MULTIPROCESSING}")
+message(STATUS "🔧 GEMPBA_TELEMETRY=${GEMPBA_TELEMETRY}")
+message(STATUS "🔧 GEMPBA_HWLOC=${GEMPBA_HWLOC}")
 message(STATUS "🔧 GEMPBA_DEBUG_COMMENTS=${GEMPBA_DEBUG_COMMENTS}")
 message(STATUS "🔧 GEMPBA_BUILD_EXAMPLES=${GEMPBA_BUILD_EXAMPLES}")
 message(STATUS "🔧 GEMPBA_BUILD_TESTS=${GEMPBA_BUILD_TESTS}")
 
 
-# 🏷️ Conditional compilation flags for Debug/Release
-target_compile_options(gempba PRIVATE
-        -pthread -fexceptions
-        $<$<CONFIG:Debug>:-Wall -Wextra -Wpedantic -g -O0 -ggdb3 -DGEMPBA_DEBUG_COMMENTS>
-        $<$<CONFIG:Release>:-O3 -DNDEBUG>
-)
+# 🏷️ Conditional compilation flags for Debug
+target_compile_options(gempba PRIVATE $<$<CONFIG:Debug>:-Wall -Wextra -Wpedantic -O0 -ggdb3>)
 
 # 🔗 Linking
 # external_libs is intentionally excluded: it is not an installable exported target.
@@ -124,6 +134,14 @@ target_compile_definitions(gempba PUBLIC SPDLOG_HEADER_ONLY)
 # C++23 stacktrace support (standard library, not external)
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 14)
     target_link_libraries(gempba PUBLIC stdc++exp)
+endif ()
+
+if (GEMPBA_HWLOC)
+    target_link_libraries(gempba PRIVATE PkgConfig::HWLOC)
+endif ()
+
+if (WIN32)
+    target_link_libraries(gempba PRIVATE psapi ws2_32)
 endif ()
 
 if (UNIX AND NOT APPLE)

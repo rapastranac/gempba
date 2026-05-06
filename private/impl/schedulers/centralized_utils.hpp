@@ -112,7 +112,7 @@ inline size_t get_peak_rss() {
     /* Windows -------------------------------------------------- */
     PROCESS_MEMORY_COUNTERS v_info;
     GetProcessMemoryInfo(GetCurrentProcess(), &v_info, sizeof(v_info));
-    return (size_t) v_info.PeakWorkingSetSize;
+    return static_cast<size_t>(v_info.PeakWorkingSetSize);
 
 #elif (defined(_AIX) || defined(__TOS__AIX__)) || (defined(__sun__) || defined(__sun) || defined(sun) && (defined(__SVR4) || defined(__svr4__)))
     /* AIX and Solaris ------------------------------------------ */
@@ -152,7 +152,7 @@ inline size_t get_current_rss() {
     /* Windows -------------------------------------------------- */
     PROCESS_MEMORY_COUNTERS v_info;
     GetProcessMemoryInfo(GetCurrentProcess(), &v_info, sizeof(v_info));
-    return (size_t) v_info.WorkingSetSize;
+    return static_cast<size_t>(v_info.WorkingSetSize);
 
 #elif defined(__APPLE__) && defined(__MACH__)
     /* OSX ------------------------------------------------------ */
