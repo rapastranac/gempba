@@ -17,9 +17,12 @@ namespace {
 #if GEMPBA_DEBUG_COMMENTS
 namespace {
     struct debug_logger_initializer {
-        debug_logger_initializer() {
-            spdlog::set_level(spdlog::level::debug);
-            spdlog::info("GEMPBA_DEBUG_COMMENTS enabled");
+        debug_logger_initializer() noexcept {
+            try {
+                spdlog::set_level(spdlog::level::debug);
+                spdlog::info("GEMPBA_DEBUG_COMMENTS enabled");
+            } catch (...) {
+            }
         }
     };
 
