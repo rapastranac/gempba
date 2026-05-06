@@ -33,7 +33,7 @@ endif ()
 CPMAddPackage(
         NAME BS_thread_pool
         GITHUB_REPOSITORY rapastranac/thread-pool
-        GIT_TAG master)
+        GIT_TAG v5.1.0.1)
 add_library(BS_thread_pool INTERFACE)
 target_include_directories(BS_thread_pool INTERFACE ${BS_thread_pool_SOURCE_DIR}/include)
 
