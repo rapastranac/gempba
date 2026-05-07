@@ -24,17 +24,34 @@
 #ifndef GEMPBA_GEMPBA_HPP
 #define GEMPBA_GEMPBA_HPP
 
+#include <gempba/config.h>
 #include <gempba/core/load_balancer.hpp>
 #include <gempba/core/scheduler.hpp>
-#include <gempba/defaults/default_mpi_stats_visitor.hpp>
 #include <gempba/detail/nodes/node_core_impl.hpp>
 #include <gempba/detail/runnables/serial_runnable_non_void.hpp>
 #include <gempba/detail/runnables/serial_runnable_void.hpp>
 #include <gempba/telemetry/telemetry_hub.hpp>
 #include <gempba/utils/gempba_utils.hpp>
 
+#if GEMPBA_MULTIPROCESSING
+    #include <gempba/defaults/default_mpi_stats_visitor.hpp>
+#endif
+
+// In a dependency consumer build (`GEMPBA_DEV_MODE=OFF`) the build flag selects exactly one
+// implementation namespace, which is then made `inline` so consumers can call
+// `gempba::create_*(...)` without typing `multithreading::` / `multiprocessing::`. In a
+// gempba root-project (dev) build we keep both namespaces compilable so changes can't silently
+// rot the off-mode; only `multiprocessing` is inline in that case (it is the superset). In-tree
+// tests and examples always use the explicit form for that reason.
+#if GEMPBA_MULTIPROCESSING
+    #define GEMPBA_INLINE_MT_NAMESPACE
+#else
+    #define GEMPBA_INLINE_MT_NAMESPACE inline
+#endif
+
 namespace gempba {
 
+#if GEMPBA_MULTIPROCESSING
     /////////////////////////////////////////////////////////////////////////////////////////////////
     /// SCHEDULING
     /// /////////////////////////////////////////////////////////////////////////////////////////////
@@ -43,6 +60,7 @@ namespace gempba {
     scheduler* try_get_scheduler() noexcept;
 
     void reset_scheduler();
+#endif
 
     /////////////////////////////////////////////////////////////////////////////////////////////////
     /// LOAD BALANCING
@@ -77,26 +95,36 @@ namespace gempba {
 
     void check_not_null([[maybe_unused]] const node& p_parent);
 
-    namespace mt {
+    /////////////////////////////////////////////////////////////////////////////////////////////////
+    /// LOAD BALANCING (mode-agnostic)
+    /// /////////////////////////////////////////////////////////////////////////////////////////////
+    /**
+     * @brief Take ownership of a caller-provided `load_balancer` implementation.
+     *
+     * Behaves identically in MT and MP builds; the worker pointer (when relevant) is part of the
+     * caller-provided instance.
+     */
+    load_balancer* create_load_balancer(std::unique_ptr<load_balancer> p_your_implementation);
+
+#if !GEMPBA_MULTIPROCESSING || GEMPBA_DEV_MODE
+    GEMPBA_INLINE_MT_NAMESPACE namespace multithreading {
         /////////////////////////////////////////////////////////////////////////////////////////////////
         /// LOAD BALANCING
         /// /////////////////////////////////////////////////////////////////////////////////////////////
-        load_balancer* create_load_balancer(std::unique_ptr<load_balancer> p_your_implementation);
-
         load_balancer* create_load_balancer(const balancing_policy& p_policy);
 
         /////////////////////////////////////////////////////////////////////////////////////////////////
         /// BRANCH HANDLING
         /// /////////////////////////////////////////////////////////////////////////////////////////////
 
-        node_manager& create_node_manager(load_balancer* p_load_balancer);
+        node_manager& create_node_manager(load_balancer * p_load_balancer);
 
         /////////////////////////////////////////////////////////////////////////////////////////////////
         /// NODES
         /// /////////////////////////////////////////////////////////////////////////////////////////////
 
         template<typename Ret, typename... Args>
-        static node create_explicit_node(load_balancer& p_load_balancer, node& p_parent, invokable<Ret, Args...> auto&& p_runnable, std::tuple<Args...>&& p_args) {
+        static node create_explicit_node(load_balancer & p_load_balancer, node & p_parent, invokable<Ret, Args...> auto&& p_runnable, std::tuple<Args...>&& p_args) {
             check_not_null(p_parent);
 
             const std::function<std::shared_ptr<node_core>(std::shared_ptr<node_core>)> v_factory = [&](std::shared_ptr<node_core> p_core_parent) {
@@ -107,7 +135,7 @@ namespace gempba {
         }
 
         template<typename Ret, typename... Args>
-        static node create_lazy_node(load_balancer& p_load_balancer, const node& p_parent, invokable<Ret, Args...> auto&& p_runnable,
+        static node create_lazy_node(load_balancer & p_load_balancer, const node& p_parent, invokable<Ret, Args...> auto&& p_runnable,
                                      std::function<std::optional<std::tuple<Args...>>()> p_args_initializer) {
             check_not_null(p_parent);
 
@@ -119,9 +147,11 @@ namespace gempba {
             return node::create(p_parent, v_factory);
         }
 
-    } // namespace mt
+    } // namespace multithreading
+#endif // !GEMPBA_MULTIPROCESSING || GEMPBA_DEV_MODE
 
-    namespace mp {
+#if GEMPBA_MULTIPROCESSING
+    inline namespace multiprocessing {
 
         /////////////////////////////////////////////////////////////////////////////////////////////////
         /// SCHEDULING
@@ -138,8 +168,6 @@ namespace gempba {
         /////////////////////////////////////////////////////////////////////////////////////////////////
         /// LOAD BALANCING
         /// /////////////////////////////////////////////////////////////////////////////////////////////
-
-        load_balancer* create_load_balancer(std::unique_ptr<load_balancer> p_your_implementation);
 
         load_balancer* create_load_balancer(const balancing_policy& p_policy, scheduler::worker* p_scheduler_worker);
 
@@ -219,7 +247,10 @@ namespace gempba {
             return node::create(p_parent, v_factory);
         }
 
-    } // namespace mp
+    } // namespace multiprocessing
+#endif // GEMPBA_MULTIPROCESSING
 } // namespace gempba
+
+#undef GEMPBA_INLINE_MT_NAMESPACE
 
 #endif // GEMPBA_GEMPBA_HPP

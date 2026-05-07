@@ -16,6 +16,10 @@ jobs:
   build-and-test:
     runs-on: ${{ fromJSON(vars.RUNNER_WINDOWS || '["windows-2025"]') }}
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        multiprocessing: [ON, OFF]
 
     steps:
       # 1️⃣ Checkout the repository
@@ -26,6 +30,7 @@ jobs:
           ref: ${{ github.ref }}
 
       # 2️⃣ Set up MSYS2 environment and install dependencies
+      # msmpi (SDK) and gtest are only installed for MP=ON.
       - name: Setup MSYS2
         uses: msys2/setup-msys2@v2
         with:
@@ -36,16 +41,16 @@ jobs:
             mingw-w64-x86_64-cmake
             mingw-w64-x86_64-make
             mingw-w64-x86_64-boost
-            mingw-w64-x86_64-msmpi
-            mingw-w64-x86_64-gtest
             mingw-w64-x86_64-spdlog
             mingw-w64-x86_64-fmt
             mingw-w64-x86_64-hwloc
             mingw-w64-x86_64-pkgconf
+            ${{ matrix.multiprocessing == 'ON' && 'mingw-w64-x86_64-msmpi mingw-w64-x86_64-gtest' || '' }}
 
       # 2️⃣b Install MS-MPI runtime (msmpi.dll lives in System32 and is not part
       # of the MSYS2 mingw-w64-x86_64-msmpi package, which only ships the SDK).
       - name: Install MS-MPI runtime
+        if: matrix.multiprocessing == 'ON'
         uses: mpi4py/setup-mpi@v1
         with:
           mpi: msmpi
@@ -58,9 +63,11 @@ jobs:
           echo "cmake: $(cmake --version | head -1 | awk '{print $3}')"
           echo "make: $(make --version | head -1 | awk '{print $3}')"
           echo "mingw-w64-x86_64-boost: $(pacman -Qi mingw-w64-x86_64-boost | grep Version | awk '{print $3}')"
-          echo "mingw-w64-x86_64-msmpi: $(pacman -Qi mingw-w64-x86_64-msmpi | grep Version | awk '{print $3}')"
           echo "mingw-w64-x86_64-hwloc: $(pacman -Qi mingw-w64-x86_64-hwloc | grep Version | awk '{print $3}')"
-          echo "mingw-w64-x86_64-gtest: $(pacman -Qi mingw-w64-x86_64-gtest | grep Version | awk '{print $3}')"
+          if [ "${{ matrix.multiprocessing }}" = "ON" ]; then
+            echo "mingw-w64-x86_64-msmpi: $(pacman -Qi mingw-w64-x86_64-msmpi | grep Version | awk '{print $3}')"
+            echo "mingw-w64-x86_64-gtest: $(pacman -Qi mingw-w64-x86_64-gtest | grep Version | awk '{print $3}')"
+          fi
 
       # 4️⃣ Build the project
       - name: Build
@@ -68,11 +75,12 @@ jobs:
         run: |
           mkdir -p build
           cd build
-          cmake -G "MSYS Makefiles" ..
+          cmake -G "MSYS Makefiles" -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }} ..
           make -j$(nproc)
 
-      # 5️⃣ Run tests with JUnit XML output
+      # 5️⃣ Run tests with JUnit XML output (MP=ON only — tests reference gempba::mp::*)
       - name: Run tests with retry for flaky tests
+        if: matrix.multiprocessing == 'ON'
         shell: msys2 {0}
         run: |
           cd "$GITHUB_WORKSPACE/build"
@@ -86,9 +94,9 @@ jobs:
           echo "🟢 Final check: non-flaky tests MUST be green"
           ctest --output-on-failure -E "FLAKY_"
 
-      # 6️⃣ Upload test results as artifacts
+      # 6️⃣ Upload test results as artifacts (MP=ON only — no test results otherwise)
       - name: Upload test results
-        if: always()
+        if: always() && matrix.multiprocessing == 'ON'
         uses: actions/upload-artifact@v4
         with:
           name: test-results-windows

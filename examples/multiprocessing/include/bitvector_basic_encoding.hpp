@@ -1,5 +1,5 @@
-#ifndef MP_BITVECTOR_BASIC_ENCODING_CENTRAL_HPP
-#define MP_BITVECTOR_BASIC_ENCODING_CENTRAL_HPP
+#ifndef GEMPBA_MULTIPROCESSING_BITVECTOR_BASIC_ENCODING_HPP
+#define GEMPBA_MULTIPROCESSING_BITVECTOR_BASIC_ENCODING_HPP
 
 #include <atomic>
 #include <format>
@@ -12,7 +12,7 @@
 #include "basic_encoding_utils.hpp"
 
 
-class mp_bitvector_basic_encoding final : public VertexCover {
+class multiprocessing_bitvector_basic_encoding final : public VertexCover {
 
     std::function<void(std::thread::id, int, BitGraph, int, gempba::node)> m_function;
     std::function<gempba::task_packet(int, BitGraph, int)> m_args_serializer;
@@ -30,14 +30,14 @@ public:
     gempba::node_manager &m_node_manager;
     gempba::load_balancer *m_load_balancer;
 
-    mp_bitvector_basic_encoding(gempba::node_manager &p_node_manager, gempba::load_balancer *p_load_balancer) :
+    multiprocessing_bitvector_basic_encoding(gempba::node_manager &p_node_manager, gempba::load_balancer *p_load_balancer) :
         m_node_manager(p_node_manager), m_load_balancer(p_load_balancer) {
-        this->m_function = std::bind(&mp_bitvector_basic_encoding::mvcbitset, this, _1, _2, _3, _4, _5);
+        this->m_function = std::bind(&multiprocessing_bitvector_basic_encoding::mvcbitset, this, _1, _2, _3, _4, _5);
         this->m_args_deserializer = create_deserializer();
         this->m_args_serializer = make_serializer();
     }
 
-    ~mp_bitvector_basic_encoding() override = default;
+    ~multiprocessing_bitvector_basic_encoding() override = default;
 
     void setGraph(Graph &graph) {
         is_skips = 0;
@@ -234,7 +234,7 @@ public:
             return std::nullopt;
         };
 
-        gempba::node v_left = gempba::mp::create_lazy_node<void>(
+        gempba::node v_left = gempba::multiprocessing::create_lazy_node<void>(
                 *m_load_balancer,
                 v_parent, m_function,
                 v_left_args_initializer,
@@ -259,7 +259,7 @@ public:
             return std::nullopt;
         };
 
-        gempba::node v_right = gempba::mp::create_lazy_node<void>(
+        gempba::node v_right = gempba::multiprocessing::create_lazy_node<void>(
                 *m_load_balancer,
                 v_parent, m_function,
                 v_right_args_initializer,
@@ -292,4 +292,4 @@ private:
 };
 
 
-#endif // MP_BITVECTOR_BASIC_ENCODING_CENTRAL_HPP
+#endif // GEMPBA_MULTIPROCESSING_BITVECTOR_BASIC_ENCODING_HPP

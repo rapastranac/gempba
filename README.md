@@ -39,6 +39,24 @@ The two main research contributions baked into the framework are the **Quasi-Hor
 - Windows
 - macOS
 
+## Selecting a mode
+
+Pick the parallelism model at configure time:
+
+```
+cmake -B build -DGEMPBA_MULTIPROCESSING=ON   # multi-process (MPI required)
+cmake -B build -DGEMPBA_MULTIPROCESSING=OFF  # multi-thread only (no MPI dependency)
+```
+
+In consumer code, write the short form — the build flag selects the implementation:
+
+```cpp
+auto* lb = gempba::create_load_balancer(gempba::QUASI_HORIZONTAL /*, worker* if MP*/);
+auto& nm = gempba::create_node_manager(lb /*, worker* if MP*/);
+```
+
+The explicit `gempba::multithreading::*` and `gempba::multiprocessing::*` qualifiers are also available for code that wants to be unambiguous; the in-tree examples use them so they compile under `GEMPBA_DEV_MODE=ON` (where both implementations coexist).
+
 ## Requirements
 
 | Dependency | Version | Notes |
