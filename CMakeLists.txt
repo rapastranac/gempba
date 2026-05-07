@@ -23,7 +23,6 @@ if (CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
     option(GEMPBA_BUILD_TESTS      "Build gempba unit tests"              ON)
     option(GEMPBA_BUILD_EXAMPLES   "Build gempba examples"                ON)
     option(GEMPBA_MULTIPROCESSING  "Enable multiprocessing support"       ON)
-    option(GEMPBA_TELEMETRY        "Enable runtime telemetry"             OFF)
     option(GEMPBA_HWLOC            "Use hwloc for hardware topology"      ON)
     option(GEMPBA_DEBUG_COMMENTS   "Enable debug comments in gempba"      OFF)
 
@@ -44,7 +43,6 @@ else ()
     option(GEMPBA_BUILD_TESTS      "Build gempba unit tests"              OFF)
     option(GEMPBA_BUILD_EXAMPLES   "Build gempba examples"                OFF)
     option(GEMPBA_MULTIPROCESSING  "Enable multiprocessing support"       OFF)
-    option(GEMPBA_TELEMETRY        "Enable runtime telemetry"             OFF)
     option(GEMPBA_HWLOC            "Use hwloc for hardware topology"      OFF)
     option(GEMPBA_DEBUG_COMMENTS   "Enable debug comments in gempba"      OFF)
 
@@ -94,7 +92,6 @@ add_library(gempba STATIC ${Sources})
 target_compile_definitions(gempba PRIVATE
         $<$<BOOL:${GEMPBA_DEV_MODE}>:GEMPBA_DEV_MODE>
         $<$<BOOL:${GEMPBA_MULTIPROCESSING}>:GEMPBA_MULTIPROCESSING>
-        $<$<BOOL:${GEMPBA_TELEMETRY}>:GEMPBA_TELEMETRY>
         $<$<BOOL:${GEMPBA_HWLOC}>:GEMPBA_HWLOC>
         $<$<OR:$<BOOL:${GEMPBA_DEBUG_COMMENTS}>,$<CONFIG:Debug>>:GEMPBA_DEBUG_COMMENTS>
         $<$<BOOL:${GEMPBA_BUILD_EXAMPLES}>:GEMPBA_BUILD_EXAMPLES>
@@ -104,7 +101,6 @@ target_compile_definitions(gempba PRIVATE
 # Print messages to confirm the flags
 message(STATUS "🔧 GEMPBA_DEV_MODE=${GEMPBA_DEV_MODE}")
 message(STATUS "🔧 GEMPBA_MULTIPROCESSING=${GEMPBA_MULTIPROCESSING}")
-message(STATUS "🔧 GEMPBA_TELEMETRY=${GEMPBA_TELEMETRY}")
 message(STATUS "🔧 GEMPBA_HWLOC=${GEMPBA_HWLOC}")
 message(STATUS "🔧 GEMPBA_DEBUG_COMMENTS=${GEMPBA_DEBUG_COMMENTS}")
 message(STATUS "🔧 GEMPBA_BUILD_EXAMPLES=${GEMPBA_BUILD_EXAMPLES}")

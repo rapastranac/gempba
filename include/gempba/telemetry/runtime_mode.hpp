@@ -5,8 +5,7 @@ namespace gempba::telemetry {
 
     enum class runtime_mode {
         MT_ONLY,
-        MPI,
-        OTHER_IPC,
+        MP_MPI,
     };
 
 } // namespace gempba::telemetry

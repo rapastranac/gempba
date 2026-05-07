@@ -13,19 +13,21 @@ namespace {
     inline std::unique_ptr<gempba::load_balancer> g_load_balancer;
     inline std::unique_ptr<gempba::node_manager> g_node_manager;
 
-#if GEMPBA_TELEMETRY
     void install_telemetry_hub_if_needed() {
-        if (gempba::telemetry::get() != nullptr)
+        if (gempba::telemetry::is_disabled()) {
             return;
+        }
+        if (gempba::telemetry::get() != nullptr) {
+            return;
+        }
         auto v_hub = std::make_unique<gempba::telemetry::telemetry_hub>();
         if (g_scheduler) {
-            v_hub->on_runtime_ready(gempba::telemetry::runtime_mode::MPI, static_cast<std::uint32_t>(g_scheduler->rank_me()), static_cast<std::uint32_t>(g_scheduler->world_size()));
+            v_hub->on_runtime_ready(gempba::telemetry::runtime_mode::MP_MPI, static_cast<std::uint32_t>(g_scheduler->rank_me()), static_cast<std::uint32_t>(g_scheduler->world_size()));
         } else {
             v_hub->on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1);
         }
         gempba::telemetry::install(std::move(v_hub));
     }
-#endif
 } // namespace
 
 #if GEMPBA_DEBUG_COMMENTS
@@ -68,11 +70,7 @@ gempba::scheduler* gempba::mp::create_scheduler(std::unique_ptr<scheduler> p_you
         throw std::runtime_error("load_balancer already exists!");
     }
     g_scheduler = std::move(p_your_implementation);
-
-#if GEMPBA_TELEMETRY
     install_telemetry_hub_if_needed();
-#endif
-
     return g_scheduler.get();
 }
 
@@ -90,11 +88,7 @@ gempba::scheduler* gempba::mp::create_scheduler(const scheduler_topology& p_topo
             break;
         }
     }
-
-#if GEMPBA_TELEMETRY
     install_telemetry_hub_if_needed();
-#endif
-
     return g_scheduler.get();
 }
 
@@ -124,11 +118,7 @@ gempba::node_manager& gempba::mp::create_node_manager(load_balancer* p_load_bala
         throw std::runtime_error("node_manager already exist!");
     }
     g_node_manager = std::make_unique<node_manager>(p_load_balancer, p_worker);
-
-#if GEMPBA_TELEMETRY
     install_telemetry_hub_if_needed();
-#endif
-
     return *g_node_manager;
 }
 
@@ -158,9 +148,7 @@ gempba::node_manager& gempba::get_node_manager() {
 void gempba::reset_node_manager() { g_node_manager.reset(); }
 
 int gempba::shutdown() {
-#if GEMPBA_TELEMETRY
     telemetry::uninstall();
-#endif
     g_scheduler.reset();
     g_load_balancer.reset();
     g_node_manager.reset();

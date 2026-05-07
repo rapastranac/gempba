@@ -272,10 +272,8 @@ namespace gempba::telemetry {
         switch (p_mode) {
             case runtime_mode::MT_ONLY:
                 return build_mt_only_snapshot(p_worker_id);
-            case runtime_mode::MPI:
+            case runtime_mode::MP_MPI:
                 return build_mpi_snapshot(p_worker_id, p_world_size);
-            case runtime_mode::OTHER_IPC:
-                return build_mt_only_snapshot(p_worker_id);
         }
         return build_mt_only_snapshot(p_worker_id);
     }

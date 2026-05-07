@@ -13,7 +13,8 @@
     or as the local end of an SSH tunnel for remote dashboards. Pass -Port to
     match whatever port the gempba binary was launched with (-telemetry_port).
 
-    The gempba binary must be built with -DGEMPBA_TELEMETRY=ON.
+    The gempba binary must call gempba::telemetry::install() at startup; with
+    no install call, no center is running and there is nothing to connect to.
 
 .PARAMETER Port
     TCP port to connect to on 127.0.0.1. Defaults to 9000, the gempba default.
@@ -57,7 +58,7 @@ try {
 } catch {
     Write-Host ("ERROR: cannot connect to {0}:{1}" -f $Ip, $Port) -ForegroundColor Red
     Write-Host "  - Is the benchmark running and the SSH tunnel (if any) still up?"
-    Write-Host "  - Was the benchmark built with -DGEMPBA_TELEMETRY=ON ?"
+    Write-Host "  - Did the benchmark call gempba::telemetry::install() at startup?"
     Write-Host "  - If the benchmark was launched with -telemetry_port <n>, pass -Port <n> here too."
     exit 1
 }

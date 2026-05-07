@@ -3,7 +3,6 @@
 
 /* Feature toggles (numeric 0/1) */
 #cmakedefine01 GEMPBA_MULTIPROCESSING
-#cmakedefine01 GEMPBA_TELEMETRY
 #cmakedefine01 GEMPBA_HWLOC
 #cmakedefine01 GEMPBA_BUILD_EXAMPLES
 #cmakedefine01 GEMPBA_BUILD_TESTS

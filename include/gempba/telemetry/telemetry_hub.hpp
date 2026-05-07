@@ -97,6 +97,15 @@ namespace gempba::telemetry {
     void install(std::unique_ptr<telemetry_hub> p_hub) noexcept;
     void uninstall() noexcept;
 
+    /**
+     * @brief Tear down telemetry and block subsequent install() calls until enable().
+     */
+    void disable() noexcept;
+
+    void enable() noexcept;
+
+    [[nodiscard]] bool is_disabled() noexcept;
+
     // Sets the TCP port the center will bind. Must be called before the hub is
     // installed (i.e., before the first node_manager / scheduler is created).
     // Default is 9000 if never called.
