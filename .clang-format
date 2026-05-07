@@ -40,11 +40,17 @@ IncludeCategories:
     Priority: 3
 IncludeIsMainRegex: '([-_](test|unittest))?$'
 IndentCaseLabels: true
+IndentExternBlock: Indent
 IndentPPDirectives: BeforeHash
 IndentWidth: 4
 InsertNewlineAtEOF: true
-MacroBlockBegin: ''
-MacroBlockEnd: ''
+# Treat the c_api try/catch macros as block delimiters so clang-format can
+# balance braces around them.  Without this, void functions of the shape
+# `try { ... GEMPBA_CATCH_VOID }` look unbalanced (the macro's closing `}`
+# is invisible to clang-format) and the next function gets nested inside,
+# pushing the whole file rightwards on each reformat pass.
+MacroBlockBegin: 'GEMPBA_TRY'
+MacroBlockEnd:   'GEMPBA_CATCH_VOID|GEMPBA_CATCH_RETURN_STATUS|GEMPBA_CATCH_RETURN_NULL'
 MaxEmptyLinesToKeep: 2
 NamespaceIndentation: All
 PointerAlignment: Left
