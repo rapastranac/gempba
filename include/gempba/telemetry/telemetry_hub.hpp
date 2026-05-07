@@ -98,13 +98,47 @@ namespace gempba::telemetry {
     void uninstall() noexcept;
 
     /**
-     * @brief Tear down telemetry and block subsequent install() calls until enable().
+     * @brief Tear down any running telemetry hub on this process and suppress subsequent
+     *        auto-installs from `gempba::mp::create_scheduler` / `create_node_manager` until
+     *        `enable()` is called.
+     *
+     * @details The flag is **process-local** and **sticky**: it lives in this process only
+     *          and remains in effect across `mp::create_*` calls until explicitly re-enabled.
+     *
+     * @warning In multi-process (`gempba::mp`) mode this MUST be called symmetrically on
+     *          every process — every process or no process. The telemetry install path goes
+     *          through a collective IPC handshake; an asymmetric call leaves the
+     *          still-enabled processes blocked indefinitely waiting for the disabled
+     *          processes that never join. The same symmetry requirement applies to teardown.
+     *
+     * @par Recommended pattern (mp):
+     * @code
+     * gempba::telemetry::disable();           // every process, before create_*
+     * auto* sch = gempba::mp::create_scheduler(...);
+     * @endcode
      */
     void disable() noexcept;
 
+    /**
+     * @brief Lift a previous `disable()` so subsequent `mp::create_*` calls install the
+     *        telemetry hub again.
+     *
+     * @warning Same symmetry requirement as @ref disable: call on every process in
+     *          multi-process mode or none. A process that lifts the block while peers stay
+     *          disabled will block on the next install's collective IPC handshake.
+     */
     void enable() noexcept;
 
-    [[nodiscard]] bool is_disabled() noexcept;
+    /**
+     * @brief Query this process's telemetry-enabled flag.
+     *
+     * @return `true` while installs are allowed (default), `false` after `disable()` and
+     *         before the matching `enable()`.
+     *
+     * @note Process-local. Reflects only this process's flag and does not poll peers — two
+     *       processes can disagree if `disable()` / `enable()` were called asymmetrically.
+     */
+    [[nodiscard]] bool is_enabled() noexcept;
 
     // Sets the TCP port the center will bind. Must be called before the hub is
     // installed (i.e., before the first node_manager / scheduler is created).

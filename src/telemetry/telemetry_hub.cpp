@@ -24,7 +24,7 @@ namespace gempba::telemetry {
 
     namespace {
         std::unique_ptr<telemetry_hub> g_owner;
-        bool g_disabled = false;
+        bool g_enabled = true;
 
         std::uint64_t monotonic_ms() noexcept {
             using clock = std::chrono::steady_clock;
@@ -338,7 +338,7 @@ namespace gempba::telemetry {
     telemetry_hub* get() noexcept { return g_owner.get(); }
 
     void install(std::unique_ptr<telemetry_hub> p_hub) noexcept {
-        if (g_disabled) {
+        if (!g_enabled) {
             return;
         }
         g_owner = std::move(p_hub);
@@ -352,12 +352,12 @@ namespace gempba::telemetry {
     }
 
     void disable() noexcept {
-        g_disabled = true;
+        g_enabled = false;
         uninstall();
     }
 
-    void enable() noexcept { g_disabled = false; }
+    void enable() noexcept { g_enabled = true; }
 
-    bool is_disabled() noexcept { return g_disabled; }
+    bool is_enabled() noexcept { return g_enabled; }
 
 } // namespace gempba::telemetry

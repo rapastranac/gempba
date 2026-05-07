@@ -14,7 +14,7 @@ namespace {
     inline std::unique_ptr<gempba::node_manager> g_node_manager;
 
     void install_telemetry_hub_if_needed() {
-        if (gempba::telemetry::is_disabled()) {
+        if (!gempba::telemetry::is_enabled()) {
             return;
         }
         if (gempba::telemetry::get() != nullptr) {

@@ -30,6 +30,7 @@
 #include <gempba/detail/nodes/node_core_impl.hpp>
 #include <gempba/detail/runnables/serial_runnable_non_void.hpp>
 #include <gempba/detail/runnables/serial_runnable_void.hpp>
+#include <gempba/telemetry/telemetry_hub.hpp>
 #include <gempba/utils/gempba_utils.hpp>
 
 namespace gempba {
@@ -58,6 +59,7 @@ namespace gempba {
     void reset_node_manager();
 
     int shutdown();
+
 
     template<typename Ret, typename... Args>
     static node create_seed_node(load_balancer& p_load_balancer, invokable<Ret, Args...> auto&& p_runnable, std::tuple<Args...> p_args) {
