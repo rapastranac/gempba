@@ -37,9 +37,8 @@ namespace gempba {
     class task_packet {
         std::vector<std::byte> m_data;
 
-        task_packet() = default;
-
     public:
+        task_packet() = default;
         // Construct from std::vector<byte> (copy)
         explicit task_packet(const std::vector<std::byte>& p_data) : task_packet(std::vector(p_data)) {}
 
