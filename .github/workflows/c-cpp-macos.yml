@@ -112,21 +112,43 @@ jobs:
           multiprocessing: ${{ matrix.multiprocessing }}
           tests: 'false'
 
-      # 3️⃣ Build and install gempba into a workspace-local prefix
-      - name: Install gempba
+      # 3️⃣ Install gempba mt (the base package) into the prefix. The mpi
+      #    topping package depends on the mt base for headers and the
+      #    gempbaConfig.cmake dispatcher, so the mt install always happens
+      #    first — even on the MP=ON matrix leg.
+      - name: Install gempba (mt base)
         run: |
-          cmake -S . -B "$RUNNER_TEMP/gempba-build" \
+          cmake -S . -B "$RUNNER_TEMP/gempba-build-mt" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="$GEMPBA_INSTALL_PREFIX" \
             -DGEMPBA_BUILD_TESTS=OFF \
             -DGEMPBA_DEV_MODE=OFF \
-            -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }} \
+            -DGEMPBA_MULTIPROCESSING=OFF \
             -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -I$(brew --prefix libomp)/include" \
             -DOpenMP_CXX_LIB_NAMES="omp" \
             -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib \
             -DCMAKE_PREFIX_PATH=$(brew --prefix boost)
-          cmake --build "$RUNNER_TEMP/gempba-build" --parallel $(sysctl -n hw.logicalcpu)
-          cmake --install "$RUNNER_TEMP/gempba-build"
+          cmake --build "$RUNNER_TEMP/gempba-build-mt" --parallel $(sysctl -n hw.logicalcpu)
+          cmake --install "$RUNNER_TEMP/gempba-build-mt"
+
+      # 3️⃣bis Layer the mpi topping on top of the mt base when the matrix
+      #       leg is MP=ON. Adds libgempba_mpi.a + gempba_mpi-targets.cmake
+      #       so find_package(gempba COMPONENTS mpi) resolves.
+      - name: Install gempba (mpi topping)
+        if: matrix.multiprocessing == 'ON'
+        run: |
+          cmake -S . -B "$RUNNER_TEMP/gempba-build-mpi" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$GEMPBA_INSTALL_PREFIX" \
+            -DGEMPBA_BUILD_TESTS=OFF \
+            -DGEMPBA_DEV_MODE=OFF \
+            -DGEMPBA_MULTIPROCESSING=ON \
+            -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -I$(brew --prefix libomp)/include" \
+            -DOpenMP_CXX_LIB_NAMES="omp" \
+            -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib \
+            -DCMAKE_PREFIX_PATH=$(brew --prefix boost)
+          cmake --build "$RUNNER_TEMP/gempba-build-mpi" --parallel $(sysctl -n hw.logicalcpu)
+          cmake --install "$RUNNER_TEMP/gempba-build-mpi"
 
       # 4️⃣ Resolve sister-repo branch (same-name, fall back to main)
       - name: Resolve gempba-examples ref
