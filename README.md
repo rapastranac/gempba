@@ -39,6 +39,60 @@ The two main research contributions baked into the framework are the **Quasi-Hor
 - Windows
 - macOS
 
+## Installing
+
+GemPBA ships two distinct flavors that can coexist on a single machine. Multithreading is the default — fast local iteration, no MPI needed. Install the MPI flavor on top when you need to scale across nodes.
+
+```bash
+# Debian / Ubuntu (from the project's APT repo)
+sudo apt install libgempba-dev          # multithreading flavor (default)
+sudo apt install libgempba-mpi-dev      # MPI flavor; depends on libgempba-dev
+```
+
+```bash
+# MSYS2 / MinGW
+pacman -S mingw-w64-x86_64-gempba       # multithreading flavor
+pacman -S mingw-w64-x86_64-gempba-mpi   # MPI flavor; depends on mingw-w64-x86_64-gempba
+```
+
+If you are building from source instead, pick the flavor at configure time and install:
+
+```bash
+cmake -B build -DGEMPBA_MULTIPROCESSING=ON   # MPI
+cmake -B build -DGEMPBA_MULTIPROCESSING=OFF  # multithreading
+cmake --build build --parallel
+sudo cmake --install build
+```
+
+## Selecting a flavor
+
+Consumer code is identical regardless of flavor. Pick at `find_package` time:
+
+```cmake
+find_package(gempba REQUIRED)                  # default: mt
+find_package(gempba REQUIRED COMPONENTS mt)    # explicit mt
+find_package(gempba REQUIRED COMPONENTS mpi)   # mpi (requires libgempba-mpi-dev installed)
+
+target_link_libraries(my_app PRIVATE gempba::gempba)
+```
+
+The same target name `gempba::gempba` is exported by both flavors, so the link line never changes. The `GEMPBA_MULTIPROCESSING` macro flows through the target's interface and `<gempba/gempba.hpp>` exposes the matching API at compile time.
+
+In code, write the short form:
+
+```cpp
+auto* lb = gempba::create_load_balancer(gempba::QUASI_HORIZONTAL /*, worker* if MP*/);
+auto& nm = gempba::create_node_manager(lb /*, worker* if MP*/);
+```
+
+The explicit `gempba::multithreading::*` and `gempba::multiprocessing::*` qualifiers are also available for code that wants to be unambiguous.
+
+The two flavors are **mutually exclusive within a single binary**: they share mode-agnostic top-level symbols (`gempba::shutdown`, `gempba::get_load_balancer`, …) and would ODR-clash at link time. `find_package(gempba COMPONENTS mt mpi)` is therefore rejected up front with a clear diagnostic. A project that genuinely needs both flavors — say, an MT debug runner and an MPI cluster runner — splits into two executables, each `find_package`-ing the flavor it needs.
+
+## Examples
+
+Working example programs live in the sibling repo **[gempba-examples](https://github.com/rapastranac/gempba-examples)**, where they consume gempba via `find_package(gempba)` exactly as a downstream user would. Every PR on this repo builds that example tree against an installed copy of the PR's gempba (matrix on `multiprocessing: [ON, OFF]`), so the install/`gempbaConfig.cmake`/exported-headers chain is exercised on every change.
+
 ## Requirements
 
 | Dependency | Version | Notes |
@@ -54,10 +108,6 @@ The two main research contributions baked into the framework are the **Quasi-Hor
 Installation, quick-start, and full API reference are at:
 
 **[GemPBA-Docs/](https://rapastranac.github.io/gempba-docs/)**
-
-## Examples
-
-Runnable examples live in the sibling repo **[gempba-examples](https://github.com/rapastranac/gempba-examples)**. They are built against an installed gempba (`find_package(gempba)`) so every example PR exercises the public API the same way downstream consumers do.
 
 ## Copyright and Citing
 
