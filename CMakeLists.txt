@@ -95,6 +95,13 @@ endif ()
 # 🛠️ Create the main library
 add_library(gempba STATIC ${Sources})
 
+if (GEMPBA_MULTIPROCESSING)
+    set(GEMPBA_FLAVOR_TAG mpi)
+    set_target_properties(gempba PROPERTIES OUTPUT_NAME gempba_mpi)
+else ()
+    set(GEMPBA_FLAVOR_TAG mt)
+endif ()
+
 # 🔧️ Add macros for the library
 # GEMPBA_MULTIPROCESSING is PUBLIC so consumers (and examples) receive the
 # same flag the library was built with via target propagation.
@@ -137,7 +144,7 @@ if (GEMPBA_MULTIPROCESSING)
 endif ()
 
 # spdlog is used in header-only mode. Deliberately NOT linked as a CMake target
-# so spdlog::spdlog_header_only never appears in gempbaTargets.cmake and
+# so spdlog::spdlog_header_only never appears in the exported targets file and
 # consumers don't need find_package(spdlog) just to use gempba.
 get_target_property(_spdlog_includes spdlog::spdlog_header_only INTERFACE_INCLUDE_DIRECTORIES)
 target_include_directories(gempba PRIVATE ${_spdlog_includes})
@@ -187,7 +194,7 @@ target_include_directories(gempba
 
 # ─── Install: library archive ────────────────────────────────────────────────
 install(TARGETS gempba
-        EXPORT gempbaTargets
+        EXPORT gempba_${GEMPBA_FLAVOR_TAG}_Targets
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
@@ -204,8 +211,8 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/gempba/config.h
 )
 
 # ─── Install: exported CMake targets ─────────────────────────────────────────
-install(EXPORT gempbaTargets
-        FILE gempbaTargets.cmake
+install(EXPORT gempba_${GEMPBA_FLAVOR_TAG}_Targets
+        FILE gempba_${GEMPBA_FLAVOR_TAG}-targets.cmake
         NAMESPACE gempba::
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/gempba
 )

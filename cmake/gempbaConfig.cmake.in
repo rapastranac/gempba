@@ -21,6 +21,6 @@ if (@GEMPBA_HWLOC@)
 endif ()
 
 # ─── Import the exported targets ─────────────────────────────────────────────
-include("${CMAKE_CURRENT_LIST_DIR}/gempbaTargets.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/gempba_@GEMPBA_FLAVOR_TAG@-targets.cmake")
 
 check_required_components(gempba)
