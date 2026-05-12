@@ -4,8 +4,8 @@
 #include <unistd.h>
 #include <spdlog/spdlog.h>
 
-#include "include/main.hpp"
-#include "include/mt_bitvector_optimized_encoding.hpp"
+#include "main.hpp"
+#include "bitvector_optimized_encoding.hpp"
 
 using namespace std::placeholders;
 
@@ -15,14 +15,14 @@ int run(const std::string& p_job_name, int p_job_id, int p_nodes, int p_ntasks_p
     std::cout << "USING MULTITHREADING ONLY" << std::endl;
     std::cout << "NUMTHREADS= " << p_threads_per_task << std::endl;
 
-    gempba::load_balancer *v_load_balancer = gempba::mt::create_load_balancer(gempba::balancing_policy::QUASI_HORIZONTAL);
-    gempba::node_manager &v_node_manager = gempba::mt::create_node_manager(v_load_balancer);
+    gempba::load_balancer *v_load_balancer = gempba::multithreading::create_load_balancer(gempba::balancing_policy::QUASI_HORIZONTAL);
+    gempba::node_manager &v_node_manager = gempba::multithreading::create_node_manager(v_load_balancer);
 
     v_node_manager.set_goal(gempba::MINIMISE, gempba::score_type::I32);
     v_node_manager.set_thread_pool_size(p_threads_per_task);
 
-    mt_bitvector_optimized_encoding v_instance(v_node_manager, v_load_balancer);
-    auto v_function = std::bind(&mt_bitvector_optimized_encoding::mvcbitset, &v_instance, _1, _2, _3, _4, _5); // target algorithm [all arguments]
+    multithreading_bitvector_optimized_encoding v_instance(v_node_manager, v_load_balancer);
+    auto v_function = std::bind(&multithreading_bitvector_optimized_encoding::mvcbitset, &v_instance, _1, _2, _3, _4, _5); // target algorithm [all arguments]
 
 
     Graph v_graph;

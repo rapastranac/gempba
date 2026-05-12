@@ -15,7 +15,11 @@ permissions:
 jobs:
   build-and-test:
     runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
-    timeout-minutes: 10
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        multiprocessing: [ON, OFF]
     env:
       CC: gcc-14
       CXX: g++-14
@@ -37,14 +41,17 @@ jobs:
           sudo apt-get install -y gcc-14 g++-14
           sudo apt-get install -y make
           sudo apt-get install -y libboost-all-dev
-          sudo apt-get install -y libopenmpi-dev
           sudo apt-get install -y libspdlog-dev libfmt-dev
           sudo apt-get install -y libhwloc-dev pkg-config
-          sudo apt-get install -y libgtest-dev
-          sudo apt-get install -y libgmock-dev
+          if [ "${{ matrix.multiprocessing }}" = "ON" ]; then
+            sudo apt-get install -y libopenmpi-dev
+            sudo apt-get install -y libgtest-dev
+            sudo apt-get install -y libgmock-dev
+          fi
 
       # 3️⃣ Build and install GTest/GMock from source
       - name: Build and install GTest/GMock
+        if: matrix.multiprocessing == 'ON'
         run: |
           cd /usr/src/googletest
           sudo cmake -S . -B build
@@ -57,10 +64,12 @@ jobs:
           echo "cmake: $(cmake --version | head -1 | awk '{print $3}')"
           echo "make: $(make --version | head -1 | awk '{print $3}')"
           echo "libboost-dev: $(dpkg -s libboost-dev | grep 'Version' | awk '{print $2}')"
-          echo "libopenmpi-dev: $(dpkg -s libopenmpi-dev | grep 'Version' | awk '{print $2}')"
           echo "libhwloc-dev: $(dpkg -s libhwloc-dev | grep 'Version' | awk '{print $2}')"
-          echo "libgtest-dev: $(dpkg -s libgtest-dev | grep 'Version' | awk '{print $2}')"
-          echo "libgmock-dev: $(dpkg -s libgmock-dev | grep 'Version' | awk '{print $2}')"
+          if [ "${{ matrix.multiprocessing }}" = "ON" ]; then
+            echo "libopenmpi-dev: $(dpkg -s libopenmpi-dev | grep 'Version' | awk '{print $2}')"
+            echo "libgtest-dev: $(dpkg -s libgtest-dev | grep 'Version' | awk '{print $2}')"
+            echo "libgmock-dev: $(dpkg -s libgmock-dev | grep 'Version' | awk '{print $2}')"
+          fi
 
       # 5️⃣ Build the project
       - name: Build the project
@@ -70,12 +79,14 @@ jobs:
           cd build
           cmake .. \
             -DCMAKE_BUILD_TYPE=Debug \
+            -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }} \
             -DCMAKE_CXX_FLAGS="--coverage" \
             -DCMAKE_EXE_LINKER_FLAGS="--coverage"
           make -j$(nproc)
 
-      # 6️⃣ Run tests with JUnit XML output
+      # 6️⃣ Run tests with JUnit XML output (MP=ON only — tests reference gempba::mp::*)
       - name: Run tests with retry for flaky tests
+        if: matrix.multiprocessing == 'ON'
         run: |
           cd ${{ github.workspace }}/build
 
@@ -88,16 +99,17 @@ jobs:
           echo "🟢 Final check: non-flaky tests MUST be green"
           ctest --output-on-failure -E "FLAKY_"
 
-      # 7️⃣ Upload coverage to Codecov
+      # 7️⃣ Upload coverage to Codecov (MP=ON only — coverage data only meaningful with tests)
       - name: Upload coverage to Codecov
+        if: matrix.multiprocessing == 'ON'
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
 
-      # 8️⃣ Upload test results as artifacts
+      # 8️⃣ Upload test results as artifacts (MP=ON only — no test results otherwise)
       - name: Upload test results
-        if: always()
+        if: always() && matrix.multiprocessing == 'ON'
         uses: actions/upload-artifact@v4
         with:
           name: test-results-ubuntu

@@ -2,11 +2,15 @@
 
 #include <algorithm>
 #include <cstring>
+#include <gempba/config.h>
 #include <impl/telemetry/hwloc_probe.hpp>
 #include <map>
-#include <mpi.h>
 #include <thread>
 #include <vector>
+
+#if GEMPBA_MULTIPROCESSING
+    #include <mpi.h>
+#endif
 
 #if defined(_WIN32)
     #include <windows.h>
@@ -219,6 +223,7 @@ namespace gempba::telemetry {
             return v_snapshot;
         }
 
+#if GEMPBA_MULTIPROCESSING
         topology_snapshot build_mpi_snapshot(std::uint32_t p_worker_id, std::uint32_t p_world_size) {
             topology_snapshot v_snapshot;
             const worker_identity v_self = build_self_identity(p_worker_id);
@@ -265,6 +270,7 @@ namespace gempba::telemetry {
 
             return v_snapshot;
         }
+#endif // GEMPBA_MULTIPROCESSING
 
     } // namespace
 
@@ -272,8 +278,13 @@ namespace gempba::telemetry {
         switch (p_mode) {
             case runtime_mode::MT_ONLY:
                 return build_mt_only_snapshot(p_worker_id);
+#if GEMPBA_MULTIPROCESSING
             case runtime_mode::MP_MPI:
                 return build_mpi_snapshot(p_worker_id, p_world_size);
+#else
+            case runtime_mode::MP_MPI:
+                return build_mt_only_snapshot(p_worker_id);
+#endif
         }
         return build_mt_only_snapshot(p_worker_id);
     }

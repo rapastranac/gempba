@@ -1,24 +1,24 @@
-#ifndef MT_GRAPH_OPT_ENC_SEMI_HPP
-#define MT_GRAPH_OPT_ENC_SEMI_HPP
+#ifndef GEMPBA_MULTITHREADING_GRAPH_OPT_ENC_SEMI_HPP
+#define GEMPBA_MULTITHREADING_GRAPH_OPT_ENC_SEMI_HPP
 
 
 #include <gempba/gempba.hpp>
 #include <spdlog/spdlog.h>
 #include "VertexCover.hpp"
 
-class mt_graph_optimized_encoding_semi_centralized final : public VertexCover {
+class multithreading_graph_optimized_encoding_semi_centralized final : public VertexCover {
 
     gempba::node_manager &m_node_manager;
     gempba::load_balancer &m_load_balancer;
     std::function<void(std::thread::id, int, Graph, gempba::node)> m_function;
 
 public:
-    explicit mt_graph_optimized_encoding_semi_centralized(gempba::node_manager &p_node_manager, gempba::load_balancer &p_load_balancer) :
+    explicit multithreading_graph_optimized_encoding_semi_centralized(gempba::node_manager &p_node_manager, gempba::load_balancer &p_load_balancer) :
         m_node_manager(p_node_manager), m_load_balancer(p_load_balancer) {
-        this->m_function = std::bind(&mt_graph_optimized_encoding_semi_centralized::mvc, this, _1, _2, _3, _4);
+        this->m_function = std::bind(&multithreading_graph_optimized_encoding_semi_centralized::mvc, this, _1, _2, _3, _4);
     }
 
-    ~mt_graph_optimized_encoding_semi_centralized() override = default;
+    ~multithreading_graph_optimized_encoding_semi_centralized() override = default;
 
     bool findCover(int run) {
         string msg_center = fmt::format("run # {} ", run);
@@ -118,7 +118,7 @@ public:
             return std::nullopt;
         };
 
-        gempba::node v_left = gempba::mt::create_lazy_node<void>(m_load_balancer, v_parent, m_function, v_left_args_initializer);
+        gempba::node v_left = gempba::multithreading::create_lazy_node<void>(m_load_balancer, v_parent, m_function, v_left_args_initializer);
 
         std::function<std::optional<std::tuple<int, Graph> >()> v_right_args_initializer = [&]() -> std::optional<std::tuple<int, Graph> > {
             Graph g = graph;
@@ -138,7 +138,7 @@ public:
             return std::nullopt;
         };
 
-        gempba::node v_right = gempba::mt::create_lazy_node<void>(
+        gempba::node v_right = gempba::multithreading::create_lazy_node<void>(
                 m_load_balancer,
                 v_parent, m_function,
                 v_right_args_initializer
@@ -168,4 +168,4 @@ private:
     }
 };
 
-#endif // MT_GRAPH_OPT_ENC_SEMI_HPP
+#endif // GEMPBA_MULTITHREADING_GRAPH_OPT_ENC_SEMI_HPP
