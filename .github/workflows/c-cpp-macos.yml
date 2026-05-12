@@ -15,7 +15,11 @@ permissions:
 jobs:
   build-and-test:
     runs-on: ${{ fromJSON(vars.RUNNER_MACOS || '["macos-26"]') }}
-    timeout-minutes: 10
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        multiprocessing: [ON, OFF]
 
     steps:
       # 1️⃣ Checkout the repository
@@ -25,6 +29,24 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ github.ref }}
 
+      # 1️⃣b Bootstrap Homebrew on PATH (self-hosted runners don't source the user
+      # profile in non-interactive shells, so brew may exist on disk but not on PATH).
+      - name: Bootstrap Homebrew on PATH
+        run: |
+          if [ -x /opt/homebrew/bin/brew ]; then
+            BREW_PREFIX=/opt/homebrew
+          elif [ -x /usr/local/bin/brew ]; then
+            BREW_PREFIX=/usr/local
+          else
+            echo "Homebrew not found at /opt/homebrew or /usr/local. Install it on the runner first." >&2
+            exit 1
+          fi
+          echo "$BREW_PREFIX/bin" >> "$GITHUB_PATH"
+          echo "$BREW_PREFIX/sbin" >> "$GITHUB_PATH"
+          # Also export for the rest of this step in case anything else runs here.
+          eval "$($BREW_PREFIX/bin/brew shellenv)"
+          brew --version
+
       # 2️⃣ Set up environment and install dependencies
       - name: Setup Dependencies
         run: |
@@ -32,12 +54,14 @@ jobs:
           brew install cmake
           brew install pkg-config
           brew install boost
-          brew install open-mpi
           brew install spdlog
           brew install fmt
           brew install hwloc
-          brew install googletest
           brew install libomp
+          if [ "${{ matrix.multiprocessing }}" = "ON" ]; then
+            brew install open-mpi
+            brew install googletest
+          fi
 
       # 3️⃣ Echo versions of installed dependencies
       - name: Echo Dependencies Version
@@ -46,9 +70,11 @@ jobs:
           echo "cmake: $(cmake --version | head -1 | awk '{print $3}')"
           echo "make: $(make --version | head -1 | awk '{print $3}')"
           echo "boost: $(brew info boost --json | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["versions"]["stable"])')"
-          echo "open-mpi: $(mpicc --showme:version 2>/dev/null || brew info open-mpi --json | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["versions"]["stable"])')"
           echo "hwloc: $(brew info hwloc --json | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["versions"]["stable"])')"
-          echo "googletest: $(brew info googletest --json | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["versions"]["stable"])')"
+          if [ "${{ matrix.multiprocessing }}" = "ON" ]; then
+            echo "open-mpi: $(mpicc --showme:version 2>/dev/null || brew info open-mpi --json | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["versions"]["stable"])')"
+            echo "googletest: $(brew info googletest --json | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["versions"]["stable"])')"
+          fi
 
       # 4️⃣ Build the project
       - name: Build the project
@@ -57,14 +83,16 @@ jobs:
           mkdir -p build
           cd build
           cmake .. \
+            -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }} \
             -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -I$(brew --prefix libomp)/include" \
             -DOpenMP_CXX_LIB_NAMES="omp" \
             -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib \
             -DCMAKE_PREFIX_PATH=$(brew --prefix boost)
           make -j$(sysctl -n hw.logicalcpu)
 
-      # 5️⃣ Run tests with JUnit XML output
+      # 5️⃣ Run tests with JUnit XML output (MP=ON only — tests reference gempba::mp::*)
       - name: Run tests with retry for flaky tests
+        if: matrix.multiprocessing == 'ON'
         run: |
           cd ${{ github.workspace }}/build
 
@@ -77,9 +105,9 @@ jobs:
           echo "🟢 Final check: non-flaky tests MUST be green"
           ctest --output-on-failure -E "FLAKY_"
 
-      # 6️⃣ Upload test results as artifacts
+      # 6️⃣ Upload test results as artifacts (MP=ON only — no test results otherwise)
       - name: Upload test results
-        if: always()
+        if: always() && matrix.multiprocessing == 'ON'
         uses: actions/upload-artifact@v4
         with:
           name: test-results-macos

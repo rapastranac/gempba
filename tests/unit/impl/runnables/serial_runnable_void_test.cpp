@@ -56,7 +56,7 @@ TEST(serial_runnable_void_test, test) {
     };
     constexpr int ID = 314;
 
-    const std::shared_ptr<gempba::serial_runnable> v_runnable = gempba::mp::runnables::return_none::create(ID, v_function, v_args_deserializer);
+    const std::shared_ptr<gempba::serial_runnable> v_runnable = gempba::multiprocessing::runnables::return_none::create(ID, v_function, v_args_deserializer);
 
     ASSERT_EQ(314, v_runnable->get_id());
 

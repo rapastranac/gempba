@@ -43,7 +43,7 @@ for file in "${GRAPH_FILES[@]}"; do
     )
 
     # Execute MPI program (BLOCKING)
-    mpirun -n "$TASKS_PER_NODE" --bind-to core --map-by slot:PE="$CPUS_PER_TASK" --report-bindings ./bin/mp_bitvect_opt_enc_semi "${ARGS[@]}"
+    mpirun -n "$TASKS_PER_NODE" --bind-to core --map-by slot:PE="$CPUS_PER_TASK" --report-bindings ./bin/multiprocessing_bitvect_opt_enc_semi "${ARGS[@]}"
 
     echo "Finished file: $(basename "$file") at $(date)"
 done

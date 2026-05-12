@@ -1,5 +1,5 @@
-#ifndef MT_BITVECTOR_OPTIMIZED_ENCODING_HPP
-#define MT_BITVECTOR_OPTIMIZED_ENCODING_HPP
+#ifndef GEMPBA_MULTITHREADING_BITVECTOR_OPTIMIZED_ENCODING_HPP
+#define GEMPBA_MULTITHREADING_BITVECTOR_OPTIMIZED_ENCODING_HPP
 
 #include <atomic>
 #include <functional>
@@ -21,7 +21,7 @@ using namespace std::placeholders;
 #define GBITSET dynamic_bitset<>
 
 
-class mt_bitvector_optimized_encoding final {
+class multithreading_bitvector_optimized_encoding final {
     std::function<void(std::thread::id, int, GBITSET, int, gempba::node)> m_function;
 
 public:
@@ -36,13 +36,13 @@ public:
     gempba::node_manager &m_node_manager;
     gempba::load_balancer *m_load_balancer;
 
-    explicit mt_bitvector_optimized_encoding(gempba::node_manager &p_node_manager, gempba::load_balancer *p_load_balancer) :
+    explicit multithreading_bitvector_optimized_encoding(gempba::node_manager &p_node_manager, gempba::load_balancer *p_load_balancer) :
         m_node_manager(p_node_manager), m_load_balancer(p_load_balancer) {
 
-        this->m_function = std::bind(&mt_bitvector_optimized_encoding::mvcbitset, this, _1, _2, _3, _4, _5);
+        this->m_function = std::bind(&multithreading_bitvector_optimized_encoding::mvcbitset, this, _1, _2, _3, _4, _5);
     }
 
-    ~mt_bitvector_optimized_encoding() = default;
+    ~multithreading_bitvector_optimized_encoding() = default;
 
     void set_graph(Graph &p_graph) {
         m_is_skips = 0;
@@ -223,7 +223,7 @@ public:
             return std::nullopt;
         };
 
-        gempba::node v_left = gempba::mt::create_lazy_node<void>(
+        gempba::node v_left = gempba::multithreading::create_lazy_node<void>(
                 *m_load_balancer,
                 v_parent, m_function,
                 v_left_args_initializer
@@ -244,7 +244,7 @@ public:
             return std::nullopt;
         };
 
-        gempba::node v_right = gempba::mt::create_lazy_node<void>(
+        gempba::node v_right = gempba::multithreading::create_lazy_node<void>(
                 *m_load_balancer,
                 v_parent, m_function,
                 v_right_args_initializer
@@ -344,4 +344,4 @@ public:
     }
 };
 
-#endif // MT_BITVECTOR_OPTIMIZED_ENCODING_HPP
+#endif // GEMPBA_MULTITHREADING_BITVECTOR_OPTIMIZED_ENCODING_HPP

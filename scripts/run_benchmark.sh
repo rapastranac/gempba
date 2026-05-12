@@ -37,12 +37,12 @@ args=(
 ## Multiprocessing scenarios:
 
 # - Benchmarking algorithm
-mpirun -n "$TASKS_PER_NODE" --bind-to core --map-by slot:PE="$CPUS_PER_TASK" --report-bindings ./bin/mp_benchmark "${args[@]}"
+mpirun -n "$TASKS_PER_NODE" --bind-to core --map-by slot:PE="$CPUS_PER_TASK" --report-bindings ./bin/multiprocessing_benchmark "${args[@]}"
 
 ## Multithreading scenarios:
 
 # - Benchmarking algorithm
-#./bin/mt_benchmark "${args[@]}"
+#./bin/multithreading_benchmark "${args[@]}"
 
 
 # ---------------------------------------------------------------------

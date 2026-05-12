@@ -99,29 +99,30 @@ namespace gempba::telemetry {
 
     /**
      * @brief Tear down any running telemetry hub on this process and suppress subsequent
-     *        auto-installs from `gempba::mp::create_scheduler` / `create_node_manager` until
-     *        `enable()` is called.
+     *        auto-installs from `gempba::multiprocessing::create_scheduler` / `create_node_manager`
+     *        until `enable()` is called.
      *
      * @details The flag is **process-local** and **sticky**: it lives in this process only
-     *          and remains in effect across `mp::create_*` calls until explicitly re-enabled.
+     *          and remains in effect across `multiprocessing::create_*` calls until explicitly
+     *          re-enabled.
      *
-     * @warning In multi-process (`gempba::mp`) mode this MUST be called symmetrically on
-     *          every process — every process or no process. The telemetry install path goes
-     *          through a collective IPC handshake; an asymmetric call leaves the
-     *          still-enabled processes blocked indefinitely waiting for the disabled
+     * @warning In multi-process (`gempba::multiprocessing`) mode this MUST be called
+     *          symmetrically on every process — every process or no process. The telemetry
+     *          install path goes through a collective IPC handshake; an asymmetric call leaves
+     *          the still-enabled processes blocked indefinitely waiting for the disabled
      *          processes that never join. The same symmetry requirement applies to teardown.
      *
-     * @par Recommended pattern (mp):
+     * @par Recommended pattern (multiprocessing):
      * @code
      * gempba::telemetry::disable();           // every process, before create_*
-     * auto* sch = gempba::mp::create_scheduler(...);
+     * auto* sch = gempba::multiprocessing::create_scheduler(...);
      * @endcode
      */
     void disable() noexcept;
 
     /**
-     * @brief Lift a previous `disable()` so subsequent `mp::create_*` calls install the
-     *        telemetry hub again.
+     * @brief Lift a previous `disable()` so subsequent `multiprocessing::create_*` calls install
+     *        the telemetry hub again.
      *
      * @warning Same symmetry requirement as @ref disable: call on every process in
      *          multi-process mode or none. A process that lifts the block while peers stay
