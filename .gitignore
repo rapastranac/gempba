@@ -32,3 +32,6 @@ external/
 
 # ─── graphify (knowledge graph artifacts) ────────────────────────────────────
 graphify-out/
+
+# ─── claude ──────────────────────────────────────────────────────────────────
+CLAUDE.md
