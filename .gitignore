@@ -29,3 +29,6 @@ global.cbp
 # ─── Dependencies ────────────────────────────────────────────────────────────
 external/
 !external/CMakeLists.txt
+
+# ─── graphify (knowledge graph artifacts) ────────────────────────────────────
+graphify-out/
