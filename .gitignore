@@ -29,3 +29,10 @@ global.cbp
 # ─── Dependencies ────────────────────────────────────────────────────────────
 external/
 !external/CMakeLists.txt
+
+# ─── graphify (knowledge graph artifacts) ────────────────────────────────────
+graphify-out/
+
+# ─── claude ──────────────────────────────────────────────────────────────────
+CLAUDE.md
+GIT_WORKFLOW.md
