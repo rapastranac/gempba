@@ -25,6 +25,24 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ github.ref }}
 
+      # 1️⃣b Bootstrap Homebrew on PATH (self-hosted runners don't source the user
+      # profile in non-interactive shells, so brew may exist on disk but not on PATH).
+      - name: Bootstrap Homebrew on PATH
+        run: |
+          if [ -x /opt/homebrew/bin/brew ]; then
+            BREW_PREFIX=/opt/homebrew
+          elif [ -x /usr/local/bin/brew ]; then
+            BREW_PREFIX=/usr/local
+          else
+            echo "Homebrew not found at /opt/homebrew or /usr/local. Install it on the runner first." >&2
+            exit 1
+          fi
+          echo "$BREW_PREFIX/bin" >> "$GITHUB_PATH"
+          echo "$BREW_PREFIX/sbin" >> "$GITHUB_PATH"
+          # Also export for the rest of this step in case anything else runs here.
+          eval "$($BREW_PREFIX/bin/brew shellenv)"
+          brew --version
+
       # 2️⃣ Set up environment and install dependencies
       - name: Setup Dependencies
         run: |
