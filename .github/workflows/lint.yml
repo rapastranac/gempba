@@ -2,10 +2,10 @@ name: Lint
 
 on:
   push:
-    branches: [ "main", "${NUMBER}-*" ]
+    branches: [ "main", "${NUMBER}-*", "release" ]
     tags: [ "v*" ]
   pull_request:
-    branches: [ "main", "${NUMBER}-*" ]
+    branches: [ "main", "${NUMBER}-*", "release" ]
 
 permissions:
   contents: read

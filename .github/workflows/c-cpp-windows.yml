@@ -2,10 +2,10 @@ name: C/C++ CI (Windows 2025)
 
 on:
   push:
-    branches: [ "main", "${NUMBER}-*" ]
+    branches: [ "main", "${NUMBER}-*", "release" ]
     tags: [ "v*" ]
   pull_request:
-    branches: [ "main", "${NUMBER}-*" ]
+    branches: [ "main", "${NUMBER}-*", "release" ]
 
 permissions:
   contents: read
@@ -29,6 +29,8 @@ jobs:
       - name: Setup MSYS2
         uses: msys2/setup-msys2@v2
         with:
+          release: false
+          cache: false
           update: true
           install: >-
             base-devel
@@ -111,6 +113,8 @@ jobs:
         uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
+          release: false
+          cache: false
           update: true
           install: >-
             base-devel
