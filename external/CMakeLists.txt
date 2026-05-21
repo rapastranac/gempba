@@ -30,10 +30,15 @@ if (NOT COMMAND CPMAddPackage)
             "and has been removed. Re-run the build.")
 endif ()
 
+# Pinned to a literal release tag (not `master`) for build reproducibility:
+# any push to upstream `master` would silently change the version gempba
+# consumes — potentially breaking the build, ABI, or runtime behavior with
+# no warning. Bumps to a newer release are an explicit, reviewed change to
+# this line, not a silent drift on every clean build.
 CPMAddPackage(
         NAME BS_thread_pool
         GITHUB_REPOSITORY rapastranac/thread-pool
-        GIT_TAG master)
+        GIT_TAG v5.1.0.1)
 add_library(BS_thread_pool INTERFACE)
 target_include_directories(BS_thread_pool INTERFACE ${BS_thread_pool_SOURCE_DIR}/include)
 
