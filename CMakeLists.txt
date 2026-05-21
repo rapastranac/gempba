@@ -126,6 +126,11 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_
     target_link_libraries(gempba PUBLIC stdc++exp)
 endif ()
 
+if (WIN32)
+    # process_probe needs psapi (process info); telemetry TCP server needs ws2_32 (Winsock).
+    target_link_libraries(gempba PRIVATE psapi ws2_32)
+endif ()
+
 if (UNIX AND NOT APPLE)
     target_link_options(gempba PUBLIC -rdynamic)
 endif ()
