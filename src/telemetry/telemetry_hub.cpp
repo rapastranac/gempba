@@ -4,6 +4,7 @@
 #include <gempba/telemetry/telemetry_hub.hpp>
 #include <impl/telemetry/center_tcp_server.hpp>
 #include <impl/telemetry/local_transport.hpp>
+#include <impl/telemetry/mpi_transport.hpp>
 #include <impl/telemetry/node_probe.hpp>
 #include <impl/telemetry/process_probe.hpp>
 #include <impl/telemetry/topology_builder.hpp>
@@ -68,7 +69,7 @@ namespace gempba::telemetry {
                 m_transport = std::make_unique<local_transport>();
                 break;
             case runtime_mode::MP_MPI:
-                // MPI transport is installed in a subsequent commit.
+                m_transport = std::make_unique<mpi_transport>();
                 break;
         }
 
