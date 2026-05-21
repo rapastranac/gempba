@@ -39,6 +39,7 @@ jobs:
           sudo apt-get install -y libboost-all-dev
           sudo apt-get install -y libopenmpi-dev
           sudo apt-get install -y libspdlog-dev libfmt-dev
+          sudo apt-get install -y libhwloc-dev pkg-config
           sudo apt-get install -y libgtest-dev
           sudo apt-get install -y libgmock-dev
 
@@ -57,6 +58,7 @@ jobs:
           echo "make: $(make --version | head -1 | awk '{print $3}')"
           echo "libboost-dev: $(dpkg -s libboost-dev | grep 'Version' | awk '{print $2}')"
           echo "libopenmpi-dev: $(dpkg -s libopenmpi-dev | grep 'Version' | awk '{print $2}')"
+          echo "libhwloc-dev: $(dpkg -s libhwloc-dev | grep 'Version' | awk '{print $2}')"
           echo "libgtest-dev: $(dpkg -s libgtest-dev | grep 'Version' | awk '{print $2}')"
           echo "libgmock-dev: $(dpkg -s libgmock-dev | grep 'Version' | awk '{print $2}')"
 
@@ -123,7 +125,7 @@ jobs:
       - name: Setup Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake gcc-14 g++-14 make libopenmpi-dev libspdlog-dev libfmt-dev
+          sudo apt-get install -y build-essential cmake gcc-14 g++-14 make libopenmpi-dev libspdlog-dev libfmt-dev libhwloc-dev pkg-config
 
       # 3️⃣ Configure for Release, targeting /usr prefix
       - name: Configure (Release)
