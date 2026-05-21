@@ -1,0 +1,260 @@
+name: Prepare release
+
+# Manually-triggered workflow that opens a release-prep PR against the
+# resolved target branch (main or release; see "Resolve target branch" step):
+#   - branches `release/v<version>` from latest <target_branch>
+#   - bumps CMakeLists.txt project VERSION + packaging/msys2/PKGBUILD pkgver
+#     (sha256sums set to 'SKIP'; the real sha lands via post-tag-pkgbuild.yml
+#     after the tag is pushed)
+#   - drafts docs/releases/release-notes-v<version>.md from `git log`
+#   - opens the PR
+#
+# CITATION.cff is intentionally NOT bumped: its `version:` field is the cited
+# version (initial library publication, 2021-07-08), not the current code
+# version, so it does not move with code releases.
+#
+# v3.2.0 foundation scope only. java/pom.xml and packaging/homebrew/*.rb.in
+# bumps will be added as separate follow-up issues in their respective
+# milestones when those files exist.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Target version (e.g. 3.2.0; no leading v)'
+        required: true
+        type: string
+      target_branch:
+        description: |
+          Branch to base the release on (e.g. main or release). Leave blank to auto-detect:
+          if both `main` and `release` exist, the workflow fails as ambiguous unless this
+          input is set or vars.RELEASE_TARGET_BRANCH is configured.
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  prepare:
+    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
+    timeout-minutes: 5
+
+    steps:
+      - name: Validate version
+        run: |
+          set -euo pipefail
+          V='${{ inputs.version }}'
+          if ! [[ "$V" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::version must be X.Y.Z (got '$V')"
+            exit 1
+          fi
+          {
+            echo "VERSION=$V"
+            echo "TAG=v$V"
+            echo "BRANCH=release/v$V"
+          } >> "$GITHUB_ENV"
+
+      # Resolve which branch the release-prep PR targets. Precedence:
+      #   1. The `target_branch` workflow input, if non-empty.
+      #   2. The repository variable `RELEASE_TARGET_BRANCH`, if set.
+      #   3. Auto-detect by probing the origin repo via the GitHub REST API:
+      #        - both `main` and `release` exist  -> fail as ambiguous
+      #        - only one exists                  -> use it
+      #        - neither exists                   -> fail
+      # Runs BEFORE checkout because the checkout step needs the resolved ref.
+      - name: Resolve target branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_TARGET: ${{ inputs.target_branch }}
+          VAR_TARGET: ${{ vars.RELEASE_TARGET_BRANCH }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          probe() {
+            local branch="$1" code
+            code=$(curl -sS -o /dev/null -w "%{http_code}" \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${REPO}/branches/${branch}")
+            [[ "$code" == "200" ]]
+          }
+          if [[ -n "${INPUT_TARGET:-}" ]]; then
+            if ! probe "$INPUT_TARGET"; then
+              echo "::error::target_branch input '${INPUT_TARGET}' does not exist on ${REPO}"
+              exit 1
+            fi
+            TARGET="$INPUT_TARGET"
+            SRC="workflow input"
+          elif [[ -n "${VAR_TARGET:-}" ]]; then
+            if ! probe "$VAR_TARGET"; then
+              echo "::error::vars.RELEASE_TARGET_BRANCH='${VAR_TARGET}' does not exist on ${REPO}"
+              exit 1
+            fi
+            TARGET="$VAR_TARGET"
+            SRC="vars.RELEASE_TARGET_BRANCH"
+          else
+            HAS_MAIN=false
+            HAS_RELEASE=false
+            probe main    && HAS_MAIN=true    || true
+            probe release && HAS_RELEASE=true || true
+            if $HAS_MAIN && $HAS_RELEASE; then
+              echo "::error::both 'main' and 'release' exist on ${REPO}; set vars.RELEASE_TARGET_BRANCH or pass the target_branch workflow input to disambiguate"
+              exit 1
+            elif $HAS_RELEASE; then
+              TARGET=release
+              SRC="auto-detect (only 'release' present)"
+            elif $HAS_MAIN; then
+              TARGET=main
+              SRC="auto-detect (only 'main' present)"
+            else
+              echo "::error::neither 'main' nor 'release' exists on ${REPO}"
+              exit 1
+            fi
+          fi
+          echo "TARGET_BRANCH=$TARGET" >> "$GITHUB_ENV"
+          echo "Target branch resolved to '${TARGET}' (${SRC})"
+
+      - name: Checkout target branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0  # need git log history for release-notes generation
+
+      - name: Setup gh CLI
+        uses: ./.github/actions/setup-gh-cli
+
+      - name: Refuse if tag or branch already exists on origin
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --tags origin "$TAG" >/dev/null 2>&1; then
+            echo "::error::tag $TAG already exists on origin"
+            exit 1
+          fi
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            echo "::error::branch $BRANCH already exists on origin"
+            exit 1
+          fi
+
+      - name: Configure git
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Create release branch
+        run: git switch -c "$BRANCH"
+
+      - name: Bump CMakeLists.txt project VERSION
+        run: |
+          set -euo pipefail
+          sed -i -E "s/^(project\(gempba VERSION )[0-9]+\.[0-9]+\.[0-9]+( LANGUAGES.*)/\1${VERSION}\2/" CMakeLists.txt
+          if ! grep -qE "^project\(gempba VERSION ${VERSION//./\\.} LANGUAGES" CMakeLists.txt; then
+            echo "::error::CMakeLists.txt VERSION bump did not take effect"
+            grep -nE "^project\(gempba" CMakeLists.txt || true
+            exit 1
+          fi
+          grep -nE "^project\(gempba" CMakeLists.txt
+
+      # CITATION.cff is the citation record for the original library publication
+      # (initial release 2021-07-08); its `version:` field is the cited version,
+      # not the current code version. Do not bump it as part of releases.
+
+      - name: Bump PKGBUILD pkgver + set sha256sums to SKIP
+        run: |
+          set -euo pipefail
+          PKGBUILD=packaging/msys2/PKGBUILD
+          sed -i -E "s/^pkgver=.*/pkgver=${VERSION}/" "$PKGBUILD"
+          sed -i -E "s/^sha256sums=.*/sha256sums=('SKIP')/" "$PKGBUILD"
+          grep -nE "^(pkgver|sha256sums)=" "$PKGBUILD"
+
+      - name: Generate release-notes draft
+        run: |
+          set -euo pipefail
+          NOTES_DIR=docs/releases
+          NOTES="${NOTES_DIR}/release-notes-v${VERSION}.md"
+          mkdir -p "$NOTES_DIR"
+          if [[ -f "$NOTES" ]]; then
+            echo "::notice::$NOTES already exists; leaving in place (curate manually)"
+            exit 0
+          fi
+          LAST_TAG=$(git tag -l 'v*' --sort=-v:refname | head -1 || true)
+          if [[ -z "$LAST_TAG" ]]; then
+            RANGE=""
+            SINCE_DESC="initial release"
+          else
+            RANGE="${LAST_TAG}..HEAD"
+            SINCE_DESC="$LAST_TAG"
+          fi
+          DATE=$(date -u +%Y-%m-%d)
+          TAG_URL="https://github.com/${{ github.repository }}/releases/tag/${TAG}"
+          {
+            printf '%s\n' "# v${VERSION}"
+            printf '\n'
+            printf '%s\n' "<small>${DATE} · [tag](${TAG_URL})</small>"
+            printf '\n'
+            printf '%s\n' "<!-- TODO: tagline -->"
+            printf '\n'
+            printf '%s\n' "## Changed"
+            printf '\n'
+            if [[ -n "$RANGE" ]]; then
+              git log --no-merges --pretty='- %s' "$RANGE" | head -200
+            fi
+            printf '\n'
+            printf '%s\n' "<!-- TODO: curate. Drop CI / internal items, rewrite for end-users."
+            printf '%s\n' "     Add Added / Fixed / Removed / Build sections as applicable."
+            printf '%s\n' "     Major releases also get a Breaking changes section. -->"
+          } > "$NOTES"
+          echo "wrote $NOTES (since ${SINCE_DESC})"
+
+      - name: Commit
+        run: |
+          set -euo pipefail
+          git add CMakeLists.txt packaging/msys2/PKGBUILD docs/releases/
+          if git diff --cached --quiet; then
+            echo "::error::nothing staged — the bumps and notes generation produced no diff"
+            exit 1
+          fi
+          MSG=$(printf '%s\n\n%s\n%s\n%s' \
+            "Prep release ${TAG}" \
+            "- Bump CMakeLists.txt project VERSION + packaging/msys2/PKGBUILD pkgver to ${VERSION}" \
+            "- packaging/msys2/PKGBUILD sha256sums set to 'SKIP' (real sha lands via post-tag-pkgbuild workflow)" \
+            "- Add docs/releases/release-notes-v${VERSION}.md draft (curate before merging)")
+          git commit -m "$MSG"
+
+      - name: Push branch
+        run: git push -u origin "$BRANCH"
+
+      - name: Open prep PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          BODY_FILE=$(mktemp)
+          printf '%s\n' \
+            "Auto-opened by the prepare-release workflow against \`${TARGET_BRANCH}\`." \
+            "" \
+            "**Changes**" \
+            "" \
+            "- Version bumps applied to \`CMakeLists.txt\` and \`packaging/msys2/PKGBUILD\`." \
+            "- Release-notes draft at \`docs/releases/release-notes-v${VERSION}.md\` — generated from \`git log\`; **curate before merging** (drop CI / internal items, write for end-users)." \
+            "- \`packaging/msys2/PKGBUILD\` \`sha256sums\` is the placeholder \`'SKIP'\`. The real sha lands automatically via the \`post-tag-pkgbuild\` workflow after \`${TAG}\` is pushed." \
+            "- \`CITATION.cff\` is intentionally NOT bumped — it records the citation for the original library publication, not the current code version." \
+            "" \
+            "**Operator checklist**" \
+            "" \
+            "- [ ] Curate \`docs/releases/release-notes-v${VERSION}.md\` (the auto-draft is verbose by design)." \
+            "- [ ] Verify CI passes on this branch." \
+            "- [ ] Merge to \`${TARGET_BRANCH}\`." \
+            "- [ ] Push the \`${TAG}\` tag (the publish workflows + set-release-body run from the tag)." \
+            "- [ ] Merge the follow-up sha256 PR auto-opened by \`post-tag-pkgbuild\`." \
+            > "$BODY_FILE"
+          gh pr create \
+            --base "${TARGET_BRANCH}" \
+            --head "$BRANCH" \
+            --title "Prep release ${TAG}" \
+            --label Release \
+            --body-file "$BODY_FILE"
