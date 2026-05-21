@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cstring>
+#include <map>
+#include <mpi.h>
 #include <thread>
 #include <vector>
 
@@ -212,8 +214,63 @@ namespace gempba::telemetry {
             return v_snapshot;
         }
 
+        topology_snapshot build_mpi_snapshot(std::uint32_t p_worker_id, std::uint32_t p_world_size) {
+            topology_snapshot v_snapshot;
+            const worker_identity v_self = build_self_identity(p_worker_id);
+
+            int v_initialized = 0;
+            MPI_Initialized(&v_initialized);
+            if (!v_initialized || p_world_size <= 1) {
+                v_snapshot.m_identities.push_back(v_self);
+                topology_node v_node;
+                v_node.m_hostname = v_self.m_hostname;
+                v_node.m_worker_ids.push_back(p_worker_id);
+                v_node.m_sentinel_worker_id = p_worker_id;
+                fill_local_host_fields(v_node);
+                v_snapshot.m_nodes.push_back(std::move(v_node));
+                return v_snapshot;
+            }
+
+            std::vector<worker_identity> v_all(p_world_size);
+            MPI_Allgather(&v_self, sizeof(worker_identity), MPI_BYTE, v_all.data(), sizeof(worker_identity), MPI_BYTE, MPI_COMM_WORLD);
+            v_snapshot.m_identities = v_all;
+
+            std::map<std::string, std::size_t> v_node_index_by_hostname;
+            for (const auto& v_id: v_all) {
+                const std::string v_hostname(v_id.m_hostname);
+                auto v_it = v_node_index_by_hostname.find(v_hostname);
+                if (v_it == v_node_index_by_hostname.end()) {
+                    topology_node v_node;
+                    v_node.m_hostname = v_hostname;
+                    v_node.m_worker_ids.push_back(v_id.m_worker_id);
+                    v_node.m_sentinel_worker_id = v_id.m_worker_id;
+                    if (v_hostname == std::string(v_self.m_hostname)) {
+                        fill_local_host_fields(v_node);
+                    }
+                    v_node_index_by_hostname.emplace(v_hostname, v_snapshot.m_nodes.size());
+                    v_snapshot.m_nodes.push_back(std::move(v_node));
+                } else {
+                    topology_node& v_existing = v_snapshot.m_nodes[v_it->second];
+                    v_existing.m_worker_ids.push_back(v_id.m_worker_id);
+                    if (v_id.m_worker_id < v_existing.m_sentinel_worker_id) {
+                        v_existing.m_sentinel_worker_id = v_id.m_worker_id;
+                    }
+                }
+            }
+
+            return v_snapshot;
+        }
+
     } // namespace
 
-    topology_snapshot build_topology_snapshot(const runtime_mode, const std::uint32_t p_worker_id, const std::uint32_t) { return build_mt_only_snapshot(p_worker_id); }
+    topology_snapshot build_topology_snapshot(const runtime_mode p_mode, const std::uint32_t p_worker_id, const std::uint32_t p_world_size) {
+        switch (p_mode) {
+            case runtime_mode::MT_ONLY:
+                return build_mt_only_snapshot(p_worker_id);
+            case runtime_mode::MP_MPI:
+                return build_mpi_snapshot(p_worker_id, p_world_size);
+        }
+        return build_mt_only_snapshot(p_worker_id);
+    }
 
 } // namespace gempba::telemetry
