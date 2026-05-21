@@ -431,10 +431,6 @@ namespace gempba {
                 utils::print_ipc_debug_comments("rank {} sent function id to rank {}\n", m_world_rank, m_destination_rank);
 
                 m_destination_rank = -1;
-                m_sent_tasks++;
-                m_total_requests_number++;
-                m_stats.m_sent_task_count++;
-                m_stats.m_total_requested_tasks++;
             } else {
                 throw std::runtime_error("rank " + std::to_string(m_world_rank) + ", could not send task to rank " + std::to_string(m_destination_rank) + "\n");
             }
