@@ -36,11 +36,18 @@ jobs:
 
       - name: Install LLVM
         run: |
+          # `llvm.sh -- 21` installs the LLVM 21 apt repo (which also exposes
+          # the 19 packages we use for tidy). We pin clang-tidy to 19 — not 21
+          # — because clang-21's stricter consteval evaluation breaks inside
+          # the system spdlog/fmt headers on `FMT_STRING("{:02}")`. That's a
+          # clang-21 × system-spdlog/fmt incompatibility, not a gempba bug;
+          # bumping past 19 needs a newer spdlog on the runner image first.
+          # clang-format stays on 21 (no consteval interaction).
           wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s -- 21
-          sudo apt-get install -y clang-format-21 clang-tidy-18 clang-18
+          sudo apt-get install -y clang-format-21 clang-tidy-19 clang-19
           echo "CLANG_FORMAT=clang-format-21" >> $GITHUB_ENV
-          echo "CLANG_TIDY=clang-tidy-18"    >> $GITHUB_ENV
-          echo "RUN_CLANG_TIDY=run-clang-tidy-18" >> $GITHUB_ENV
+          echo "CLANG_TIDY=clang-tidy-19"    >> $GITHUB_ENV
+          echo "RUN_CLANG_TIDY=run-clang-tidy-19" >> $GITHUB_ENV
 
       - name: Echo Tool Versions
         run: |
