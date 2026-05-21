@@ -5,11 +5,16 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cctype>
+#include <charconv>
 #include <chrono>
 #include <cstring>
+#include <limits>
 #include <mutex>
+#include <optional>
 #include <spdlog/spdlog.h>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <vector>
 
@@ -18,6 +23,7 @@
 #else
     #include <arpa/inet.h>
     #include <netinet/in.h>
+    #include <sys/select.h>
     #include <sys/socket.h>
     #include <unistd.h>
 #endif
@@ -90,6 +96,8 @@ namespace gempba::telemetry {
 
         constexpr std::chrono::milliseconds k_broadcast_interval{500};
 
+        constexpr std::size_t k_inbox_cap = 4096;
+
         std::string current_hostname() {
             char v_buf[64] = {};
             if (::gethostname(v_buf, sizeof(v_buf) - 1) == 0) {
@@ -98,7 +106,86 @@ namespace gempba::telemetry {
             return "unknown";
         }
 
+        std::string_view trim(std::string_view p_s) noexcept {
+            while (!p_s.empty() && std::isspace(static_cast<unsigned char>(p_s.front())))
+                p_s.remove_prefix(1);
+            while (!p_s.empty() && std::isspace(static_cast<unsigned char>(p_s.back())))
+                p_s.remove_suffix(1);
+            return p_s;
+        }
+
+        bool parse_control_line(std::string_view p_line, control_kind& p_out_kind, std::uint32_t& p_out_value) noexcept {
+            const auto v_find_string_field = [&](std::string_view p_name) -> std::optional<std::string_view> {
+                std::string v_pat;
+                v_pat.reserve(p_name.size() + 4);
+                v_pat += '"';
+                v_pat.append(p_name);
+                v_pat += "\":";
+                const auto v_pos = p_line.find(v_pat);
+                if (v_pos == std::string_view::npos)
+                    return std::nullopt;
+                std::size_t v_i = v_pos + v_pat.size();
+                while (v_i < p_line.size() && std::isspace(static_cast<unsigned char>(p_line[v_i])))
+                    ++v_i;
+                if (v_i >= p_line.size() || p_line[v_i] != '"')
+                    return std::nullopt;
+                ++v_i;
+                const std::size_t v_start = v_i;
+                while (v_i < p_line.size() && p_line[v_i] != '"')
+                    ++v_i;
+                if (v_i >= p_line.size())
+                    return std::nullopt;
+                return p_line.substr(v_start, v_i - v_start);
+            };
+
+            const auto v_find_uint_field = [&](std::string_view p_name) -> std::optional<std::uint32_t> {
+                std::string v_pat;
+                v_pat.reserve(p_name.size() + 4);
+                v_pat += '"';
+                v_pat.append(p_name);
+                v_pat += "\":";
+                const auto v_pos = p_line.find(v_pat);
+                if (v_pos == std::string_view::npos)
+                    return std::nullopt;
+                std::size_t v_i = v_pos + v_pat.size();
+                while (v_i < p_line.size() && std::isspace(static_cast<unsigned char>(p_line[v_i])))
+                    ++v_i;
+                std::uint64_t v_acc = 0;
+                bool v_any = false;
+                while (v_i < p_line.size() && std::isdigit(static_cast<unsigned char>(p_line[v_i]))) {
+                    v_acc = v_acc * 10 + static_cast<std::uint64_t>(p_line[v_i] - '0');
+                    if (v_acc > std::numeric_limits<std::uint32_t>::max())
+                        return std::nullopt;
+                    ++v_i;
+                    v_any = true;
+                }
+                if (!v_any)
+                    return std::nullopt;
+                return static_cast<std::uint32_t>(v_acc);
+            };
+
+            const auto v_kind_str = v_find_string_field("kind");
+            const auto v_value = v_find_uint_field("value");
+            if (!v_kind_str || !v_value)
+                return false;
+            const auto v_kind_trimmed = trim(*v_kind_str);
+            if (v_kind_trimmed == "set_worker_interval_ms") {
+                p_out_kind = control_kind::SET_WORKER_INTERVAL_MS;
+            } else if (v_kind_trimmed == "set_node_interval_ms") {
+                p_out_kind = control_kind::SET_NODE_INTERVAL_MS;
+            } else {
+                return false;
+            }
+            p_out_value = *v_value;
+            return true;
+        }
+
     } // namespace
+
+    struct client_state {
+        socket_t m_sock = k_invalid_socket;
+        std::string m_inbox;
+    };
 
     struct center_tcp_server::impl {
         std::uint16_t m_requested_port = 0;
@@ -111,7 +198,7 @@ namespace gempba::telemetry {
         std::thread m_broadcast_thread;
 
         std::mutex m_clients_mtx;
-        std::vector<socket_t> m_clients;
+        std::vector<client_state> m_clients;
     };
 
     center_tcp_server::center_tcp_server(const std::uint16_t p_port, telemetry_hub& p_hub) noexcept : m_impl(std::make_unique<impl>()) {
@@ -176,12 +263,56 @@ namespace gempba::telemetry {
                 }
                 {
                     const std::scoped_lock v_lock(v_impl_ptr->m_clients_mtx);
-                    v_impl_ptr->m_clients.push_back(v_client);
+                    v_impl_ptr->m_clients.push_back(client_state{v_client, {}});
                 }
             }
         });
 
         m_impl->m_broadcast_thread = std::thread([v_impl_ptr = m_impl.get()] {
+            const auto v_drain_inbound = [&](client_state& p_cs) -> bool {
+                while (true) {
+                    fd_set v_rfds;
+                    FD_ZERO(&v_rfds);
+                    FD_SET(p_cs.m_sock, &v_rfds);
+                    timeval v_tv{0, 0};
+                    const int v_ready = ::select(static_cast<int>(p_cs.m_sock) + 1, &v_rfds, nullptr, nullptr, &v_tv);
+                    if (v_ready <= 0)
+                        break;
+
+                    char v_buf[256];
+#if defined(_WIN32)
+                    const int v_n = ::recv(p_cs.m_sock, v_buf, static_cast<int>(sizeof(v_buf)), 0);
+                    if (v_n == SOCKET_ERROR)
+                        return false;
+#else
+                    const ssize_t v_n = ::recv(p_cs.m_sock, v_buf, sizeof(v_buf), 0);
+                    if (v_n < 0)
+                        return false;
+#endif
+                    if (v_n == 0)
+                        return false;
+                    p_cs.m_inbox.append(v_buf, static_cast<std::size_t>(v_n));
+                    if (p_cs.m_inbox.size() > k_inbox_cap)
+                        return false;
+                }
+
+                while (true) {
+                    const auto v_nl = p_cs.m_inbox.find('\n');
+                    if (v_nl == std::string::npos)
+                        break;
+                    const std::string_view v_line(p_cs.m_inbox.data(), v_nl);
+                    control_kind v_kind{};
+                    std::uint32_t v_value = 0;
+                    if (parse_control_line(v_line, v_kind, v_value)) {
+                        if (v_impl_ptr->m_hub != nullptr)
+                            v_impl_ptr->m_hub->apply_control_from_client(v_kind, v_value);
+                    } else {
+                        spdlog::warn("telemetry: ignoring malformed control line ({} bytes)", v_nl);
+                    }
+                    p_cs.m_inbox.erase(0, v_nl + 1);
+                }
+                return true;
+            };
 
             while (v_impl_ptr->m_running.load(std::memory_order_acquire)) {
                 std::this_thread::sleep_for(k_broadcast_interval);
@@ -220,14 +351,18 @@ namespace gempba::telemetry {
                 std::vector<socket_t> v_dead;
                 {
                     const std::scoped_lock v_lock(v_impl_ptr->m_clients_mtx);
-                    for (const socket_t v_c: v_impl_ptr->m_clients) {
-                        if (!send_all(v_c, v_line.data(), v_line.size())) {
-                            v_dead.push_back(v_c);
+                    for (auto& v_cs: v_impl_ptr->m_clients) {
+                        if (!v_drain_inbound(v_cs)) {
+                            v_dead.push_back(v_cs.m_sock);
+                            continue;
+                        }
+                        if (!send_all(v_cs.m_sock, v_line.data(), v_line.size())) {
+                            v_dead.push_back(v_cs.m_sock);
                         }
                     }
                     if (!v_dead.empty()) {
                         v_impl_ptr->m_clients.erase(std::remove_if(v_impl_ptr->m_clients.begin(), v_impl_ptr->m_clients.end(),
-                                                                   [&](socket_t p_s) { return std::find(v_dead.begin(), v_dead.end(), p_s) != v_dead.end(); }),
+                                                                   [&](const client_state& p_cs) { return std::find(v_dead.begin(), v_dead.end(), p_cs.m_sock) != v_dead.end(); }),
                                                     v_impl_ptr->m_clients.end());
                     }
                 }
@@ -266,8 +401,8 @@ namespace gempba::telemetry {
             m_impl->m_broadcast_thread.join();
 
         const std::scoped_lock v_lock(m_impl->m_clients_mtx);
-        for (socket_t v_c: m_impl->m_clients)
-            close_socket(v_c);
+        for (const auto& v_cs: m_impl->m_clients)
+            close_socket(v_cs.m_sock);
         m_impl->m_clients.clear();
     }
 
