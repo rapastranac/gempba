@@ -42,7 +42,7 @@
 namespace gempba {
     class quasi_horizontal_load_balancer final : public load_balancer {
 
-        BS::thread_pool<> m_thread_pool;
+        BS::thread_pool<> m_thread_pool{1};
         unsigned int m_unique_id_counter = 0;
         std::recursive_mutex m_recursive_mutex;
         scheduler::worker* const m_scheduler_worker;

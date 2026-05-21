@@ -39,7 +39,7 @@
 namespace gempba {
     class work_stealing_load_balancer final : public load_balancer {
 
-        BS::thread_pool<> m_thread_pool;
+        BS::thread_pool<> m_thread_pool{1};
         unsigned int m_unique_id_counter = 0;
         std::recursive_mutex m_recursive_mutex;
         std::size_t m_thread_request_count = 0;
