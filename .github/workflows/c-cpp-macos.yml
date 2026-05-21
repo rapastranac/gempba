@@ -48,10 +48,12 @@ jobs:
         run: |
           brew update
           brew install cmake
+          brew install pkg-config
           brew install boost
           brew install open-mpi
           brew install spdlog
           brew install fmt
+          brew install hwloc
           brew install googletest
           brew install libomp
 
@@ -63,6 +65,7 @@ jobs:
           echo "make: $(make --version | head -1 | awk '{print $3}')"
           echo "boost: $(brew info boost --json | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["versions"]["stable"])')"
           echo "open-mpi: $(mpicc --showme:version 2>/dev/null || brew info open-mpi --json | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["versions"]["stable"])')"
+          echo "hwloc: $(brew info hwloc --json | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["versions"]["stable"])')"
           echo "googletest: $(brew info googletest --json | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["versions"]["stable"])')"
 
       # 4️⃣ Build the project

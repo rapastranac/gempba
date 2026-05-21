@@ -10,6 +10,7 @@ CMakeFiles/
 CMakeCache.txt
 CMakeSettings.json
 cmake_install.cmake
+cmake_test_discovery_*.json
 Makefile
 .cmake/
 
