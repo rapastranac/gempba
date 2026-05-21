@@ -126,6 +126,8 @@ namespace gempba {
 
         [[nodiscard]] unsigned int get_thread_pool_size() const override { return m_thread_pool.get_thread_count(); }
 
+        [[nodiscard]] std::size_t get_tasks_running_count() const override { return m_thread_pool.get_tasks_running(); }
+
         void wait() override { m_thread_pool.wait(); }
 
         bool is_done() const override { return m_thread_pool.get_tasks_total() == 0; }
