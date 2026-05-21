@@ -45,6 +45,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VAR_TARGET: ${{ vars.RELEASE_TARGET_BRANCH }}
           REPO: ${{ github.repository }}
+          TAG_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           probe() {
@@ -54,6 +55,13 @@ jobs:
               -H "Accept: application/vnd.github+json" \
               "https://api.github.com/repos/${REPO}/branches/${branch}")
             [[ "$code" == "200" ]]
+          }
+          branch_head_sha() {
+            curl -sS \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${REPO}/branches/$1" \
+              | jq -r '.commit.sha // ""'
           }
           if [[ -n "${VAR_TARGET:-}" ]]; then
             if ! probe "$VAR_TARGET"; then
@@ -68,8 +76,26 @@ jobs:
             probe main    && HAS_MAIN=true    || true
             probe release && HAS_RELEASE=true || true
             if $HAS_MAIN && $HAS_RELEASE; then
-              echo "::error::both 'main' and 'release' exist on ${REPO}; set vars.RELEASE_TARGET_BRANCH to disambiguate"
-              exit 1
+              # Both branches exist — this workflow has no manual input, so
+              # disambiguate by tag-commit reachability: whichever branch's
+              # HEAD equals the just-pushed tag commit was the one tagged
+              # from. If neither or both match, fall back to the explicit
+              # repo-var requirement.
+              MAIN_SHA=$(branch_head_sha main)
+              RELEASE_SHA=$(branch_head_sha release)
+              if [[ "$MAIN_SHA" == "$TAG_SHA" && "$RELEASE_SHA" == "$TAG_SHA" ]]; then
+                echo "::error::both 'main' and 'release' point at the tag commit ${TAG_SHA}; set vars.RELEASE_TARGET_BRANCH to disambiguate"
+                exit 1
+              elif [[ "$MAIN_SHA" == "$TAG_SHA" ]]; then
+                TARGET=main
+                SRC="auto-detect (main HEAD = tag commit)"
+              elif [[ "$RELEASE_SHA" == "$TAG_SHA" ]]; then
+                TARGET=release
+                SRC="auto-detect (release HEAD = tag commit)"
+              else
+                echo "::error::both 'main' and 'release' exist on ${REPO} but neither HEAD points at the tag commit ${TAG_SHA}; set vars.RELEASE_TARGET_BRANCH to disambiguate"
+                exit 1
+              fi
             elif $HAS_RELEASE; then
               TARGET=release
               SRC="auto-detect (only 'release' present)"
