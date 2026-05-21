@@ -100,6 +100,8 @@ namespace gempba {
             spdlog::debug("thread pool size: {}", m_thread_pool.get_thread_count());
         }
 
+        [[nodiscard]] unsigned int get_thread_pool_size() const override { return m_thread_pool.get_thread_count(); }
+
         void wait() override { m_thread_pool.wait(); }
 
         bool is_done() const override { return m_thread_pool.get_tasks_total() == 0; }

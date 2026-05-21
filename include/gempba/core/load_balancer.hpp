@@ -50,6 +50,8 @@ namespace gempba {
 
         virtual void set_thread_pool_size(unsigned int p_size) = 0;
 
+        [[nodiscard]] virtual unsigned int get_thread_pool_size() const = 0;
+
         virtual balancing_policy get_balancing_policy() = 0;
 
         virtual unsigned int generate_unique_id() = 0;

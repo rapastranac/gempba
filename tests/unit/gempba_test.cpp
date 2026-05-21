@@ -314,6 +314,7 @@ namespace {
         void set_root(std::thread::id, std::shared_ptr<gempba::node_core>&) override { throw std::runtime_error("set_root failed"); }
         std::shared_ptr<std::shared_ptr<gempba::node_core>> get_root(std::thread::id) override { return {}; }
         void set_thread_pool_size(unsigned int) override {}
+        [[nodiscard]] unsigned int get_thread_pool_size() const override { return 0; }
         std::future<std::any> force_local_submit(std::function<std::any()>&&) override { return {}; }
         void forward(gempba::node&) override {}
         bool try_local_submit(gempba::node&) override { return false; }

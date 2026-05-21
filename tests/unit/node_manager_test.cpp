@@ -55,6 +55,7 @@ public:
     MOCK_METHOD(void, set_root, (std::thread::id, std::shared_ptr<gempba::node_core>&), (override));
     MOCK_METHOD(std::shared_ptr<std::shared_ptr<gempba::node_core>>, get_root, (std::thread::id), (override));
     MOCK_METHOD(void, set_thread_pool_size, (unsigned int), (override));
+    MOCK_METHOD(unsigned int, get_thread_pool_size, (), (const, override));
     MOCK_METHOD(std::future<std::any>, force_local_submit, (std::function<std::any()>&&), (override));
     MOCK_METHOD(void, forward, (gempba::node&), (override));
     MOCK_METHOD(bool, try_local_submit, (gempba::node&), (override));
