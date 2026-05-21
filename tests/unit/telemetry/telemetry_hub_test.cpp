@@ -11,7 +11,10 @@ namespace {
 
     class telemetry_hub_test : public ::testing::Test {
     protected:
-        void TearDown() override { gempba::telemetry::uninstall(); }
+        void TearDown() override {
+            gempba::telemetry::uninstall();
+            gempba::telemetry::enable();
+        }
     };
 
     TEST_F(telemetry_hub_test, get_returns_nullptr_when_no_hub_installed) { EXPECT_EQ(nullptr, gempba::telemetry::get()); }
@@ -28,6 +31,41 @@ namespace {
         ASSERT_NE(nullptr, gempba::telemetry::get());
         gempba::telemetry::uninstall();
         EXPECT_EQ(nullptr, gempba::telemetry::get());
+    }
+
+    TEST_F(telemetry_hub_test, disable_tears_down_installed_hub_and_blocks_install) {
+        gempba::telemetry::install(std::make_unique<gempba::telemetry::telemetry_hub>());
+        ASSERT_NE(nullptr, gempba::telemetry::get());
+
+        gempba::telemetry::disable();
+        EXPECT_EQ(nullptr, gempba::telemetry::get());
+        EXPECT_FALSE(gempba::telemetry::is_enabled());
+
+        gempba::telemetry::install(std::make_unique<gempba::telemetry::telemetry_hub>());
+        EXPECT_EQ(nullptr, gempba::telemetry::get());
+    }
+
+    TEST_F(telemetry_hub_test, disable_before_install_blocks_install) {
+        gempba::telemetry::disable();
+        gempba::telemetry::install(std::make_unique<gempba::telemetry::telemetry_hub>());
+        EXPECT_EQ(nullptr, gempba::telemetry::get());
+    }
+
+    TEST_F(telemetry_hub_test, enable_after_disable_allows_install_again) {
+        gempba::telemetry::disable();
+        gempba::telemetry::enable();
+        EXPECT_TRUE(gempba::telemetry::is_enabled());
+
+        gempba::telemetry::install(std::make_unique<gempba::telemetry::telemetry_hub>());
+        EXPECT_NE(nullptr, gempba::telemetry::get());
+    }
+
+    TEST_F(telemetry_hub_test, disable_and_enable_are_idempotent) {
+        EXPECT_NO_THROW(gempba::telemetry::disable());
+        EXPECT_NO_THROW(gempba::telemetry::disable());
+        EXPECT_NO_THROW(gempba::telemetry::enable());
+        EXPECT_NO_THROW(gempba::telemetry::enable());
+        EXPECT_TRUE(gempba::telemetry::is_enabled());
     }
 
     TEST_F(telemetry_hub_test, on_runtime_ready_does_not_throw_in_either_mode) {

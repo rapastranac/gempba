@@ -17,6 +17,9 @@ namespace {
     // Called from both mp::create_scheduler (every MPI rank reaches it -> MPI_Comm_dup
     // is collective-symmetric) and mt::create_node_manager (single-process MT_ONLY).
     void install_telemetry_hub_if_needed() {
+        if (!gempba::telemetry::is_enabled()) {
+            return;
+        }
         if (gempba::telemetry::get() != nullptr) {
             return;
         }

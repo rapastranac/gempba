@@ -165,6 +165,23 @@ namespace gempba::telemetry {
     void uninstall() noexcept;
 
     /**
+     * @brief Tear down the installed hub and block subsequent @ref install calls until @ref enable.
+     *
+     * Process-local and sticky. Must be called symmetrically across every
+     * participating rank (or none): disabling on a subset will deadlock the
+     * still-enabled ranks during transport setup. The recommended pattern is
+     * to call @ref disable on every rank before any @c create_* runtime entry
+     * point.
+     */
+    void disable() noexcept;
+
+    /// Lift a prior @ref disable; subsequent @ref install calls take effect again.
+    void enable() noexcept;
+
+    /// @return @c true when the kill switch is in the @ref enable state.
+    [[nodiscard]] bool is_enabled() noexcept;
+
+    /**
      * @brief Set the TCP port the center role will bind for the dashboard.
      *
      * Must be called before the hub is installed (i.e., before the first

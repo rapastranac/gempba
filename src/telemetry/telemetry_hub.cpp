@@ -24,6 +24,8 @@ namespace gempba::telemetry {
 
     namespace {
         std::unique_ptr<telemetry_hub> g_owner;
+        // Telemetry is ON by default; the kill switch is opt-out.
+        bool g_enabled = true;
 
         std::uint64_t monotonic_ms() noexcept {
             using clock = std::chrono::steady_clock;
@@ -336,7 +338,12 @@ namespace gempba::telemetry {
 
     telemetry_hub* get() noexcept { return g_owner.get(); }
 
-    void install(std::unique_ptr<telemetry_hub> p_hub) noexcept { g_owner = std::move(p_hub); }
+    void install(std::unique_ptr<telemetry_hub> p_hub) noexcept {
+        if (!g_enabled) {
+            return;
+        }
+        g_owner = std::move(p_hub);
+    }
 
     void uninstall() noexcept {
         if (g_owner) {
@@ -344,5 +351,14 @@ namespace gempba::telemetry {
         }
         g_owner.reset();
     }
+
+    void disable() noexcept {
+        g_enabled = false;
+        uninstall();
+    }
+
+    void enable() noexcept { g_enabled = true; }
+
+    bool is_enabled() noexcept { return g_enabled; }
 
 } // namespace gempba::telemetry

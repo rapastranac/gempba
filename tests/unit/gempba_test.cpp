@@ -95,6 +95,7 @@ class gempba_test : public ::testing::Test {
 protected:
     void TearDown() override {
         gempba::telemetry::uninstall();
+        gempba::telemetry::enable();
         gempba::reset_node_manager();
         gempba::reset_load_balancer();
         gempba::reset_scheduler();
@@ -230,6 +231,27 @@ TEST_F(gempba_test, mp_create_node_manager_throws_if_already_exists) {
 TEST_F(gempba_test, mp_get_default_mpi_stats_visitor_returns_non_null) {
     auto v_visitor = gempba::mp::get_default_mpi_stats_visitor();
     ASSERT_NE(nullptr, v_visitor);
+}
+
+TEST_F(gempba_test, telemetry_disable_before_create_scheduler_suppresses_auto_install) {
+    gempba::telemetry::disable();
+    gempba::mp::create_scheduler(std::make_unique<scheduler_stub>());
+    EXPECT_EQ(nullptr, gempba::telemetry::get());
+}
+
+TEST_F(gempba_test, telemetry_disable_before_create_node_manager_suppresses_auto_install) {
+    gempba::telemetry::disable();
+    gempba::load_balancer* v_lb = gempba::mt::create_load_balancer(gempba::QUASI_HORIZONTAL);
+    gempba::mt::create_node_manager(v_lb);
+    EXPECT_EQ(nullptr, gempba::telemetry::get());
+}
+
+TEST_F(gempba_test, telemetry_disable_after_create_scheduler_tears_down_auto_installed_hub) {
+    gempba::mp::create_scheduler(std::make_unique<scheduler_stub>());
+    ASSERT_NE(nullptr, gempba::telemetry::get());
+
+    gempba::telemetry::disable();
+    EXPECT_EQ(nullptr, gempba::telemetry::get());
 }
 
 TEST_F(gempba_test, shutdown_resets_all_singletons) {
