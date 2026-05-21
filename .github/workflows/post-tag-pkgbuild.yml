@@ -1,0 +1,151 @@
+name: Post-tag PKGBUILD sha256 cleanup
+
+# Triggered on `v*` tag push: replaces the `'SKIP'` placeholder that the
+# prep PR landed in `packaging/msys2/PKGBUILD` with the real sha of the
+# source tarball that GitHub publishes for the new tag.
+#
+# Opens a follow-up PR against `release`. The maintainer reviews + merges.
+
+on:
+  push:
+    tags: [ "v*" ]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
+    timeout-minutes: 5
+
+    steps:
+      - name: Derive version + branch name from tag
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          {
+            echo "TAG=$TAG"
+            echo "VERSION=$VERSION"
+            echo "BRANCH=post-tag/pkgbuild-sha-${TAG}"
+          } >> "$GITHUB_ENV"
+
+      # Resolve which branch the follow-up PR targets. Precedence:
+      #   1. The repository variable `RELEASE_TARGET_BRANCH`, if set.
+      #   2. Auto-detect by probing the origin repo via the GitHub REST API:
+      #        - both `main` and `release` exist  -> fail as ambiguous
+      #        - only one exists                  -> use it
+      #        - neither exists                   -> fail
+      # No workflow input here (this workflow is triggered by tag push,
+      # not workflow_dispatch); set vars.RELEASE_TARGET_BRANCH if both
+      # `main` and `release` exist on your fork.
+      - name: Resolve target branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VAR_TARGET: ${{ vars.RELEASE_TARGET_BRANCH }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          probe() {
+            local branch="$1" code
+            code=$(curl -sS -o /dev/null -w "%{http_code}" \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${REPO}/branches/${branch}")
+            [[ "$code" == "200" ]]
+          }
+          if [[ -n "${VAR_TARGET:-}" ]]; then
+            if ! probe "$VAR_TARGET"; then
+              echo "::error::vars.RELEASE_TARGET_BRANCH='${VAR_TARGET}' does not exist on ${REPO}"
+              exit 1
+            fi
+            TARGET="$VAR_TARGET"
+            SRC="vars.RELEASE_TARGET_BRANCH"
+          else
+            HAS_MAIN=false
+            HAS_RELEASE=false
+            probe main    && HAS_MAIN=true    || true
+            probe release && HAS_RELEASE=true || true
+            if $HAS_MAIN && $HAS_RELEASE; then
+              echo "::error::both 'main' and 'release' exist on ${REPO}; set vars.RELEASE_TARGET_BRANCH to disambiguate"
+              exit 1
+            elif $HAS_RELEASE; then
+              TARGET=release
+              SRC="auto-detect (only 'release' present)"
+            elif $HAS_MAIN; then
+              TARGET=main
+              SRC="auto-detect (only 'main' present)"
+            else
+              echo "::error::neither 'main' nor 'release' exists on ${REPO}"
+              exit 1
+            fi
+          fi
+          echo "TARGET_BRANCH=$TARGET" >> "$GITHUB_ENV"
+          echo "Target branch resolved to '${TARGET}' (${SRC})"
+
+      - name: Checkout target branch (not the tag)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+
+      - name: Setup gh CLI
+        uses: ./.github/actions/setup-gh-cli
+
+      - name: Configure git
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Create work branch
+        run: git switch -c "$BRANCH"
+
+      - name: Run update-pkgbuild against the new tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/update-pkgbuild.sh "$VERSION"
+
+      - name: Commit (skip if PKGBUILD already correct)
+        id: commit
+        run: |
+          set -euo pipefail
+          if git diff --quiet packaging/msys2/PKGBUILD; then
+            echo "::notice::PKGBUILD already has the right sha for ${TAG}; nothing to do"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git add packaging/msys2/PKGBUILD
+          MSG=$(printf '%s\n\n%s\n%s' \
+            "Update PKGBUILD sha256 for ${TAG}" \
+            "- Replace 'SKIP' placeholder from prep PR with the real sha of ${TAG}'s source tarball" \
+            "- Auto-opened by the post-tag-pkgbuild workflow")
+          git commit -m "$MSG"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Push + open PR
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git push -u origin "$BRANCH"
+          BODY_FILE=$(mktemp)
+          printf '%s\n' \
+            "Auto-opened by the \`post-tag-pkgbuild\` workflow after \`${TAG}\` was published." \
+            "" \
+            "**What changed**" \
+            "" \
+            "- \`packaging/msys2/PKGBUILD\` \`sha256sums\` updated from \`'SKIP'\` to the real sha of \`${TAG}\`'s source tarball." \
+            "" \
+            "**Why this is a follow-up PR**" \
+            "" \
+            "- The real sha can only be computed after the tag is pushed and the source tarball is available at \`https://github.com/${{ github.repository }}/archive/refs/tags/${TAG}.tar.gz\`." \
+            "- Setting \`'SKIP'\` in the prep PR keeps that diff reviewable; this follow-up PR lands the real sha once it's known." \
+            > "$BODY_FILE"
+          gh pr create \
+            --base "${TARGET_BRANCH}" \
+            --head "$BRANCH" \
+            --title "Update PKGBUILD sha256 for ${TAG}" \
+            --label Release \
+            --body-file "$BODY_FILE"
