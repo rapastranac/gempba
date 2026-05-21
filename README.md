@@ -57,7 +57,7 @@ Installation, quick-start, full API reference, and examples are all at:
 
 ## Copyright and Citing
 
-Copyright © 2021-2025 [Andrés Pastrana](https://www.linkedin.com/in/andrepas/). Licensed under the [MIT license](https://github.com/rapastranac/gempba/blob/main/LICENSE).
+Copyright © 2021-2026 [Andrés Pastrana](https://www.linkedin.com/in/andrepas/). Licensed under the [MIT license](https://github.com/rapastranac/gempba/blob/main/LICENSE).
 
 If you use GemPBA in software or research of any kind, please include a link to [the GitHub repository](https://github.com/rapastranac/gempba) in your source code and documentation.
 
