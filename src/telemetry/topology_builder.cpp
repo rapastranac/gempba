@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <impl/telemetry/hwloc_probe.hpp>
 #include <map>
 #include <mpi.h>
 #include <thread>
@@ -182,6 +183,10 @@ namespace gempba::telemetry {
         // node in MPI mode.
         void fill_local_host_fields(topology_node& p_node) noexcept {
             p_node.m_mem_total_bytes = query_total_memory_bytes();
+
+            if (fill_static_topology_via_hwloc(p_node)) {
+                return;
+            }
 
             const unsigned v_logical = std::thread::hardware_concurrency();
             const auto v_logical_clamped = static_cast<std::uint16_t>(v_logical == 0 ? 1u : v_logical);
