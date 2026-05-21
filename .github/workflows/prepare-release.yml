@@ -2,7 +2,10 @@ name: Prepare release
 
 # Manually-triggered workflow that opens a release-prep PR against the
 # resolved target branch (main or release; see "Resolve target branch" step):
-#   - branches `release/v<version>` from latest <target_branch>
+#   - branches `prep/v<version>` from latest <target_branch>
+#     (`prep/` namespace avoids the git-ref hierarchy collision that the
+#     legacy `release/v<version>` pattern hit when the target fork has a
+#     long-lived `release` branch — see #197)
 #   - bumps CMakeLists.txt project VERSION + packaging/msys2/PKGBUILD pkgver
 #     (sha256sums set to 'SKIP'; the real sha lands via post-tag-pkgbuild.yml
 #     after the tag is pushed)
@@ -54,7 +57,7 @@ jobs:
           {
             echo "VERSION=$V"
             echo "TAG=v$V"
-            echo "BRANCH=release/v$V"
+            echo "BRANCH=prep/v$V"
           } >> "$GITHUB_ENV"
 
       # Resolve which branch the release-prep PR targets. Precedence:
