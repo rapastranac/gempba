@@ -59,6 +59,12 @@ find_package(MPI REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(fmt REQUIRED)
 
+if (GEMPBA_HWLOC)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(HWLOC REQUIRED IMPORTED_TARGET hwloc)
+    message(STATUS "Found hwloc ${HWLOC_VERSION}")
+endif ()
+
 # 📂 Includes
 include_directories(${MPI_INCLUDE_PATH})
 include_directories(include)
@@ -128,6 +134,10 @@ target_compile_definitions(gempba PUBLIC SPDLOG_HEADER_ONLY)
 # C++23 stacktrace support (standard library, not external)
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 14)
     target_link_libraries(gempba PUBLIC stdc++exp)
+endif ()
+
+if (GEMPBA_HWLOC)
+    target_link_libraries(gempba PRIVATE PkgConfig::HWLOC)
 endif ()
 
 if (WIN32)
