@@ -42,6 +42,8 @@ jobs:
             mingw-w64-x86_64-gtest
             mingw-w64-x86_64-spdlog
             mingw-w64-x86_64-fmt
+            mingw-w64-x86_64-hwloc
+            mingw-w64-x86_64-pkgconf
 
       # 2️⃣b Install MS-MPI runtime (msmpi.dll lives in System32 and is not part
       # of the MSYS2 mingw-w64-x86_64-msmpi package, which only ships the SDK).
@@ -59,6 +61,7 @@ jobs:
           echo "make: $(make --version | head -1 | awk '{print $3}')"
           echo "mingw-w64-x86_64-boost: $(pacman -Qi mingw-w64-x86_64-boost | grep Version | awk '{print $3}')"
           echo "mingw-w64-x86_64-msmpi: $(pacman -Qi mingw-w64-x86_64-msmpi | grep Version | awk '{print $3}')"
+          echo "mingw-w64-x86_64-hwloc: $(pacman -Qi mingw-w64-x86_64-hwloc | grep Version | awk '{print $3}')"
           echo "mingw-w64-x86_64-gtest: $(pacman -Qi mingw-w64-x86_64-gtest | grep Version | awk '{print $3}')"
 
       # 4️⃣ Build the project
@@ -124,6 +127,8 @@ jobs:
             mingw-w64-x86_64-msmpi
             mingw-w64-x86_64-spdlog
             mingw-w64-x86_64-fmt
+            mingw-w64-x86_64-hwloc
+            mingw-w64-x86_64-pkgconf
             git
             zstd
 
