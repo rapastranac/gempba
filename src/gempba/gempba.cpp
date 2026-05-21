@@ -109,6 +109,8 @@ gempba::scheduler* gempba::get_scheduler() {
     return g_scheduler.get();
 }
 
+gempba::scheduler* gempba::try_get_scheduler() noexcept { return g_scheduler.get(); }
+
 void gempba::reset_scheduler() { g_scheduler.reset(); }
 
 gempba::load_balancer* gempba::get_load_balancer() { return g_load_balancer.get(); }
