@@ -1,0 +1,80 @@
+name: Setup gh CLI
+description: |
+  Ensure the GitHub CLI is on PATH. No-op on github-hosted runners (gh is
+  pre-installed). On self-hosted runners where gh is missing, download a pinned
+  release into $RUNNER_TEMP and prepend it to $GITHUB_PATH for the rest of the
+  job.
+
+inputs:
+  version:
+    description: gh CLI version to install when not already present (no leading v).
+    required: false
+    default: '2.64.0'
+
+runs:
+  using: composite
+  steps:
+    - name: Check if gh is already on PATH
+      id: check
+      shell: bash
+      run: |
+        set -euo pipefail
+        if command -v gh >/dev/null 2>&1; then
+          echo "present=true" >> "$GITHUB_OUTPUT"
+          echo "gh already on PATH: $(gh --version | head -1)"
+        else
+          echo "present=false" >> "$GITHUB_OUTPUT"
+          echo "gh not on PATH; will install ${{ inputs.version }}"
+        fi
+
+    - name: Install gh
+      if: steps.check.outputs.present == 'false'
+      shell: bash
+      run: |
+        set -euo pipefail
+        VERSION="${{ inputs.version }}"
+        OS_RAW="$(uname -s | tr '[:upper:]' '[:lower:]')"
+        ARCH_RAW="$(uname -m)"
+
+        case "$ARCH_RAW" in
+          x86_64)        ARCH=amd64 ;;
+          aarch64|arm64) ARCH=arm64 ;;
+          *) echo "::error::unsupported arch: $ARCH_RAW"; exit 1 ;;
+        esac
+
+        case "$OS_RAW" in
+          linux)
+            PKG="gh_${VERSION}_linux_${ARCH}.tar.gz"
+            EXTRACTOR="tar -xzf"
+            ;;
+          darwin)
+            PKG="gh_${VERSION}_macOS_${ARCH}.zip"
+            EXTRACTOR="unzip -q"
+            ;;
+          mingw*|msys*|cygwin*)
+            PKG="gh_${VERSION}_windows_${ARCH}.zip"
+            EXTRACTOR="unzip -q"
+            ;;
+          *) echo "::error::unsupported OS: $OS_RAW"; exit 1 ;;
+        esac
+
+        URL="https://github.com/cli/cli/releases/download/v${VERSION}/${PKG}"
+        DEST="${RUNNER_TEMP}/gh-cli"
+        mkdir -p "$DEST"
+
+        echo "Downloading $URL"
+        curl --fail --silent --show-error --location --retry 3 \
+          --output "$DEST/$PKG" "$URL"
+
+        $EXTRACTOR "$DEST/$PKG" -C "$DEST" 2>/dev/null || \
+          (cd "$DEST" && $EXTRACTOR "$PKG")
+
+        BIN_DIR="$(find "$DEST" -mindepth 2 -maxdepth 2 -type d -name bin | head -1)"
+        if [[ -z "$BIN_DIR" ]]; then
+          echo "::error::could not locate bin/ inside the extracted gh archive"
+          ls -la "$DEST"
+          exit 1
+        fi
+
+        echo "$BIN_DIR" >> "$GITHUB_PATH"
+        "$BIN_DIR"/gh --version || "$BIN_DIR"/gh.exe --version
