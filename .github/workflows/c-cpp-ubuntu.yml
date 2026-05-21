@@ -162,6 +162,41 @@ jobs:
           path: build/*.deb
           retention-days: 7
 
+  # Apply the curated release-notes file to the GitHub Release body created by
+  # `publish-deb`. Must live in the same workflow (rather than listening on
+  # `release: created` or `workflow_run`) because Actions suppresses recursive
+  # triggers from `GITHUB_TOKEN`-authored events. Same-workflow guarantees
+  # ordering after the Release exists.
+  set-release-body:
+    needs: publish-deb
+    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout the tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Setup gh CLI
+        uses: ./.github/actions/setup-gh-cli
+
+      - name: Apply release notes to GitHub Release body
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          NOTES="docs/releases/release-notes-v${VERSION}.md"
+          if [[ ! -f "$NOTES" ]]; then
+            echo "::error::missing $NOTES — was the release-notes file curated and merged before tagging?"
+            exit 1
+          fi
+          gh release edit "$TAG" --notes-file "$NOTES"
+
   publish-apt-repo:
     needs: publish-deb
     runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
