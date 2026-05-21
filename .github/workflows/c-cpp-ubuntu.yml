@@ -153,9 +153,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 6️⃣b PR → store as workflow artifact so publish-apt-repo can consume it
-      - name: Upload .deb as workflow artifact (PR)
-        if: github.event_name == 'pull_request'
+      # 6️⃣b Store as workflow artifact so publish-apt-repo can consume it.
+      # Always uploaded (tag + PR) so publish-apt-repo's download step has a
+      # uniform source. The Release attachment in step 6️⃣a is independent and
+      # only fires on tag pushes.
+      - name: Upload .deb as workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: deb-package
@@ -228,18 +230,11 @@ jobs:
           sed -i "s|SIGN_WITH_KEY_ID|${{ vars.GPG_KEY_ID }}|" \
             apt-repo/conf/distributions
 
-      # 5️⃣a Tag → download .deb from GitHub Release
-      - name: Download .deb from release (tag)
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          TAG=${GITHUB_REF#refs/tags/}
-          gh release download "$TAG" --pattern "*.deb" --dir deb-download
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # 5️⃣b PR → download .deb from the workflow artifact uploaded by publish-deb
-      - name: Download .deb from artifact (PR)
-        if: github.event_name == 'pull_request'
+      # 5️⃣ Download .deb from the workflow artifact uploaded by publish-deb.
+      # Single code path for both tag and PR — no `gh release download`, so the
+      # self-hosted Linux runner image doesn't need the gh CLI just for this
+      # step. (See #170 for the gh-missing-on-self-hosted-runners failure.)
+      - name: Download .deb from artifact
         uses: actions/download-artifact@v4
         with:
           name: deb-package
