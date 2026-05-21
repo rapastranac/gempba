@@ -31,6 +31,7 @@
 
 #include <gempba/core/load_balancer.hpp>
 #include <gempba/core/node.hpp>
+#include <gempba/telemetry/telemetry_hub.hpp>
 #include <gempba/utils/transmission_guard.hpp>
 #include <gempba/utils/utils.hpp>
 
@@ -59,6 +60,8 @@ namespace gempba {
 
         std::future<std::any> force_local_submit(std::function<std::any()>&& p_function) override {
             ++m_thread_request_count;
+            if (auto* v_telemetry = telemetry::get())
+                v_telemetry->record_task_local();
             return m_thread_pool.submit_task(p_function);
         }
 

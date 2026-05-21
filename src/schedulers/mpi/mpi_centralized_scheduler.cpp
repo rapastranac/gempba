@@ -1,4 +1,5 @@
 #include <gempba/node_manager.hpp>
+#include <gempba/telemetry/telemetry_hub.hpp>
 #include <impl/schedulers/mpi_centralized_scheduler.hpp>
 
 namespace gempba {
@@ -43,6 +44,8 @@ namespace gempba {
                 m_stats.m_sent_task_count++;
                 m_stats.m_total_requested_tasks++;
 
+                if (auto* v_telemetry = telemetry::get())
+                    v_telemetry->record_send(static_cast<std::uint32_t>(CENTER_NODE), v_packet->size());
 
                 send_task_to_center(*v_packet);
 
@@ -74,6 +77,12 @@ namespace gempba {
                     break;
                 }
             }
+
+            // Workers spend most of their time inside this loop while user
+            // computation runs on the thread pool; drive telemetry from here
+            // so worker frames keep flowing during long computations.
+            if (auto* v_telemetry = telemetry::get())
+                v_telemetry->tick_if_due();
         }
         utils::print_ipc_debug_comments("rank {} sent {} tasks\n", m_world_rank, m_sent_tasks);
 

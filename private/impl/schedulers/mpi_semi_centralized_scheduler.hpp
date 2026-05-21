@@ -16,6 +16,7 @@
 #include <thread>
 
 #include <gempba/core/scheduler.hpp>
+#include <gempba/telemetry/telemetry_hub.hpp>
 #include <gempba/utils/gempba_utils.hpp>
 #include <gempba/utils/queue.hpp>
 #include <gempba/utils/result.hpp>
@@ -211,6 +212,9 @@ namespace gempba {
                 if (v_is_terminated) {
                     break; // exit loop
                 }
+
+                if (auto* v_telemetry = telemetry::get())
+                    v_telemetry->tick_if_due();
             }
             /**
              * TODO.. send results back to the rank from which the task was sent.
@@ -272,6 +276,11 @@ namespace gempba {
                 if (++branch > INT_MAX - 1000) {
                     branch = 0;
                 }
+
+                // Drive telemetry from inside the busy-wait so worker frames
+                // ship in real time even when no task traffic is flowing.
+                if (auto* v_telemetry = telemetry::get())
+                    v_telemetry->tick_if_due();
             }
         }
 
@@ -321,6 +330,9 @@ namespace gempba {
             m_received_tasks++;
             m_stats.m_received_task_count++;
             m_stats.m_total_requested_tasks++;
+
+            if (auto* v_telemetry = telemetry::get())
+                v_telemetry->record_recv(static_cast<std::uint32_t>(p_status.MPI_SOURCE), static_cast<std::uint64_t>(v_count));
 
             //  Delegates the processing of the incoming buffer to the node manager and stores the potential returned value in _returned_value_future.
             const auto v_runnable = p_runnables[v_runnable_id];
@@ -485,6 +497,9 @@ namespace gempba {
                         // nothing
                     };
                 }
+
+                if (auto* v_telemetry = telemetry::get())
+                    v_telemetry->tick_if_due();
             }
 
             /*
@@ -528,6 +543,13 @@ namespace gempba {
                         branch = 0;
                     }
                     ++v_cycles;
+
+                    // Drive telemetry from inside the center busy-wait so the
+                    // aggregator drains worker frames in real time even when
+                    // no task traffic is flowing.
+                    if (auto* v_telemetry = telemetry::get())
+                        v_telemetry->tick_if_due();
+
                     double v_elapsed = utils::diff_time(v_wall_time0, MPI_Wtime());
                     if (v_elapsed > m_timeout) {
                         spdlog::debug("rank {}: no messages received in {} seconds, cycles: {}", m_world_rank, v_elapsed, v_cycles);
@@ -756,6 +778,9 @@ namespace gempba {
             m_total_requests_number++;
             m_stats.m_sent_task_count++;
             m_stats.m_total_requested_tasks++;
+
+            if (auto* v_telemetry = telemetry::get())
+                v_telemetry->record_send(static_cast<std::uint32_t>(DEST), p_packet.size());
         }
 
     private:
