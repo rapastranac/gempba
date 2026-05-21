@@ -1,6 +1,7 @@
 #include <impl/telemetry/node_probe.hpp>
 
 #include <cstring>
+#include <impl/telemetry/hwloc_probe.hpp>
 #include <thread>
 
 #if defined(_WIN32)
@@ -122,11 +123,13 @@ namespace gempba::telemetry {
 
         fill_memory(p_out.m_mem_total_bytes, p_out.m_mem_avail_bytes);
 
-        p_out.m_socket_count = 1;
-        p_out.m_sockets[0].m_socket_id = 0;
-        p_out.m_sockets[0].m_cpu_pct = 0.0f;
-        p_out.m_sockets[0].m_mem_total_bytes = p_out.m_mem_total_bytes;
-        p_out.m_sockets[0].m_mem_used_bytes = p_out.m_mem_total_bytes > p_out.m_mem_avail_bytes ? p_out.m_mem_total_bytes - p_out.m_mem_avail_bytes : 0;
+        if (!fill_runtime_via_hwloc(p_out)) {
+            p_out.m_socket_count = 1;
+            p_out.m_sockets[0].m_socket_id = 0;
+            p_out.m_sockets[0].m_cpu_pct = 0.0f;
+            p_out.m_sockets[0].m_mem_total_bytes = p_out.m_mem_total_bytes;
+            p_out.m_sockets[0].m_mem_used_bytes = p_out.m_mem_total_bytes > p_out.m_mem_avail_bytes ? p_out.m_mem_total_bytes - p_out.m_mem_avail_bytes : 0;
+        }
 
         p_out.m_net_aggregate = net_stats{};
         p_out.m_disk_aggregate = disk_stats{};
