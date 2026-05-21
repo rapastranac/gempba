@@ -9,6 +9,7 @@
 #include <impl/telemetry/process_probe.hpp>
 #include <impl/telemetry/topology_builder.hpp>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstring>
@@ -17,6 +18,7 @@
 #include <mutex>
 #include <thread>
 #include <utility>
+#include <vector>
 
 namespace gempba::telemetry {
 
@@ -203,6 +205,19 @@ namespace gempba::telemetry {
             }
         }
 
+        std::vector<control_msg> v_pending;
+        {
+            const std::scoped_lock v_lock(m_pending_fanout_mtx);
+            v_pending.swap(m_pending_fanout);
+        }
+        for (const auto& v_msg: v_pending) {
+            for (std::uint32_t v_id = 0; v_id < m_world_size; ++v_id) {
+                if (v_id == m_worker_id)
+                    continue;
+                m_transport->send_control(v_id, v_msg);
+            }
+        }
+
         if (m_aggregator) {
             const std::uint64_t v_ts = monotonic_ms();
             m_transport->poll(
@@ -290,6 +305,34 @@ namespace gempba::telemetry {
     void telemetry_hub::set_node_interval_ms(const std::uint32_t p_interval_ms) noexcept { m_node_interval_ms.store(p_interval_ms, std::memory_order_relaxed); }
 
     void telemetry_hub::mark_as_node_sentinel() noexcept { m_is_sentinel.store(true, std::memory_order_relaxed); }
+
+    std::uint32_t telemetry_hub::worker_interval_ms() const noexcept { return m_worker_interval_ms.load(std::memory_order_relaxed); }
+
+    std::uint32_t telemetry_hub::node_interval_ms() const noexcept { return m_node_interval_ms.load(std::memory_order_relaxed); }
+
+    void telemetry_hub::apply_control_from_client(const control_kind p_kind, const std::uint32_t p_value) noexcept {
+        constexpr std::uint32_t k_min_interval_ms = 50;
+        constexpr std::uint32_t k_max_interval_ms = 600'000;
+
+        std::uint32_t v_value = p_value;
+        switch (p_kind) {
+            case control_kind::SET_WORKER_INTERVAL_MS:
+            case control_kind::SET_NODE_INTERVAL_MS:
+                v_value = std::clamp(v_value, k_min_interval_ms, k_max_interval_ms);
+                break;
+            default:
+                return;
+        }
+
+        if (p_kind == control_kind::SET_WORKER_INTERVAL_MS) {
+            m_worker_interval_ms.store(v_value, std::memory_order_relaxed);
+        } else {
+            m_node_interval_ms.store(v_value, std::memory_order_relaxed);
+        }
+
+        const std::scoped_lock v_lock(m_pending_fanout_mtx);
+        m_pending_fanout.push_back(control_msg{TELEMETRY_SCHEMA_VERSION, p_kind, v_value});
+    }
 
     telemetry_hub* get() noexcept { return g_owner.get(); }
 
