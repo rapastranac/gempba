@@ -29,6 +29,7 @@
 
 #include <gempba/gempba.hpp>
 #include <gempba/node_manager.hpp>
+#include <gempba/telemetry/telemetry_hub.hpp>
 #include <impl/load_balancing/quasi_horizontal_load_balancer.hpp>
 #include <impl/load_balancing/work_stealing_load_balancer.hpp>
 
@@ -93,6 +94,7 @@ public:
 class gempba_test : public ::testing::Test {
 protected:
     void TearDown() override {
+        gempba::telemetry::uninstall();
         gempba::reset_node_manager();
         gempba::reset_load_balancer();
         gempba::reset_scheduler();
