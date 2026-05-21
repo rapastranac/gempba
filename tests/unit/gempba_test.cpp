@@ -75,6 +75,8 @@ public:
     [[nodiscard]] std::unique_ptr<gempba::stats> get_stats() const override { return nullptr; }
     [[nodiscard]] double elapsed_time() const override { return 0.0; }
 
+    [[nodiscard]] std::size_t get_pending_request_count() const override { return 0; }
+
     void set_goal(gempba::goal, gempba::score_type) override {}
 
     void set_custom_initial_topology(tree&&) override {}

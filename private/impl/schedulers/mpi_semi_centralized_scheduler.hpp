@@ -134,6 +134,8 @@ namespace gempba {
 
         [[nodiscard]] double elapsed_time() const override { return (m_end_time - m_start_time) - static_cast<double>(m_timeout); }
 
+        [[nodiscard]] std::size_t get_pending_request_count() const override { return 0; }
+
     private:
         [[nodiscard]] int next_process() const { return this->m_next_process; }
 
