@@ -20,6 +20,10 @@ jobs:
   build:
     runs-on: ${{ fromJSON(vars.RUNNER_WINDOWS || '["windows-2025"]') }}
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        multiprocessing: ['ON', 'OFF']
 
     steps:
       # 1️⃣ Checkout the repository
@@ -34,8 +38,8 @@ jobs:
       - name: Setup Dependencies
         uses: ./.github/actions/setup-windows-deps
         with:
-          multiprocessing: 'ON'
-          tests: 'true'
+          multiprocessing: ${{ matrix.multiprocessing }}
+          tests: ${{ matrix.multiprocessing == 'ON' && 'true' || 'false' }}
           cache: 'false'
           release: 'false'
 
@@ -47,9 +51,11 @@ jobs:
           echo "cmake: $(cmake --version | head -1 | awk '{print $3}')"
           echo "make: $(make --version | head -1 | awk '{print $3}')"
           echo "mingw-w64-x86_64-boost: $(pacman -Qi mingw-w64-x86_64-boost | grep Version | awk '{print $3}')"
-          echo "mingw-w64-x86_64-msmpi: $(pacman -Qi mingw-w64-x86_64-msmpi | grep Version | awk '{print $3}')"
           echo "mingw-w64-x86_64-hwloc: $(pacman -Qi mingw-w64-x86_64-hwloc | grep Version | awk '{print $3}')"
-          echo "mingw-w64-x86_64-gtest: $(pacman -Qi mingw-w64-x86_64-gtest | grep Version | awk '{print $3}')"
+          if [ "${{ matrix.multiprocessing }}" = "ON" ]; then
+            echo "mingw-w64-x86_64-msmpi: $(pacman -Qi mingw-w64-x86_64-msmpi | grep Version | awk '{print $3}')"
+            echo "mingw-w64-x86_64-gtest: $(pacman -Qi mingw-w64-x86_64-gtest | grep Version | awk '{print $3}')"
+          fi
 
       # 4️⃣ Build the project (no artifact upload — the test job rebuilds
       # locally so every CMake-generated path is resolved on the test runner;
@@ -57,7 +63,7 @@ jobs:
       - name: Build
         shell: msys2 {0}
         run: |
-          cmake -G "MSYS Makefiles" -S . -B build
+          cmake -G "MSYS Makefiles" -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }} -S . -B build
           cmake --build build --parallel $(nproc)
 
   test:
@@ -83,13 +89,14 @@ jobs:
           cache: 'false'
           release: 'false'
 
-      # 3️⃣ Build locally so cmake-generated paths point at this runner's
-      # workspace. No ccache on Windows yet (mingw+msys2 PATH plumbing is a
-      # separate follow-up), so this is a full compile every time.
+      # 3️⃣ Build locally with MP=ON so cmake-generated paths point at this
+      # runner's workspace. No ccache on Windows yet (mingw+msys2 PATH plumbing
+      # is a separate follow-up), so this is a full compile every time. Tests
+      # reference gempba::mp::* directly so we never exercise MP=OFF here.
       - name: Configure + build
         shell: msys2 {0}
         run: |
-          cmake -G "MSYS Makefiles" -S . -B build
+          cmake -G "MSYS Makefiles" -DGEMPBA_MULTIPROCESSING=ON -S . -B build
           cmake --build build --parallel $(nproc)
 
       # 4️⃣ Run tests with JUnit XML output
