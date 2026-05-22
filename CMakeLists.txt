@@ -89,13 +89,17 @@ file(GLOB_RECURSE Sources "src/*.cpp")
 add_library(gempba STATIC ${Sources})
 
 # 🔧️ Add macros for the library
-target_compile_definitions(gempba PRIVATE
-        $<$<BOOL:${GEMPBA_DEV_MODE}>:GEMPBA_DEV_MODE>
-        $<$<BOOL:${GEMPBA_MULTIPROCESSING}>:GEMPBA_MULTIPROCESSING>
-        $<$<BOOL:${GEMPBA_HWLOC}>:GEMPBA_HWLOC>
-        $<$<BOOL:${GEMPBA_DEBUG_COMMENTS}>:GEMPBA_DEBUG_COMMENTS>
-        $<$<BOOL:${GEMPBA_BUILD_EXAMPLES}>:GEMPBA_BUILD_EXAMPLES>
-        $<$<BOOL:${GEMPBA_BUILD_TESTS}>:GEMPBA_BUILD_TESTS>
+# GEMPBA_MULTIPROCESSING is PUBLIC so consumers (and examples) receive the
+# same flag the library was built with via target propagation.
+target_compile_definitions(gempba
+        PUBLIC
+            GEMPBA_MULTIPROCESSING=$<IF:$<BOOL:${GEMPBA_MULTIPROCESSING}>,1,0>
+        PRIVATE
+            $<$<BOOL:${GEMPBA_DEV_MODE}>:GEMPBA_DEV_MODE>
+            $<$<BOOL:${GEMPBA_HWLOC}>:GEMPBA_HWLOC>
+            $<$<BOOL:${GEMPBA_DEBUG_COMMENTS}>:GEMPBA_DEBUG_COMMENTS>
+            $<$<BOOL:${GEMPBA_BUILD_EXAMPLES}>:GEMPBA_BUILD_EXAMPLES>
+            $<$<BOOL:${GEMPBA_BUILD_TESTS}>:GEMPBA_BUILD_TESTS>
 )
 
 # Print messages to confirm the flags
