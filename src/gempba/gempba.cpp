@@ -4,9 +4,12 @@
 #include <gempba/telemetry/telemetry_hub.hpp>
 #include <impl/load_balancing/quasi_horizontal_load_balancer.hpp>
 #include <impl/load_balancing/work_stealing_load_balancer.hpp>
-#include <impl/schedulers/mpi_centralized_scheduler.hpp>
-#include <impl/schedulers/mpi_semi_centralized_scheduler.hpp>
 #include <memory>
+
+#if GEMPBA_MULTIPROCESSING
+    #include <impl/schedulers/mpi_centralized_scheduler.hpp>
+    #include <impl/schedulers/mpi_semi_centralized_scheduler.hpp>
+#endif
 
 namespace {
     inline std::unique_ptr<gempba::scheduler> g_scheduler;
@@ -97,6 +100,8 @@ gempba::load_balancer* gempba::mt::create_load_balancer(const balancing_policy& 
 
 gempba::node_manager& gempba::mt::create_node_manager(load_balancer* p_load_balancer) { return build_node_manager(p_load_balancer, nullptr); }
 
+#if GEMPBA_MULTIPROCESSING
+
 gempba::scheduler* gempba::mp::create_scheduler(std::unique_ptr<scheduler> p_your_implementation) {
     if (g_scheduler != nullptr) {
         throw std::runtime_error("load_balancer already exists!");
@@ -144,6 +149,8 @@ gempba::scheduler* gempba::get_scheduler() {
 gempba::scheduler* gempba::try_get_scheduler() noexcept { return g_scheduler.get(); }
 
 void gempba::reset_scheduler() { g_scheduler.reset(); }
+
+#endif // GEMPBA_MULTIPROCESSING
 
 gempba::load_balancer* gempba::get_load_balancer() { return g_load_balancer.get(); }
 

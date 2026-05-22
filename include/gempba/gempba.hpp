@@ -26,14 +26,18 @@
 
 #include <gempba/core/load_balancer.hpp>
 #include <gempba/core/scheduler.hpp>
-#include <gempba/defaults/default_mpi_stats_visitor.hpp>
 #include <gempba/detail/nodes/node_core_impl.hpp>
 #include <gempba/detail/runnables/serial_runnable_non_void.hpp>
 #include <gempba/detail/runnables/serial_runnable_void.hpp>
 #include <gempba/utils/gempba_utils.hpp>
 
+#if GEMPBA_MULTIPROCESSING
+    #include <gempba/defaults/default_mpi_stats_visitor.hpp>
+#endif
+
 namespace gempba {
 
+#if GEMPBA_MULTIPROCESSING
     /////////////////////////////////////////////////////////////////////////////////////////////////
     /// SCHEDULING
     /// /////////////////////////////////////////////////////////////////////////////////////////////
@@ -42,6 +46,7 @@ namespace gempba {
     scheduler* try_get_scheduler() noexcept;
 
     void reset_scheduler();
+#endif
 
     /////////////////////////////////////////////////////////////////////////////////////////////////
     /// LOAD BALANCING
@@ -119,6 +124,7 @@ namespace gempba {
 
     } // namespace mt
 
+#if GEMPBA_MULTIPROCESSING
     namespace mp {
 
         /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -218,6 +224,7 @@ namespace gempba {
         }
 
     } // namespace mp
+#endif // GEMPBA_MULTIPROCESSING
 } // namespace gempba
 
 #endif // GEMPBA_GEMPBA_HPP
