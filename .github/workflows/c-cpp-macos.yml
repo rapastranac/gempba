@@ -29,37 +29,12 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ github.ref }}
 
-      # 1️⃣b Bootstrap Homebrew on PATH (self-hosted runners don't source the user
-      # profile in non-interactive shells, so brew may exist on disk but not on PATH).
-      - name: Bootstrap Homebrew on PATH
-        run: |
-          if [ -x /opt/homebrew/bin/brew ]; then
-            BREW_PREFIX=/opt/homebrew
-          elif [ -x /usr/local/bin/brew ]; then
-            BREW_PREFIX=/usr/local
-          else
-            echo "Homebrew not found at /opt/homebrew or /usr/local. Install it on the runner first." >&2
-            exit 1
-          fi
-          echo "$BREW_PREFIX/bin" >> "$GITHUB_PATH"
-          echo "$BREW_PREFIX/sbin" >> "$GITHUB_PATH"
-          # Also export for the rest of this step in case anything else runs here.
-          eval "$($BREW_PREFIX/bin/brew shellenv)"
-          brew --version
-
-      # 2️⃣ Set up environment and install dependencies
+      # 2️⃣ Bootstrap Homebrew on PATH + install brew packages
       - name: Setup Dependencies
-        run: |
-          brew update
-          brew install cmake
-          brew install pkg-config
-          brew install boost
-          brew install open-mpi
-          brew install spdlog
-          brew install fmt
-          brew install hwloc
-          brew install googletest
-          brew install libomp
+        uses: ./.github/actions/setup-macos-deps
+        with:
+          multiprocessing: 'ON'
+          tests: 'true'
 
       # 3️⃣ Echo versions of installed dependencies
       - name: Echo Dependencies Version
