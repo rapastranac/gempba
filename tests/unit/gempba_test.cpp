@@ -29,6 +29,7 @@
 
 #include <gempba/gempba.hpp>
 #include <gempba/node_manager.hpp>
+#include <gempba/telemetry/telemetry_hub.hpp>
 #include <impl/load_balancing/quasi_horizontal_load_balancer.hpp>
 #include <impl/load_balancing/work_stealing_load_balancer.hpp>
 
@@ -75,6 +76,8 @@ public:
     [[nodiscard]] std::unique_ptr<gempba::stats> get_stats() const override { return nullptr; }
     [[nodiscard]] double elapsed_time() const override { return 0.0; }
 
+    [[nodiscard]] std::size_t get_pending_request_count() const override { return 0; }
+
     void set_goal(gempba::goal, gempba::score_type) override {}
 
     void set_custom_initial_topology(tree&&) override {}
@@ -91,6 +94,8 @@ public:
 class gempba_test : public ::testing::Test {
 protected:
     void TearDown() override {
+        gempba::telemetry::uninstall();
+        gempba::telemetry::enable();
         gempba::reset_node_manager();
         gempba::reset_load_balancer();
         gempba::reset_scheduler();
@@ -228,6 +233,27 @@ TEST_F(gempba_test, mp_get_default_mpi_stats_visitor_returns_non_null) {
     ASSERT_NE(nullptr, v_visitor);
 }
 
+TEST_F(gempba_test, telemetry_disable_before_create_scheduler_suppresses_auto_install) {
+    gempba::telemetry::disable();
+    gempba::mp::create_scheduler(std::make_unique<scheduler_stub>());
+    EXPECT_EQ(nullptr, gempba::telemetry::get());
+}
+
+TEST_F(gempba_test, telemetry_disable_before_create_node_manager_suppresses_auto_install) {
+    gempba::telemetry::disable();
+    gempba::load_balancer* v_lb = gempba::mt::create_load_balancer(gempba::QUASI_HORIZONTAL);
+    gempba::mt::create_node_manager(v_lb);
+    EXPECT_EQ(nullptr, gempba::telemetry::get());
+}
+
+TEST_F(gempba_test, telemetry_disable_after_create_scheduler_tears_down_auto_installed_hub) {
+    gempba::mp::create_scheduler(std::make_unique<scheduler_stub>());
+    ASSERT_NE(nullptr, gempba::telemetry::get());
+
+    gempba::telemetry::disable();
+    EXPECT_EQ(nullptr, gempba::telemetry::get());
+}
+
 TEST_F(gempba_test, shutdown_resets_all_singletons) {
     gempba::load_balancer* v_lb = gempba::mt::create_load_balancer(gempba::QUASI_HORIZONTAL);
     gempba::mt::create_node_manager(v_lb);
@@ -314,6 +340,8 @@ namespace {
         void set_root(std::thread::id, std::shared_ptr<gempba::node_core>&) override { throw std::runtime_error("set_root failed"); }
         std::shared_ptr<std::shared_ptr<gempba::node_core>> get_root(std::thread::id) override { return {}; }
         void set_thread_pool_size(unsigned int) override {}
+        [[nodiscard]] unsigned int get_thread_pool_size() const override { return 0; }
+        [[nodiscard]] std::size_t get_tasks_running_count() const override { return 0; }
         std::future<std::any> force_local_submit(std::function<std::any()>&&) override { return {}; }
         void forward(gempba::node&) override {}
         bool try_local_submit(gempba::node&) override { return false; }

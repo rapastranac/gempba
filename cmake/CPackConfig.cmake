@@ -24,7 +24,7 @@ set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "amd64")
 set(CPACK_DEBIAN_PACKAGE_SECTION "libdevel")
 set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
 set(CPACK_DEBIAN_PACKAGE_DEPENDS
-    "libopenmpi-dev (>= 4.0), libspdlog-dev, libfmt-dev, libgomp1, libc6 (>= 2.17)")
+    "libopenmpi-dev (>= 4.0), libspdlog-dev, libfmt-dev, libhwloc-dev, libgomp1, libc6 (>= 2.17)")
 set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "https://github.com/rapastranac/gempba")
 
 include(CPack)

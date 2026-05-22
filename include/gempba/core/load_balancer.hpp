@@ -26,6 +26,7 @@
 #define GEMPBA_LOAD_BALANCER_HPP
 
 #include <any>
+#include <cstddef>
 #include <future>
 #include <gempba/core/node.hpp>
 #include <gempba/utils/gempba_utils.hpp>
@@ -49,6 +50,10 @@ namespace gempba {
         virtual void set_root(std::thread::id p_thread_id, std::shared_ptr<node_core>& p_root) = 0;
 
         virtual void set_thread_pool_size(unsigned int p_size) = 0;
+
+        [[nodiscard]] virtual unsigned int get_thread_pool_size() const = 0;
+
+        [[nodiscard]] virtual std::size_t get_tasks_running_count() const = 0;
 
         virtual balancing_policy get_balancing_policy() = 0;
 

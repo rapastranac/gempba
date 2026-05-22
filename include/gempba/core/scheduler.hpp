@@ -1,6 +1,7 @@
 #ifndef GEMPBA_SCHEDULER_HPP
 #define GEMPBA_SCHEDULER_HPP
 
+#include <cstddef>
 #include <functional>
 #include <gempba/core/scheduler_traits.hpp>
 #include <gempba/core/serial_runnable.hpp>
@@ -27,6 +28,8 @@ namespace gempba {
         ~scheduler() override = default;
 
         [[nodiscard]] virtual double elapsed_time() const = 0;
+
+        [[nodiscard]] virtual std::size_t get_pending_request_count() const = 0;
 
         virtual void set_goal(goal p_goal, score_type p_type) = 0;
 

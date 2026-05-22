@@ -27,6 +27,7 @@
 #include <BS_thread_pool.hpp>
 #include <gempba/core/load_balancer.hpp>
 #include <gempba/core/node.hpp>
+#include <gempba/telemetry/telemetry_hub.hpp>
 #include <gempba/utils/transmission_guard.hpp>
 #include <gempba/utils/utils.hpp>
 #include <spdlog/spdlog.h>
@@ -39,7 +40,7 @@
 namespace gempba {
     class work_stealing_load_balancer final : public load_balancer {
 
-        BS::thread_pool<> m_thread_pool;
+        BS::thread_pool<> m_thread_pool{1};
         unsigned int m_unique_id_counter = 0;
         std::recursive_mutex m_recursive_mutex;
         std::size_t m_thread_request_count = 0;
@@ -55,6 +56,8 @@ namespace gempba {
 
         std::future<std::any> force_local_submit(std::function<std::any()>&& p_function) override {
             ++m_thread_request_count;
+            if (auto* v_telemetry = telemetry::get())
+                v_telemetry->record_task_local();
             return m_thread_pool.submit_task(p_function);
         }
 
@@ -99,6 +102,10 @@ namespace gempba {
             m_thread_pool.reset(p_size);
             spdlog::debug("thread pool size: {}", m_thread_pool.get_thread_count());
         }
+
+        [[nodiscard]] unsigned int get_thread_pool_size() const override { return m_thread_pool.get_thread_count(); }
+
+        [[nodiscard]] std::size_t get_tasks_running_count() const override { return m_thread_pool.get_tasks_running(); }
 
         void wait() override { m_thread_pool.wait(); }
 

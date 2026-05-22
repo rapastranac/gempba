@@ -50,6 +50,11 @@ target_link_libraries(all_tests
         Boost::fiber
 )
 
+if (WIN32)
+    # Telemetry tests (TCP server / local transport) talk Winsock directly.
+    target_link_libraries(all_tests PRIVATE ws2_32)
+endif ()
+
 # Compilation options by mode
 target_compile_options(all_tests PRIVATE
         -Wall -Wextra -Wpedantic -pthread -fexceptions
