@@ -23,7 +23,7 @@ jobs:
     steps:
       # 1️⃣ Checkout the repository
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ github.ref }}
@@ -98,7 +98,7 @@ jobs:
       # 8️⃣ Upload test results as artifacts
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-ubuntu
           path: ${{ github.workspace }}/build/test_results.xml
@@ -117,7 +117,7 @@ jobs:
     steps:
       # 1️⃣ Checkout the repository
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.ref }}
 
@@ -160,7 +160,7 @@ jobs:
       # uniform source. The Release attachment in step 6️⃣a is independent and
       # only fires on tag pushes.
       - name: Upload .deb as workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: deb-package
           path: build/*.deb
@@ -180,7 +180,7 @@ jobs:
 
     steps:
       - name: Checkout the tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.ref }}
 
@@ -216,7 +216,7 @@ jobs:
     steps:
       # 1️⃣ Checkout (needs apt-repo/conf/distributions and pubkey.gpg)
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # 2️⃣ Install reprepro
       - name: Install reprepro
@@ -237,7 +237,7 @@ jobs:
       # self-hosted Linux runner image doesn't need the gh CLI just for this
       # step. (See #170 for the gh-missing-on-self-hosted-runners failure.)
       - name: Download .deb from artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: deb-package
           path: deb-download
@@ -259,7 +259,7 @@ jobs:
       # 7️⃣b PR → store apt-repo as a workflow artifact for inspection
       - name: Upload APT index as workflow artifact (PR)
         if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: apt-repo-index
           path: apt-repo/
@@ -290,7 +290,7 @@ jobs:
     steps:
       # Download the test results
       - name: Download test results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: test-results-ubuntu
 
