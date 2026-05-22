@@ -101,7 +101,7 @@ public:
             return std::nullopt;
         };
 
-        gempba::node v_left = gempba::mt::create_lazy_node<Graph>(m_load_balancer, v_parent, m_function, v_left_args_initializer);
+        gempba::node v_left = gempba::multithreading::create_lazy_node<Graph>(m_load_balancer, v_parent, m_function, v_left_args_initializer);
 
         std::function<std::optional<std::tuple<int, Graph> >()> v_right_args_initializer = [&]() -> std::optional<std::tuple<int, Graph> > {
             Graph g = graph;
@@ -121,7 +121,7 @@ public:
             return std::nullopt;
         };
 
-        gempba::node v_right = gempba::mt::create_lazy_node<Graph>(
+        gempba::node v_right = gempba::multithreading::create_lazy_node<Graph>(
                 m_load_balancer,
                 v_parent, m_function,
                 v_right_args_initializer

@@ -8,8 +8,8 @@ int run(int job_id, int ntasks_per_node, int prob, string &filename) {
     Graph graph;
     Graph oGraph;
 
-    gempba::load_balancer *v_load_balancer = gempba::mt::create_load_balancer(gempba::balancing_policy::QUASI_HORIZONTAL);
-    gempba::node_manager &v_node_manager = gempba::mt::create_node_manager(v_load_balancer);
+    gempba::load_balancer *v_load_balancer = gempba::multithreading::create_load_balancer(gempba::balancing_policy::QUASI_HORIZONTAL);
+    gempba::node_manager &v_node_manager = gempba::multithreading::create_node_manager(v_load_balancer);
     mt_graph_optimized_encoding_semi_centralized v_cover(v_node_manager, *v_load_balancer);
 
     graph.readEdges(filename);

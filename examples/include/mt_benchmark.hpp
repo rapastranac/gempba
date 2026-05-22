@@ -83,12 +83,12 @@ public:
         v_left_arg[p_depth % ARG_SIZE] += 0.001;
         v_right_arg[p_depth % ARG_SIZE] -= 0.001;
 
-        gempba::node v_left = gempba::mt::create_explicit_node<void, int, int, std::vector<double> >(*m_load_balancer,
+        gempba::node v_left = gempba::multithreading::create_explicit_node<void, int, int, std::vector<double> >(*m_load_balancer,
                                                                                                      v_parent,
                                                                                                      m_explore_func,
                                                                                                      std::make_tuple(p_depth + 1, p_max_depth, std::move(v_left_arg)));
 
-        gempba::node v_right = gempba::mt::create_explicit_node<void, int, int, std::vector<double> >(*m_load_balancer,
+        gempba::node v_right = gempba::multithreading::create_explicit_node<void, int, int, std::vector<double> >(*m_load_balancer,
                                                                                                       v_parent,
                                                                                                       m_explore_func,
                                                                                                       std::make_tuple(p_depth + 1, p_max_depth, std::move(v_right_arg)));

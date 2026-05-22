@@ -94,11 +94,11 @@ void gempba::check_not_null([[maybe_unused]] const node& p_parent) {
     }
 }
 
-gempba::load_balancer* gempba::mt::create_load_balancer(std::unique_ptr<load_balancer> p_your_implementation) { return assign_load_balancer(std::move(p_your_implementation)); }
+gempba::load_balancer* gempba::multithreading::create_load_balancer(std::unique_ptr<load_balancer> p_your_implementation) { return assign_load_balancer(std::move(p_your_implementation)); }
 
-gempba::load_balancer* gempba::mt::create_load_balancer(const balancing_policy& p_policy) { return build_load_balancer(p_policy, nullptr); }
+gempba::load_balancer* gempba::multithreading::create_load_balancer(const balancing_policy& p_policy) { return build_load_balancer(p_policy, nullptr); }
 
-gempba::node_manager& gempba::mt::create_node_manager(load_balancer* p_load_balancer) { return build_node_manager(p_load_balancer, nullptr); }
+gempba::node_manager& gempba::multithreading::create_node_manager(load_balancer* p_load_balancer) { return build_node_manager(p_load_balancer, nullptr); }
 
 #if GEMPBA_MULTIPROCESSING
 
