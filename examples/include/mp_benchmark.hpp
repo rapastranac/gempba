@@ -82,14 +82,14 @@ public:
         v_left_arg[p_depth % ARG_SIZE] += 0.001;
         v_right_arg[p_depth % ARG_SIZE] -= 0.001;
 
-        gempba::node v_left = gempba::mp::create_explicit_node<void, int, int, std::vector<double> >(*m_load_balancer,
+        gempba::node v_left = gempba::multiprocessing::create_explicit_node<void, int, int, std::vector<double> >(*m_load_balancer,
                                                                                                      v_parent,
                                                                                                      m_explore_func,
                                                                                                      std::make_tuple(p_depth + 1, p_max_depth, std::move(v_left_arg)),
                                                                                                      m_args_serializer,
                                                                                                      m_args_deserializer);
 
-        gempba::node v_right = gempba::mp::create_explicit_node<void, int, int, std::vector<double> >(*m_load_balancer,
+        gempba::node v_right = gempba::multiprocessing::create_explicit_node<void, int, int, std::vector<double> >(*m_load_balancer,
                                                                                                       v_parent,
                                                                                                       m_explore_func,
                                                                                                       std::make_tuple(p_depth + 1, p_max_depth, std::move(v_right_arg)),

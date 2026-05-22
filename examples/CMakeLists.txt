@@ -18,7 +18,7 @@ find_package(Boost COMPONENTS serialization fiber REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 include_directories(${ARGPARSE_INCLUDE_DIR})
 
-# Add each example scenario. mp_* examples consume gempba::mp::* and require
+# Add each example scenario. mp_* examples consume gempba::multiprocessing::** and require
 # GEMPBA_MULTIPROCESSING=ON; skip them in MT-only builds so the example tree
 # stays buildable without MPI on the system.
 file(GLOB EXAMPLES "*.cpp")

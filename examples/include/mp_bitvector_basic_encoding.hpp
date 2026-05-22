@@ -234,7 +234,7 @@ public:
             return std::nullopt;
         };
 
-        gempba::node v_left = gempba::mp::create_lazy_node<void>(
+        gempba::node v_left = gempba::multiprocessing::create_lazy_node<void>(
                 *m_load_balancer,
                 v_parent, m_function,
                 v_left_args_initializer,
@@ -259,7 +259,7 @@ public:
             return std::nullopt;
         };
 
-        gempba::node v_right = gempba::mp::create_lazy_node<void>(
+        gempba::node v_right = gempba::multiprocessing::create_lazy_node<void>(
                 *m_load_balancer,
                 v_parent, m_function,
                 v_right_args_initializer,

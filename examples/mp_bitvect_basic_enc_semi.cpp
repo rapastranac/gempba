@@ -15,24 +15,24 @@ using namespace std::placeholders;
 
 gempba::node_manager &initiate_node_manager(gempba::scheduler *p_scheduler, gempba::load_balancer *p_load_balancer) {
     if (p_scheduler->rank_me() == 0) {
-        return gempba::mp::create_node_manager(p_load_balancer, nullptr);
+        return gempba::multiprocessing::create_node_manager(p_load_balancer, nullptr);
     }
     gempba::scheduler::worker *v_worker_view = &p_scheduler->worker_view();
-    return gempba::mp::create_node_manager(p_load_balancer, v_worker_view);
+    return gempba::multiprocessing::create_node_manager(p_load_balancer, v_worker_view);
 }
 
 gempba::load_balancer *initiate_load_balancer(gempba::scheduler *p_scheduler, const gempba::balancing_policy p_policy) {
     if (p_scheduler->rank_me() == 0) {
-        return gempba::mp::create_load_balancer(p_policy, nullptr);
+        return gempba::multiprocessing::create_load_balancer(p_policy, nullptr);
     }
     gempba::scheduler::worker *v_worker_view = &p_scheduler->worker_view();
-    return gempba::mp::create_load_balancer(p_policy, v_worker_view);
+    return gempba::multiprocessing::create_load_balancer(p_policy, v_worker_view);
 }
 
 int run(const std::string& p_job_name, int p_job_id, int p_nodes, int p_ntasks_per_node, int p_ntasks_per_socket, int p_threads_per_task, int p_probability, bool p_csv_append, std::string &p_filename_directory) {
 
     // NOTE: instantiated object depends on SCHEDULER_CENTRALIZED macro
-    auto v_scheduler = gempba::mp::create_scheduler(gempba::mp::scheduler_topology::SEMI_CENTRALIZED);
+    auto v_scheduler = gempba::multiprocessing::create_scheduler(gempba::multiprocessing::scheduler_topology::SEMI_CENTRALIZED);
     v_scheduler->set_goal(gempba::MINIMISE, gempba::score_type::I32);
 
     int rank = v_scheduler->rank_me();
@@ -108,7 +108,7 @@ int run(const std::string& p_job_name, int p_job_id, int p_nodes, int p_ntasks_p
         v_node_manager.set_thread_pool_size(p_threads_per_task);
 
         auto v_deser = create_deserializer();
-        auto v_runnable = gempba::mp::runnables::return_none::create(v_runnable_id, v_function, v_deser);
+        auto v_runnable = gempba::multiprocessing::runnables::return_none::create(v_runnable_id, v_function, v_deser);
 
         std::map<int, std::shared_ptr<gempba::serial_runnable> > v_runnables;
         v_runnables[v_runnable->get_id()] = v_runnable;
@@ -147,7 +147,7 @@ int run(const std::string& p_job_name, int p_job_id, int p_nodes, int p_ntasks_p
         for (int v_rank = 0; v_rank < v_stats_vector.size(); ++v_rank) {
             std::unique_ptr<gempba::stats> &v_stats = v_stats_vector[v_rank];
 
-            std::unique_ptr<gempba::default_mpi_stats_visitor> v_visitor = gempba::mp::get_default_mpi_stats_visitor();
+            std::unique_ptr<gempba::default_mpi_stats_visitor> v_visitor = gempba::multiprocessing::get_default_mpi_stats_visitor();
             v_stats->visit(v_visitor.get());
 
             v_received_tasks[v_rank] = v_visitor->m_received_task_count;

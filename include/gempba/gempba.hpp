@@ -125,7 +125,7 @@ namespace gempba {
     } // namespace multithreading
 
 #if GEMPBA_MULTIPROCESSING
-    namespace mp {
+    namespace multiprocessing {
 
         /////////////////////////////////////////////////////////////////////////////////////////////////
         /// SCHEDULING
@@ -223,7 +223,7 @@ namespace gempba {
             return node::create(p_parent, v_factory);
         }
 
-    } // namespace mp
+    } // namespace multiprocessing
 #endif // GEMPBA_MULTIPROCESSING
 } // namespace gempba
 
