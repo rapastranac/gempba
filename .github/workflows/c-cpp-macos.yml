@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  build-and-test:
+  build:
     runs-on: ${{ fromJSON(vars.RUNNER_MACOS || '["macos-26"]') }}
     timeout-minutes: 30
 
@@ -47,18 +47,68 @@ jobs:
           echo "hwloc: $(brew info hwloc --json | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["versions"]["stable"])')"
           echo "googletest: $(brew info googletest --json | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["versions"]["stable"])')"
 
-      # 4️⃣ Build the project
+      # 4️⃣ Set up ccache (shared across PR re-runs AND with the test job below)
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: build-macos
+
+      # 5️⃣ Build the project (no artifact upload — the test job re-runs cmake
+      # configure + cmake --build locally with the same ccache key, so every
+      # CMake-generated path is resolved on the test runner)
       - name: Build the project
         run: |
-          cd ${{ github.workspace }}
-          mkdir -p build
-          cd build
-          cmake .. \
+          cmake -S . -B build \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -I$(brew --prefix libomp)/include" \
             -DOpenMP_CXX_LIB_NAMES="omp" \
             -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib \
             -DCMAKE_PREFIX_PATH=$(brew --prefix boost)
-          make -j$(sysctl -n hw.logicalcpu)
+          cmake --build build --parallel $(sysctl -n hw.logicalcpu)
+
+  test:
+    needs: build
+    runs-on: ${{ fromJSON(vars.RUNNER_MACOS || '["macos-26"]') }}
+    timeout-minutes: 30
+
+    steps:
+      # 1️⃣ Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.ref }}
+
+      # 2️⃣ Bootstrap Homebrew on PATH + install brew packages
+      - name: Setup Dependencies
+        uses: ./.github/actions/setup-macos-deps
+        with:
+          multiprocessing: 'ON'
+          tests: 'true'
+
+      # 3️⃣ Restore the ccache that the build job populated. save: false because
+      # this job doesn't add anything new — the build job is the canonical writer.
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: build-macos
+          save: false
+
+      # 4️⃣ Configure + build locally. Same flags as the build job so ccache
+      # hashes match; cache hits make this near-instant. cmake-generated paths
+      # (CTestTestfile.cmake, gtest_discover_tests output) point at this
+      # runner's workspace.
+      - name: Configure + cached build
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -I$(brew --prefix libomp)/include" \
+            -DOpenMP_CXX_LIB_NAMES="omp" \
+            -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib \
+            -DCMAKE_PREFIX_PATH=$(brew --prefix boost)
+          cmake --build build --parallel $(sysctl -n hw.logicalcpu)
 
       # 5️⃣ Run tests with JUnit XML output
       - name: Run tests with retry for flaky tests
@@ -81,7 +131,7 @@ jobs:
           retention-days: 30
 
   publish-test-results:
-    needs: build-and-test
+    needs: test
     runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
     if: ${{ !cancelled() }}
 
