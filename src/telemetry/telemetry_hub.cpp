@@ -4,10 +4,13 @@
 #include <gempba/telemetry/telemetry_hub.hpp>
 #include <impl/telemetry/center_tcp_server.hpp>
 #include <impl/telemetry/local_transport.hpp>
-#include <impl/telemetry/mpi_transport.hpp>
 #include <impl/telemetry/node_probe.hpp>
 #include <impl/telemetry/process_probe.hpp>
 #include <impl/telemetry/topology_builder.hpp>
+
+#if GEMPBA_MULTIPROCESSING
+    #include <impl/telemetry/mpi_transport.hpp>
+#endif
 
 #include <algorithm>
 #include <atomic>
@@ -73,7 +76,11 @@ namespace gempba::telemetry {
                 m_transport = std::make_unique<local_transport>();
                 break;
             case runtime_mode::MP_MPI:
+#if GEMPBA_MULTIPROCESSING
                 m_transport = std::make_unique<mpi_transport>();
+#else
+                m_transport = std::make_unique<local_transport>();
+#endif
                 break;
         }
 
@@ -259,9 +266,11 @@ namespace gempba::telemetry {
             p_out.m_tasks_running = static_cast<std::uint32_t>(v_lb->get_tasks_running_count());
         }
 
+#if GEMPBA_MULTIPROCESSING
         if (auto* v_sched = gempba::try_get_scheduler()) {
             p_out.m_scheduler_pending_count = static_cast<std::uint32_t>(v_sched->get_pending_request_count());
         }
+#endif
     }
 
     void telemetry_hub::snapshot_node_frame(node_frame& p_out) noexcept {

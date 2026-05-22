@@ -20,6 +20,10 @@ jobs:
   build:
     runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        multiprocessing: ['ON', 'OFF']
     env:
       CC: gcc-14
       CXX: g++-14
@@ -36,8 +40,8 @@ jobs:
       - name: Setup Dependencies
         uses: ./.github/actions/setup-ubuntu-deps
         with:
-          multiprocessing: 'ON'
-          tests: 'true'
+          multiprocessing: ${{ matrix.multiprocessing }}
+          tests: ${{ matrix.multiprocessing == 'ON' && 'true' || 'false' }}
 
       # 3️⃣ Echo versions of installed dependencies
       - name: Echo Dependencies Version
@@ -46,16 +50,19 @@ jobs:
           echo "cmake: $(cmake --version | head -1 | awk '{print $3}')"
           echo "make: $(make --version | head -1 | awk '{print $3}')"
           echo "libboost-dev: $(dpkg -s libboost-dev | grep 'Version' | awk '{print $2}')"
-          echo "libopenmpi-dev: $(dpkg -s libopenmpi-dev | grep 'Version' | awk '{print $2}')"
           echo "libhwloc-dev: $(dpkg -s libhwloc-dev | grep 'Version' | awk '{print $2}')"
-          echo "libgtest-dev: $(dpkg -s libgtest-dev | grep 'Version' | awk '{print $2}')"
-          echo "libgmock-dev: $(dpkg -s libgmock-dev | grep 'Version' | awk '{print $2}')"
+          if [ "${{ matrix.multiprocessing }}" = "ON" ]; then
+            echo "libopenmpi-dev: $(dpkg -s libopenmpi-dev | grep 'Version' | awk '{print $2}')"
+            echo "libgtest-dev: $(dpkg -s libgtest-dev | grep 'Version' | awk '{print $2}')"
+            echo "libgmock-dev: $(dpkg -s libgmock-dev | grep 'Version' | awk '{print $2}')"
+          fi
 
-      # 4️⃣ Set up ccache (shared across PR re-runs AND with the test job below)
+      # 4️⃣ Set up ccache (per-matrix-leg key so MP=ON and MP=OFF don't poison
+      # each other; the MP=ON leg's cache is consumed by the test job below)
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1
         with:
-          key: build-ubuntu
+          key: build-ubuntu-mp${{ matrix.multiprocessing }}
 
       # 5️⃣ Build the project (no artifact upload — the test job re-runs cmake
       # configure + cmake --build locally with the same ccache key, so every
@@ -64,6 +71,7 @@ jobs:
         run: |
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Debug \
+            -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }} \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_FLAGS="--coverage" \
@@ -93,22 +101,25 @@ jobs:
           multiprocessing: 'ON'
           tests: 'true'
 
-      # 3️⃣ Restore the ccache that the build job populated. save: false because
-      # this job doesn't add anything new — the build job is the canonical writer.
+      # 3️⃣ Restore the MP=ON cache that the build job populated. save: false
+      # because this job doesn't add anything new — the build job is the
+      # canonical writer. Tests reference gempba::mp::* directly so we never
+      # exercise the MP=OFF leg here.
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1
         with:
-          key: build-ubuntu
+          key: build-ubuntu-mpON
           save: false
 
-      # 4️⃣ Configure + build locally. Same flags as the build job so ccache
-      # hashes match; cache hits make this near-instant. cmake-generated paths
-      # (CTestTestfile.cmake, gtest_discover_tests output) point at this
-      # runner's workspace.
+      # 4️⃣ Configure + build locally with MP=ON. Same flags as the build job
+      # so ccache hashes match; cache hits make this near-instant. cmake-
+      # generated paths (CTestTestfile.cmake, gtest_discover_tests output)
+      # point at this runner's workspace.
       - name: Configure + cached build
         run: |
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Debug \
+            -DGEMPBA_MULTIPROCESSING=ON \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_FLAGS="--coverage" \

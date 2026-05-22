@@ -20,6 +20,12 @@ jobs:
   build:
     runs-on: ${{ fromJSON(vars.RUNNER_MACOS || '["macos-26"]') }}
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      # Serial: concurrent legs race on a shared Homebrew install.
+      max-parallel: 1
+      matrix:
+        multiprocessing: ['ON', 'OFF']
 
     steps:
       # 1️⃣ Checkout the repository
@@ -33,8 +39,8 @@ jobs:
       - name: Setup Dependencies
         uses: ./.github/actions/setup-macos-deps
         with:
-          multiprocessing: 'ON'
-          tests: 'true'
+          multiprocessing: ${{ matrix.multiprocessing }}
+          tests: ${{ matrix.multiprocessing == 'ON' && 'true' || 'false' }}
 
       # 3️⃣ Echo versions of installed dependencies
       - name: Echo Dependencies Version
@@ -43,15 +49,18 @@ jobs:
           echo "cmake: $(cmake --version | head -1 | awk '{print $3}')"
           echo "make: $(make --version | head -1 | awk '{print $3}')"
           echo "boost: $(brew info boost --json | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["versions"]["stable"])')"
-          echo "open-mpi: $(mpicc --showme:version 2>/dev/null || brew info open-mpi --json | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["versions"]["stable"])')"
           echo "hwloc: $(brew info hwloc --json | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["versions"]["stable"])')"
-          echo "googletest: $(brew info googletest --json | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["versions"]["stable"])')"
+          if [ "${{ matrix.multiprocessing }}" = "ON" ]; then
+            echo "open-mpi: $(mpicc --showme:version 2>/dev/null || brew info open-mpi --json | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["versions"]["stable"])')"
+            echo "googletest: $(brew info googletest --json | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["versions"]["stable"])')"
+          fi
 
-      # 4️⃣ Set up ccache (shared across PR re-runs AND with the test job below)
+      # 4️⃣ Set up ccache (per-matrix-leg key so MP=ON and MP=OFF don't poison
+      # each other; the MP=ON leg's cache is consumed by the test job below)
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1
         with:
-          key: build-macos
+          key: build-macos-mp${{ matrix.multiprocessing }}
 
       # 5️⃣ Build the project (no artifact upload — the test job re-runs cmake
       # configure + cmake --build locally with the same ccache key, so every
@@ -59,6 +68,7 @@ jobs:
       - name: Build the project
         run: |
           cmake -S . -B build \
+            -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }} \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -I$(brew --prefix libomp)/include" \
@@ -87,21 +97,24 @@ jobs:
           multiprocessing: 'ON'
           tests: 'true'
 
-      # 3️⃣ Restore the ccache that the build job populated. save: false because
-      # this job doesn't add anything new — the build job is the canonical writer.
+      # 3️⃣ Restore the MP=ON cache that the build job populated. save: false
+      # because this job doesn't add anything new — the build job is the
+      # canonical writer. Tests reference gempba::mp::* directly so we never
+      # exercise the MP=OFF leg here.
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1
         with:
-          key: build-macos
+          key: build-macos-mpON
           save: false
 
-      # 4️⃣ Configure + build locally. Same flags as the build job so ccache
-      # hashes match; cache hits make this near-instant. cmake-generated paths
-      # (CTestTestfile.cmake, gtest_discover_tests output) point at this
-      # runner's workspace.
+      # 4️⃣ Configure + build locally with MP=ON. Same flags as the build job
+      # so ccache hashes match; cache hits make this near-instant. cmake-
+      # generated paths (CTestTestfile.cmake, gtest_discover_tests output)
+      # point at this runner's workspace.
       - name: Configure + cached build
         run: |
           cmake -S . -B build \
+            -DGEMPBA_MULTIPROCESSING=ON \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -I$(brew --prefix libomp)/include" \

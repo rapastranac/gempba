@@ -55,9 +55,12 @@ endif ()
 # 📦 Dependencies
 find_package(OpenMP REQUIRED)
 find_package(Threads REQUIRED)
-find_package(MPI REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(fmt REQUIRED)
+
+if (GEMPBA_MULTIPROCESSING)
+    find_package(MPI REQUIRED)
+endif ()
 
 if (GEMPBA_HWLOC)
     find_package(PkgConfig REQUIRED)
@@ -66,16 +69,20 @@ if (GEMPBA_HWLOC)
 endif ()
 
 # 📂 Includes
-include_directories(${MPI_INCLUDE_PATH})
+if (GEMPBA_MULTIPROCESSING)
+    include_directories(${MPI_INCLUDE_PATH})
+endif ()
 include_directories(include)
 include_directories(private)
 
 # 📦 Subprojects
 add_subdirectory(external)
 
-if (GEMPBA_BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt")
+if (GEMPBA_BUILD_TESTS AND GEMPBA_MULTIPROCESSING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt")
     enable_testing()
     add_subdirectory(tests)
+elseif (GEMPBA_BUILD_TESTS AND NOT GEMPBA_MULTIPROCESSING)
+    message(STATUS "Skipping tests: tests reference gempba::mp::* and require GEMPBA_MULTIPROCESSING=ON")
 endif ()
 
 if (GEMPBA_BUILD_EXAMPLES AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/examples/CMakeLists.txt")
@@ -84,18 +91,26 @@ endif ()
 
 # 📄 Main source files
 file(GLOB_RECURSE Sources "src/*.cpp")
+if (NOT GEMPBA_MULTIPROCESSING)
+    list(FILTER Sources EXCLUDE REGEX ".*/src/schedulers/mpi/.*")
+    list(FILTER Sources EXCLUDE REGEX ".*/src/telemetry/mpi_transport\\.cpp$")
+endif ()
 
 # 🛠️ Create the main library
 add_library(gempba STATIC ${Sources})
 
 # 🔧️ Add macros for the library
-target_compile_definitions(gempba PRIVATE
-        $<$<BOOL:${GEMPBA_DEV_MODE}>:GEMPBA_DEV_MODE>
-        $<$<BOOL:${GEMPBA_MULTIPROCESSING}>:GEMPBA_MULTIPROCESSING>
-        $<$<BOOL:${GEMPBA_HWLOC}>:GEMPBA_HWLOC>
-        $<$<BOOL:${GEMPBA_DEBUG_COMMENTS}>:GEMPBA_DEBUG_COMMENTS>
-        $<$<BOOL:${GEMPBA_BUILD_EXAMPLES}>:GEMPBA_BUILD_EXAMPLES>
-        $<$<BOOL:${GEMPBA_BUILD_TESTS}>:GEMPBA_BUILD_TESTS>
+# GEMPBA_MULTIPROCESSING is PUBLIC so consumers (and examples) receive the
+# same flag the library was built with via target propagation.
+target_compile_definitions(gempba
+        PUBLIC
+            GEMPBA_MULTIPROCESSING=$<IF:$<BOOL:${GEMPBA_MULTIPROCESSING}>,1,0>
+        PRIVATE
+            $<$<BOOL:${GEMPBA_DEV_MODE}>:GEMPBA_DEV_MODE>
+            $<$<BOOL:${GEMPBA_HWLOC}>:GEMPBA_HWLOC>
+            $<$<BOOL:${GEMPBA_DEBUG_COMMENTS}>:GEMPBA_DEBUG_COMMENTS>
+            $<$<BOOL:${GEMPBA_BUILD_EXAMPLES}>:GEMPBA_BUILD_EXAMPLES>
+            $<$<BOOL:${GEMPBA_BUILD_TESTS}>:GEMPBA_BUILD_TESTS>
 )
 
 # Print messages to confirm the flags
@@ -119,10 +134,13 @@ target_compile_options(gempba PRIVATE
 # Its contents (BS_thread_pool headers, spdlog) are wired in via target_include_directories.
 target_link_libraries(gempba PUBLIC
         Threads::Threads
-        MPI::MPI_CXX
         OpenMP::OpenMP_CXX
         fmt::fmt
 )
+
+if (GEMPBA_MULTIPROCESSING)
+    target_link_libraries(gempba PUBLIC MPI::MPI_CXX)
+endif ()
 
 # spdlog is used in header-only mode. Deliberately NOT linked as a CMake target
 # so spdlog::spdlog_header_only never appears in gempbaTargets.cmake and
