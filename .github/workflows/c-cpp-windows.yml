@@ -175,6 +175,23 @@ jobs:
           path: ${{ github.workspace }}/mingw-w64-x86_64-gempba-*.pkg.tar.zst
           retention-days: 7
 
+      # 5️⃣ Wipe makepkg-mingw fakeroot dirs (read-only files inside trip the
+      # next run's `git clean -ffdx` on self-hosted Windows runners).
+      - name: Clean up makepkg artifacts
+        if: always()
+        shell: pwsh
+        run: |
+          $msys2 = Join-Path $env:GITHUB_WORKSPACE 'packaging\msys2'
+          foreach ($name in 'pkg', 'src') {
+            $path = Join-Path $msys2 $name
+            if (Test-Path -LiteralPath $path) {
+              cmd /c "attrib -R `"$path\*`" /S /D" 2>$null
+              cmd /c "rd /s /q `"$path`""
+            }
+          }
+          Get-ChildItem -LiteralPath $msys2 -Filter 'gempba-*.tar.gz' -ErrorAction SilentlyContinue |
+            Remove-Item -Force
+
   publish-test-results:
     needs: build-and-test
     runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
