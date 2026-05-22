@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  build-and-test:
+  build:
     runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
     timeout-minutes: 30
     env:
@@ -51,17 +51,69 @@ jobs:
           echo "libgtest-dev: $(dpkg -s libgtest-dev | grep 'Version' | awk '{print $2}')"
           echo "libgmock-dev: $(dpkg -s libgmock-dev | grep 'Version' | awk '{print $2}')"
 
-      # 4️⃣ Build the project
+      # 4️⃣ Set up ccache (shared across PR re-runs AND with the test job below)
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: build-ubuntu
+
+      # 5️⃣ Build the project (no artifact upload — the test job re-runs cmake
+      # configure + cmake --build locally with the same ccache key, so every
+      # CMake-generated path is resolved on the test runner)
       - name: Build the project
         run: |
-          cd ${{ github.workspace }}
-          mkdir -p build
-          cd build
-          cmake .. \
+          cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_FLAGS="--coverage" \
             -DCMAKE_EXE_LINKER_FLAGS="--coverage"
-          make -j$(nproc)
+          cmake --build build --parallel $(nproc)
+
+  test:
+    needs: build
+    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
+    timeout-minutes: 30
+    env:
+      CC: gcc-14
+      CXX: g++-14
+
+    steps:
+      # 1️⃣ Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.ref }}
+
+      # 2️⃣ Set up environment and install dependencies
+      - name: Setup Dependencies
+        uses: ./.github/actions/setup-ubuntu-deps
+        with:
+          multiprocessing: 'ON'
+          tests: 'true'
+
+      # 3️⃣ Restore the ccache that the build job populated. save: false because
+      # this job doesn't add anything new — the build job is the canonical writer.
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: build-ubuntu
+          save: false
+
+      # 4️⃣ Configure + build locally. Same flags as the build job so ccache
+      # hashes match; cache hits make this near-instant. cmake-generated paths
+      # (CTestTestfile.cmake, gtest_discover_tests output) point at this
+      # runner's workspace.
+      - name: Configure + cached build
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_FLAGS="--coverage" \
+            -DCMAKE_EXE_LINKER_FLAGS="--coverage"
+          cmake --build build --parallel $(nproc)
 
       # 5️⃣ Run tests with JUnit XML output
       - name: Run tests with retry for flaky tests
@@ -91,7 +143,7 @@ jobs:
           retention-days: 30
 
   publish-deb:
-    needs: build-and-test
+    needs: build
     runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'pull_request'
     permissions:
@@ -269,7 +321,7 @@ jobs:
         uses: actions/deploy-pages@v4
 
   publish-test-results:
-    needs: build-and-test
+    needs: test
     runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
     if: ${{ !cancelled() }}
 
