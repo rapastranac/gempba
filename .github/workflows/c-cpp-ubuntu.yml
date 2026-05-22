@@ -34,27 +34,12 @@ jobs:
 
       # 2️⃣ Set up environment and install dependencies
       - name: Setup Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential
-          sudo apt-get install -y cmake
-          sudo apt-get install -y gcc-14 g++-14
-          sudo apt-get install -y make
-          sudo apt-get install -y libboost-all-dev
-          sudo apt-get install -y libopenmpi-dev
-          sudo apt-get install -y libspdlog-dev libfmt-dev
-          sudo apt-get install -y libhwloc-dev pkg-config
-          sudo apt-get install -y libgtest-dev
-          sudo apt-get install -y libgmock-dev
+        uses: ./.github/actions/setup-ubuntu-deps
+        with:
+          multiprocessing: 'ON'
+          tests: 'true'
 
-      # 3️⃣ Build and install GTest/GMock from source
-      - name: Build and install GTest/GMock
-        run: |
-          cd /usr/src/googletest
-          sudo cmake -S . -B build
-          sudo cmake --build build --target install
-
-      # 4️⃣ Echo versions of installed dependencies
+      # 3️⃣ Echo versions of installed dependencies
       - name: Echo Dependencies Version
         run: |
           echo "g++: $($CXX --version | head -1 | awk '{print $4}')"
@@ -66,7 +51,7 @@ jobs:
           echo "libgtest-dev: $(dpkg -s libgtest-dev | grep 'Version' | awk '{print $2}')"
           echo "libgmock-dev: $(dpkg -s libgmock-dev | grep 'Version' | awk '{print $2}')"
 
-      # 5️⃣ Build the project
+      # 4️⃣ Build the project
       - name: Build the project
         run: |
           cd ${{ github.workspace }}
@@ -78,7 +63,7 @@ jobs:
             -DCMAKE_EXE_LINKER_FLAGS="--coverage"
           make -j$(nproc)
 
-      # 6️⃣ Run tests with JUnit XML output
+      # 5️⃣ Run tests with JUnit XML output
       - name: Run tests with retry for flaky tests
         run: |
           cd ${{ github.workspace }}/build
@@ -89,14 +74,14 @@ jobs:
           echo "🟡 Flaky tests: up to 3 attempts each"
           ctest --repeat until-pass:3 --output-on-failure --output-junit test_results_flaky.xml -R "FLAKY_" --no-tests=ignore
 
-      # 7️⃣ Upload coverage to Codecov
+      # 6️⃣ Upload coverage to Codecov
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
 
-      # 8️⃣ Upload test results as artifacts
+      # 7️⃣ Upload test results as artifacts
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v7
