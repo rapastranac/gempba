@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  build-and-test:
+  build:
     runs-on: ${{ fromJSON(vars.RUNNER_WINDOWS || '["windows-2025"]') }}
     timeout-minutes: 30
 
@@ -51,16 +51,48 @@ jobs:
           echo "mingw-w64-x86_64-hwloc: $(pacman -Qi mingw-w64-x86_64-hwloc | grep Version | awk '{print $3}')"
           echo "mingw-w64-x86_64-gtest: $(pacman -Qi mingw-w64-x86_64-gtest | grep Version | awk '{print $3}')"
 
-      # 4️⃣ Build the project
+      # 4️⃣ Build the project (no artifact upload — the test job rebuilds
+      # locally so every CMake-generated path is resolved on the test runner;
+      # ccache wiring for MSYS2+mingw is a separate follow-up)
       - name: Build
         shell: msys2 {0}
         run: |
-          mkdir -p build
-          cd build
-          cmake -G "MSYS Makefiles" ..
-          make -j$(nproc)
+          cmake -G "MSYS Makefiles" -S . -B build
+          cmake --build build --parallel $(nproc)
 
-      # 5️⃣ Run tests with JUnit XML output
+  test:
+    needs: build
+    runs-on: ${{ fromJSON(vars.RUNNER_WINDOWS || '["windows-2025"]') }}
+    timeout-minutes: 30
+
+    steps:
+      # 1️⃣ Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.ref }}
+
+      # 2️⃣ Set up MSYS2 + MS-MPI runtime (same set as build for ABI parity;
+      # cache: false, release: false preserves the preinstalled C:\msys64 — see #159).
+      - name: Setup Dependencies
+        uses: ./.github/actions/setup-windows-deps
+        with:
+          multiprocessing: 'ON'
+          tests: 'true'
+          cache: 'false'
+          release: 'false'
+
+      # 3️⃣ Build locally so cmake-generated paths point at this runner's
+      # workspace. No ccache on Windows yet (mingw+msys2 PATH plumbing is a
+      # separate follow-up), so this is a full compile every time.
+      - name: Configure + build
+        shell: msys2 {0}
+        run: |
+          cmake -G "MSYS Makefiles" -S . -B build
+          cmake --build build --parallel $(nproc)
+
+      # 4️⃣ Run tests with JUnit XML output
       - name: Run tests with retry for flaky tests
         shell: msys2 {0}
         run: |
@@ -72,7 +104,7 @@ jobs:
           echo "🟡 Flaky tests: up to 3 attempts each"
           ctest --repeat until-pass:3 --output-on-failure --output-junit test_results_flaky.xml -R "FLAKY_" --no-tests=ignore
 
-      # 6️⃣ Upload test results as artifacts
+      # 5️⃣ Upload test results as artifacts
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v7
@@ -82,7 +114,7 @@ jobs:
           retention-days: 30
 
   publish-msys2:
-    needs: build-and-test
+    needs: build
     runs-on: ${{ fromJSON(vars.RUNNER_WINDOWS || '["windows-2025"]') }}
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'pull_request'
     permissions:
@@ -173,7 +205,7 @@ jobs:
             Remove-Item -Force
 
   publish-test-results:
-    needs: build-and-test
+    needs: test
     runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
     if: ${{ !cancelled() }}
 
