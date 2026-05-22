@@ -1,0 +1,51 @@
+name: Setup Windows deps
+description: Set up MSYS2 plus MS-MPI runtime for gempba on Windows
+inputs:
+  multiprocessing:
+    description: 'ON or OFF — controls msmpi SDK + runtime install'
+    required: true
+  tests:
+    description: 'true to install mingw-w64-x86_64-gtest'
+    required: false
+    default: 'false'
+  extra:
+    description: 'Additional MSYS2 packages, space-separated (e.g. "git" for cross-repo clones)'
+    required: false
+    default: ''
+  cache:
+    description: 'msys2/setup-msys2 cache input. Default false because the Server 2025 self-hosted runner image ships a preinstalled MSYS2 that we reuse via release: false.'
+    required: false
+    default: 'false'
+  release:
+    description: 'msys2/setup-msys2 release input. Default false so the action reuses the preinstalled C:\msys64 instead of a fresh install whose pacman-key wedges on Server 2025 build-26100.'
+    required: false
+    default: 'false'
+runs:
+  using: composite
+  steps:
+    - name: Setup MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        release: ${{ inputs.release }}
+        cache: ${{ inputs.cache }}
+        update: true
+        install: >-
+          base-devel
+          mingw-w64-x86_64-toolchain
+          mingw-w64-x86_64-cmake
+          mingw-w64-x86_64-make
+          mingw-w64-x86_64-boost
+          mingw-w64-x86_64-spdlog
+          mingw-w64-x86_64-fmt
+          mingw-w64-x86_64-hwloc
+          mingw-w64-x86_64-pkgconf
+          ${{ inputs.multiprocessing == 'ON' && 'mingw-w64-x86_64-msmpi' || '' }}
+          ${{ inputs.tests == 'true' && 'mingw-w64-x86_64-gtest' || '' }}
+          ${{ inputs.extra }}
+
+    - name: Install MS-MPI runtime
+      if: inputs.multiprocessing == 'ON'
+      uses: mpi4py/setup-mpi@v1
+      with:
+        mpi: msmpi

@@ -29,32 +29,15 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ github.ref }}
 
-      # 2️⃣ Set up MSYS2 environment and install dependencies
-      - name: Setup MSYS2
-        uses: msys2/setup-msys2@v2
+      # 2️⃣ Set up MSYS2 + MS-MPI runtime (cache: false, release: false preserves
+      # the preinstalled C:\msys64 on Server 2025 self-hosted runners — see #159).
+      - name: Setup Dependencies
+        uses: ./.github/actions/setup-windows-deps
         with:
-          release: false
-          cache: false
-          update: true
-          install: >-
-            base-devel
-            mingw-w64-x86_64-toolchain
-            mingw-w64-x86_64-cmake
-            mingw-w64-x86_64-make
-            mingw-w64-x86_64-boost
-            mingw-w64-x86_64-msmpi
-            mingw-w64-x86_64-gtest
-            mingw-w64-x86_64-spdlog
-            mingw-w64-x86_64-fmt
-            mingw-w64-x86_64-hwloc
-            mingw-w64-x86_64-pkgconf
-
-      # 2️⃣b Install MS-MPI runtime (msmpi.dll lives in System32 and is not part
-      # of the MSYS2 mingw-w64-x86_64-msmpi package, which only ships the SDK).
-      - name: Install MS-MPI runtime
-        uses: mpi4py/setup-mpi@v1
-        with:
-          mpi: msmpi
+          multiprocessing: 'ON'
+          tests: 'true'
+          cache: 'false'
+          release: 'false'
 
       # 3️⃣ Echo versions of installed dependencies
       - name: Echo Dependencies Version
