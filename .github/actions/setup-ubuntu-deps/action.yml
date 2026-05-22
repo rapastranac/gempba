@@ -1,0 +1,41 @@
+name: Setup Ubuntu deps
+description: Install gempba's apt deps and optionally rebuild GTest from /usr/src/googletest
+inputs:
+  multiprocessing:
+    description: 'ON or OFF — controls libopenmpi-dev install'
+    required: true
+  tests:
+    description: 'true to install libgtest-dev/libgmock-dev and rebuild GTest from source'
+    required: false
+    default: 'false'
+runs:
+  using: composite
+  steps:
+    - name: Install apt packages
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          gcc-14 g++-14 \
+          make \
+          libboost-all-dev \
+          libspdlog-dev \
+          libfmt-dev \
+          libhwloc-dev \
+          pkg-config
+        if [ "${{ inputs.multiprocessing }}" = "ON" ]; then
+          sudo apt-get install -y libopenmpi-dev
+        fi
+        if [ "${{ inputs.tests }}" = "true" ]; then
+          sudo apt-get install -y libgtest-dev libgmock-dev
+        fi
+
+    - name: Build and install GTest/GMock from source
+      if: inputs.tests == 'true'
+      shell: bash
+      run: |
+        cd /usr/src/googletest
+        sudo cmake -S . -B build
+        sudo cmake --build build --target install
