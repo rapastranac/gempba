@@ -12,6 +12,10 @@ permissions:
   checks: write
   pull-requests: write
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   lint:
     runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
