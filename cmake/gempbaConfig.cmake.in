@@ -6,12 +6,15 @@ include(CMakeFindDependencyMacro)
 find_dependency(fmt REQUIRED)
 find_dependency(OpenMP REQUIRED)
 find_dependency(Threads REQUIRED)
-find_dependency(MPI REQUIRED)
 
 # ─── Optional dependencies, conditional on the build-time configuration ──────
 # gempba is a STATIC library, so its PRIVATE link deps still need to be
 # reachable from consumers' link line. Re-discover them here so consumers
 # don't have to know about gempba's internal dependencies.
+if (@GEMPBA_MULTIPROCESSING@)
+    find_dependency(MPI REQUIRED)
+endif ()
+
 if (@GEMPBA_HWLOC@)
     find_dependency(PkgConfig REQUIRED)
     pkg_check_modules(HWLOC REQUIRED IMPORTED_TARGET hwloc)
