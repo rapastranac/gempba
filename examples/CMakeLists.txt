@@ -18,12 +18,20 @@ find_package(Boost COMPONENTS serialization fiber REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 include_directories(${ARGPARSE_INCLUDE_DIR})
 
-# Add each example scenario
+# Add each example scenario. mp_* examples consume gempba::mp::* and require
+# GEMPBA_MULTIPROCESSING=ON; skip them in MT-only builds so the example tree
+# stays buildable without MPI on the system.
 file(GLOB EXAMPLES "*.cpp")
+if (NOT GEMPBA_MULTIPROCESSING)
+    list(FILTER EXAMPLES EXCLUDE REGEX ".*/mp_[^/]+\\.cpp$")
+endif ()
 
 foreach (EXAMPLE ${EXAMPLES})
     get_filename_component(EXAMPLE_NAME ${EXAMPLE} NAME_WE) # Get the name without extension
     add_executable(${EXAMPLE_NAME} ${EXAMPLE})
+
+    # GEMPBA_MULTIPROCESSING is no longer set per-example; examples inherit the
+    # macro from the gempba target's PUBLIC compile definition.
 
     # Link examples with GemPBA and Boost
     target_link_libraries(${EXAMPLE_NAME}
@@ -39,14 +47,6 @@ foreach (EXAMPLE ${EXAMPLES})
             PROPERTIES
             RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin
     )
-
-    # Check if the example name starts with "mp_"
-    if (EXAMPLE_NAME MATCHES "^mp_")
-        message(STATUS "Adding GEMPBA_MULTIPROCESSING for ${EXAMPLE_NAME}")
-        target_compile_definitions(${EXAMPLE_NAME} PRIVATE GEMPBA_MULTIPROCESSING=1)
-    else ()
-        target_compile_definitions(${EXAMPLE_NAME} PRIVATE GEMPBA_MULTIPROCESSING=0)
-    endif ()
 
     # Compilation options by mode
     target_compile_options(${EXAMPLE_NAME} PRIVATE
