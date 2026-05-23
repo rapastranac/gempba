@@ -125,7 +125,7 @@ TEST_F(gempba_test, mt_create_load_balancer_throws_if_already_exists) {
 TEST_F(gempba_test, mt_create_load_balancer_custom_implementation) {
     auto v_custom = std::make_unique<gempba::work_stealing_load_balancer>();
     const gempba::work_stealing_load_balancer* v_raw = v_custom.get();
-    gempba::load_balancer* v_lb = gempba::multithreading::create_load_balancer(std::move(v_custom));
+    gempba::load_balancer* v_lb = gempba::create_load_balancer(std::move(v_custom));
     ASSERT_NE(nullptr, v_lb);
     EXPECT_EQ(v_raw, v_lb);
 }
@@ -133,7 +133,7 @@ TEST_F(gempba_test, mt_create_load_balancer_custom_implementation) {
 TEST_F(gempba_test, mt_create_load_balancer_custom_throws_if_already_exists) {
     gempba::multithreading::create_load_balancer(gempba::QUASI_HORIZONTAL);
     auto v_custom = std::make_unique<gempba::work_stealing_load_balancer>();
-    EXPECT_THROW(gempba::multithreading::create_load_balancer(std::move(v_custom)), std::runtime_error);
+    EXPECT_THROW(gempba::create_load_balancer(std::move(v_custom)), std::runtime_error);
 }
 
 TEST_F(gempba_test, get_load_balancer_returns_non_null_after_creation) {
@@ -212,7 +212,7 @@ TEST_F(gempba_test, mp_create_load_balancer_throws_if_already_exists) {
 TEST_F(gempba_test, mp_create_load_balancer_custom_implementation) {
     auto v_custom = std::make_unique<gempba::quasi_horizontal_load_balancer>();
     const gempba::quasi_horizontal_load_balancer* v_raw = v_custom.get();
-    gempba::load_balancer* v_lb = gempba::multiprocessing::create_load_balancer(std::move(v_custom));
+    gempba::load_balancer* v_lb = gempba::create_load_balancer(std::move(v_custom));
     EXPECT_EQ(v_raw, v_lb);
 }
 

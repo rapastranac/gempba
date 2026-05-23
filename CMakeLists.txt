@@ -78,11 +78,13 @@ include_directories(private)
 # 📦 Subprojects
 add_subdirectory(external)
 
-if (GEMPBA_BUILD_TESTS AND GEMPBA_MULTIPROCESSING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt")
+if (GEMPBA_BUILD_TESTS AND GEMPBA_MULTIPROCESSING AND GEMPBA_DEV_MODE AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt")
     enable_testing()
     add_subdirectory(tests)
 elseif (GEMPBA_BUILD_TESTS AND NOT GEMPBA_MULTIPROCESSING)
-    message(STATUS "Skipping tests: tests reference gempba::mp::* and require GEMPBA_MULTIPROCESSING=ON")
+    message(STATUS "Skipping tests: tests reference gempba::multiprocessing::* and require GEMPBA_MULTIPROCESSING=ON")
+elseif (GEMPBA_BUILD_TESTS AND NOT GEMPBA_DEV_MODE)
+    message(STATUS "Skipping tests: tests use the explicit gempba::multithreading::* form and require GEMPBA_DEV_MODE=ON")
 endif ()
 
 if (GEMPBA_BUILD_EXAMPLES AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/examples/CMakeLists.txt")

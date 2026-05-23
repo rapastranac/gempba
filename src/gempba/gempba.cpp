@@ -94,11 +94,15 @@ void gempba::check_not_null([[maybe_unused]] const node& p_parent) {
     }
 }
 
-gempba::load_balancer* gempba::multithreading::create_load_balancer(std::unique_ptr<load_balancer> p_your_implementation) { return assign_load_balancer(std::move(p_your_implementation)); }
+gempba::load_balancer* gempba::create_load_balancer(std::unique_ptr<load_balancer> p_your_implementation) { return assign_load_balancer(std::move(p_your_implementation)); }
+
+#if !GEMPBA_MULTIPROCESSING || GEMPBA_DEV_MODE
 
 gempba::load_balancer* gempba::multithreading::create_load_balancer(const balancing_policy& p_policy) { return build_load_balancer(p_policy, nullptr); }
 
 gempba::node_manager& gempba::multithreading::create_node_manager(load_balancer* p_load_balancer) { return build_node_manager(p_load_balancer, nullptr); }
+
+#endif // !GEMPBA_MULTIPROCESSING || GEMPBA_DEV_MODE
 
 #if GEMPBA_MULTIPROCESSING
 
@@ -128,8 +132,6 @@ gempba::scheduler* gempba::multiprocessing::create_scheduler(const scheduler_top
     install_telemetry_hub_if_needed();
     return g_scheduler.get();
 }
-
-gempba::load_balancer* gempba::multiprocessing::create_load_balancer(std::unique_ptr<load_balancer> p_your_implementation) { return assign_load_balancer(std::move(p_your_implementation)); }
 
 gempba::load_balancer* gempba::multiprocessing::create_load_balancer(const balancing_policy& p_policy, scheduler::worker* const p_scheduler_worker) {
     return build_load_balancer(p_policy, p_scheduler_worker);
