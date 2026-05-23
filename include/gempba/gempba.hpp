@@ -80,12 +80,21 @@ namespace gempba {
 
     void check_not_null([[maybe_unused]] const node& p_parent);
 
+    /////////////////////////////////////////////////////////////////////////////////////////////////
+    /// LOAD BALANCING (mode-agnostic)
+    /// /////////////////////////////////////////////////////////////////////////////////////////////
+    /**
+     * @brief Take ownership of a caller-provided `load_balancer` implementation.
+     *
+     * Behaves identically in MT and MP builds; the worker pointer (when relevant) is part of the
+     * caller-provided instance.
+     */
+    load_balancer* create_load_balancer(std::unique_ptr<load_balancer> p_your_implementation);
+
     namespace multithreading {
         /////////////////////////////////////////////////////////////////////////////////////////////////
         /// LOAD BALANCING
         /// /////////////////////////////////////////////////////////////////////////////////////////////
-        load_balancer* create_load_balancer(std::unique_ptr<load_balancer> p_your_implementation);
-
         load_balancer* create_load_balancer(const balancing_policy& p_policy);
 
         /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -142,8 +151,6 @@ namespace gempba {
         /////////////////////////////////////////////////////////////////////////////////////////////////
         /// LOAD BALANCING
         /// /////////////////////////////////////////////////////////////////////////////////////////////
-
-        load_balancer* create_load_balancer(std::unique_ptr<load_balancer> p_your_implementation);
 
         load_balancer* create_load_balancer(const balancing_policy& p_policy, scheduler::worker* p_scheduler_worker);
 
