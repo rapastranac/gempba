@@ -17,7 +17,7 @@
 #include "Graph.hpp"
 #include "optimized_encoding_utils.hpp"
 
-class mp_bitvector_optimized_encoding final {
+class bitvector_optimized_encoding final {
     std::function<void(std::thread::id, int, G_BITSET, int, gempba::node)> m_function;
     std::function<gempba::task_packet(int, G_BITSET, int)> m_args_serializer;
     std::function<std::tuple<int, G_BITSET, int>(gempba::task_packet)> m_args_deserializer;
@@ -34,15 +34,15 @@ public:
     gempba::node_manager &m_node_manager;
     gempba::load_balancer *m_load_balancer;
 
-    explicit mp_bitvector_optimized_encoding(gempba::node_manager &p_node_manager, gempba::load_balancer *p_load_balancer) :
+    explicit bitvector_optimized_encoding(gempba::node_manager &p_node_manager, gempba::load_balancer *p_load_balancer) :
         m_node_manager(p_node_manager), m_load_balancer(p_load_balancer) {
 
-        this->m_function = std::bind(&mp_bitvector_optimized_encoding::mvcbitset, this, _1, _2, _3, _4, _5);
+        this->m_function = std::bind(&bitvector_optimized_encoding::mvcbitset, this, _1, _2, _3, _4, _5);
         this->m_args_deserializer = create_deserializer();
         this->m_args_serializer = make_serializer();
     }
 
-    ~mp_bitvector_optimized_encoding() = default;
+    ~bitvector_optimized_encoding() = default;
 
     void set_graph(Graph &p_graph) {
         m_is_skips = 0;

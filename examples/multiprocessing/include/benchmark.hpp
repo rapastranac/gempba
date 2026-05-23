@@ -18,7 +18,7 @@ constexpr unsigned RNG_SEED = 12345; // Fixed for reproducibility
 std::mt19937 rng(RNG_SEED);
 std::uniform_int_distribution<int> jitter(-30, 30);
 
-class mp_benchmark {
+class benchmark {
 
     gempba::node_manager &m_node_manager;
     gempba::load_balancer *m_load_balancer;
@@ -27,9 +27,9 @@ class mp_benchmark {
     std::function<std::tuple<int, int, std::vector<double> >(gempba::task_packet)> m_args_deserializer;
 
 public:
-    mp_benchmark(gempba::node_manager &p_node_manager, gempba::load_balancer *p_load_balancer) :
+    benchmark(gempba::node_manager &p_node_manager, gempba::load_balancer *p_load_balancer) :
         m_node_manager(p_node_manager), m_load_balancer(p_load_balancer) {
-        m_explore_func = std::bind(&mp_benchmark::explore, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5);
+        m_explore_func = std::bind(&benchmark::explore, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5);
         m_args_serializer = make_serializer();
         m_args_deserializer = make_deserializer();
     }

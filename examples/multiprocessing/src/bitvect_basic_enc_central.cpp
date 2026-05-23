@@ -10,7 +10,7 @@
 #include <gempba/gempba.hpp>
 
 #include "main.hpp"
-#include "mp_bitvector_basic_encoding.hpp"
+#include "bitvector_basic_encoding.hpp"
 
 using namespace std::placeholders;
 
@@ -58,8 +58,8 @@ int run(const std::string& p_job_name, int p_job_id, int p_nodes, int p_ntasks_p
     v_node_manager.set_goal(gempba::MINIMISE, gempba::score_type::I32);
     v_scheduler->set_goal(gempba::MINIMISE, gempba::score_type::I32);
 
-    mp_bitvector_basic_encoding cover(v_node_manager, v_load_balancer);
-    auto v_function = std::bind(&mp_bitvector_basic_encoding::mvcbitset, &cover, _1, _2, _3, _4, _5); // target algorithm [all arguments]
+    bitvector_basic_encoding cover(v_node_manager, v_load_balancer);
+    auto v_function = std::bind(&bitvector_basic_encoding::mvcbitset, &cover, _1, _2, _3, _4, _5); // target algorithm [all arguments]
 
 
     // initialize MPI and member variable linkin
