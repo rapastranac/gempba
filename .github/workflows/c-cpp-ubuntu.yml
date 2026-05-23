@@ -183,7 +183,6 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=/usr \
             -DGEMPBA_BUILD_TESTS=OFF \
-            -DGEMPBA_BUILD_EXAMPLES=OFF \
             -DGEMPBA_DEV_MODE=OFF \
             -DGEMPBA_MULTIPROCESSING=ON
 
