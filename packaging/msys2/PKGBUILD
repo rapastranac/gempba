@@ -37,7 +37,6 @@ build() {
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX="${MINGW_PREFIX}" \
         -DGEMPBA_BUILD_TESTS=OFF \
-        -DGEMPBA_BUILD_EXAMPLES=OFF \
         -DGEMPBA_DEV_MODE=OFF \
         -DGEMPBA_MULTIPROCESSING=ON \
         "../${_realname}-${pkgver}"

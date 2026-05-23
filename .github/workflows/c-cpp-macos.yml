@@ -77,6 +77,106 @@ jobs:
             -DCMAKE_PREFIX_PATH=$(brew --prefix boost)
           cmake --build build --parallel $(sysctl -n hw.logicalcpu)
 
+  # Build the gempba-examples sister repo against an installed gempba built
+  # from THIS branch. See c-cpp-ubuntu.yml for rationale.
+  # needs: [build, test] serializes this job after both so none of the three
+  # race on the shared Homebrew install on the self-hosted macOS runner —
+  # build's matrix legs run first (max-parallel: 1), then test, then this.
+  build-examples-from-install:
+    needs: [build, test]
+    runs-on: ${{ fromJSON(vars.RUNNER_MACOS || '["macos-26"]') }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      # Serial: concurrent legs race on a shared Homebrew install.
+      max-parallel: 1
+      matrix:
+        multiprocessing: ['ON', 'OFF']
+    env:
+      GEMPBA_EXAMPLES_OWNER: ${{ vars.GEMPBA_EXAMPLES_OWNER || github.repository_owner }}
+      GEMPBA_INSTALL_PREFIX: ${{ github.workspace }}/.gempba-install
+      GEMPBA_CROSS_REPO_TOKEN: ${{ secrets.GEMPBA_CROSS_REPO_TOKEN || '' }}
+
+    steps:
+      # 1️⃣ Checkout gempba (this PR's commit)
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.ref }}
+
+      # 2️⃣ Install dependencies (mirror build job's set)
+      - name: Setup Dependencies
+        uses: ./.github/actions/setup-macos-deps
+        with:
+          multiprocessing: ${{ matrix.multiprocessing }}
+          tests: 'false'
+
+      # 3️⃣ Build and install gempba into a workspace-local prefix
+      - name: Install gempba
+        run: |
+          cmake -S . -B "$RUNNER_TEMP/gempba-build" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$GEMPBA_INSTALL_PREFIX" \
+            -DGEMPBA_BUILD_TESTS=OFF \
+            -DGEMPBA_DEV_MODE=OFF \
+            -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }} \
+            -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -I$(brew --prefix libomp)/include" \
+            -DOpenMP_CXX_LIB_NAMES="omp" \
+            -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib \
+            -DCMAKE_PREFIX_PATH=$(brew --prefix boost)
+          cmake --build "$RUNNER_TEMP/gempba-build" --parallel $(sysctl -n hw.logicalcpu)
+          cmake --install "$RUNNER_TEMP/gempba-build"
+
+      # 4️⃣ Resolve sister-repo branch (same-name, fall back to main)
+      - name: Resolve gempba-examples ref
+        id: examples_ref
+        run: |
+          # Override any extraheader/credential helper set by actions/checkout
+          # (v6 writes the GITHUB_TOKEN auth header to a separate config file
+          # that --local --unset-all cannot reach, so the URL-embedded PAT was
+          # being shadowed). -c clears them for THIS command only.
+          if [ -n "$GEMPBA_CROSS_REPO_TOKEN" ]; then
+            EX_URL="https://x-access-token:${GEMPBA_CROSS_REPO_TOKEN}@github.com/${GEMPBA_EXAMPLES_OWNER}/gempba-examples.git"
+          else
+            EX_URL="https://github.com/${GEMPBA_EXAMPLES_OWNER}/gempba-examples.git"
+          fi
+          BRANCH="${{ github.head_ref || github.ref_name }}"
+          set +e
+          LS_OUTPUT=$(git -c http."https://github.com/".extraheader= -c credential.helper= ls-remote --exit-code --heads "$EX_URL" "$BRANCH" 2>&1)
+          LS_EXIT=$?
+          set -e
+          if [ "$LS_EXIT" = "0" ]; then
+            echo "ref=$BRANCH" >> "$GITHUB_OUTPUT"
+            echo "Picked sister branch '$BRANCH' from $GEMPBA_EXAMPLES_OWNER/gempba-examples"
+          elif [ "$LS_EXIT" = "2" ]; then
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+            echo "Sister branch '$BRANCH' not present in $GEMPBA_EXAMPLES_OWNER/gempba-examples; falling back to main"
+          else
+            echo "::error::ls-remote against $GEMPBA_EXAMPLES_OWNER/gempba-examples failed (exit $LS_EXIT)"
+            echo "$LS_OUTPUT"
+            exit "$LS_EXIT"
+          fi
+
+      # 5️⃣ Clone gempba-examples and build it against the installed gempba
+      - name: Build gempba-examples
+        run: |
+          if [ -n "$GEMPBA_CROSS_REPO_TOKEN" ]; then
+            EX_URL="https://x-access-token:${GEMPBA_CROSS_REPO_TOKEN}@github.com/${GEMPBA_EXAMPLES_OWNER}/gempba-examples.git"
+          else
+            EX_URL="https://github.com/${GEMPBA_EXAMPLES_OWNER}/gempba-examples.git"
+          fi
+          git -c http."https://github.com/".extraheader= -c credential.helper= clone --depth 1 --branch "${{ steps.examples_ref.outputs.ref }}" \
+            "$EX_URL" "$RUNNER_TEMP/gempba-examples-src"
+          cmake -S "$RUNNER_TEMP/gempba-examples-src" -B "$RUNNER_TEMP/gempba-examples-build" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$GEMPBA_INSTALL_PREFIX;$(brew --prefix boost)" \
+            -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }} \
+            -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -I$(brew --prefix libomp)/include" \
+            -DOpenMP_CXX_LIB_NAMES="omp" \
+            -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib
+          cmake --build "$RUNNER_TEMP/gempba-examples-build" --parallel $(sysctl -n hw.logicalcpu)
+
   test:
     needs: build
     runs-on: ${{ fromJSON(vars.RUNNER_MACOS || '["macos-26"]') }}

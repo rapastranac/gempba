@@ -17,16 +17,15 @@ endif ()
 # option() only writes the cache when the key is not yet present, so user-passed
 # -DGEMPBA_BUILD_TESTS=OFF (or =ON) always takes precedence over these defaults.
 if (CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
-    message(STATUS "GemPBA detected as root project. Defaulting to build tests and examples.")
+    message(STATUS "GemPBA detected as root project. Defaulting to build tests.")
 
     option(GEMPBA_DEV_MODE         "Enable dev mode"                      ON)
     option(GEMPBA_BUILD_TESTS      "Build gempba unit tests"              ON)
-    option(GEMPBA_BUILD_EXAMPLES   "Build gempba examples"                ON)
     option(GEMPBA_MULTIPROCESSING  "Enable multiprocessing support"       ON)
     option(GEMPBA_HWLOC            "Use hwloc for hardware topology"      ON)
     option(GEMPBA_DEBUG_COMMENTS   "Enable debug comments in gempba"      OFF)
 
-    message(STATUS "GEMPBA_BUILD_TESTS=${GEMPBA_BUILD_TESTS}, GEMPBA_BUILD_EXAMPLES=${GEMPBA_BUILD_EXAMPLES}")
+    message(STATUS "GEMPBA_BUILD_TESTS=${GEMPBA_BUILD_TESTS}")
 
     # 🎯 If we are developing gempba and the type was not specified, use Debug
     if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -37,16 +36,15 @@ if (CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
     endif ()
 
 else ()
-    message(STATUS "GemPBA detected as a subproject. Defaulting to not build tests and examples.")
+    message(STATUS "GemPBA detected as a subproject. Defaulting to not build tests.")
 
     option(GEMPBA_DEV_MODE         "Enable dev mode"                      OFF)
     option(GEMPBA_BUILD_TESTS      "Build gempba unit tests"              OFF)
-    option(GEMPBA_BUILD_EXAMPLES   "Build gempba examples"                OFF)
     option(GEMPBA_MULTIPROCESSING  "Enable multiprocessing support"       OFF)
     option(GEMPBA_HWLOC            "Use hwloc for hardware topology"      OFF)
     option(GEMPBA_DEBUG_COMMENTS   "Enable debug comments in gempba"      OFF)
 
-    message(STATUS "GEMPBA_BUILD_TESTS=${GEMPBA_BUILD_TESTS}, GEMPBA_BUILD_EXAMPLES=${GEMPBA_BUILD_EXAMPLES}")
+    message(STATUS "GEMPBA_BUILD_TESTS=${GEMPBA_BUILD_TESTS}")
 
     # ⚠️ DO NOT set CMAKE_BUILD_TYPE here — inherit from parent
     message(STATUS "Using parent project's CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}")
@@ -87,10 +85,6 @@ elseif (GEMPBA_BUILD_TESTS AND NOT GEMPBA_DEV_MODE)
     message(STATUS "Skipping tests: tests use the explicit gempba::multithreading::* form and require GEMPBA_DEV_MODE=ON")
 endif ()
 
-if (GEMPBA_BUILD_EXAMPLES AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/examples/CMakeLists.txt")
-    add_subdirectory(examples)
-endif ()
-
 # 📄 Main source files
 file(GLOB_RECURSE Sources "src/*.cpp")
 if (NOT GEMPBA_MULTIPROCESSING)
@@ -111,7 +105,6 @@ target_compile_definitions(gempba
             $<$<BOOL:${GEMPBA_DEV_MODE}>:GEMPBA_DEV_MODE>
             $<$<BOOL:${GEMPBA_HWLOC}>:GEMPBA_HWLOC>
             $<$<BOOL:${GEMPBA_DEBUG_COMMENTS}>:GEMPBA_DEBUG_COMMENTS>
-            $<$<BOOL:${GEMPBA_BUILD_EXAMPLES}>:GEMPBA_BUILD_EXAMPLES>
             $<$<BOOL:${GEMPBA_BUILD_TESTS}>:GEMPBA_BUILD_TESTS>
 )
 
@@ -120,7 +113,6 @@ message(STATUS "🔧 GEMPBA_DEV_MODE=${GEMPBA_DEV_MODE}")
 message(STATUS "🔧 GEMPBA_MULTIPROCESSING=${GEMPBA_MULTIPROCESSING}")
 message(STATUS "🔧 GEMPBA_HWLOC=${GEMPBA_HWLOC}")
 message(STATUS "🔧 GEMPBA_DEBUG_COMMENTS=${GEMPBA_DEBUG_COMMENTS}")
-message(STATUS "🔧 GEMPBA_BUILD_EXAMPLES=${GEMPBA_BUILD_EXAMPLES}")
 message(STATUS "🔧 GEMPBA_BUILD_TESTS=${GEMPBA_BUILD_TESTS}")
 
 

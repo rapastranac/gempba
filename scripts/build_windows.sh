@@ -17,5 +17,4 @@ mkdir -p "$WORKSPACE/.build"
     -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
     -DGEMPBA_HWLOC="$HWLOC" \
     -DGEMPBA_BUILD_TESTS=ON \
-    -DGEMPBA_BUILD_EXAMPLES=ON \
     "$WORKSPACE" && make -j"$(nproc)")

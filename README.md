@@ -46,14 +46,18 @@ The two main research contributions baked into the framework are the **Quasi-Hor
 | C++ compiler | C++23 | GCC or Clang |
 | CMake | ≥ 3.28 | |
 | OpenMPI | ≥ 4.0 | Multiprocessing only |
-| Boost | any recent | Examples and tests only |
+| Boost | any recent | Tests only |
 | GoogleTest | any recent | Tests only |
 
 ## Documentation
 
-Installation, quick-start, full API reference, and examples are all at:
+Installation, quick-start, and full API reference are at:
 
 **[GemPBA-Docs/](https://rapastranac.github.io/gempba-docs/)**
+
+## Examples
+
+Runnable examples live in the sibling repo **[gempba-examples](https://github.com/rapastranac/gempba-examples)**. They are built against an installed gempba (`find_package(gempba)`) so every example PR exercises the public API the same way downstream consumers do.
 
 ## Copyright and Citing
 
