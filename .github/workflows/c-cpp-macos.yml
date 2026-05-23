@@ -22,8 +22,6 @@ jobs:
     timeout-minutes: 30
     strategy:
       fail-fast: false
-      # Serial: concurrent legs race on a shared Homebrew install.
-      max-parallel: 1
       matrix:
         multiprocessing: ['ON', 'OFF']
 
@@ -77,19 +75,79 @@ jobs:
             -DCMAKE_PREFIX_PATH=$(brew --prefix boost)
           cmake --build build --parallel $(sysctl -n hw.logicalcpu)
 
+  test:
+    needs: build
+    runs-on: ${{ fromJSON(vars.RUNNER_MACOS || '["macos-26"]') }}
+    timeout-minutes: 30
+
+    steps:
+      # 1️⃣ Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.ref }}
+
+      # 2️⃣ Bootstrap Homebrew on PATH + install brew packages
+      - name: Setup Dependencies
+        uses: ./.github/actions/setup-macos-deps
+        with:
+          multiprocessing: 'ON'
+          tests: 'true'
+
+      # 3️⃣ Restore the MP=ON cache that the build job populated. save: false
+      # because this job doesn't add anything new — the build job is the
+      # canonical writer. Tests reference gempba::mp::* directly so we never
+      # exercise the MP=OFF leg here.
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: build-macos-mpON
+          save: false
+
+      # 4️⃣ Configure + build locally with MP=ON. Same flags as the build job
+      # so ccache hashes match; cache hits make this near-instant. cmake-
+      # generated paths (CTestTestfile.cmake, gtest_discover_tests output)
+      # point at this runner's workspace.
+      - name: Configure + cached build
+        run: |
+          cmake -S . -B build \
+            -DGEMPBA_MULTIPROCESSING=ON \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -I$(brew --prefix libomp)/include" \
+            -DOpenMP_CXX_LIB_NAMES="omp" \
+            -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib \
+            -DCMAKE_PREFIX_PATH=$(brew --prefix boost)
+          cmake --build build --parallel $(sysctl -n hw.logicalcpu)
+
+      # 5️⃣ Run tests with JUnit XML output
+      - name: Run tests with retry for flaky tests
+        run: |
+          cd ${{ github.workspace }}/build
+
+          echo "🟢 Non-flaky tests: single run, must pass"
+          ctest --output-on-failure --output-junit test_results_main.xml -E "FLAKY_"
+
+          echo "🟡 Flaky tests: up to 3 attempts each"
+          ctest --repeat until-pass:3 --output-on-failure --output-junit test_results_flaky.xml -R "FLAKY_" --no-tests=ignore
+
+      # 6️⃣ Upload test results as artifacts
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-macos
+          path: ${{ github.workspace }}/build/test_results_*.xml
+          retention-days: 30
+
   # Build the gempba-examples sister repo against an installed gempba built
   # from THIS branch. See c-cpp-ubuntu.yml for rationale.
-  # needs: [build, test] serializes this job after both so none of the three
-  # race on the shared Homebrew install on the self-hosted macOS runner —
-  # build's matrix legs run first (max-parallel: 1), then test, then this.
   build-examples-from-install:
-    needs: [build, test]
     runs-on: ${{ fromJSON(vars.RUNNER_MACOS || '["macos-26"]') }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
-      # Serial: concurrent legs race on a shared Homebrew install.
-      max-parallel: 1
       matrix:
         multiprocessing: ['ON', 'OFF']
     env:
@@ -198,72 +256,6 @@ jobs:
             -DOpenMP_CXX_LIB_NAMES="omp" \
             -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib
           cmake --build "$RUNNER_TEMP/gempba-examples-build" --parallel $(sysctl -n hw.logicalcpu)
-
-  test:
-    needs: build
-    runs-on: ${{ fromJSON(vars.RUNNER_MACOS || '["macos-26"]') }}
-    timeout-minutes: 30
-
-    steps:
-      # 1️⃣ Checkout the repository
-      - name: Checkout repository
-        uses: actions/checkout@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          ref: ${{ github.ref }}
-
-      # 2️⃣ Bootstrap Homebrew on PATH + install brew packages
-      - name: Setup Dependencies
-        uses: ./.github/actions/setup-macos-deps
-        with:
-          multiprocessing: 'ON'
-          tests: 'true'
-
-      # 3️⃣ Restore the MP=ON cache that the build job populated. save: false
-      # because this job doesn't add anything new — the build job is the
-      # canonical writer. Tests reference gempba::mp::* directly so we never
-      # exercise the MP=OFF leg here.
-      - name: Setup ccache
-        uses: hendrikmuhs/ccache-action@v1
-        with:
-          key: build-macos-mpON
-          save: false
-
-      # 4️⃣ Configure + build locally with MP=ON. Same flags as the build job
-      # so ccache hashes match; cache hits make this near-instant. cmake-
-      # generated paths (CTestTestfile.cmake, gtest_discover_tests output)
-      # point at this runner's workspace.
-      - name: Configure + cached build
-        run: |
-          cmake -S . -B build \
-            -DGEMPBA_MULTIPROCESSING=ON \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -I$(brew --prefix libomp)/include" \
-            -DOpenMP_CXX_LIB_NAMES="omp" \
-            -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib \
-            -DCMAKE_PREFIX_PATH=$(brew --prefix boost)
-          cmake --build build --parallel $(sysctl -n hw.logicalcpu)
-
-      # 5️⃣ Run tests with JUnit XML output
-      - name: Run tests with retry for flaky tests
-        run: |
-          cd ${{ github.workspace }}/build
-
-          echo "🟢 Non-flaky tests: single run, must pass"
-          ctest --output-on-failure --output-junit test_results_main.xml -E "FLAKY_"
-
-          echo "🟡 Flaky tests: up to 3 attempts each"
-          ctest --repeat until-pass:3 --output-on-failure --output-junit test_results_flaky.xml -R "FLAKY_" --no-tests=ignore
-
-      # 6️⃣ Upload test results as artifacts
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: test-results-macos
-          path: ${{ github.workspace }}/build/test_results_*.xml
-          retention-days: 30
 
   publish-test-results:
     needs: test

@@ -66,6 +66,60 @@ jobs:
           cmake -G "MSYS Makefiles" -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }} -S . -B build
           cmake --build build --parallel $(nproc)
 
+  test:
+    needs: build
+    runs-on: ${{ fromJSON(vars.RUNNER_WINDOWS || '["windows-2025"]') }}
+    timeout-minutes: 30
+
+    steps:
+      # 1️⃣ Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.ref }}
+
+      # 2️⃣ Set up MSYS2 + MS-MPI runtime (same set as build for ABI parity;
+      # cache: false, release: false preserves the preinstalled C:\msys64 — see #159).
+      - name: Setup Dependencies
+        uses: ./.github/actions/setup-windows-deps
+        with:
+          multiprocessing: 'ON'
+          tests: 'true'
+          cache: 'false'
+          release: 'false'
+
+      # 3️⃣ Build locally with MP=ON so cmake-generated paths point at this
+      # runner's workspace. No ccache on Windows yet (mingw+msys2 PATH plumbing
+      # is a separate follow-up), so this is a full compile every time. Tests
+      # reference gempba::mp::* directly so we never exercise MP=OFF here.
+      - name: Configure + build
+        shell: msys2 {0}
+        run: |
+          cmake -G "MSYS Makefiles" -DGEMPBA_MULTIPROCESSING=ON -S . -B build
+          cmake --build build --parallel $(nproc)
+
+      # 4️⃣ Run tests with JUnit XML output
+      - name: Run tests with retry for flaky tests
+        shell: msys2 {0}
+        run: |
+          cd "$GITHUB_WORKSPACE/build"
+
+          echo "🟢 Non-flaky tests: single run, must pass"
+          ctest --output-on-failure --output-junit test_results_main.xml -E "FLAKY_"
+
+          echo "🟡 Flaky tests: up to 3 attempts each"
+          ctest --repeat until-pass:3 --output-on-failure --output-junit test_results_flaky.xml -R "FLAKY_" --no-tests=ignore
+
+      # 5️⃣ Upload test results as artifacts
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-windows
+          path: ${{ github.workspace }}/build/test_results_*.xml
+          retention-days: 30
+
   # Build the gempba-examples sister repo against an installed gempba built
   # from THIS branch. See c-cpp-ubuntu.yml for rationale.
   build-examples-from-install:
@@ -183,60 +237,6 @@ jobs:
             -DCMAKE_PREFIX_PATH="$GEMPBA_INSTALL_PREFIX" \
             -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }}
           cmake --build "$RUNNER_TEMP/gempba-examples-build" --parallel $(nproc)
-
-  test:
-    needs: build
-    runs-on: ${{ fromJSON(vars.RUNNER_WINDOWS || '["windows-2025"]') }}
-    timeout-minutes: 30
-
-    steps:
-      # 1️⃣ Checkout the repository
-      - name: Checkout repository
-        uses: actions/checkout@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          ref: ${{ github.ref }}
-
-      # 2️⃣ Set up MSYS2 + MS-MPI runtime (same set as build for ABI parity;
-      # cache: false, release: false preserves the preinstalled C:\msys64 — see #159).
-      - name: Setup Dependencies
-        uses: ./.github/actions/setup-windows-deps
-        with:
-          multiprocessing: 'ON'
-          tests: 'true'
-          cache: 'false'
-          release: 'false'
-
-      # 3️⃣ Build locally with MP=ON so cmake-generated paths point at this
-      # runner's workspace. No ccache on Windows yet (mingw+msys2 PATH plumbing
-      # is a separate follow-up), so this is a full compile every time. Tests
-      # reference gempba::mp::* directly so we never exercise MP=OFF here.
-      - name: Configure + build
-        shell: msys2 {0}
-        run: |
-          cmake -G "MSYS Makefiles" -DGEMPBA_MULTIPROCESSING=ON -S . -B build
-          cmake --build build --parallel $(nproc)
-
-      # 4️⃣ Run tests with JUnit XML output
-      - name: Run tests with retry for flaky tests
-        shell: msys2 {0}
-        run: |
-          cd "$GITHUB_WORKSPACE/build"
-
-          echo "🟢 Non-flaky tests: single run, must pass"
-          ctest --output-on-failure --output-junit test_results_main.xml -E "FLAKY_"
-
-          echo "🟡 Flaky tests: up to 3 attempts each"
-          ctest --repeat until-pass:3 --output-on-failure --output-junit test_results_flaky.xml -R "FLAKY_" --no-tests=ignore
-
-      # 5️⃣ Upload test results as artifacts
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: test-results-windows
-          path: ${{ github.workspace }}/build/test_results_*.xml
-          retention-days: 30
 
   publish-msys2:
     needs: build
