@@ -18,22 +18,25 @@ find_package(Boost COMPONENTS serialization fiber REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 include_directories(${ARGPARSE_INCLUDE_DIR})
 
-# Add each example scenario. mp_* examples consume gempba::multiprocessing::** and require
-# GEMPBA_MULTIPROCESSING=ON; skip them in MT-only builds so the example tree
-# stays buildable without MPI on the system.
-file(GLOB EXAMPLES "*.cpp")
+# Each mode has its own subtree (multithreading/{src,include}, multiprocessing/
+# {src,include}) and its own CMakeLists that drives its example targets. The
+# multiprocessing/ subtree consumes gempba::multiprocessing::* and is only
+# added when GEMPBA_MULTIPROCESSING=ON. The mp_*.cpp files still at the root
+# move into the multiprocessing/ subtree in a later commit.
+
+add_subdirectory(multithreading)
+
+# Pre-migration: mp_*.cpp examples still live at the root until their
+# structural move lands. The legacy filter keeps them out of MT-only builds.
+file(GLOB ROOT_EXAMPLES "*.cpp")
 if (NOT GEMPBA_MULTIPROCESSING)
-    list(FILTER EXAMPLES EXCLUDE REGEX ".*/mp_[^/]+\\.cpp$")
+    list(FILTER ROOT_EXAMPLES EXCLUDE REGEX ".*/mp_[^/]+\\.cpp$")
 endif ()
 
-foreach (EXAMPLE ${EXAMPLES})
-    get_filename_component(EXAMPLE_NAME ${EXAMPLE} NAME_WE) # Get the name without extension
+foreach (EXAMPLE ${ROOT_EXAMPLES})
+    get_filename_component(EXAMPLE_NAME ${EXAMPLE} NAME_WE)
     add_executable(${EXAMPLE_NAME} ${EXAMPLE})
 
-    # GEMPBA_MULTIPROCESSING is no longer set per-example; examples inherit the
-    # macro from the gempba target's PUBLIC compile definition.
-
-    # Link examples with GemPBA and Boost
     target_link_libraries(${EXAMPLE_NAME}
             PRIVATE
             gempba
@@ -42,13 +45,11 @@ foreach (EXAMPLE ${EXAMPLES})
             Boost::fiber
     )
 
-    # Executables output directory
     set_target_properties(${EXAMPLE_NAME}
             PROPERTIES
             RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin
     )
 
-    # Compilation options by mode
     target_compile_options(${EXAMPLE_NAME} PRIVATE
             -Wall -Wextra -Wpedantic -pthread -fexceptions
             $<$<CONFIG:Debug>:-g -O0 -ggdb3 -DGEMPBA_DEBUG_COMMENTS>

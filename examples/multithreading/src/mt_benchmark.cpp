@@ -1,5 +1,5 @@
-#include "include/benchmark.hpp"
-#include "include/mt_benchmark.hpp"
+#include "benchmark.hpp"
+#include "mt_benchmark.hpp"
 #include <gempba/gempba.hpp>
 
 #include <iostream>

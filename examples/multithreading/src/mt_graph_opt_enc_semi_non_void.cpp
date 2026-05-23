@@ -1,9 +1,9 @@
-#include "include/mt_graph_opt_enc_semi_non_void.hpp"
+#include "mt_graph_opt_enc_semi_non_void.hpp"
 
 #include <string>
 #include <gempba/gempba.hpp>
 
-#include "include/main.hpp"
+#include "main.hpp"
 
 int run(const int p_num_threads, const int p_probability, const std::string &filename) {
 

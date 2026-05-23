@@ -4,8 +4,8 @@
 #include <unistd.h>
 #include <spdlog/spdlog.h>
 
-#include "include/main.hpp"
-#include "include/mt_bitvector_optimized_encoding.hpp"
+#include "main.hpp"
+#include "mt_bitvector_optimized_encoding.hpp"
 
 using namespace std::placeholders;
 

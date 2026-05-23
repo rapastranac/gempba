@@ -1,8 +1,8 @@
-#include "include/mt_graph_opt_enc_semi.hpp"
+#include "mt_graph_opt_enc_semi.hpp"
 
 #include <gempba/gempba.hpp>
-#include "include/Graph.hpp"
-#include "include/main.hpp"
+#include "Graph.hpp"
+#include "main.hpp"
 
 int run(int job_id, int ntasks_per_node, int prob, string &filename) {
     Graph graph;
