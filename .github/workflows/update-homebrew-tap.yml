@@ -1,0 +1,204 @@
+name: Update Homebrew Tap
+
+# Renders the two formula templates under packaging/homebrew/ and pushes them
+# to a sister tap repo. The tap is its own GitHub repo (Homebrew's convention),
+# so the workflow needs cross-repo write access; that token is the only piece
+# of operator setup beyond creating the tap repo itself.
+#
+# Multi-owner model (downstream/upstream coexistence)
+# ---------------------------------------------------
+# Every owner that cuts a gempba release maintains its own pair:
+#   <owner>/gempba              (this repo, the source of truth)
+#   <owner>/homebrew-gempba     (the tap, must exist; can be empty on first run)
+# Defaults below pick the same owner that runs the workflow, so an upstream
+# port (e.g. rapastranac) needs zero source-tree edits — only:
+#   - create rapastranac/homebrew-gempba (empty repo)
+#   - add `secrets.HOMEBREW_TAP_TOKEN` to that owner (PAT with
+#     contents:write on the tap repo)
+#   - (optional) add `secrets.GEMPBA_CROSS_REPO_TOKEN` if the tarball lives
+#     behind a private gempba and the workflow runs from a different owner
+#
+# To publish from one owner into another owner's tap (mixed-owner scenario):
+#   - vars.GEMPBA_PUBLIC_REPO  = <tarball-owner>/gempba
+#   - vars.HOMEBREW_TAP_REPO   = <tap-owner>/homebrew-gempba
+#   - secrets.HOMEBREW_TAP_TOKEN must have write access on <tap-owner>/...
+
+on:
+  push:
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'packaging/homebrew/**'
+      - '.github/workflows/update-homebrew-tap.yml'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to publish (e.g. v3.0.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish-formula:
+    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
+    timeout-minutes: 5
+    env:
+      # Public-facing repo the formula points its homepage/url/head at.
+      # Defaults to the same owner running the workflow; override with
+      # `vars.GEMPBA_PUBLIC_REPO` (e.g. `<owner>/gempba`) to point formulas
+      # at a different gempba (mixed-owner publish).
+      PUBLIC_REPO: ${{ vars.GEMPBA_PUBLIC_REPO || github.repository }}
+      # Homebrew tap repo to push the rendered formula to. Defaults to
+      # `<repo-owner>/homebrew-gempba`; override with `vars.HOMEBREW_TAP_REPO`.
+      TAP_REPO: ${{ vars.HOMEBREW_TAP_REPO || format('{0}/homebrew-gempba', github.repository_owner) }}
+
+    steps:
+      # 1️⃣ Checkout gempba (to read the formula template)
+      - name: Checkout gempba
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      # 2️⃣ Resolve tag — either real (push/dispatch) or synthetic (PR preview)
+      - name: Resolve tag
+        id: tag
+        run: |
+          case "${{ github.event_name }}" in
+            workflow_dispatch)
+              TAG="${{ inputs.tag }}"
+              ;;
+            push)
+              TAG="${GITHUB_REF_NAME}"
+              ;;
+            pull_request)
+              VER=$(grep -m1 'project(gempba VERSION' CMakeLists.txt | grep -oP '\d+\.\d+\.\d+')
+              TAG="v${VER}-pr${{ github.event.pull_request.number }}"
+              ;;
+            *)
+              echo "::error::unsupported event ${{ github.event_name }}"
+              exit 1
+              ;;
+          esac
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Resolved tag: ${TAG}"
+
+      # 3️⃣ Compute tarball sha256 — only on real publish (tag/dispatch). The
+      #    URL must match the one we bake into the formula, so we hit
+      #    PUBLIC_REPO (which may differ from github.repository if this
+      #    workflow runs from a mirror).
+      #
+      #    We use the api.github.com tarball endpoint rather than
+      #    github.com/<owner>/<repo>/archive/... because the latter is the HTML
+      #    download path and ignores `Authorization` headers — anonymous
+      #    requests to a private repo's archive get 404, not 401, regardless of
+      #    token. The api endpoint accepts `GITHUB_TOKEN` (contents:read) and
+      #    Homebrew on the consumer side honours `HOMEBREW_GITHUB_API_TOKEN`
+      #    against it. For a public PUBLIC_REPO the same URL works
+      #    (rate-limited unauth at 60/hr/IP, irrelevant at our scale).
+      - name: Compute tarball sha256
+        id: sha
+        if: github.event_name != 'pull_request'
+        env:
+          # GITHUB_TOKEN works when PUBLIC_REPO is the running repo. When the
+          # mixed-owner scenario points PUBLIC_REPO at a different owner whose
+          # gempba is private, fall through to GEMPBA_CROSS_REPO_TOKEN (the
+          # same org-level PAT used by cross-repo gempba-examples clones).
+          GH_TOKEN: ${{ secrets.GEMPBA_CROSS_REPO_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          VERSION="${TAG#v}"
+          URL="https://api.github.com/repos/${PUBLIC_REPO}/tarball/refs/tags/${TAG}"
+          curl -fsSL -L \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -o release.tar.gz \
+            "${URL}"
+          SHA=$(shasum -a 256 release.tar.gz | awk '{print $1}')
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "url=${URL}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "sha256=${SHA}"
+
+      # 4️⃣ Render both formulas from the in-repo templates:
+      #    - always substitute __OWNER_REPO__ → PUBLIC_REPO
+      #    - on real publish, also patch url/version/sha256 with the resolved tag
+      #    Two coexisting formulas mirror the apt/MSYS2 split:
+      #      gempba      — multithreading flavor (base)
+      #      gempba-mpi  — MPI multiprocessing flavor (depends on gempba)
+      - name: Render formulas
+        run: |
+          mkdir -p out/Formula
+          for name in gempba gempba-mpi; do
+            cp "packaging/homebrew/${name}.rb.in" "out/Formula/${name}.rb"
+            sed -i "s|__OWNER_REPO__|${PUBLIC_REPO}|g" "out/Formula/${name}.rb"
+          done
+
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            URL='${{ steps.sha.outputs.url }}'
+            SHA='${{ steps.sha.outputs.sha }}'
+            VERSION='${{ steps.sha.outputs.version }}'
+            for name in gempba gempba-mpi; do
+              # Replace the url line (`head "..."` is left intact — the regex
+              # anchors on `url`, not `head`).
+              sed -i -E "s|^(\s*url\s+\").*(\")|\1${URL}\2|" "out/Formula/${name}.rb"
+              # Replace the version line (api.github.com URLs don't encode the
+              # version, so brew can't auto-derive it).
+              sed -i -E "s|^(\s*version\s+\").*(\")|\1${VERSION}\2|" "out/Formula/${name}.rb"
+              # Replace the sha256 line (placeholder is 64 zeros).
+              sed -i -E "s|^(\s*sha256\s+\")[0-9a-fA-F]{64}(\")|\1${SHA}\2|" "out/Formula/${name}.rb"
+            done
+          fi
+
+          for name in gempba gempba-mpi; do
+            echo "--- rendered ${name}.rb ---"
+            cat "out/Formula/${name}.rb"
+          done
+
+      # 5️⃣a PR → store both rendered formulas as a single workflow artifact
+      - name: Upload formulas as workflow artifact (PR)
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: homebrew-formulas
+          path: out/Formula/
+          retention-days: 7
+
+      # 5️⃣b Tag/dispatch → checkout the tap and push both rendered formulas
+      - name: Checkout homebrew tap
+        if: github.event_name != 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.TAP_REPO }}
+          # PAT with contents:write on the tap repo; each owner that publishes
+          # a gempba release issues its own under the same secret name.
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+
+      - name: Commit and push
+        if: github.event_name != 'pull_request'
+        working-directory: tap
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          mkdir -p Formula
+          cp ../out/Formula/gempba.rb     Formula/gempba.rb
+          cp ../out/Formula/gempba-mpi.rb Formula/gempba-mpi.rb
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Stage first, then compare index vs HEAD. `git diff --quiet` (no
+          # --cached) ignores untracked paths, so on a first-ever publish a
+          # newly-cp'd formula would be reported as "no diff" and the commit
+          # would be silently skipped.
+          git add Formula/gempba.rb Formula/gempba-mpi.rb
+          if git diff --cached --quiet -- Formula/gempba.rb Formula/gempba-mpi.rb; then
+            echo "Formulas already up to date; nothing to commit."
+            exit 0
+          fi
+
+          git commit -m "gempba ${TAG}"
+          git push origin HEAD:main
