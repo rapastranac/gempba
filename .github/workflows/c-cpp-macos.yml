@@ -26,6 +26,13 @@ jobs:
         multiprocessing: ['ON', 'OFF']
 
     steps:
+      - name: Clean stale .git locks from prior interrupted runs
+        shell: bash
+        run: |
+          if [ -d "$GITHUB_WORKSPACE/.git" ]; then
+            find "$GITHUB_WORKSPACE/.git" -name '*.lock' -delete 2>/dev/null || true
+          fi
+
       # 1️⃣ Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -81,6 +88,13 @@ jobs:
     timeout-minutes: 30
 
     steps:
+      - name: Clean stale .git locks from prior interrupted runs
+        shell: bash
+        run: |
+          if [ -d "$GITHUB_WORKSPACE/.git" ]; then
+            find "$GITHUB_WORKSPACE/.git" -name '*.lock' -delete 2>/dev/null || true
+          fi
+
       # 1️⃣ Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -156,6 +170,13 @@ jobs:
       GEMPBA_CROSS_REPO_TOKEN: ${{ secrets.GEMPBA_CROSS_REPO_TOKEN || '' }}
 
     steps:
+      - name: Clean stale .git locks from prior interrupted runs
+        shell: bash
+        run: |
+          if [ -d "$GITHUB_WORKSPACE/.git" ]; then
+            find "$GITHUB_WORKSPACE/.git" -name '*.lock' -delete 2>/dev/null || true
+          fi
+
       # 1️⃣ Checkout gempba (this PR's commit)
       - name: Checkout repository
         uses: actions/checkout@v6
