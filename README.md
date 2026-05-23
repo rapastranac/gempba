@@ -55,6 +55,13 @@ pacman -S mingw-w64-x86_64-gempba       # multithreading flavor
 pacman -S mingw-w64-x86_64-gempba-mpi   # MPI flavor; depends on mingw-w64-x86_64-gempba
 ```
 
+```bash
+# macOS (from the project's Homebrew tap)
+brew tap <owner>/gempba
+brew install gempba       # multithreading flavor (default)
+brew install gempba-mpi   # MPI flavor; depends on gempba
+```
+
 If you are building from source instead, pick the flavor at configure time and install:
 
 ```bash
