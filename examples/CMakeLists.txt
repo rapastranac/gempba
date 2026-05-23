@@ -25,34 +25,6 @@ include_directories(${ARGPARSE_INCLUDE_DIR})
 # move into the multiprocessing/ subtree in a later commit.
 
 add_subdirectory(multithreading)
-
-# Pre-migration: mp_*.cpp examples still live at the root until their
-# structural move lands. The legacy filter keeps them out of MT-only builds.
-file(GLOB ROOT_EXAMPLES "*.cpp")
-if (NOT GEMPBA_MULTIPROCESSING)
-    list(FILTER ROOT_EXAMPLES EXCLUDE REGEX ".*/mp_[^/]+\\.cpp$")
+if (GEMPBA_MULTIPROCESSING)
+    add_subdirectory(multiprocessing)
 endif ()
-
-foreach (EXAMPLE ${ROOT_EXAMPLES})
-    get_filename_component(EXAMPLE_NAME ${EXAMPLE} NAME_WE)
-    add_executable(${EXAMPLE_NAME} ${EXAMPLE})
-
-    target_link_libraries(${EXAMPLE_NAME}
-            PRIVATE
-            gempba
-            example_libs
-            Boost::serialization
-            Boost::fiber
-    )
-
-    set_target_properties(${EXAMPLE_NAME}
-            PROPERTIES
-            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin
-    )
-
-    target_compile_options(${EXAMPLE_NAME} PRIVATE
-            -Wall -Wextra -Wpedantic -pthread -fexceptions
-            $<$<CONFIG:Debug>:-g -O0 -ggdb3 -DGEMPBA_DEBUG_COMMENTS>
-            $<$<CONFIG:Release>:-O3 -DNDEBUG>
-    )
-endforeach ()

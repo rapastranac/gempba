@@ -8,8 +8,8 @@
 #include <vector>
 #include <spdlog/spdlog.h>
 
-#include "include/main.hpp"
-#include "include/mp_bitvector_optimized_encoding.hpp"
+#include "main.hpp"
+#include "mp_bitvector_optimized_encoding.hpp"
 
 using namespace std::placeholders;
 
