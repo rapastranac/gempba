@@ -22,8 +22,6 @@ jobs:
     timeout-minutes: 30
     strategy:
       fail-fast: false
-      # Serial: concurrent legs race on a shared Homebrew install.
-      max-parallel: 1
       matrix:
         multiprocessing: ['ON', 'OFF']
 
@@ -79,17 +77,11 @@ jobs:
 
   # Build the gempba-examples sister repo against an installed gempba built
   # from THIS branch. See c-cpp-ubuntu.yml for rationale.
-  # needs: [build, test] serializes this job after both so none of the three
-  # race on the shared Homebrew install on the self-hosted macOS runner —
-  # build's matrix legs run first (max-parallel: 1), then test, then this.
   build-examples-from-install:
-    needs: [build, test]
     runs-on: ${{ fromJSON(vars.RUNNER_MACOS || '["macos-26"]') }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
-      # Serial: concurrent legs race on a shared Homebrew install.
-      max-parallel: 1
       matrix:
         multiprocessing: ['ON', 'OFF']
     env:
