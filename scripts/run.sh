@@ -35,27 +35,27 @@ args=(
 ## Multiprocessing scenarios:
 
 #  - Bitvector Optimized Encoding Semi-Centralized
-mpirun -n "$TASKS_PER_NODE" --bind-to core --map-by slot:PE="$CPUS_PER_TASK" --report-bindings ./bin/mp_bitvect_opt_enc_semi "${args[@]}"
+mpirun -n "$TASKS_PER_NODE" --bind-to core --map-by slot:PE="$CPUS_PER_TASK" --report-bindings ./bin/multiprocessing_bitvect_opt_enc_semi "${args[@]}"
 
 #  - Bitvector Optimized Encoding Centralized
-#mpirun -n "$TASKS_PER_NODE" --bind-to core --map-by slot:PE="$CPUS_PER_TASK" --report-bindings ./bin/mp_bitvect_opt_enc_central "${args[@]}"
+#mpirun -n "$TASKS_PER_NODE" --bind-to core --map-by slot:PE="$CPUS_PER_TASK" --report-bindings ./bin/multiprocessing_bitvect_opt_enc_central "${args[@]}"
 
 #  - Bitvector Basic Encoding Semi-Centralized
-#mpirun -n "$TASKS_PER_NODE" --bind-to core --map-by slot:PE="$CPUS_PER_TASK" --report-bindings ./bin/mp_bitvect_basic_enc_semi "${args[@]}"
+#mpirun -n "$TASKS_PER_NODE" --bind-to core --map-by slot:PE="$CPUS_PER_TASK" --report-bindings ./bin/multiprocessing_bitvect_basic_enc_semi "${args[@]}"
 
 #  - Bitvector Basic Encoding Centralized
-#mpirun -n "$TASKS_PER_NODE" --bind-to core --map-by slot:PE="$CPUS_PER_TASK" --report-bindings ./bin/mp_bitvect_basic_enc_central "${args[@]}"
+#mpirun -n "$TASKS_PER_NODE" --bind-to core --map-by slot:PE="$CPUS_PER_TASK" --report-bindings ./bin/multiprocessing_bitvect_basic_enc_central "${args[@]}"
 
 ## Multithreading scenarios:
 
 #  - Bitvector Optimized Encoding Semi-Centralized
-#./bin/mt_bitvect_opt_enc_semi "${args[@]}"
+#./bin/multithreading_bitvect_opt_enc_semi "${args[@]}"
 
 #  - Graph Optimized Encoding Semi-Centralized
-#./bin/mt_graph_opt_enc_semi "${args[@]}"
+#./bin/multithreading_graph_opt_enc_semi "${args[@]}"
 
 #  - Graph Optimized Encoding Semi-Centralized for non-void algorithms
-#./bin/mt_graph_opt_enc_semi_non_void "${args[@]}"
+#./bin/multithreading_graph_opt_enc_semi_non_void "${args[@]}"
 
 
 

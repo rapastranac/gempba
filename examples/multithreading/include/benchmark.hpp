@@ -18,7 +18,7 @@ constexpr unsigned RNG_SEED = 12345; // Fixed for reproducibility
 std::mt19937 rng(RNG_SEED);
 std::uniform_int_distribution<int> jitter(-30, 30);
 
-class mt_benchmark {
+class benchmark {
 
     gempba::node_manager &m_node_manager;
     gempba::load_balancer *m_load_balancer;
@@ -27,9 +27,9 @@ class mt_benchmark {
     long m_leaf_count{0};
 
 public:
-    mt_benchmark(gempba::node_manager &p_node_manager, gempba::load_balancer *p_load_balancer) :
+    benchmark(gempba::node_manager &p_node_manager, gempba::load_balancer *p_load_balancer) :
         m_node_manager(p_node_manager), m_load_balancer(p_load_balancer) {
-        m_explore_func = std::bind(&mt_benchmark::explore, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5);
+        m_explore_func = std::bind(&benchmark::explore, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5);
     }
 
 private:
@@ -83,12 +83,12 @@ public:
         v_left_arg[p_depth % ARG_SIZE] += 0.001;
         v_right_arg[p_depth % ARG_SIZE] -= 0.001;
 
-        gempba::node v_left = gempba::mt::create_explicit_node<void, int, int, std::vector<double> >(*m_load_balancer,
+        gempba::node v_left = gempba::multithreading::create_explicit_node<void, int, int, std::vector<double> >(*m_load_balancer,
                                                                                                      v_parent,
                                                                                                      m_explore_func,
                                                                                                      std::make_tuple(p_depth + 1, p_max_depth, std::move(v_left_arg)));
 
-        gempba::node v_right = gempba::mt::create_explicit_node<void, int, int, std::vector<double> >(*m_load_balancer,
+        gempba::node v_right = gempba::multithreading::create_explicit_node<void, int, int, std::vector<double> >(*m_load_balancer,
                                                                                                       v_parent,
                                                                                                       m_explore_func,
                                                                                                       std::make_tuple(p_depth + 1, p_max_depth, std::move(v_right_arg)));

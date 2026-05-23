@@ -18,7 +18,7 @@ constexpr unsigned RNG_SEED = 12345; // Fixed for reproducibility
 std::mt19937 rng(RNG_SEED);
 std::uniform_int_distribution<int> jitter(-30, 30);
 
-class mp_benchmark {
+class benchmark {
 
     gempba::node_manager &m_node_manager;
     gempba::load_balancer *m_load_balancer;
@@ -27,9 +27,9 @@ class mp_benchmark {
     std::function<std::tuple<int, int, std::vector<double> >(gempba::task_packet)> m_args_deserializer;
 
 public:
-    mp_benchmark(gempba::node_manager &p_node_manager, gempba::load_balancer *p_load_balancer) :
+    benchmark(gempba::node_manager &p_node_manager, gempba::load_balancer *p_load_balancer) :
         m_node_manager(p_node_manager), m_load_balancer(p_load_balancer) {
-        m_explore_func = std::bind(&mp_benchmark::explore, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5);
+        m_explore_func = std::bind(&benchmark::explore, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5);
         m_args_serializer = make_serializer();
         m_args_deserializer = make_deserializer();
     }
@@ -82,14 +82,14 @@ public:
         v_left_arg[p_depth % ARG_SIZE] += 0.001;
         v_right_arg[p_depth % ARG_SIZE] -= 0.001;
 
-        gempba::node v_left = gempba::mp::create_explicit_node<void, int, int, std::vector<double> >(*m_load_balancer,
+        gempba::node v_left = gempba::multiprocessing::create_explicit_node<void, int, int, std::vector<double> >(*m_load_balancer,
                                                                                                      v_parent,
                                                                                                      m_explore_func,
                                                                                                      std::make_tuple(p_depth + 1, p_max_depth, std::move(v_left_arg)),
                                                                                                      m_args_serializer,
                                                                                                      m_args_deserializer);
 
-        gempba::node v_right = gempba::mp::create_explicit_node<void, int, int, std::vector<double> >(*m_load_balancer,
+        gempba::node v_right = gempba::multiprocessing::create_explicit_node<void, int, int, std::vector<double> >(*m_load_balancer,
                                                                                                       v_parent,
                                                                                                       m_explore_func,
                                                                                                       std::make_tuple(p_depth + 1, p_max_depth, std::move(v_right_arg)),

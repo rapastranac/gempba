@@ -6,19 +6,19 @@
 
 // TODO... The whole algorithm passes by value, which is not efficient. We should pass by reference.
 
-class mt_graph_opt_enc_semi_non_void final : public VertexCover {
+class graph_opt_enc_semi_non_void final : public VertexCover {
 
     gempba::node_manager &m_node_manager;
     gempba::load_balancer &m_load_balancer;
     std::function<Graph(std::thread::id, int, Graph, gempba::node)> m_function;
 
 public:
-    mt_graph_opt_enc_semi_non_void(gempba::node_manager &p_node_manager, gempba::load_balancer &p_load_balancer) :
+    graph_opt_enc_semi_non_void(gempba::node_manager &p_node_manager, gempba::load_balancer &p_load_balancer) :
         m_node_manager(p_node_manager), m_load_balancer(p_load_balancer) {
-        this->m_function = std::bind(&mt_graph_opt_enc_semi_non_void::mvc, this, _1, _2, _3, _4);
+        this->m_function = std::bind(&graph_opt_enc_semi_non_void::mvc, this, _1, _2, _3, _4);
     }
 
-    ~mt_graph_opt_enc_semi_non_void() override {
+    ~graph_opt_enc_semi_non_void() override {
     }
 
     bool findCover(int run) {
@@ -101,7 +101,7 @@ public:
             return std::nullopt;
         };
 
-        gempba::node v_left = gempba::mt::create_lazy_node<Graph>(m_load_balancer, v_parent, m_function, v_left_args_initializer);
+        gempba::node v_left = gempba::multithreading::create_lazy_node<Graph>(m_load_balancer, v_parent, m_function, v_left_args_initializer);
 
         std::function<std::optional<std::tuple<int, Graph> >()> v_right_args_initializer = [&]() -> std::optional<std::tuple<int, Graph> > {
             Graph g = graph;
@@ -121,7 +121,7 @@ public:
             return std::nullopt;
         };
 
-        gempba::node v_right = gempba::mt::create_lazy_node<Graph>(
+        gempba::node v_right = gempba::multithreading::create_lazy_node<Graph>(
                 m_load_balancer,
                 v_parent, m_function,
                 v_right_args_initializer

@@ -36,8 +36,8 @@ args=(
     "-I"                 "Unused"
 )
 
-srun ./bin/mt_benchmark "${args[@]}"    # Multi-threaded run: Only 1 node or it will fail
-#srun ./bin/mp_benchmark "${args[@]}"   # Multi-process run (using MPI): At least 2 nodes or it will fail
+srun ./bin/multithreading_benchmark "${args[@]}"    # Multi-threaded run: Only 1 node or it will fail
+#srun ./bin/multiprocessing_benchmark "${args[@]}"   # Multi-process run (using MPI): At least 2 nodes or it will fail
 
 
 # ---------------------------------------------------------------------

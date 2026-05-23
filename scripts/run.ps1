@@ -30,27 +30,27 @@ $arguments = @(
 ## Multiprocessing scenarios:
 
 #  - Bitvector Optimized Encoding Semi-Centralized
-mpiexec.exe -n $TASKS_PER_NODE ./bin/mp_bitvect_opt_enc_semi $arguments
+mpiexec.exe -n $TASKS_PER_NODE ./bin/multiprocessing_bitvect_opt_enc_semi $arguments
 
 #  - Bitvector Optimized Encoding Centralized
-#mpiexec.exe -n $TASKS_PER_NODE ./bin/mp_bitvect_opt_enc_central $arguments
+#mpiexec.exe -n $TASKS_PER_NODE ./bin/multiprocessing_bitvect_opt_enc_central $arguments
 
 #  - Bitvector Basic Encoding Semi-Centralized
-#mpiexec.exe -n $TASKS_PER_NODE ./bin/mp_bitvect_basic_enc_semi $arguments
+#mpiexec.exe -n $TASKS_PER_NODE ./bin/multiprocessing_bitvect_basic_enc_semi $arguments
 
 #  - Bitvector Basic Encoding Centralized
-#mpiexec.exe -n $TASKS_PER_NODE ./bin/mp_bitvect_basic_enc_central $arguments
+#mpiexec.exe -n $TASKS_PER_NODE ./bin/multiprocessing_bitvect_basic_enc_central $arguments
 
 
 ## Multithreading scenarios:
 
 #  - Bitvector Optimized Encoding Semi-Centralized
-#./bin/mt_bitvect_opt_enc_semi $arguments
+#./bin/multithreading_bitvect_opt_enc_semi $arguments
 
 #  - Graph Optimized Encoding Semi-Centralized
-#./bin/mt_graph_opt_enc_semi $arguments
+#./bin/multithreading_graph_opt_enc_semi $arguments
 
 #  - Graph Optimized Encoding Semi-Centralized for non-void algorithms
-#./bin/mt_graph_opt_enc_semi_non_void $arguments
+#./bin/multithreading_graph_opt_enc_semi_non_void $arguments
 
 Write-Output "Finished run at: $( Get-Date )"

@@ -80,7 +80,7 @@ namespace gempba {
 
     void check_not_null([[maybe_unused]] const node& p_parent);
 
-    namespace mt {
+    namespace multithreading {
         /////////////////////////////////////////////////////////////////////////////////////////////////
         /// LOAD BALANCING
         /// /////////////////////////////////////////////////////////////////////////////////////////////
@@ -122,10 +122,10 @@ namespace gempba {
             return node::create(p_parent, v_factory);
         }
 
-    } // namespace mt
+    } // namespace multithreading
 
 #if GEMPBA_MULTIPROCESSING
-    namespace mp {
+    namespace multiprocessing {
 
         /////////////////////////////////////////////////////////////////////////////////////////////////
         /// SCHEDULING
@@ -223,7 +223,7 @@ namespace gempba {
             return node::create(p_parent, v_factory);
         }
 
-    } // namespace mp
+    } // namespace multiprocessing
 #endif // GEMPBA_MULTIPROCESSING
 } // namespace gempba
 

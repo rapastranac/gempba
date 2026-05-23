@@ -33,12 +33,12 @@ $arguments = @(
 ## Multiprocessing scenarios:
 
 # - Benchmarking algorithm
-#mpiexec.exe -n $TASKS_PER_NODE ./bin/mp_benchmark $arguments
+#mpiexec.exe -n $TASKS_PER_NODE ./bin/multiprocessing_benchmark $arguments
 
 ## Multithreading scenarios:
 
 # - Benchmarking algorithm
-./bin/mt_benchmark $arguments
+./bin/multithreading_benchmark $arguments
 
 
 Write-Output "Finished run at: $( Get-Date )"
