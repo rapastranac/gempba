@@ -66,6 +66,81 @@ jobs:
           cmake -G "MSYS Makefiles" -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }} -S . -B build
           cmake --build build --parallel $(nproc)
 
+  # Build the gempba-examples sister repo against an installed gempba built
+  # from THIS branch. See c-cpp-ubuntu.yml for rationale.
+  build-examples-from-install:
+    runs-on: ${{ fromJSON(vars.RUNNER_WINDOWS || '["windows-2025"]') }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        multiprocessing: ['ON', 'OFF']
+    env:
+      GEMPBA_EXAMPLES_OWNER: ${{ vars.GEMPBA_EXAMPLES_OWNER || github.repository_owner }}
+
+    steps:
+      # 1️⃣ Checkout gempba (this PR's commit)
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.ref }}
+
+      # 2️⃣ Set up MSYS2 + MS-MPI runtime; `extra: git` so the cross-repo clone
+      # step has git available inside the msys2 shell.
+      - name: Setup Dependencies
+        uses: ./.github/actions/setup-windows-deps
+        with:
+          multiprocessing: ${{ matrix.multiprocessing }}
+          tests: 'false'
+          extra: 'git'
+          cache: 'false'
+          release: 'false'
+
+      # 3️⃣ Build and install gempba into a workspace-local prefix
+      - name: Install gempba
+        shell: msys2 {0}
+        run: |
+          WS=$(cygpath -u "$GITHUB_WORKSPACE")
+          GEMPBA_INSTALL_PREFIX="$WS/.gempba-install"
+          echo "GEMPBA_INSTALL_PREFIX=$GEMPBA_INSTALL_PREFIX" >> "$GITHUB_ENV"
+          cmake -G "MSYS Makefiles" \
+            -S . -B "$RUNNER_TEMP/gempba-build" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$GEMPBA_INSTALL_PREFIX" \
+            -DGEMPBA_BUILD_TESTS=OFF \
+            -DGEMPBA_DEV_MODE=OFF \
+            -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }}
+          cmake --build "$RUNNER_TEMP/gempba-build" --parallel $(nproc)
+          cmake --install "$RUNNER_TEMP/gempba-build"
+
+      # 4️⃣ Resolve the gempba-examples ref (sister branch → fallback main)
+      - name: Resolve gempba-examples ref
+        id: examples_ref
+        shell: msys2 {0}
+        run: |
+          BRANCH="${{ github.head_ref || github.ref_name }}"
+          if git ls-remote --exit-code --heads "https://github.com/$GEMPBA_EXAMPLES_OWNER/gempba-examples.git" "$BRANCH" >/dev/null 2>&1; then
+            echo "ref=$BRANCH" >> "$GITHUB_OUTPUT"
+            echo "Picked sister branch '$BRANCH' from $GEMPBA_EXAMPLES_OWNER/gempba-examples"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+            echo "Sister branch '$BRANCH' not present in $GEMPBA_EXAMPLES_OWNER/gempba-examples; falling back to main"
+          fi
+
+      # 5️⃣ Clone gempba-examples and build it against the installed gempba
+      - name: Build gempba-examples
+        shell: msys2 {0}
+        run: |
+          git clone --depth 1 --branch "${{ steps.examples_ref.outputs.ref }}" \
+            "https://github.com/$GEMPBA_EXAMPLES_OWNER/gempba-examples.git" "$RUNNER_TEMP/gempba-examples-src"
+          cmake -G "MSYS Makefiles" \
+            -S "$RUNNER_TEMP/gempba-examples-src" -B "$RUNNER_TEMP/gempba-examples-build" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$GEMPBA_INSTALL_PREFIX" \
+            -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }}
+          cmake --build "$RUNNER_TEMP/gempba-examples-build" --parallel $(nproc)
+
   test:
     needs: build
     runs-on: ${{ fromJSON(vars.RUNNER_WINDOWS || '["windows-2025"]') }}

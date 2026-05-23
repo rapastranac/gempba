@@ -153,6 +153,77 @@ jobs:
           path: ${{ github.workspace }}/build/test_results_*.xml
           retention-days: 30
 
+  # Build the gempba-examples sister repo against an installed gempba built
+  # from THIS branch. Mirror of gempba-examples' own CI job, except it
+  # pulls gempba from this PR's commit rather than from a remote sister
+  # branch. Matrix on both flavours so an install-surface regression in
+  # either mode fails this PR — not the next gempba-examples PR.
+  build-examples-from-install:
+    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        multiprocessing: ['ON', 'OFF']
+    env:
+      CC: gcc-14
+      CXX: g++-14
+      GEMPBA_EXAMPLES_OWNER: ${{ vars.GEMPBA_EXAMPLES_OWNER || github.repository_owner }}
+      GEMPBA_INSTALL_PREFIX: ${{ github.workspace }}/.gempba-install
+
+    steps:
+      # 1️⃣ Checkout gempba (this PR's commit)
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.ref }}
+
+      # 2️⃣ Install dependencies (mirror build job's set)
+      - name: Setup Dependencies
+        uses: ./.github/actions/setup-ubuntu-deps
+        with:
+          multiprocessing: ${{ matrix.multiprocessing }}
+          tests: 'false'
+
+      # 3️⃣ Build and install gempba into a workspace-local prefix
+      - name: Install gempba
+        run: |
+          cmake -S . -B "$RUNNER_TEMP/gempba-build" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$GEMPBA_INSTALL_PREFIX" \
+            -DGEMPBA_BUILD_TESTS=OFF \
+            -DGEMPBA_DEV_MODE=OFF \
+            -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }}
+          cmake --build "$RUNNER_TEMP/gempba-build" --parallel $(nproc)
+          cmake --install "$RUNNER_TEMP/gempba-build"
+
+      # 4️⃣ Resolve the gempba-examples ref. Prefer a same-named branch in the
+      # examples sister repo so paired API changes are picked up atomically;
+      # fall back to `main` for non-breaking PRs.
+      - name: Resolve gempba-examples ref
+        id: examples_ref
+        run: |
+          BRANCH="${{ github.head_ref || github.ref_name }}"
+          if git ls-remote --exit-code --heads "https://github.com/$GEMPBA_EXAMPLES_OWNER/gempba-examples.git" "$BRANCH" >/dev/null 2>&1; then
+            echo "ref=$BRANCH" >> "$GITHUB_OUTPUT"
+            echo "Picked sister branch '$BRANCH' from $GEMPBA_EXAMPLES_OWNER/gempba-examples"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+            echo "Sister branch '$BRANCH' not present in $GEMPBA_EXAMPLES_OWNER/gempba-examples; falling back to main"
+          fi
+
+      # 5️⃣ Clone gempba-examples and build it against the installed gempba
+      - name: Build gempba-examples
+        run: |
+          git clone --depth 1 --branch "${{ steps.examples_ref.outputs.ref }}" \
+            "https://github.com/$GEMPBA_EXAMPLES_OWNER/gempba-examples.git" "$RUNNER_TEMP/gempba-examples-src"
+          cmake -S "$RUNNER_TEMP/gempba-examples-src" -B "$RUNNER_TEMP/gempba-examples-build" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$GEMPBA_INSTALL_PREFIX" \
+            -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }}
+          cmake --build "$RUNNER_TEMP/gempba-examples-build" --parallel $(nproc)
+
   publish-deb:
     needs: build
     runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
