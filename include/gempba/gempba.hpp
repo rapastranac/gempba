@@ -35,6 +35,18 @@
     #include <gempba/defaults/default_mpi_stats_visitor.hpp>
 #endif
 
+// In a dependency consumer build (`GEMPBA_DEV_MODE=OFF`) the build flag selects exactly one
+// implementation namespace, which is then made `inline` so consumers can call
+// `gempba::create_*(...)` without typing `multithreading::` / `multiprocessing::`. In a
+// gempba root-project (dev) build we keep both namespaces compilable so changes can't silently
+// rot the off-mode; only `multiprocessing` is inline in that case (it is the superset). In-tree
+// tests and examples always use the explicit form for that reason.
+#if GEMPBA_MULTIPROCESSING
+    #define GEMPBA_INLINE_MT_NAMESPACE
+#else
+    #define GEMPBA_INLINE_MT_NAMESPACE inline
+#endif
+
 namespace gempba {
 
 #if GEMPBA_MULTIPROCESSING
@@ -91,7 +103,8 @@ namespace gempba {
      */
     load_balancer* create_load_balancer(std::unique_ptr<load_balancer> p_your_implementation);
 
-    namespace multithreading {
+#if !GEMPBA_MULTIPROCESSING || GEMPBA_DEV_MODE
+    GEMPBA_INLINE_MT_NAMESPACE namespace multithreading {
         /////////////////////////////////////////////////////////////////////////////////////////////////
         /// LOAD BALANCING
         /// /////////////////////////////////////////////////////////////////////////////////////////////
@@ -132,9 +145,10 @@ namespace gempba {
         }
 
     } // namespace multithreading
+#endif // !GEMPBA_MULTIPROCESSING || GEMPBA_DEV_MODE
 
 #if GEMPBA_MULTIPROCESSING
-    namespace multiprocessing {
+    inline namespace multiprocessing {
 
         /////////////////////////////////////////////////////////////////////////////////////////////////
         /// SCHEDULING
@@ -233,5 +247,7 @@ namespace gempba {
     } // namespace multiprocessing
 #endif // GEMPBA_MULTIPROCESSING
 } // namespace gempba
+
+#undef GEMPBA_INLINE_MT_NAMESPACE
 
 #endif // GEMPBA_GEMPBA_HPP
