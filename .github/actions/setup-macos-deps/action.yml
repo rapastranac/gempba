@@ -29,8 +29,9 @@ runs:
 
     - name: Install brew packages
       shell: bash
+      env:
+        HOMEBREW_NO_AUTO_UPDATE: '1'   # see gempba#239
       run: |
-        brew update
         brew install cmake pkg-config boost spdlog fmt hwloc libomp
         if [ "${{ inputs.multiprocessing }}" = "ON" ]; then
           brew install open-mpi
