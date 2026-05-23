@@ -1,4 +1,4 @@
-#include "benchmark.hpp"
+#include "benchmark_io.hpp"
 #include "mt_benchmark.hpp"
 #include <gempba/gempba.hpp>
 
