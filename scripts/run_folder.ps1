@@ -44,9 +44,9 @@ foreach ($file in $GRAPH_FILES) {
     )
 
     # Execute MPI program (BLOCKING)
-    mpiexec.exe -n $TASKS_PER_NODE ./bin/mp_bitvect_opt_enc_semi @arguments
+    mpiexec.exe -n $TASKS_PER_NODE ./bin/multiprocessing_bitvect_opt_enc_semi @arguments
     # For non-MPI execution, uncomment the line below:
-#    ./bin/mt_bitvect_opt_enc_semi @arguments
+#    ./bin/multithreading_bitvect_opt_enc_semi @arguments
 
     Write-Output "Finished file: $($file.Name) at $( Get-Date )"
 }
