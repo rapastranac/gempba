@@ -114,14 +114,14 @@ namespace gempba {
         /// BRANCH HANDLING
         /// /////////////////////////////////////////////////////////////////////////////////////////////
 
-        node_manager& create_node_manager(load_balancer* p_load_balancer);
+        node_manager& create_node_manager(load_balancer * p_load_balancer);
 
         /////////////////////////////////////////////////////////////////////////////////////////////////
         /// NODES
         /// /////////////////////////////////////////////////////////////////////////////////////////////
 
         template<typename Ret, typename... Args>
-        static node create_explicit_node(load_balancer& p_load_balancer, node& p_parent, invokable<Ret, Args...> auto&& p_runnable, std::tuple<Args...>&& p_args) {
+        static node create_explicit_node(load_balancer & p_load_balancer, node & p_parent, invokable<Ret, Args...> auto&& p_runnable, std::tuple<Args...>&& p_args) {
             check_not_null(p_parent);
 
             const std::function<std::shared_ptr<node_core>(std::shared_ptr<node_core>)> v_factory = [&](std::shared_ptr<node_core> p_core_parent) {
@@ -132,7 +132,7 @@ namespace gempba {
         }
 
         template<typename Ret, typename... Args>
-        static node create_lazy_node(load_balancer& p_load_balancer, const node& p_parent, invokable<Ret, Args...> auto&& p_runnable,
+        static node create_lazy_node(load_balancer & p_load_balancer, const node& p_parent, invokable<Ret, Args...> auto&& p_runnable,
                                      std::function<std::optional<std::tuple<Args...>>()> p_args_initializer) {
             check_not_null(p_parent);
 
