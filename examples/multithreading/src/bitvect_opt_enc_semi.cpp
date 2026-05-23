@@ -5,7 +5,7 @@
 #include <spdlog/spdlog.h>
 
 #include "main.hpp"
-#include "mt_bitvector_optimized_encoding.hpp"
+#include "bitvector_optimized_encoding.hpp"
 
 using namespace std::placeholders;
 
@@ -21,8 +21,8 @@ int run(const std::string& p_job_name, int p_job_id, int p_nodes, int p_ntasks_p
     v_node_manager.set_goal(gempba::MINIMISE, gempba::score_type::I32);
     v_node_manager.set_thread_pool_size(p_threads_per_task);
 
-    mt_bitvector_optimized_encoding v_instance(v_node_manager, v_load_balancer);
-    auto v_function = std::bind(&mt_bitvector_optimized_encoding::mvcbitset, &v_instance, _1, _2, _3, _4, _5); // target algorithm [all arguments]
+    bitvector_optimized_encoding v_instance(v_node_manager, v_load_balancer);
+    auto v_function = std::bind(&bitvector_optimized_encoding::mvcbitset, &v_instance, _1, _2, _3, _4, _5); // target algorithm [all arguments]
 
 
     Graph v_graph;

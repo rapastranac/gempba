@@ -1,5 +1,5 @@
 #include "benchmark_io.hpp"
-#include "mt_benchmark.hpp"
+#include "benchmark.hpp"
 #include <gempba/gempba.hpp>
 
 #include <iostream>
@@ -30,9 +30,9 @@ int run(const benchmark_params &p_params) {
     v_node_manager.set_thread_pool_size(p_params.cpus_per_task);
     v_node_manager.set_score(gempba::score::make(0)); // arbitrary initial score
 
-    mt_benchmark v_instance(v_node_manager, v_load_balancer);
+    benchmark v_instance(v_node_manager, v_load_balancer);
 
-    auto v_function = std::bind(&mt_benchmark::explore, &v_instance, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5);
+    auto v_function = std::bind(&benchmark::explore, &v_instance, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5);
 
     // target algorithm [all arguments]
 

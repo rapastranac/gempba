@@ -6,19 +6,19 @@
 #include <spdlog/spdlog.h>
 #include "VertexCover.hpp"
 
-class mt_graph_optimized_encoding_semi_centralized final : public VertexCover {
+class graph_optimized_encoding_semi_centralized final : public VertexCover {
 
     gempba::node_manager &m_node_manager;
     gempba::load_balancer &m_load_balancer;
     std::function<void(std::thread::id, int, Graph, gempba::node)> m_function;
 
 public:
-    explicit mt_graph_optimized_encoding_semi_centralized(gempba::node_manager &p_node_manager, gempba::load_balancer &p_load_balancer) :
+    explicit graph_optimized_encoding_semi_centralized(gempba::node_manager &p_node_manager, gempba::load_balancer &p_load_balancer) :
         m_node_manager(p_node_manager), m_load_balancer(p_load_balancer) {
-        this->m_function = std::bind(&mt_graph_optimized_encoding_semi_centralized::mvc, this, _1, _2, _3, _4);
+        this->m_function = std::bind(&graph_optimized_encoding_semi_centralized::mvc, this, _1, _2, _3, _4);
     }
 
-    ~mt_graph_optimized_encoding_semi_centralized() override = default;
+    ~graph_optimized_encoding_semi_centralized() override = default;
 
     bool findCover(int run) {
         string msg_center = fmt::format("run # {} ", run);

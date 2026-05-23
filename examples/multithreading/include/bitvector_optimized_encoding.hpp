@@ -21,7 +21,7 @@ using namespace std::placeholders;
 #define GBITSET dynamic_bitset<>
 
 
-class mt_bitvector_optimized_encoding final {
+class bitvector_optimized_encoding final {
     std::function<void(std::thread::id, int, GBITSET, int, gempba::node)> m_function;
 
 public:
@@ -36,13 +36,13 @@ public:
     gempba::node_manager &m_node_manager;
     gempba::load_balancer *m_load_balancer;
 
-    explicit mt_bitvector_optimized_encoding(gempba::node_manager &p_node_manager, gempba::load_balancer *p_load_balancer) :
+    explicit bitvector_optimized_encoding(gempba::node_manager &p_node_manager, gempba::load_balancer *p_load_balancer) :
         m_node_manager(p_node_manager), m_load_balancer(p_load_balancer) {
 
-        this->m_function = std::bind(&mt_bitvector_optimized_encoding::mvcbitset, this, _1, _2, _3, _4, _5);
+        this->m_function = std::bind(&bitvector_optimized_encoding::mvcbitset, this, _1, _2, _3, _4, _5);
     }
 
-    ~mt_bitvector_optimized_encoding() = default;
+    ~bitvector_optimized_encoding() = default;
 
     void set_graph(Graph &p_graph) {
         m_is_skips = 0;

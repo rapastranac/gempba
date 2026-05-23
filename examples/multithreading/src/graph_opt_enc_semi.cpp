@@ -1,33 +1,37 @@
-#include "mt_graph_opt_enc_semi_non_void.hpp"
+#include "graph_opt_enc_semi.hpp"
 
-#include <string>
 #include <gempba/gempba.hpp>
-
+#include "Graph.hpp"
 #include "main.hpp"
 
-int run(const int p_num_threads, const int p_probability, const std::string &filename) {
-
+int run(int job_id, int ntasks_per_node, int prob, string &filename) {
     Graph graph;
     Graph oGraph;
+
     gempba::load_balancer *v_load_balancer = gempba::multithreading::create_load_balancer(gempba::balancing_policy::QUASI_HORIZONTAL);
     gempba::node_manager &v_node_manager = gempba::multithreading::create_node_manager(v_load_balancer);
-    mt_graph_opt_enc_semi_non_void cover(v_node_manager, *v_load_balancer);
+    graph_optimized_encoding_semi_centralized v_cover(v_node_manager, *v_load_balancer);
 
     graph.readEdges(filename);
+    //graph.readDimacs(filename);
 
-    cover.init(graph, p_num_threads, filename, p_probability);
-    cover.findCover(1);
+    v_cover.init(graph, ntasks_per_node, filename, prob);
+    v_cover.findCover(job_id);
 
     return gempba::shutdown();
 }
 
+/**
+ * Multithreaded version with Graph class, fails with big graphs due to stack limit
+ */
 
 int main(int argc, char *argv[]) {
     Params params = parse(argc, argv);
 
+    int job_id = params.job_id;
     int thread_per_task = params.cpus_per_task;
     int prob = params.prob;
     auto filename = params.filename;
 
-    return run(thread_per_task, prob, filename);
+    return run(job_id, thread_per_task, prob, filename);
 }
