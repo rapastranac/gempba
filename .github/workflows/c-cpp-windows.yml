@@ -98,22 +98,42 @@ jobs:
           cache: 'false'
           release: 'false'
 
-      # 3️⃣ Build and install gempba into a workspace-local prefix
-      - name: Install gempba
+      # 3️⃣ Install gempba mt (the base package) into the prefix. The mpi
+      #    topping package depends on the mt base for headers and the
+      #    gempbaConfig.cmake dispatcher, so the mt install always happens
+      #    first — even on the MP=ON matrix leg.
+      - name: Install gempba (mt base)
         shell: msys2 {0}
         run: |
           WS=$(cygpath -u "$GITHUB_WORKSPACE")
           GEMPBA_INSTALL_PREFIX="$WS/.gempba-install"
           echo "GEMPBA_INSTALL_PREFIX=$GEMPBA_INSTALL_PREFIX" >> "$GITHUB_ENV"
           cmake -G "MSYS Makefiles" \
-            -S . -B "$RUNNER_TEMP/gempba-build" \
+            -S . -B "$RUNNER_TEMP/gempba-build-mt" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="$GEMPBA_INSTALL_PREFIX" \
             -DGEMPBA_BUILD_TESTS=OFF \
             -DGEMPBA_DEV_MODE=OFF \
-            -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }}
-          cmake --build "$RUNNER_TEMP/gempba-build" --parallel $(nproc)
-          cmake --install "$RUNNER_TEMP/gempba-build"
+            -DGEMPBA_MULTIPROCESSING=OFF
+          cmake --build "$RUNNER_TEMP/gempba-build-mt" --parallel $(nproc)
+          cmake --install "$RUNNER_TEMP/gempba-build-mt"
+
+      # 3️⃣bis Layer the mpi topping on top of the mt base when the matrix
+      #       leg is MP=ON. Adds libgempba_mpi.a + gempba_mpi-targets.cmake
+      #       so find_package(gempba COMPONENTS mpi) resolves.
+      - name: Install gempba (mpi topping)
+        if: matrix.multiprocessing == 'ON'
+        shell: msys2 {0}
+        run: |
+          cmake -G "MSYS Makefiles" \
+            -S . -B "$RUNNER_TEMP/gempba-build-mpi" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$GEMPBA_INSTALL_PREFIX" \
+            -DGEMPBA_BUILD_TESTS=OFF \
+            -DGEMPBA_DEV_MODE=OFF \
+            -DGEMPBA_MULTIPROCESSING=ON
+          cmake --build "$RUNNER_TEMP/gempba-build-mpi" --parallel $(nproc)
+          cmake --install "$RUNNER_TEMP/gempba-build-mpi"
 
       # 4️⃣ Resolve sister-repo branch (same-name, fall back to main)
       - name: Resolve gempba-examples ref

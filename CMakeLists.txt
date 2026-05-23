@@ -95,6 +95,13 @@ endif ()
 # 🛠️ Create the main library
 add_library(gempba STATIC ${Sources})
 
+if (GEMPBA_MULTIPROCESSING)
+    set(GEMPBA_FLAVOR_TAG mpi)
+    set_target_properties(gempba PROPERTIES OUTPUT_NAME gempba_mpi)
+else ()
+    set(GEMPBA_FLAVOR_TAG mt)
+endif ()
+
 # 🔧️ Add macros for the library
 # GEMPBA_MULTIPROCESSING is PUBLIC so consumers (and examples) receive the
 # same flag the library was built with via target propagation.
@@ -137,7 +144,7 @@ if (GEMPBA_MULTIPROCESSING)
 endif ()
 
 # spdlog is used in header-only mode. Deliberately NOT linked as a CMake target
-# so spdlog::spdlog_header_only never appears in gempbaTargets.cmake and
+# so spdlog::spdlog_header_only never appears in the exported targets file and
 # consumers don't need find_package(spdlog) just to use gempba.
 get_target_property(_spdlog_includes spdlog::spdlog_header_only INTERFACE_INCLUDE_DIRECTORIES)
 target_include_directories(gempba PRIVATE ${_spdlog_includes})
@@ -187,51 +194,67 @@ target_include_directories(gempba
 
 # ─── Install: library archive ────────────────────────────────────────────────
 install(TARGETS gempba
-        EXPORT gempbaTargets
+        EXPORT gempba_${GEMPBA_FLAVOR_TAG}_Targets
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
-# ─── Install: public headers ──────────────────────────────────────────────────
-install(DIRECTORY include/gempba
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-        FILES_MATCHING PATTERN "*.hpp"
-)
+if (NOT GEMPBA_MULTIPROCESSING)
+    # ─── Install: public headers ──────────────────────────────────────────────
+    install(DIRECTORY include/gempba
+            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+            FILES_MATCHING PATTERN "*.hpp"
+    )
 
-# ─── Install: generated config.h ─────────────────────────────────────────────
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/gempba/config.h
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gempba
-)
+    # ─── Install: generated config.h ──────────────────────────────────────────
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/gempba/config.h
+            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gempba
+    )
+
+    # ─── Generate and install: CMake package config files ────────────────────
+    configure_package_config_file(
+            cmake/gempbaConfig.cmake.in
+            ${CMAKE_CURRENT_BINARY_DIR}/gempbaConfig.cmake
+            INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/gempba
+    )
+
+    write_basic_package_version_file(
+            ${CMAKE_CURRENT_BINARY_DIR}/gempbaConfigVersion.cmake
+            VERSION ${PROJECT_VERSION}
+            COMPATIBILITY SameMajorVersion
+    )
+
+    install(FILES
+            ${CMAKE_CURRENT_BINARY_DIR}/gempbaConfig.cmake
+            ${CMAKE_CURRENT_BINARY_DIR}/gempbaConfigVersion.cmake
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/gempba
+    )
+endif ()
 
 # ─── Install: exported CMake targets ─────────────────────────────────────────
-install(EXPORT gempbaTargets
-        FILE gempbaTargets.cmake
+install(EXPORT gempba_${GEMPBA_FLAVOR_TAG}_Targets
+        FILE gempba_${GEMPBA_FLAVOR_TAG}-targets.cmake
         NAMESPACE gempba::
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/gempba
 )
 
-# ─── Generate and install: CMake package config files ────────────────────────
-configure_package_config_file(
-        cmake/gempbaConfig.cmake.in
-        ${CMAKE_CURRENT_BINARY_DIR}/gempbaConfig.cmake
-        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/gempba
-)
-
-write_basic_package_version_file(
-        ${CMAKE_CURRENT_BINARY_DIR}/gempbaConfigVersion.cmake
-        VERSION ${PROJECT_VERSION}
-        COMPATIBILITY SameMajorVersion
-)
-
-install(FILES
-        ${CMAKE_CURRENT_BINARY_DIR}/gempbaConfig.cmake
-        ${CMAKE_CURRENT_BINARY_DIR}/gempbaConfigVersion.cmake
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/gempba
-)
-
 # ─── Generate and install: pkg-config .pc file ───────────────────────────────
-configure_file(cmake/gempba.pc.in gempba.pc @ONLY)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/gempba.pc
+if (GEMPBA_MULTIPROCESSING)
+    set(GEMPBA_PC_NAME "gempba-mpi")
+    set(GEMPBA_PC_LIB "gempba_mpi")
+    set(GEMPBA_PC_REQUIRES "ompi-cxx")
+    set(GEMPBA_PC_MP "1")
+    set(GEMPBA_PC_FILE "gempba-mpi.pc")
+else ()
+    set(GEMPBA_PC_NAME "gempba")
+    set(GEMPBA_PC_LIB "gempba")
+    set(GEMPBA_PC_REQUIRES "")
+    set(GEMPBA_PC_MP "0")
+    set(GEMPBA_PC_FILE "gempba.pc")
+endif ()
+
+configure_file(cmake/gempba.pc.in ${GEMPBA_PC_FILE} @ONLY)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${GEMPBA_PC_FILE}
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
 )
 

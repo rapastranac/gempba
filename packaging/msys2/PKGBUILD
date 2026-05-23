@@ -2,7 +2,10 @@
 
 _realname=gempba
 pkgbase=mingw-w64-${_realname}
-pkgname=("${MINGW_PACKAGE_PREFIX}-${_realname}")
+pkgname=(
+    "${MINGW_PACKAGE_PREFIX}-${_realname}"
+    "${MINGW_PACKAGE_PREFIX}-${_realname}-mpi"
+)
 pkgver=3.3.0
 pkgrel=1
 pkgdesc="Generic Massive Parallelisation of Branching Algorithms — parallel branch-and-bound C++23 framework (mingw-w64)"
@@ -10,26 +13,43 @@ arch=('any')
 mingw_arch=('mingw64' 'ucrt64' 'clang64')
 url="https://github.com/rapastranac/gempba"
 license=('spdx:MIT')
-depends=(
-    "${MINGW_PACKAGE_PREFIX}-gcc-libs"
-    "${MINGW_PACKAGE_PREFIX}-msmpi"
-    "${MINGW_PACKAGE_PREFIX}-spdlog"
-    "${MINGW_PACKAGE_PREFIX}-fmt"
-    "${MINGW_PACKAGE_PREFIX}-hwloc"
-)
 makedepends=(
     "${MINGW_PACKAGE_PREFIX}-cmake"
     "${MINGW_PACKAGE_PREFIX}-gcc"
     "${MINGW_PACKAGE_PREFIX}-ninja"
     "${MINGW_PACKAGE_PREFIX}-pkgconf"
+    "${MINGW_PACKAGE_PREFIX}-spdlog"
+    "${MINGW_PACKAGE_PREFIX}-fmt"
+    "${MINGW_PACKAGE_PREFIX}-hwloc"
+    "${MINGW_PACKAGE_PREFIX}-msmpi"
 )
 options=('staticlibs')
 source=("${_realname}-${pkgver}.tar.gz::https://github.com/rapastranac/gempba/archive/refs/tags/v${pkgver}.tar.gz")
 sha256sums=('83e9f11590c28670be746e35769e3654c97465ae8d5ee1bbd16d1bea4d97fa8a')
 
 build() {
-    mkdir -p "${srcdir}/build-${MSYSTEM}"
-    cd "${srcdir}/build-${MSYSTEM}"
+    # Multithreading flavor (the base package: ships headers, gempbaConfig,
+    # libgempba.a). Built first so the mpi build below sees the same source
+    # tree state.
+    mkdir -p "${srcdir}/build-mt-${MSYSTEM}"
+    cd "${srcdir}/build-mt-${MSYSTEM}"
+
+    MSYS2_ARG_CONV_EXCL="-DCMAKE_INSTALL_PREFIX=" \
+    ${MINGW_PREFIX}/bin/cmake \
+        -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX="${MINGW_PREFIX}" \
+        -DGEMPBA_BUILD_TESTS=OFF \
+        -DGEMPBA_DEV_MODE=OFF \
+        -DGEMPBA_MULTIPROCESSING=OFF \
+        "../${_realname}-${pkgver}"
+
+    ${MINGW_PREFIX}/bin/cmake --build . --parallel
+
+    # MPI multiprocessing flavor (the topping package: ships only
+    # libgempba_mpi.a + gempba_mpi-targets.cmake + gempba-mpi.pc).
+    mkdir -p "${srcdir}/build-mpi-${MSYSTEM}"
+    cd "${srcdir}/build-mpi-${MSYSTEM}"
 
     MSYS2_ARG_CONV_EXCL="-DCMAKE_INSTALL_PREFIX=" \
     ${MINGW_PREFIX}/bin/cmake \
@@ -44,10 +64,40 @@ build() {
     ${MINGW_PREFIX}/bin/cmake --build . --parallel
 }
 
-package() {
-    cd "${srcdir}/build-${MSYSTEM}"
+package_gempba() {
+    pkgdesc="GemPBA — multithreading flavor (development files, mingw-w64)"
+    depends=(
+        "${MINGW_PACKAGE_PREFIX}-gcc-libs"
+        "${MINGW_PACKAGE_PREFIX}-spdlog"
+        "${MINGW_PACKAGE_PREFIX}-fmt"
+        "${MINGW_PACKAGE_PREFIX}-hwloc"
+    )
+
+    cd "${srcdir}/build-mt-${MSYSTEM}"
     DESTDIR="${pkgdir}" ${MINGW_PREFIX}/bin/cmake --install .
 
     install -Dm644 "${srcdir}/${_realname}-${pkgver}/LICENSE" \
         "${pkgdir}${MINGW_PREFIX}/share/licenses/${_realname}/LICENSE"
 }
+
+package_gempba-mpi() {
+    pkgdesc="GemPBA — MPI multiprocessing flavor (development files, mingw-w64)"
+    depends=(
+        "${MINGW_PACKAGE_PREFIX}-${_realname}=${pkgver}-${pkgrel}"
+        "${MINGW_PACKAGE_PREFIX}-msmpi"
+    )
+
+    cd "${srcdir}/build-mpi-${MSYSTEM}"
+    DESTDIR="${pkgdir}" ${MINGW_PREFIX}/bin/cmake --install .
+}
+
+# template start; name=mingw-w64-splitpkg-wrappers; version=1.0;
+# vim: set ft=bash :
+
+# generate wrappers
+for _name in "${pkgname[@]}"; do
+    _short="package_${_name#${MINGW_PACKAGE_PREFIX}-}"
+    _func="$(declare -f "${_short}")"
+    eval "${_func/#${_short}/package_${_name}}"
+done
+# template end;
