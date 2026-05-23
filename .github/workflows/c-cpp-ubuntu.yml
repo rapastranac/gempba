@@ -170,6 +170,7 @@ jobs:
       CXX: g++-14
       GEMPBA_EXAMPLES_OWNER: ${{ vars.GEMPBA_EXAMPLES_OWNER || github.repository_owner }}
       GEMPBA_INSTALL_PREFIX: ${{ github.workspace }}/.gempba-install
+      GEMPBA_CROSS_REPO_TOKEN: ${{ secrets.GEMPBA_CROSS_REPO_TOKEN || '' }}
 
     steps:
       # 1️⃣ Checkout gempba (this PR's commit)
@@ -198,26 +199,46 @@ jobs:
           cmake --build "$RUNNER_TEMP/gempba-build" --parallel $(nproc)
           cmake --install "$RUNNER_TEMP/gempba-build"
 
-      # 4️⃣ Resolve the gempba-examples ref. Prefer a same-named branch in the
-      # examples sister repo so paired API changes are picked up atomically;
-      # fall back to `main` for non-breaking PRs.
+      # 4️⃣ Resolve sister-repo branch (same-name, fall back to main)
       - name: Resolve gempba-examples ref
         id: examples_ref
         run: |
+          # Override any extraheader/credential helper set by actions/checkout
+          # (v6 writes the GITHUB_TOKEN auth header to a separate config file
+          # that --local --unset-all cannot reach, so the URL-embedded PAT was
+          # being shadowed). -c clears them for THIS command only.
+          if [ -n "$GEMPBA_CROSS_REPO_TOKEN" ]; then
+            EX_URL="https://x-access-token:${GEMPBA_CROSS_REPO_TOKEN}@github.com/${GEMPBA_EXAMPLES_OWNER}/gempba-examples.git"
+          else
+            EX_URL="https://github.com/${GEMPBA_EXAMPLES_OWNER}/gempba-examples.git"
+          fi
           BRANCH="${{ github.head_ref || github.ref_name }}"
-          if git ls-remote --exit-code --heads "https://github.com/$GEMPBA_EXAMPLES_OWNER/gempba-examples.git" "$BRANCH" >/dev/null 2>&1; then
+          set +e
+          LS_OUTPUT=$(git -c http."https://github.com/".extraheader= -c credential.helper= ls-remote --exit-code --heads "$EX_URL" "$BRANCH" 2>&1)
+          LS_EXIT=$?
+          set -e
+          if [ "$LS_EXIT" = "0" ]; then
             echo "ref=$BRANCH" >> "$GITHUB_OUTPUT"
             echo "Picked sister branch '$BRANCH' from $GEMPBA_EXAMPLES_OWNER/gempba-examples"
-          else
+          elif [ "$LS_EXIT" = "2" ]; then
             echo "ref=main" >> "$GITHUB_OUTPUT"
             echo "Sister branch '$BRANCH' not present in $GEMPBA_EXAMPLES_OWNER/gempba-examples; falling back to main"
+          else
+            echo "::error::ls-remote against $GEMPBA_EXAMPLES_OWNER/gempba-examples failed (exit $LS_EXIT)"
+            echo "$LS_OUTPUT"
+            exit "$LS_EXIT"
           fi
 
       # 5️⃣ Clone gempba-examples and build it against the installed gempba
       - name: Build gempba-examples
         run: |
-          git clone --depth 1 --branch "${{ steps.examples_ref.outputs.ref }}" \
-            "https://github.com/$GEMPBA_EXAMPLES_OWNER/gempba-examples.git" "$RUNNER_TEMP/gempba-examples-src"
+          if [ -n "$GEMPBA_CROSS_REPO_TOKEN" ]; then
+            EX_URL="https://x-access-token:${GEMPBA_CROSS_REPO_TOKEN}@github.com/${GEMPBA_EXAMPLES_OWNER}/gempba-examples.git"
+          else
+            EX_URL="https://github.com/${GEMPBA_EXAMPLES_OWNER}/gempba-examples.git"
+          fi
+          git -c http."https://github.com/".extraheader= -c credential.helper= clone --depth 1 --branch "${{ steps.examples_ref.outputs.ref }}" \
+            "$EX_URL" "$RUNNER_TEMP/gempba-examples-src"
           cmake -S "$RUNNER_TEMP/gempba-examples-src" -B "$RUNNER_TEMP/gempba-examples-build" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH="$GEMPBA_INSTALL_PREFIX" \
