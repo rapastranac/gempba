@@ -41,6 +41,15 @@ TEST(default_mpi_stats_test, construction_and_defaults) {
     EXPECT_DOUBLE_EQ(0.0, v_stats_impl.m_elapsed_time);
 }
 
+TEST(default_mpi_stats_test, labels_match_visit_keys_in_order) {
+    const gempba::default_mpi_stats v_stats_impl(0);
+
+    std::vector<std::string> v_visit_keys;
+    v_stats_impl.visit([&](const std::string& p_key, std::any&&) { v_visit_keys.push_back(p_key); });
+
+    EXPECT_EQ(v_stats_impl.labels(), v_visit_keys);
+}
+
 TEST(default_mpi_stats_test, visitor_returns_all_fields_correctly) {
     gempba::default_mpi_stats v_stats_impl(3);
     v_stats_impl.m_received_task_count = 10;
@@ -296,13 +305,14 @@ TEST(stats_interface_test, visitor_comparison_identical_objects) {
 TEST(default_mpi_stats_test, labels_returns_expected_column_names) {
     const gempba::default_mpi_stats v_stats(0);
     const auto v_labels = v_stats.labels();
-    ASSERT_EQ(6u, v_labels.size());
+    ASSERT_EQ(7u, v_labels.size());
     EXPECT_EQ("rank", v_labels[0]);
     EXPECT_EQ("received_task_count", v_labels[1]);
     EXPECT_EQ("sent_task_count", v_labels[2]);
     EXPECT_EQ("total_requested_tasks", v_labels[3]);
-    EXPECT_EQ("idle_time", v_labels[4]);
-    EXPECT_EQ("elapsed_time", v_labels[5]);
+    EXPECT_EQ("total_thread_requests", v_labels[4]);
+    EXPECT_EQ("idle_time", v_labels[5]);
+    EXPECT_EQ("elapsed_time", v_labels[6]);
 }
 
 TEST(default_mpi_stats_test, equality_operator_equal_objects) {
