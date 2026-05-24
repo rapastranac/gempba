@@ -90,7 +90,9 @@ namespace gempba {
             return task_packet{reinterpret_cast<const char*>(&v_data), sizeof(internal_data)};
         }
 
-        [[nodiscard]] std::vector<std::string> labels() const override { return {"rank", "received_task_count", "sent_task_count", "total_requested_tasks", "idle_time", "elapsed_time"}; }
+        [[nodiscard]] std::vector<std::string> labels() const override {
+            return {"rank", "received_task_count", "sent_task_count", "total_requested_tasks", "total_thread_requests", "idle_time", "elapsed_time"};
+        }
 
         static default_mpi_stats from_packet(const task_packet& p_packet) {
             if (p_packet.size() != sizeof(internal_data)) {
