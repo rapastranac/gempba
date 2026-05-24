@@ -112,7 +112,7 @@ inline size_t get_peak_rss() {
     /* Windows -------------------------------------------------- */
     PROCESS_MEMORY_COUNTERS v_info;
     GetProcessMemoryInfo(GetCurrentProcess(), &v_info, sizeof(v_info));
-    return (size_t) v_info.PeakWorkingSetSize;
+    return static_cast<size_t>(v_info.PeakWorkingSetSize);
 
 #elif (defined(_AIX) || defined(__TOS__AIX__)) || (defined(__sun__) || defined(__sun) || defined(sun) && (defined(__SVR4) || defined(__svr4__)))
     /* AIX and Solaris ------------------------------------------ */
@@ -134,7 +134,7 @@ inline size_t get_peak_rss() {
     #if defined(__APPLE__) && defined(__MACH__)
     return (size_t) v_rusage.ru_maxrss;
     #else
-    return (size_t) (v_rusage.ru_maxrss * 1024L);
+    return static_cast<size_t>(v_rusage.ru_maxrss * 1024L);
     #endif
 
 #else
@@ -152,7 +152,7 @@ inline size_t get_current_rss() {
     /* Windows -------------------------------------------------- */
     PROCESS_MEMORY_COUNTERS v_info;
     GetProcessMemoryInfo(GetCurrentProcess(), &v_info, sizeof(v_info));
-    return (size_t) v_info.WorkingSetSize;
+    return static_cast<size_t>(v_info.WorkingSetSize);
 
 #elif defined(__APPLE__) && defined(__MACH__)
     /* OSX ------------------------------------------------------ */
@@ -167,13 +167,14 @@ inline size_t get_current_rss() {
     long v_rss = 0L;
     FILE* v_fp = nullptr;
     if ((v_fp = fopen("/proc/self/statm", "r")) == nullptr)
-        return (size_t) 0L; /* Can't open? */
-    if (fscanf(v_fp, "%*s%ld", &v_rss) != 1) { // NOLINT(cert-err34-c)
+        return static_cast<size_t>(0L); /* Can't open? */
+    // NOLINTNEXTLINE(cert-err34-c,bugprone-unchecked-string-to-number-conversion)
+    if (fscanf(v_fp, "%*s%ld", &v_rss) != 1) {
         fclose(v_fp);
-        return (size_t) 0L; /* Can't read? */
+        return static_cast<size_t>(0L); /* Can't read? */
     }
     fclose(v_fp);
-    return (size_t) v_rss * (size_t) sysconf(_SC_PAGESIZE);
+    return static_cast<size_t>(v_rss) * static_cast<size_t>(sysconf(_SC_PAGESIZE));
 
 #else
     /* AIX, BSD, Solaris, and Unknown OS ------------------------ */

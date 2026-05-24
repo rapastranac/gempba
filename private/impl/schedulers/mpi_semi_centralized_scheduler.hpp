@@ -692,7 +692,7 @@ namespace gempba {
                     --m_nodes_available;
                 }
                 if (!v_buffer_tmp.empty()) {
-                    MPI_Ssend(v_buffer_tmp.data(), (int) v_buffer_tmp.size(), MPI_INT, v_rank, NEXT_PROCESS, m_next_process_communicator);
+                    MPI_Ssend(v_buffer_tmp.data(), static_cast<int>(v_buffer_tmp.size()), MPI_INT, v_rank, NEXT_PROCESS, m_next_process_communicator);
                 }
             }
         }

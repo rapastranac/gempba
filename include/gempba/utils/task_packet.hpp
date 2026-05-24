@@ -88,7 +88,7 @@ namespace gempba {
 
         std::strong_ordering operator<=>(const task_packet& p_other) const {
             // First compare sizes
-            if (const auto v_size_cmp = m_data.size() <=> p_other.m_data.size(); v_size_cmp != 0) {
+            if (const auto v_size_cmp = m_data.size() <=> p_other.m_data.size(); std::is_neq(v_size_cmp)) {
                 return v_size_cmp;
             }
             // Then lexicographically compare contents
