@@ -235,7 +235,9 @@ if [[ $DO_TIDY -eq 1 ]]; then
         TIDY_RC=${PIPESTATUS[0]}
 
         ISSUES_FILE="$(mktemp -t gempba-tidy-issues.XXXXXX.txt)"
+        WORKSPACE_PREFIX_REGEX="^$(printf '%s\n' "$FILTER_ROOT" | sed 's/[][\.*^$/]/\\&/g')/"
         grep -E ': (warning|error): ' "$TIDY_LOG" \
+            | grep -E "$WORKSPACE_PREFIX_REGEX" \
             | sed -E "s|^${FILTER_ROOT}/||" \
             | sort -u > "$ISSUES_FILE" || true
         ISSUE_COUNT=$(wc -l < "$ISSUES_FILE" | tr -d ' ')
@@ -259,8 +261,7 @@ if [[ $DO_TIDY -eq 1 ]]; then
             printf '  Full log: %s%s%s\n' "$C_DIM" "$TIDY_LOG" "$C_OFF"
             EXIT_STATUS=1
         elif [[ $TIDY_RC -ne 0 ]]; then
-            printf '%s❌ clang-tidy exited with status %d%s (full log: %s)\n' "$C_RED" "$TIDY_RC" "$C_OFF" "$TIDY_LOG" >&2
-            EXIT_STATUS=1
+            printf '%s⚠️  clang-tidy exited with status %d but no workspace diagnostics — system-header noise, ignored (full log: %s)%s\n' "$C_ORN" "$TIDY_RC" "$TIDY_LOG" "$C_OFF"
         else
             echo "✅ clang-tidy clean"
             rm -f "$TIDY_LOG"

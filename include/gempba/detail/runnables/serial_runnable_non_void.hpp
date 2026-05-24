@@ -71,7 +71,7 @@ namespace gempba {
             });
 
             std::future<task_packet> v_fr = std::async(std::launch::async, [this, v_future = v_future_actual.share()] {
-                R v_result = v_future.get();
+                const R& v_result = v_future.get();
                 task_packet v_serialized_result = m_result_serializer(v_result);
                 return v_serialized_result;
             });

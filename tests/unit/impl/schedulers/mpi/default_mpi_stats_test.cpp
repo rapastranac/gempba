@@ -21,6 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+#include <compare>
 #include <cstring>
 #include <gempba/stats/stats.hpp>
 #include <gtest/gtest.h>
@@ -326,9 +327,9 @@ TEST(default_mpi_stats_test, equality_operator_different_objects) {
 TEST(default_mpi_stats_test, spaceship_operator_orders_by_rank) {
     const gempba::default_mpi_stats v_low(1);
     const gempba::default_mpi_stats v_high(2);
-    EXPECT_TRUE((v_low <=> v_high) < 0);
-    EXPECT_TRUE((v_high <=> v_low) > 0);
-    EXPECT_TRUE((v_low <=> v_low) == 0);
+    EXPECT_TRUE(std::is_lt(v_low <=> v_high));
+    EXPECT_TRUE(std::is_gt(v_high <=> v_low));
+    EXPECT_TRUE(std::is_eq(v_low <=> v_low));
 }
 
 TEST(stats_interface_test, polymorphic_behavior_through_interface) {

@@ -37,9 +37,8 @@ namespace gempba {
     class task_packet {
         std::vector<std::byte> m_data;
 
-        task_packet() = default;
-
     public:
+        task_packet() = default;
         // Construct from std::vector<byte> (copy)
         explicit task_packet(const std::vector<std::byte>& p_data) : task_packet(std::vector(p_data)) {}
 
@@ -88,7 +87,7 @@ namespace gempba {
 
         std::strong_ordering operator<=>(const task_packet& p_other) const {
             // First compare sizes
-            if (const auto v_size_cmp = m_data.size() <=> p_other.m_data.size(); v_size_cmp != 0) {
+            if (const auto v_size_cmp = m_data.size() <=> p_other.m_data.size(); std::is_neq(v_size_cmp)) {
                 return v_size_cmp;
             }
             // Then lexicographically compare contents
