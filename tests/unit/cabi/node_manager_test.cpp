@@ -81,6 +81,69 @@ namespace gempba::cabi_tests {
         EXPECT_EQ(gempba_nm_get_score_kind(v_nm), GEMPBA_SCORE_I32);
     }
 
+    /**
+     * One round-trip per non-I32 score kind covers the score::from_raw branch for that kind plus the get_score_raw /
+     * get_score_kind translation back across the ABI.  Values are arbitrary; what matters is bit-exact preservation.
+     */
+    TEST_F(cabi_node_manager_test, score_set_get_round_trip_u32) {
+        gempba_node_manager_t v_nm = make_node_manager();
+        ASSERT_NE(v_nm, nullptr);
+
+        const auto v_raw = static_cast<int64_t>(0xDEADBEEFu);
+        gempba_nm_set_score(v_nm, v_raw, GEMPBA_SCORE_U_I32);
+
+        EXPECT_EQ(gempba_nm_get_score_raw(v_nm), v_raw);
+        EXPECT_EQ(gempba_nm_get_score_kind(v_nm), GEMPBA_SCORE_U_I32);
+    }
+
+    TEST_F(cabi_node_manager_test, score_set_get_round_trip_i64) {
+        gempba_node_manager_t v_nm = make_node_manager();
+        ASSERT_NE(v_nm, nullptr);
+
+        const int64_t v_raw = 0x1234567890ABCDEFLL;
+        gempba_nm_set_score(v_nm, v_raw, GEMPBA_SCORE_I64);
+
+        EXPECT_EQ(gempba_nm_get_score_raw(v_nm), v_raw);
+        EXPECT_EQ(gempba_nm_get_score_kind(v_nm), GEMPBA_SCORE_I64);
+    }
+
+    TEST_F(cabi_node_manager_test, score_set_get_round_trip_u64) {
+        gempba_node_manager_t v_nm = make_node_manager();
+        ASSERT_NE(v_nm, nullptr);
+
+        const auto v_raw = static_cast<int64_t>(0xFEEDFACECAFEBEEFuLL);
+        gempba_nm_set_score(v_nm, v_raw, GEMPBA_SCORE_U_I64);
+
+        EXPECT_EQ(gempba_nm_get_score_raw(v_nm), v_raw);
+        EXPECT_EQ(gempba_nm_get_score_kind(v_nm), GEMPBA_SCORE_U_I64);
+    }
+
+    TEST_F(cabi_node_manager_test, score_set_get_round_trip_f32) {
+        gempba_node_manager_t v_nm = make_node_manager();
+        ASSERT_NE(v_nm, nullptr);
+
+        const float v_f32 = 3.1415927f;
+        int64_t v_raw = 0;
+        std::memcpy(&v_raw, &v_f32, sizeof(v_f32));
+        gempba_nm_set_score(v_nm, v_raw, GEMPBA_SCORE_F32);
+
+        EXPECT_EQ(gempba_nm_get_score_raw(v_nm), v_raw);
+        EXPECT_EQ(gempba_nm_get_score_kind(v_nm), GEMPBA_SCORE_F32);
+    }
+
+    TEST_F(cabi_node_manager_test, score_set_get_round_trip_f64) {
+        gempba_node_manager_t v_nm = make_node_manager();
+        ASSERT_NE(v_nm, nullptr);
+
+        const double v_f64 = 2.718281828459045;
+        int64_t v_raw = 0;
+        std::memcpy(&v_raw, &v_f64, sizeof(v_f64));
+        gempba_nm_set_score(v_nm, v_raw, GEMPBA_SCORE_F64);
+
+        EXPECT_EQ(gempba_nm_get_score_raw(v_nm), v_raw);
+        EXPECT_EQ(gempba_nm_get_score_kind(v_nm), GEMPBA_SCORE_F64);
+    }
+
     TEST_F(cabi_node_manager_test, generate_unique_id_returns_distinct_values) {
         gempba_node_manager_t v_nm = make_node_manager();
         ASSERT_NE(v_nm, nullptr);
