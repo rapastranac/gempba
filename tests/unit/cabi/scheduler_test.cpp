@@ -42,11 +42,16 @@
 #include <cabi_test_fixture.hpp>
 #include <gempba/stats/stats.hpp>
 #include <gempba/stats/stats_visitor.hpp>
+#include <gempba/utils/result.hpp>
+#include <gempba/utils/score.hpp>
+#include <gempba/utils/task_packet.hpp>
 
 namespace gempba::cabi_tests {
 
+    using ::testing::_;
     using ::testing::ByMove;
     using ::testing::Return;
+    using ::testing::ReturnRef;
 
     class cabi_scheduler_test : public cabi_fixture {};
 
@@ -283,6 +288,132 @@ namespace gempba::cabi_tests {
         EXPECT_EQ(v_collected[4].m_i, -3);
         EXPECT_EQ(v_collected[5].m_kind, GEMPBA_STAT_INT32);
         EXPECT_EQ(v_collected[5].m_i, 1); // bool true → 1
+    }
+
+    // ─── scheduler::center view + dispatch ──────────────────────────────────
+
+    class scheduler_center_mock : public gempba::scheduler::center {
+    public:
+        // scheduler_traits
+        MOCK_METHOD(void, barrier, (), (override));
+        MOCK_METHOD(int, rank_me, (), (const, override));
+        MOCK_METHOD(int, world_size, (), (const, override));
+        MOCK_METHOD(std::unique_ptr<gempba::stats>, get_stats, (), (const, override));
+        // center
+        MOCK_METHOD(void, run, (gempba::task_packet, int), (override));
+        MOCK_METHOD(gempba::task_packet, get_result, (), (override));
+        MOCK_METHOD(std::vector<gempba::result>, get_all_results, (), (override));
+    };
+
+    TEST_F(cabi_scheduler_test, center_view_returns_the_center_reference_as_handle) {
+        scheduler_mock v_mock;
+        scheduler_center_mock v_center;
+        gempba_scheduler_s v_s;
+        EXPECT_CALL(v_mock, center_view()).WillOnce(ReturnRef(v_center));
+        const auto v_c = gempba_scheduler_center_view(handle_for(v_mock, v_s));
+        EXPECT_EQ(v_c, reinterpret_cast<gempba_scheduler_center_t>(&v_center));
+    }
+
+    TEST_F(cabi_scheduler_test, center_barrier_dispatches_to_underlying_center) {
+        scheduler_center_mock v_center;
+        EXPECT_CALL(v_center, barrier()).Times(1);
+        gempba_scheduler_center_barrier(reinterpret_cast<gempba_scheduler_center_t>(&v_center));
+    }
+
+    TEST_F(cabi_scheduler_test, center_rank_me_returns_underlying_value) {
+        scheduler_center_mock v_center;
+        EXPECT_CALL(v_center, rank_me()).WillOnce(Return(0));
+        EXPECT_EQ(gempba_scheduler_center_rank_me(reinterpret_cast<gempba_scheduler_center_t>(&v_center)), 0);
+    }
+
+    TEST_F(cabi_scheduler_test, center_world_size_returns_underlying_value) {
+        scheduler_center_mock v_center;
+        EXPECT_CALL(v_center, world_size()).WillOnce(Return(8));
+        EXPECT_EQ(gempba_scheduler_center_world_size(reinterpret_cast<gempba_scheduler_center_t>(&v_center)), 8);
+    }
+
+    TEST_F(cabi_scheduler_test, center_run_forwards_packet_and_runnable_id) {
+        scheduler_center_mock v_center;
+        EXPECT_CALL(v_center, run(_, 5)).Times(1);
+        const std::uint8_t v_buf[] = {0xAA, 0xBB};
+        EXPECT_EQ(gempba_scheduler_center_run(reinterpret_cast<gempba_scheduler_center_t>(&v_center), gempba_bytes_t{v_buf, sizeof(v_buf)}, 5), GEMPBA_OK);
+    }
+
+    TEST_F(cabi_scheduler_test, center_get_result_returns_invalid_arg_on_null_out) {
+        scheduler_center_mock v_center;
+        EXPECT_CALL(v_center, get_result()).Times(0);
+        EXPECT_EQ(gempba_scheduler_center_get_result(reinterpret_cast<gempba_scheduler_center_t>(&v_center), nullptr), GEMPBA_ERR_INVALID_ARG);
+    }
+
+    TEST_F(cabi_scheduler_test, center_get_result_yields_empty_buffer_when_packet_is_empty) {
+        scheduler_center_mock v_center;
+        EXPECT_CALL(v_center, get_result()).WillOnce(Return(ByMove(gempba::task_packet::EMPTY)));
+        gempba_buffer_t v_out{nullptr, 99};
+        EXPECT_EQ(gempba_scheduler_center_get_result(reinterpret_cast<gempba_scheduler_center_t>(&v_center), &v_out), GEMPBA_OK);
+        EXPECT_EQ(v_out.data, nullptr);
+        EXPECT_EQ(v_out.len, 0u);
+    }
+
+    TEST_F(cabi_scheduler_test, center_get_result_copies_packet_bytes_into_owned_buffer) {
+        scheduler_center_mock v_center;
+        gempba::task_packet v_pkt(3);
+        v_pkt.data()[0] = std::byte{0xC0};
+        v_pkt.data()[1] = std::byte{0xFF};
+        v_pkt.data()[2] = std::byte{0xEE};
+        EXPECT_CALL(v_center, get_result()).WillOnce(Return(ByMove(std::move(v_pkt))));
+
+        gempba_buffer_t v_out{nullptr, 0};
+        EXPECT_EQ(gempba_scheduler_center_get_result(reinterpret_cast<gempba_scheduler_center_t>(&v_center), &v_out), GEMPBA_OK);
+        ASSERT_NE(v_out.data, nullptr);
+        ASSERT_EQ(v_out.len, 3u);
+        EXPECT_EQ(v_out.data[0], 0xC0);
+        EXPECT_EQ(v_out.data[1], 0xFF);
+        EXPECT_EQ(v_out.data[2], 0xEE);
+        gempba_buffer_free(&v_out);
+    }
+
+    TEST_F(cabi_scheduler_test, center_visit_all_results_drives_visitor_in_rank_order) {
+        scheduler_center_mock v_center;
+
+        gempba::task_packet v_p0(1);
+        v_p0.data()[0] = std::byte{0x11};
+        gempba::task_packet v_p1(2);
+        v_p1.data()[0] = std::byte{0x22};
+        v_p1.data()[1] = std::byte{0x33};
+
+        std::vector<gempba::result> v_results;
+        v_results.emplace_back(gempba::score::make(int{1}), std::move(v_p0));
+        v_results.emplace_back(gempba::score::make(int{2}), std::move(v_p1));
+        EXPECT_CALL(v_center, get_all_results()).WillOnce(Return(ByMove(std::move(v_results))));
+
+        struct entry {
+            std::size_t m_idx;
+            std::vector<std::uint8_t> m_bytes;
+        };
+        std::vector<entry> v_collected;
+        gempba_scheduler_center_visit_all_results(
+                reinterpret_cast<gempba_scheduler_center_t>(&v_center),
+                [](void* p_ud, std::size_t p_idx, gempba_bytes_t p_bytes) {
+                    auto* v_out = static_cast<std::vector<entry>*>(p_ud);
+                    v_out->push_back({p_idx, std::vector<std::uint8_t>{p_bytes.data, p_bytes.data + p_bytes.len}});
+                },
+                &v_collected);
+
+        ASSERT_EQ(v_collected.size(), 2u);
+        EXPECT_EQ(v_collected[0].m_idx, 0u);
+        ASSERT_EQ(v_collected[0].m_bytes.size(), 1u);
+        EXPECT_EQ(v_collected[0].m_bytes[0], 0x11);
+        EXPECT_EQ(v_collected[1].m_idx, 1u);
+        ASSERT_EQ(v_collected[1].m_bytes.size(), 2u);
+        EXPECT_EQ(v_collected[1].m_bytes[0], 0x22);
+        EXPECT_EQ(v_collected[1].m_bytes[1], 0x33);
+    }
+
+    TEST_F(cabi_scheduler_test, center_visit_all_results_null_visitor_is_safe) {
+        scheduler_center_mock v_center;
+        EXPECT_CALL(v_center, get_all_results()).Times(0);
+        gempba_scheduler_center_visit_all_results(reinterpret_cast<gempba_scheduler_center_t>(&v_center), nullptr, nullptr);
+        SUCCEED();
     }
 
 } // namespace gempba::cabi_tests
