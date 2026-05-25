@@ -1,0 +1,35 @@
+name: Release (Windows)
+
+on:
+  push:
+    tags: [ "v*" ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  build-msys2:
+    uses: ./.github/workflows/_build-msys2.yml
+
+  release-msys2:
+    needs: build-msys2
+    runs-on: ${{ fromJSON(vars.RUNNER_WINDOWS || '["windows-2025"]') }}
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download MSYS2 package artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: msys2-package
+          path: pkg
+
+      - name: Upload MSYS2 package to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: pkg/mingw-w64-x86_64-gempba-*.pkg.tar.zst
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
