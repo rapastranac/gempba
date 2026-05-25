@@ -43,9 +43,11 @@
  * '_00024' in the JNI-mangled function name.
  */
 
+#include <algorithm>
 #include <atomic>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include <jni.h>
 
@@ -261,6 +263,36 @@ namespace {
         *out_args = jbytearray_to_buffer(env, j_result);
         env->DeleteLocalRef(j_result);
         return GEMPBA_OK;
+    }
+
+    // ── Stats visitor: buffer (rank,label,value) tuples for getStats ────────
+
+    struct stat_record {
+        int32_t rank;
+        std::string label;
+        gempba_stat_value_t value;
+    };
+
+    extern "C" void stat_visitor_collect(void* user_data, int32_t rank, const char* label, const gempba_stat_value_t* value) {
+        auto* recs = static_cast<std::vector<stat_record>*>(user_data);
+        recs->push_back({rank, std::string(label ? label : ""), *value});
+    }
+
+    // ── Center.getAllResults visitor + counter ──────────────────────────────
+
+    struct results_collector {
+        JNIEnv* env;
+        jobjectArray array;
+    };
+
+    extern "C" void center_results_counter(void* user_data, size_t /*index*/, gempba_bytes_t /*bytes*/) { ++(*static_cast<size_t*>(user_data)); }
+
+    extern "C" void center_results_visitor(void* user_data, size_t index, gempba_bytes_t bytes) {
+        auto* c = static_cast<results_collector*>(user_data);
+        jbyteArray elem = bytes_to_jbytearray(c->env, bytes);
+        c->env->SetObjectArrayElement(c->array, static_cast<jsize>(index), elem);
+        if (elem)
+            c->env->DeleteLocalRef(elem);
     }
 
     // ── Handle conversion ────────────────────────────────────────────────────
@@ -616,6 +648,199 @@ extern "C" {
         jbyteArray arr = bytes_to_jbytearray(env, gempba_bytes_t{out.data, out.len});
         gempba_buffer_free(&out);
         return arr;
+    }
+
+    // ─── gempba::scheduler ──────────────────────────────────────────────────────
+
+    JNIEXPORT jlong JNICALL JNI_SCHED(create)(JNIEnv* env, jclass, jint topology_ordinal, jdouble timeout) {
+        gempba_scheduler_t sched = nullptr;
+        if (gempba_scheduler_create(static_cast<gempba_scheduler_topology_t>(topology_ordinal), static_cast<double>(timeout), &sched) != GEMPBA_OK) {
+            throw_from_last_error(env, "native Scheduler.create failed");
+            return 0L;
+        }
+        return to_jlong(sched);
+    }
+
+    JNIEXPORT void JNICALL JNI_SCHED(barrier)(JNIEnv*, jclass, jlong handle) { gempba_scheduler_barrier(from_jlong<gempba_scheduler_t>(handle)); }
+
+    JNIEXPORT jint JNICALL JNI_SCHED(rankMe)(JNIEnv*, jclass, jlong handle) { return static_cast<jint>(gempba_scheduler_rank_me(from_jlong<gempba_scheduler_t>(handle))); }
+
+    JNIEXPORT jint JNICALL JNI_SCHED(worldSize)(JNIEnv*, jclass, jlong handle) { return static_cast<jint>(gempba_scheduler_world_size(from_jlong<gempba_scheduler_t>(handle))); }
+
+    JNIEXPORT void JNICALL JNI_SCHED(setGoal)(JNIEnv*, jclass, jlong handle, jint goal_ordinal, jint type_ordinal) {
+        gempba_scheduler_set_goal(from_jlong<gempba_scheduler_t>(handle), static_cast<gempba_goal_t>(goal_ordinal), static_cast<gempba_score_type_t>(type_ordinal));
+    }
+
+    JNIEXPORT jdouble JNICALL JNI_SCHED(elapsedTime)(JNIEnv*, jclass, jlong handle) { return static_cast<jdouble>(gempba_scheduler_elapsed_time(from_jlong<gempba_scheduler_t>(handle))); }
+
+    JNIEXPORT void JNICALL JNI_SCHED(synchronizeStats)(JNIEnv*, jclass, jlong handle) { gempba_scheduler_synchronize_stats(from_jlong<gempba_scheduler_t>(handle)); }
+
+    /* Bridges the C ABI's visitor-based stats iteration into the Java-shaped
+     * Object[]{ String[]names, Number[][]values } that GemPBANative.Scheduler.getStats
+     * expects.  Buffers (rank,label,value) tuples in a vector, then groups them. */
+    JNIEXPORT jobjectArray JNICALL JNI_SCHED(getStats)(JNIEnv* env, jclass, jlong handle) {
+        std::vector<stat_record> recs;
+        gempba_scheduler_visit_stats(from_jlong<gempba_scheduler_t>(handle), stat_visitor_collect, &recs);
+        if (recs.empty())
+            return nullptr;
+
+        std::vector<std::string> labels;
+        for (const auto& r: recs) {
+            if (r.rank != 0)
+                break;
+            labels.push_back(r.label);
+        }
+        const auto n_stats = static_cast<jsize>(labels.size());
+        const auto world_size = static_cast<jsize>(std::max_element(recs.begin(), recs.end(), [](const stat_record& a, const stat_record& b) { return a.rank < b.rank; })->rank + 1);
+
+        jclass int_cls = env->FindClass("java/lang/Integer");
+        jclass long_cls = env->FindClass("java/lang/Long");
+        jclass double_cls = env->FindClass("java/lang/Double");
+        jmethodID int_of = env->GetStaticMethodID(int_cls, "valueOf", "(I)Ljava/lang/Integer;");
+        jmethodID long_of = env->GetStaticMethodID(long_cls, "valueOf", "(J)Ljava/lang/Long;");
+        jmethodID double_of = env->GetStaticMethodID(double_cls, "valueOf", "(D)Ljava/lang/Double;");
+
+        jclass str_cls = env->FindClass("java/lang/String");
+        jobjectArray names = env->NewObjectArray(n_stats, str_cls, nullptr);
+        for (jsize i = 0; i < n_stats; ++i) {
+            jstring s = env->NewStringUTF(labels[static_cast<size_t>(i)].c_str());
+            env->SetObjectArrayElement(names, i, s);
+            env->DeleteLocalRef(s);
+        }
+        env->DeleteLocalRef(str_cls);
+
+        jclass num_cls = env->FindClass("java/lang/Number");
+        jclass obj_cls = env->FindClass("java/lang/Object");
+        jclass obj_arr_cls = env->FindClass("[Ljava/lang/Object;");
+        jobjectArray values = env->NewObjectArray(world_size, obj_arr_cls, nullptr);
+        env->DeleteLocalRef(obj_arr_cls);
+        for (jsize r = 0; r < world_size; ++r) {
+            jobjectArray row = env->NewObjectArray(n_stats, num_cls, nullptr);
+            env->SetObjectArrayElement(values, r, row);
+            env->DeleteLocalRef(row);
+        }
+        env->DeleteLocalRef(num_cls);
+
+        for (const stat_record& rec: recs) {
+            jsize idx = -1;
+            for (jsize i = 0; i < n_stats; ++i) {
+                if (labels[static_cast<size_t>(i)] == rec.label) {
+                    idx = i;
+                    break;
+                }
+            }
+            if (idx < 0)
+                continue;
+
+            jobject boxed = nullptr;
+            switch (rec.value.kind) {
+                case GEMPBA_STAT_INT32:
+                    boxed = env->CallStaticObjectMethod(int_cls, int_of, rec.value.v.i32);
+                    break;
+                case GEMPBA_STAT_INT64:
+                    boxed = env->CallStaticObjectMethod(long_cls, long_of, static_cast<jlong>(rec.value.v.i64));
+                    break;
+                case GEMPBA_STAT_DOUBLE:
+                    boxed = env->CallStaticObjectMethod(double_cls, double_of, rec.value.v.f64);
+                    break;
+            }
+            if (!boxed)
+                continue;
+            auto row = static_cast<jobjectArray>(env->GetObjectArrayElement(values, rec.rank));
+            env->SetObjectArrayElement(row, idx, boxed);
+            env->DeleteLocalRef(boxed);
+            env->DeleteLocalRef(row);
+        }
+
+        env->DeleteLocalRef(int_cls);
+        env->DeleteLocalRef(long_cls);
+        env->DeleteLocalRef(double_cls);
+
+        jobjectArray result = env->NewObjectArray(2, obj_cls, nullptr);
+        env->DeleteLocalRef(obj_cls);
+        env->SetObjectArrayElement(result, 0, names);
+        env->SetObjectArrayElement(result, 1, values);
+        return result;
+    }
+
+    JNIEXPORT jlong JNICALL JNI_SCHED(getCenterHandle)(JNIEnv*, jclass, jlong handle) { return to_jlong(gempba_scheduler_center_view(from_jlong<gempba_scheduler_t>(handle))); }
+
+    JNIEXPORT jlong JNICALL JNI_SCHED(getWorkerHandle)(JNIEnv*, jclass, jlong handle) { return to_jlong(gempba_scheduler_worker_view(from_jlong<gempba_scheduler_t>(handle))); }
+
+    // ─── gempba::scheduler::center ──────────────────────────────────────────────
+
+    JNIEXPORT void JNICALL JNI_CENTER(barrier)(JNIEnv*, jclass, jlong handle) { gempba_scheduler_center_barrier(from_jlong<gempba_scheduler_center_t>(handle)); }
+
+    JNIEXPORT jint JNICALL JNI_CENTER(rankMe)(JNIEnv*, jclass, jlong handle) { return static_cast<jint>(gempba_scheduler_center_rank_me(from_jlong<gempba_scheduler_center_t>(handle))); }
+
+    JNIEXPORT jint JNICALL JNI_CENTER(worldSize)(JNIEnv*, jclass, jlong handle) {
+        return static_cast<jint>(gempba_scheduler_center_world_size(from_jlong<gempba_scheduler_center_t>(handle)));
+    }
+
+    JNIEXPORT void JNICALL JNI_CENTER(run)(JNIEnv* env, jclass, jlong handle, jbyteArray task, jint runnable_id) {
+        auto borrow = borrow_jbytearray(env, task);
+        if (gempba_scheduler_center_run(from_jlong<gempba_scheduler_center_t>(handle), borrow.bytes, static_cast<int32_t>(runnable_id)) != GEMPBA_OK) {
+            throw_from_last_error(env, "native Center.run failed");
+        }
+    }
+
+    JNIEXPORT jbyteArray JNICALL JNI_CENTER(getResult)(JNIEnv* env, jclass, jlong handle) {
+        gempba_buffer_t buf{nullptr, 0};
+        if (gempba_scheduler_center_get_result(from_jlong<gempba_scheduler_center_t>(handle), &buf) != GEMPBA_OK) {
+            throw_from_last_error(env, "native Center.getResult failed");
+            return nullptr;
+        }
+        if (buf.data == nullptr || buf.len == 0)
+            return bytes_to_jbytearray(env, gempba_bytes_t{nullptr, 0});
+        jbyteArray arr = bytes_to_jbytearray(env, gempba_bytes_t{buf.data, buf.len});
+        gempba_buffer_free(&buf);
+        return arr;
+    }
+
+    JNIEXPORT jobjectArray JNICALL JNI_CENTER(getAllResults)(JNIEnv* env, jclass, jlong handle) {
+        auto h = from_jlong<gempba_scheduler_center_t>(handle);
+
+        size_t count = 0;
+        gempba_scheduler_center_visit_all_results(h, center_results_counter, &count);
+
+        jclass byte_array_cls = env->FindClass("[B");
+        jobjectArray arr = env->NewObjectArray(static_cast<jsize>(count), byte_array_cls, nullptr);
+        env->DeleteLocalRef(byte_array_cls);
+
+        results_collector c{env, arr};
+        gempba_scheduler_center_visit_all_results(h, center_results_visitor, &c);
+        return arr;
+    }
+
+    // ─── gempba::scheduler::worker ──────────────────────────────────────────────
+
+    JNIEXPORT void JNICALL JNI_WORKER(barrier)(JNIEnv*, jclass, jlong handle) { gempba_scheduler_worker_barrier(from_jlong<gempba_scheduler_worker_t>(handle)); }
+
+    JNIEXPORT jint JNICALL JNI_WORKER(rankMe)(JNIEnv*, jclass, jlong handle) { return static_cast<jint>(gempba_scheduler_worker_rank_me(from_jlong<gempba_scheduler_worker_t>(handle))); }
+
+    JNIEXPORT jint JNICALL JNI_WORKER(worldSize)(JNIEnv*, jclass, jlong handle) {
+        return static_cast<jint>(gempba_scheduler_worker_world_size(from_jlong<gempba_scheduler_worker_t>(handle)));
+    }
+
+    JNIEXPORT void JNICALL JNI_WORKER(run)(JNIEnv* env, jclass, jlong worker_handle, jlong nm_handle, jintArray ids, jlongArray sr_handles) {
+        const jsize n = env->GetArrayLength(ids);
+        jint* id_elems = env->GetIntArrayElements(ids, nullptr);
+        jlong* sr_elems = env->GetLongArrayElements(sr_handles, nullptr);
+
+        std::vector<int32_t> c_ids(static_cast<size_t>(n));
+        std::vector<gempba_serial_runnable_t> c_sr(static_cast<size_t>(n));
+        for (jsize i = 0; i < n; ++i) {
+            c_ids[static_cast<size_t>(i)] = static_cast<int32_t>(id_elems[i]);
+            c_sr[static_cast<size_t>(i)] = from_jlong<gempba_serial_runnable_t>(sr_elems[i]);
+        }
+
+        env->ReleaseIntArrayElements(ids, id_elems, JNI_ABORT);
+        env->ReleaseLongArrayElements(sr_handles, sr_elems, JNI_ABORT);
+
+        if (gempba_scheduler_worker_run(from_jlong<gempba_scheduler_worker_t>(worker_handle), from_jlong<gempba_node_manager_t>(nm_handle), c_ids.data(), c_sr.data(),
+                                        static_cast<size_t>(n)) != GEMPBA_OK) {
+            throw_from_last_error(env, "native Worker.run failed");
+        }
     }
 
     // ─── gempba::telemetry (process-wide flag) ───────────────────────────────────
