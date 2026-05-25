@@ -34,7 +34,9 @@
 #include <any>
 #include <functional>
 #include <gmock/gmock.h>
+#include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -45,6 +47,7 @@
 #include <gempba/utils/result.hpp>
 #include <gempba/utils/score.hpp>
 #include <gempba/utils/task_packet.hpp>
+#include <gempba/utils/transmission_guard.hpp>
 
 namespace gempba::cabi_tests {
 
@@ -52,6 +55,7 @@ namespace gempba::cabi_tests {
     using ::testing::ByMove;
     using ::testing::Return;
     using ::testing::ReturnRef;
+    using ::testing::SizeIs;
 
     class cabi_scheduler_test : public cabi_fixture {};
 
@@ -414,6 +418,88 @@ namespace gempba::cabi_tests {
         EXPECT_CALL(v_center, get_all_results()).Times(0);
         gempba_scheduler_center_visit_all_results(reinterpret_cast<gempba_scheduler_center_t>(&v_center), nullptr, nullptr);
         SUCCEED();
+    }
+
+    // ─── scheduler::worker view + dispatch ──────────────────────────────────
+
+    class scheduler_worker_mock : public gempba::scheduler::worker {
+    public:
+        // scheduler_traits
+        MOCK_METHOD(void, barrier, (), (override));
+        MOCK_METHOD(int, rank_me, (), (const, override));
+        MOCK_METHOD(int, world_size, (), (const, override));
+        MOCK_METHOD(std::unique_ptr<gempba::stats>, get_stats, (), (const, override));
+        // worker
+        MOCK_METHOD(void, run, (gempba::node_manager&, (std::map<int, std::shared_ptr<gempba::serial_runnable>>) ), (override));
+        MOCK_METHOD(unsigned int, force_push, (gempba::task_packet&&, int), (override));
+        MOCK_METHOD(unsigned int, next_process, (), (const, override));
+        MOCK_METHOD((std::optional<gempba::transmission_guard>), try_open_transmission_channel, (), (override));
+    };
+
+    TEST_F(cabi_scheduler_test, worker_view_returns_the_worker_reference_as_handle) {
+        scheduler_mock v_mock;
+        scheduler_worker_mock v_worker;
+        gempba_scheduler_s v_s;
+        EXPECT_CALL(v_mock, worker_view()).WillOnce(ReturnRef(v_worker));
+        const auto v_w = gempba_scheduler_worker_view(handle_for(v_mock, v_s));
+        EXPECT_EQ(v_w, reinterpret_cast<gempba_scheduler_worker_t>(&v_worker));
+    }
+
+    TEST_F(cabi_scheduler_test, worker_barrier_dispatches_to_underlying_worker) {
+        scheduler_worker_mock v_worker;
+        EXPECT_CALL(v_worker, barrier()).Times(1);
+        gempba_scheduler_worker_barrier(reinterpret_cast<gempba_scheduler_worker_t>(&v_worker));
+    }
+
+    TEST_F(cabi_scheduler_test, worker_rank_me_returns_underlying_value) {
+        scheduler_worker_mock v_worker;
+        EXPECT_CALL(v_worker, rank_me()).WillOnce(Return(3));
+        EXPECT_EQ(gempba_scheduler_worker_rank_me(reinterpret_cast<gempba_scheduler_worker_t>(&v_worker)), 3);
+    }
+
+    TEST_F(cabi_scheduler_test, worker_world_size_returns_underlying_value) {
+        scheduler_worker_mock v_worker;
+        EXPECT_CALL(v_worker, world_size()).WillOnce(Return(8));
+        EXPECT_EQ(gempba_scheduler_worker_world_size(reinterpret_cast<gempba_scheduler_worker_t>(&v_worker)), 8);
+    }
+
+    TEST_F(cabi_scheduler_test, worker_run_returns_invalid_arg_on_null_pointers) {
+        scheduler_worker_mock v_worker;
+        auto* const v_w = reinterpret_cast<gempba_scheduler_worker_t>(&v_worker);
+        char v_dummy_nm;
+        auto* const v_nm = reinterpret_cast<gempba_node_manager_t>(&v_dummy_nm);
+        const int32_t v_ids[] = {0};
+        gempba_serial_runnable_s v_r{};
+        const gempba_serial_runnable_t v_handles[] = {reinterpret_cast<gempba_serial_runnable_t>(&v_r)};
+
+        EXPECT_CALL(v_worker, run(_, _)).Times(0);
+        EXPECT_EQ(gempba_scheduler_worker_run(nullptr, v_nm, v_ids, v_handles, 1), GEMPBA_ERR_INVALID_ARG);
+        EXPECT_EQ(gempba_scheduler_worker_run(v_w, nullptr, v_ids, v_handles, 1), GEMPBA_ERR_INVALID_ARG);
+        EXPECT_EQ(gempba_scheduler_worker_run(v_w, v_nm, nullptr, v_handles, 1), GEMPBA_ERR_INVALID_ARG);
+        EXPECT_EQ(gempba_scheduler_worker_run(v_w, v_nm, v_ids, nullptr, 1), GEMPBA_ERR_INVALID_ARG);
+    }
+
+    TEST_F(cabi_scheduler_test, worker_run_translates_id_runnable_arrays_to_map) {
+        scheduler_worker_mock v_worker;
+        auto* const v_w = reinterpret_cast<gempba_scheduler_worker_t>(&v_worker);
+        char v_dummy_nm;
+        auto* const v_nm = reinterpret_cast<gempba_node_manager_t>(&v_dummy_nm);
+
+        // The cabi just copies the shared_ptr; nullptr inside is fine because the
+        // worker mock never dereferences the runnable.
+        gempba_serial_runnable_s v_r0{}, v_r1{};
+        const gempba_serial_runnable_t v_handles[] = {
+                reinterpret_cast<gempba_serial_runnable_t>(&v_r0),
+                reinterpret_cast<gempba_serial_runnable_t>(&v_r1),
+        };
+        const int32_t v_ids[] = {10, 20};
+
+        std::map<int, std::shared_ptr<gempba::serial_runnable>> v_captured;
+        EXPECT_CALL(v_worker, run(_, SizeIs(2))).WillOnce(::testing::DoAll(::testing::SaveArg<1>(&v_captured)));
+
+        EXPECT_EQ(gempba_scheduler_worker_run(v_w, v_nm, v_ids, v_handles, 2), GEMPBA_OK);
+        EXPECT_TRUE(v_captured.count(10) == 1);
+        EXPECT_TRUE(v_captured.count(20) == 1);
     }
 
 } // namespace gempba::cabi_tests
