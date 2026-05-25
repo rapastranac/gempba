@@ -1,0 +1,5 @@
+# Compiled native libraries — built by CMake, not tracked in git.
+# Run: mvn package -Pbuild-native   (or scripts/build_jar_windows.sh Debug ON)
+**/*.dll
+**/*.so
+**/*.dylib
