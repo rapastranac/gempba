@@ -382,6 +382,55 @@ extern "C" {
         // Owned by the gempba singleton; freed via gempba_shutdown().
     }
 
+    // ─── gempba::mt ──────────────────────────────────────────────────────────────
+
+    JNIEXPORT jlong JNICALL JNI_MT(createLoadBalancer)(JNIEnv* env, jclass, jint policy_ordinal) {
+        auto lb = gempba_mt_create_load_balancer(static_cast<gempba_balancing_policy_t>(policy_ordinal));
+        if (lb == nullptr) {
+            throw_from_last_error(env, "native MT.createLoadBalancer failed");
+            return 0L;
+        }
+        return to_jlong(lb);
+    }
+
+    JNIEXPORT jlong JNICALL JNI_MT(createNodeManager)(JNIEnv* env, jclass, jlong lb_handle) {
+        auto nm = gempba_mt_create_node_manager(from_jlong<gempba_load_balancer_t>(lb_handle));
+        if (nm == nullptr) {
+            throw_from_last_error(env, "native MT.createNodeManager failed");
+            return 0L;
+        }
+        return to_jlong(nm);
+    }
+
+    JNIEXPORT jlong JNICALL JNI_MT(createExplicitNode)(JNIEnv* env, jclass, jlong lb_handle, jlong parent_handle, jobject callback, jbyteArray args_bytes) {
+        auto* ud = new_user_data(env, callback);
+        if (!ud)
+            return 0L;
+
+        auto args_borrow = borrow_jbytearray(env, args_bytes);
+        gempba_node_t node = nullptr;
+        if (gempba_mt_create_explicit_node(from_jlong<gempba_load_balancer_t>(lb_handle), from_jlong<gempba_node_t>(parent_handle), java_node_runnable_callback, ud, java_user_data_release,
+                                           args_borrow.bytes, &node) != GEMPBA_OK) {
+            throw_from_last_error(env, "native MT.createExplicitNode failed");
+            return 0L;
+        }
+        return to_jlong(node);
+    }
+
+    JNIEXPORT jlong JNICALL JNI_MT(createLazyNode)(JNIEnv* env, jclass, jlong lb_handle, jlong parent_handle, jobject callback, jbyteArray /*unused*/) {
+        auto* ud = new_user_data(env, callback);
+        if (!ud)
+            return 0L;
+
+        gempba_node_t node = nullptr;
+        if (gempba_mt_create_lazy_node(from_jlong<gempba_load_balancer_t>(lb_handle), from_jlong<gempba_node_t>(parent_handle), java_node_runnable_callback, java_node_lazy_args_callback, ud,
+                                       java_user_data_release, &node) != GEMPBA_OK) {
+            throw_from_last_error(env, "native MT.createLazyNode failed");
+            return 0L;
+        }
+        return to_jlong(node);
+    }
+
     // ─── gempba::telemetry (process-wide flag) ───────────────────────────────────
 
     JNIEXPORT void JNICALL JNI_TELEM(enable)(JNIEnv*, jclass) { gempba_telemetry_enable(); }
