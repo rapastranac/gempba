@@ -487,6 +487,102 @@ extern "C" {
         return to_jlong(nm);
     }
 
+    // ─── gempba::node_manager ────────────────────────────────────────────────────
+
+    JNIEXPORT void JNICALL JNI_NM(setGoal)(JNIEnv*, jclass, jlong handle, jint goal_ordinal, jint score_type_ordinal) {
+        gempba_nm_set_goal(from_jlong<gempba_node_manager_t>(handle), static_cast<gempba_goal_t>(goal_ordinal), static_cast<gempba_score_type_t>(score_type_ordinal));
+    }
+
+    JNIEXPORT void JNICALL JNI_NM(setBalancingPolicy)(JNIEnv*, jclass, jlong handle, jint policy_ordinal) {
+        gempba_nm_set_balancing_policy(from_jlong<gempba_node_manager_t>(handle), static_cast<gempba_balancing_policy_t>(policy_ordinal));
+    }
+
+    JNIEXPORT void JNICALL JNI_NM(setThreadPoolSize)(JNIEnv*, jclass, jlong handle, jint n) {
+        gempba_nm_set_thread_pool_size(from_jlong<gempba_node_manager_t>(handle), static_cast<uint32_t>(n));
+    }
+
+    JNIEXPORT jboolean JNICALL JNI_NM(tryLocalSubmit)(JNIEnv* env, jclass, jlong handle, jlong node_handle) {
+        gempba_bool_t accepted = 0;
+        if (gempba_nm_try_local_submit(from_jlong<gempba_node_manager_t>(handle), from_jlong<gempba_node_t>(node_handle), &accepted) != GEMPBA_OK) {
+            throw_from_last_error(env, "native tryLocalSubmit failed");
+            return JNI_FALSE;
+        }
+        return accepted ? JNI_TRUE : JNI_FALSE;
+    }
+
+    JNIEXPORT void JNICALL JNI_NM(forward)(JNIEnv* env, jclass, jlong handle, jlong node_handle) {
+        if (gempba_nm_forward(from_jlong<gempba_node_manager_t>(handle), from_jlong<gempba_node_t>(node_handle)) != GEMPBA_OK) {
+            throw_from_last_error(env, "native forward failed");
+        }
+    }
+
+    JNIEXPORT jboolean JNICALL JNI_NM(tryUpdateResultMT)(JNIEnv*, jclass, jlong handle, jlong raw_bits, jint type_ordinal) {
+        return gempba_nm_try_update_score(from_jlong<gempba_node_manager_t>(handle), static_cast<int64_t>(raw_bits), static_cast<gempba_score_type_t>(type_ordinal)) ? JNI_TRUE : JNI_FALSE;
+    }
+
+    JNIEXPORT jboolean JNICALL JNI_NM(tryUpdateResult)(JNIEnv* env, jclass, jlong handle, jbyteArray result_bytes, jlong raw_bits, jint type_ordinal) {
+        auto borrow = borrow_jbytearray(env, result_bytes);
+        return gempba_nm_try_update_result(from_jlong<gempba_node_manager_t>(handle), borrow.bytes, static_cast<int64_t>(raw_bits), static_cast<gempba_score_type_t>(type_ordinal))
+                       ? JNI_TRUE
+                       : JNI_FALSE;
+    }
+
+    JNIEXPORT jlong JNICALL JNI_NM(getScoreRawBits)(JNIEnv*, jclass, jlong handle) { return static_cast<jlong>(gempba_nm_get_score_raw(from_jlong<gempba_node_manager_t>(handle))); }
+
+    JNIEXPORT jint JNICALL JNI_NM(getScoreTypeOrdinal)(JNIEnv*, jclass, jlong handle) { return static_cast<jint>(gempba_nm_get_score_kind(from_jlong<gempba_node_manager_t>(handle))); }
+
+    JNIEXPORT void JNICALL JNI_NM(setScore)(JNIEnv*, jclass, jlong handle, jlong raw_bits, jint type_ordinal) {
+        gempba_nm_set_score(from_jlong<gempba_node_manager_t>(handle), static_cast<int64_t>(raw_bits), static_cast<gempba_score_type_t>(type_ordinal));
+    }
+
+    JNIEXPORT jbyteArray JNICALL JNI_NM(getResultBytes)(JNIEnv* env, jclass, jlong handle) {
+        gempba_buffer_t buf{nullptr, 0};
+        if (gempba_nm_get_result(from_jlong<gempba_node_manager_t>(handle), &buf) != GEMPBA_OK) {
+            throw_from_last_error(env, "native getResultBytes failed");
+            return nullptr;
+        }
+        if (buf.data == nullptr || buf.len == 0)
+            return nullptr;
+        jbyteArray arr = bytes_to_jbytearray(env, gempba_bytes_t{buf.data, buf.len});
+        gempba_buffer_free(&buf);
+        return arr;
+    }
+
+    JNIEXPORT jint JNICALL JNI_NM(generateUniqueId)(JNIEnv*, jclass, jlong handle) { return static_cast<jint>(gempba_nm_generate_unique_id(from_jlong<gempba_node_manager_t>(handle))); }
+
+    JNIEXPORT jdouble JNICALL JNI_NM(getWallTime)(JNIEnv*, jclass, jlong /*handle*/) { return static_cast<jdouble>(gempba_nm_wall_time()); }
+
+    JNIEXPORT jint JNICALL JNI_NM(rankMe)(JNIEnv*, jclass, jlong handle) { return static_cast<jint>(gempba_nm_rank_me(from_jlong<gempba_node_manager_t>(handle))); }
+
+    JNIEXPORT jlong JNICALL JNI_NM(getThreadRequestCount)(JNIEnv*, jclass, jlong handle) {
+        return static_cast<jlong>(gempba_nm_thread_request_count(from_jlong<gempba_node_manager_t>(handle)));
+    }
+
+    JNIEXPORT jdouble JNICALL JNI_NM(getIdleTime)(JNIEnv*, jclass, jlong handle) { return static_cast<jdouble>(gempba_nm_idle_time(from_jlong<gempba_node_manager_t>(handle))); }
+
+    JNIEXPORT jint JNICALL JNI_NM(getBalancingPolicy)(JNIEnv*, jclass, jlong handle) { return static_cast<jint>(gempba_nm_get_balancing_policy(from_jlong<gempba_node_manager_t>(handle))); }
+
+    JNIEXPORT jboolean JNICALL JNI_NM(tryRemoteSubmit)(JNIEnv* env, jclass, jlong handle, jlong node_handle, jint runnable_id) {
+        gempba_bool_t accepted = 0;
+        if (gempba_nm_try_remote_submit(from_jlong<gempba_node_manager_t>(handle), from_jlong<gempba_node_t>(node_handle), static_cast<int32_t>(runnable_id), &accepted) != GEMPBA_OK) {
+            throw_from_last_error(env, "native tryRemoteSubmit failed");
+            return JNI_FALSE;
+        }
+        return accepted ? JNI_TRUE : JNI_FALSE;
+    }
+
+    JNIEXPORT jboolean JNICALL JNI_NM(isDone)(JNIEnv*, jclass, jlong handle) { return gempba_nm_is_done(from_jlong<gempba_node_manager_t>(handle)) ? JNI_TRUE : JNI_FALSE; }
+
+    JNIEXPORT void JNICALL JNI_NM(waitForCompletion)(JNIEnv* env, jclass, jlong handle) {
+        if (gempba_nm_wait(from_jlong<gempba_node_manager_t>(handle)) != GEMPBA_OK) {
+            throw_from_last_error(env, "native waitForCompletion failed");
+        }
+    }
+
+    JNIEXPORT void JNICALL JNI_NM(destroy)(JNIEnv*, jclass, jlong /*handle*/) {
+        // Owned by the gempba singleton; freed via gempba_shutdown().
+    }
+
     // ─── gempba::mp::serial_runnable ────────────────────────────────────────────
 
     JNIEXPORT jlong JNICALL JNI_SR(create)(JNIEnv* env, jclass, jint id, jobject callback, jboolean returns_value) {
