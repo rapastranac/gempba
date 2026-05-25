@@ -21,39 +21,25 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  *
- * Tests for gempba_buffer_* — the owned-buffer allocator/freer that
- * bindings use to receive bytes produced by gempba (runnable results,
- * lazy-args producers, node_manager::get_result, …). The contract under
- * test is documented in include/gempba/cabi/gempba.h: zero-length alloc returns
- * {NULL, 0}; free zeroes the handle; free on a NULL pointer is a no-op.
+ * Tests for the gempba_scheduler_* surface.  Only the no-MPI-runtime-needed
+ * branches are covered here; full scheduler happy paths require a live MPI
+ * process group and live in MPI-launched integration tests, not the unit
+ * suite.
  */
 
 #include <cabi_test_fixture.hpp>
 
 namespace gempba::cabi_tests {
 
-    class cabi_buffer_test : public cabi_fixture {};
+    class cabi_scheduler_test : public cabi_fixture {};
 
-    TEST_F(cabi_buffer_test, buffer_alloc_zero_returns_empty) {
-        gempba_buffer_t v_buf = gempba_buffer_alloc(0);
-        EXPECT_EQ(v_buf.data, nullptr);
-        EXPECT_EQ(v_buf.len, 0u);
-        gempba_buffer_free(&v_buf); // safe on {NULL, 0}
+    TEST_F(cabi_scheduler_test, create_null_out_returns_invalid_arg) {
+        EXPECT_EQ(gempba_scheduler_create(GEMPBA_TOPOLOGY_CENTRALIZED, /*timeout=*/0.0, /*out=*/nullptr), GEMPBA_ERR_INVALID_ARG);
+        EXPECT_NE(gempba_last_error_message(), nullptr);
     }
 
-    TEST_F(cabi_buffer_test, buffer_alloc_then_free_resets_handle) {
-        gempba_buffer_t v_buf = gempba_buffer_alloc(32);
-        ASSERT_NE(v_buf.data, nullptr);
-        EXPECT_EQ(v_buf.len, 32u);
-        std::memset(v_buf.data, 0xAB, v_buf.len);
-        gempba_buffer_free(&v_buf);
-        EXPECT_EQ(v_buf.data, nullptr);
-        EXPECT_EQ(v_buf.len, 0u);
-    }
-
-    TEST_F(cabi_buffer_test, buffer_free_on_null_pointer_is_safe) {
-        // Explicit nullptr guard documented in cabi/gempba.cpp.
-        gempba_buffer_free(nullptr);
+    TEST_F(cabi_scheduler_test, destroy_null_is_safe) {
+        gempba_scheduler_destroy(nullptr);
         SUCCEED();
     }
 

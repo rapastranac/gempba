@@ -48,4 +48,13 @@ namespace gempba::cabi_tests {
         EXPECT_NE(gempba_last_error_message(), nullptr);
     }
 
+    TEST_F(cabi_load_balancer_test, mp_create_with_null_worker_succeeds) {
+        // In an MP/DEV build, gempba_mp_create_load_balancer(policy, NULL)
+        // hits the same underlying multiprocessing::create_load_balancer
+        // overload the MT shim uses, but through the MP-side entry point.
+        gempba_load_balancer_t v_lb = gempba_mp_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING, /*worker=*/nullptr);
+        ASSERT_NE(v_lb, nullptr);
+        EXPECT_EQ(v_lb, gempba_get_load_balancer());
+    }
+
 } // namespace gempba::cabi_tests

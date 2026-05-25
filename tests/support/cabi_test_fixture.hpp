@@ -104,6 +104,20 @@ namespace gempba::cabi_tests {
      * "exactly once" contract that safe_make_holder guarantees. */
     inline void increment_release(void* p_user_data) { static_cast<cb_state*>(p_user_data)->m_releases.fetch_add(1, std::memory_order_relaxed); }
 
+    /**
+     * Builds a fresh load_balancer + node_manager pair on top of the fixture's
+     * clean state, returning the node_manager handle. Most node_manager tests
+     * don't care which load_balancer policy is in play; pass an explicit one
+     * only when a test exercises the policy itself.
+     */
+    inline gempba_node_manager_t make_node_manager(gempba_balancing_policy_t p_policy = GEMPBA_BALANCING_WORK_STEALING) {
+        gempba_load_balancer_t v_lb = gempba_mt_create_load_balancer(p_policy);
+        if (v_lb == nullptr) {
+            return nullptr;
+        }
+        return gempba_mt_create_node_manager(v_lb);
+    }
+
 } // namespace gempba::cabi_tests
 
 #endif // GEMPBA_TESTS_CABI_TEST_FIXTURE_HPP

@@ -22,9 +22,9 @@
  * SOFTWARE.
  *
  * Tests for the process-wide runtime plumbing: gempba_last_error_message,
- * gempba_clear_last_error, and the "no singletons before any factory ran"
- * baseline. Anything else that lives below the load balancer / node
- * manager / scheduler surfaces moves to its own file.
+ * gempba_clear_last_error, gempba_shutdown, and the "no singletons before
+ * any factory ran" baseline.  Anything else that lives below the load
+ * balancer / node manager / scheduler surfaces moves to its own file.
  */
 
 #include <cabi_test_fixture.hpp>
@@ -48,5 +48,14 @@ namespace gempba::cabi_tests {
     }
 
     TEST_F(cabi_runtime_test, get_load_balancer_returns_null_before_creation) { EXPECT_EQ(gempba_get_load_balancer(), nullptr); }
+
+    TEST_F(cabi_runtime_test, shutdown_returns_value_through_c_abi) {
+        // gempba_shutdown surfaces the C++ shutdown() return through the ABI.
+        // The fixture's SetUp already shut down via the C++ helper, so this
+        // call simply verifies the ABI entry point is reachable and doesn't
+        // raise.
+        const int32_t v_rc = gempba_shutdown();
+        EXPECT_GE(v_rc, -1);
+    }
 
 } // namespace gempba::cabi_tests
