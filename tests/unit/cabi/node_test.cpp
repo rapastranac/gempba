@@ -441,4 +441,69 @@ namespace gempba::cabi_tests {
         // success path, where it can be asserted deterministically.
     }
 
+    // ─── runnable throws across the boundary (defensive ABI catches) ────────
+    //
+    // Bindings MUST NOT throw across the C ABI per the documented contract,
+    // but if one does the ABI must translate the exception into a sensible
+    // gempba_status_t code, never crash.  These tests deliberately violate
+    // the contract to pin the GEMPBA_CATCH_RETURN_STATUS branches.
+    //
+    // The status code depends on which path try_local_submit picks:
+    //   - Queued path (submit returns OK): the gempba task wrapper captures
+    //     the throw, then future.get() inside gempba_node_get_result re-raises
+    //     it as a normalised std::exception subclass → C ABI's catch-
+    //     std::exception branch fires → GEMPBA_ERR_RUNTIME.
+    //   - Inline-forward path (submit propagates synchronously): the throw
+    //     bubbles straight to try_local_submit's catch envelope, so the
+    //     specific catch-std::bad_alloc / catch (...) branch fires directly
+    //     → GEMPBA_ERR_OUT_OF_MEMORY / GEMPBA_ERR_UNKNOWN.
+    // Both paths are valid outcomes — the test accepts either.
+
+    namespace {
+        gempba_status_t throws_bad_alloc(void*, uint64_t, gempba_bytes_t, gempba_node_t, gempba_buffer_t*) { throw std::bad_alloc{}; }
+
+        gempba_status_t throws_unknown(void*, uint64_t, gempba_bytes_t, gempba_node_t, gempba_buffer_t*) {
+            throw 42; // NOLINT(hicpp-exception-baseclass) — non-std::exception type exercises catch (...)
+        }
+    } // namespace
+
+    /**
+     * Drives a runnable through submit + get_result and asserts the C ABI
+     * surfaces either `p_inline_expected` (when the load balancer ran it
+     * synchronously via forward()) or `p_queued_expected` (when it queued
+     * to the thread pool and the future re-threw on get_result).
+     */
+    static void expect_runnable_translates_to(gempba_runnable_fn p_runnable, gempba_status_t p_inline_expected, gempba_status_t p_queued_expected) {
+        gempba_load_balancer_t v_lb = gempba_mt_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING);
+        ASSERT_NE(v_lb, nullptr);
+        gempba_node_manager_t v_nm = gempba_mt_create_node_manager(v_lb);
+        ASSERT_NE(v_nm, nullptr);
+        gempba_nm_set_thread_pool_size(v_nm, 2);
+
+        gempba_node_t v_parent = nullptr;
+        ASSERT_EQ(gempba_create_dummy_node(v_lb, &v_parent), GEMPBA_OK);
+
+        cb_state v_state;
+        gempba_node_t v_child = nullptr;
+        ASSERT_EQ(gempba_mt_create_explicit_node(v_lb, v_parent, p_runnable, &v_state, increment_release, gempba_bytes_t{nullptr, 0}, &v_child), GEMPBA_OK);
+
+        gempba_bool_t v_accepted = 0;
+        const gempba_status_t v_submit_rc = gempba_nm_try_local_submit(v_nm, v_child, &v_accepted);
+        if (v_submit_rc == GEMPBA_OK) {
+            ASSERT_EQ(gempba_nm_wait(v_nm), GEMPBA_OK);
+            gempba_buffer_t v_out{nullptr, 0};
+            EXPECT_EQ(gempba_node_get_result(v_child, &v_out), p_queued_expected);
+            gempba_buffer_free(&v_out);
+        } else {
+            EXPECT_EQ(v_submit_rc, p_inline_expected);
+        }
+
+        gempba_node_destroy(v_child);
+        gempba_node_destroy(v_parent);
+    }
+
+    TEST_F(cabi_node_test, runnable_throwing_bad_alloc_maps_to_out_of_memory_or_runtime) { expect_runnable_translates_to(throws_bad_alloc, GEMPBA_ERR_OUT_OF_MEMORY, GEMPBA_ERR_RUNTIME); }
+
+    TEST_F(cabi_node_test, runnable_throwing_non_std_type_maps_to_unknown_or_runtime) { expect_runnable_translates_to(throws_unknown, GEMPBA_ERR_UNKNOWN, GEMPBA_ERR_RUNTIME); }
+
 } // namespace gempba::cabi_tests
