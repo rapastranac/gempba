@@ -95,6 +95,12 @@ endif ()
 # 🛠️ Create the main library
 add_library(gempba STATIC ${Sources})
 
+target_sources(gempba
+        PRIVATE FILE_SET cabi_headers TYPE HEADERS
+        BASE_DIRS include
+        FILES include/gempba/cabi/gempba.h
+)
+
 if (GEMPBA_MULTIPROCESSING)
     set(GEMPBA_FLAVOR_TAG mpi)
     set_target_properties(gempba PROPERTIES OUTPUT_NAME gempba_mpi)
@@ -203,7 +209,9 @@ if (NOT GEMPBA_MULTIPROCESSING)
     # ─── Install: public headers ──────────────────────────────────────────────
     install(DIRECTORY include/gempba
             DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-            FILES_MATCHING PATTERN "*.hpp"
+            FILES_MATCHING
+                PATTERN "*.hpp"
+                PATTERN "*.h"
     )
 
     # ─── Install: generated config.h ──────────────────────────────────────────
