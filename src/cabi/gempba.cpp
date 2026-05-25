@@ -402,6 +402,33 @@ extern "C" {
         GEMPBA_CATCH_RETURN_STATUS
     }
 
+#else // !GEMPBA_MULTIPROCESSING
+
+    /** ── multiprocessing stubs ──────────────────────────────────────────────────
+     * Non-MP builds still export every MP entry point so a single language
+     * binding (JNI, ctypes, …) can link against either variant of the native
+     * library.  Each stub sets last_error and returns a failure code; the
+     * binding's MP-related calls therefore surface a clean runtime error
+     * instead of an UnsatisfiedLinkError. */
+
+    static constexpr const char* k_mp_disabled_msg = "gempba was built without GEMPBA_MULTIPROCESSING; this entry point is unavailable";
+
+    gempba_load_balancer_t gempba_mp_create_load_balancer(gempba_balancing_policy_t, gempba_scheduler_worker_t) {
+        set_last_error(k_mp_disabled_msg);
+        return nullptr;
+    }
+    gempba_node_manager_t gempba_mp_create_node_manager(gempba_load_balancer_t, gempba_scheduler_worker_t) {
+        set_last_error(k_mp_disabled_msg);
+        return nullptr;
+    }
+    gempba_status_t gempba_mp_create_explicit_node(gempba_load_balancer_t, gempba_node_t, gempba_runnable_fn, void* user_data, gempba_release_fn release_user_data, gempba_bytes_t,
+                                                   gempba_node_t*) {
+        if (release_user_data && user_data)
+            release_user_data(user_data);
+        set_last_error(k_mp_disabled_msg);
+        return GEMPBA_ERR_RUNTIME;
+    }
+
 #endif // GEMPBA_MULTIPROCESSING
 
     /* ── node_manager ──────────────────────────────────────────────────────── */
@@ -756,6 +783,59 @@ extern "C" {
             reinterpret_cast<gempba::scheduler::worker*>(w)->run(*reinterpret_cast<gempba::node_manager*>(nm), std::move(map));
             return GEMPBA_OK;
         GEMPBA_CATCH_RETURN_STATUS
+    }
+
+#else // !GEMPBA_MULTIPROCESSING
+
+    /** ── serial_runnable / scheduler stubs ─────────────────────────────────────
+     * Mirrors the surface guarded above so non-MP builds still link cleanly. */
+
+    gempba_status_t gempba_serial_runnable_create(int32_t, gempba_bool_t, gempba_runnable_fn, void* user_data, gempba_release_fn release_user_data, gempba_serial_runnable_t*) {
+        if (release_user_data && user_data)
+            release_user_data(user_data);
+        set_last_error(k_mp_disabled_msg);
+        return GEMPBA_ERR_RUNTIME;
+    }
+    void gempba_serial_runnable_destroy(gempba_serial_runnable_t) {}
+    gempba_status_t gempba_serial_runnable_invoke(gempba_serial_runnable_t, gempba_node_manager_t, gempba_bytes_t, gempba_buffer_t*) {
+        set_last_error(k_mp_disabled_msg);
+        return GEMPBA_ERR_RUNTIME;
+    }
+
+    gempba_status_t gempba_scheduler_create(gempba_scheduler_topology_t, double, gempba_scheduler_t*) {
+        set_last_error(k_mp_disabled_msg);
+        return GEMPBA_ERR_RUNTIME;
+    }
+    void gempba_scheduler_destroy(gempba_scheduler_t) {}
+    void gempba_scheduler_barrier(gempba_scheduler_t) { set_last_error(k_mp_disabled_msg); }
+    int32_t gempba_scheduler_rank_me(gempba_scheduler_t) { return -1; }
+    int32_t gempba_scheduler_world_size(gempba_scheduler_t) { return 0; }
+    void gempba_scheduler_set_goal(gempba_scheduler_t, gempba_goal_t, gempba_score_type_t) { set_last_error(k_mp_disabled_msg); }
+    double gempba_scheduler_elapsed_time(gempba_scheduler_t) { return 0.0; }
+    void gempba_scheduler_synchronize_stats(gempba_scheduler_t) { set_last_error(k_mp_disabled_msg); }
+    gempba_scheduler_center_t gempba_scheduler_center_view(gempba_scheduler_t) { return nullptr; }
+    gempba_scheduler_worker_t gempba_scheduler_worker_view(gempba_scheduler_t) { return nullptr; }
+    void gempba_scheduler_visit_stats(gempba_scheduler_t, gempba_stat_visitor_fn, void*) { set_last_error(k_mp_disabled_msg); }
+
+    void gempba_scheduler_center_barrier(gempba_scheduler_center_t) { set_last_error(k_mp_disabled_msg); }
+    int32_t gempba_scheduler_center_rank_me(gempba_scheduler_center_t) { return -1; }
+    int32_t gempba_scheduler_center_world_size(gempba_scheduler_center_t) { return 0; }
+    gempba_status_t gempba_scheduler_center_run(gempba_scheduler_center_t, gempba_bytes_t, int32_t) {
+        set_last_error(k_mp_disabled_msg);
+        return GEMPBA_ERR_RUNTIME;
+    }
+    gempba_status_t gempba_scheduler_center_get_result(gempba_scheduler_center_t, gempba_buffer_t*) {
+        set_last_error(k_mp_disabled_msg);
+        return GEMPBA_ERR_RUNTIME;
+    }
+    void gempba_scheduler_center_visit_all_results(gempba_scheduler_center_t, gempba_result_visitor_fn, void*) { set_last_error(k_mp_disabled_msg); }
+
+    void gempba_scheduler_worker_barrier(gempba_scheduler_worker_t) { set_last_error(k_mp_disabled_msg); }
+    int32_t gempba_scheduler_worker_rank_me(gempba_scheduler_worker_t) { return -1; }
+    int32_t gempba_scheduler_worker_world_size(gempba_scheduler_worker_t) { return 0; }
+    gempba_status_t gempba_scheduler_worker_run(gempba_scheduler_worker_t, gempba_node_manager_t, const int32_t*, const gempba_serial_runnable_t*, size_t) {
+        set_last_error(k_mp_disabled_msg);
+        return GEMPBA_ERR_RUNTIME;
     }
 
 #endif // GEMPBA_MULTIPROCESSING
