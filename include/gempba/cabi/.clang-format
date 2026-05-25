@@ -1,0 +1,21 @@
+---
+# C ABI surface — overrides the project's C++ defaults for readability of the
+# binding contract that external languages (Java/JNI, Python, Rust, …) wrap.
+#
+# Differences from the root .clang-format:
+#   - Enums break onto multiple lines (one constant per line) — easier to scan,
+#     trivial to diff when adding a new value.
+#   - Consecutive declarations / typedefs align their identifier and trailing
+#     comment columns so the opaque-handle block reads as a table.
+#   - Pointers / brace placement / column limit inherited from the root profile.
+BasedOnStyle: InheritParentConfig
+Language: Cpp
+
+ColumnLimit: 120
+AllowShortEnumsOnASingleLine: false
+AlignConsecutiveDeclarations: Consecutive
+AlignConsecutiveAssignments: Consecutive
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 0
+...
