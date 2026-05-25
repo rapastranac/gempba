@@ -222,6 +222,11 @@ namespace {
         return status;
     }
 
+    extern "C" gempba_status_t java_sr_runnable_callback(void* user_data, uint64_t thread_id, gempba_bytes_t args, gempba_node_t /*parent*/, gempba_buffer_t* out_result) {
+        // SR is multi-shot — no early release; release_fn handles teardown.
+        return invoke_java_byte_callback(static_cast<java_user_data*>(user_data), g_sr_execute_mid, thread_id, args, /*handle=*/0L, out_result);
+    }
+
     extern "C" gempba_status_t java_node_lazy_args_callback(void* user_data, gempba_bool_t* produced, gempba_buffer_t* out_args) {
         auto* d = static_cast<java_user_data*>(user_data);
         JNIEnv* env = get_env();
@@ -288,6 +293,21 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /*reserved*/) {
     if (!g_node_execute_mid || !g_node_lazyinit_mid)
         return JNI_ERR;
     env->DeleteLocalRef(node_cls);
+
+    // SerialRunnable lives in the multiprocessing variant only.  In a
+    // multithreading-only JAR the class is absent from the classpath, so
+    // FindClass legitimately returns NULL.  Swallow the pending
+    // ClassNotFoundException and continue — the corresponding native methods
+    // (gempba_serial_runnable_*) are never invoked from MT-only Java code.
+    jclass sr_cls = env->FindClass("io/gempba/scheduler/SerialRunnable");
+    if (sr_cls) {
+        g_sr_execute_mid = env->GetMethodID(sr_cls, "_execute", "(J[BJ)[B");
+        if (!g_sr_execute_mid)
+            return JNI_ERR;
+        env->DeleteLocalRef(sr_cls);
+    } else if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+    }
 
     return JNI_VERSION_24;
 }
@@ -429,6 +449,77 @@ extern "C" {
             return 0L;
         }
         return to_jlong(node);
+    }
+
+    // ─── gempba::mp ──────────────────────────────────────────────────────────────
+
+    JNIEXPORT jlong JNICALL JNI_MP(createExplicitNode)(JNIEnv* env, jclass, jlong lb_handle, jlong parent_handle, jobject callback, jbyteArray args_bytes) {
+        auto* ud = new_user_data(env, callback);
+        if (!ud)
+            return 0L;
+
+        auto args_borrow = borrow_jbytearray(env, args_bytes);
+        gempba_node_t node = nullptr;
+        if (gempba_mp_create_explicit_node(from_jlong<gempba_load_balancer_t>(lb_handle), from_jlong<gempba_node_t>(parent_handle), java_node_runnable_callback, ud, java_user_data_release,
+                                           args_borrow.bytes, &node) != GEMPBA_OK) {
+            throw_from_last_error(env, "native MP.createExplicitNode failed");
+            return 0L;
+        }
+        return to_jlong(node);
+    }
+
+    JNIEXPORT jlong JNICALL JNI_MP(createLoadBalancer)(JNIEnv* env, jclass, jint policy_ordinal, jlong worker_handle) {
+        auto lb =
+                gempba_mp_create_load_balancer(static_cast<gempba_balancing_policy_t>(policy_ordinal), worker_handle == 0L ? nullptr : from_jlong<gempba_scheduler_worker_t>(worker_handle));
+        if (lb == nullptr) {
+            throw_from_last_error(env, "native MP.createLoadBalancer failed");
+            return 0L;
+        }
+        return to_jlong(lb);
+    }
+
+    JNIEXPORT jlong JNICALL JNI_MP(createNodeManager)(JNIEnv* env, jclass, jlong lb_handle, jlong worker_handle) {
+        auto nm = gempba_mp_create_node_manager(from_jlong<gempba_load_balancer_t>(lb_handle), worker_handle == 0L ? nullptr : from_jlong<gempba_scheduler_worker_t>(worker_handle));
+        if (nm == nullptr) {
+            throw_from_last_error(env, "native MP.createNodeManager failed");
+            return 0L;
+        }
+        return to_jlong(nm);
+    }
+
+    // ─── gempba::mp::serial_runnable ────────────────────────────────────────────
+
+    JNIEXPORT jlong JNICALL JNI_SR(create)(JNIEnv* env, jclass, jint id, jobject callback, jboolean returns_value) {
+        auto* ud = new_user_data(env, callback);
+        if (!ud)
+            return 0L;
+
+        gempba_serial_runnable_t sr = nullptr;
+        if (gempba_serial_runnable_create(static_cast<int32_t>(id), returns_value == JNI_TRUE ? 1 : 0, java_sr_runnable_callback, ud, java_user_data_release, &sr) != GEMPBA_OK) {
+            throw_from_last_error(env, "native SerialRunnable.create failed");
+            return 0L;
+        }
+        return to_jlong(sr);
+    }
+
+    JNIEXPORT void JNICALL JNI_SR(destroy)(JNIEnv*, jclass, jlong handle) {
+        if (handle == 0L)
+            return;
+        gempba_serial_runnable_destroy(from_jlong<gempba_serial_runnable_t>(handle));
+    }
+
+    JNIEXPORT jbyteArray JNICALL JNI_SR(invoke)(JNIEnv* env, jclass, jlong sr_handle, jlong nm_handle, jbyteArray args_bytes) {
+        auto borrow = borrow_jbytearray(env, args_bytes);
+        gempba_buffer_t out{nullptr, 0};
+        if (gempba_serial_runnable_invoke(from_jlong<gempba_serial_runnable_t>(sr_handle), from_jlong<gempba_node_manager_t>(nm_handle), borrow.bytes, &out) != GEMPBA_OK) {
+            throw_from_last_error(env, "native SerialRunnable.invoke failed");
+            return nullptr;
+        }
+        if (out.data == nullptr || out.len == 0)
+            return nullptr;
+        jbyteArray arr = bytes_to_jbytearray(env, gempba_bytes_t{out.data, out.len});
+        gempba_buffer_free(&out);
+        return arr;
     }
 
     // ─── gempba::telemetry (process-wide flag) ───────────────────────────────────
