@@ -203,7 +203,9 @@ if (NOT GEMPBA_MULTIPROCESSING)
     # ─── Install: public headers ──────────────────────────────────────────────
     install(DIRECTORY include/gempba
             DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-            FILES_MATCHING PATTERN "*.hpp"
+            FILES_MATCHING
+                PATTERN "*.hpp"
+                PATTERN "*.h"
     )
 
     # ─── Install: generated config.h ──────────────────────────────────────────
