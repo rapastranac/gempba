@@ -43,6 +43,7 @@
  * '_00024' in the JNI-mangled function name.
  */
 
+#include <atomic>
 #include <cstdint>
 #include <string>
 
@@ -55,6 +56,10 @@
 namespace {
 
     JavaVM* g_jvm = nullptr;
+
+    jmethodID g_node_execute_mid = nullptr;
+    jmethodID g_node_lazyinit_mid = nullptr;
+    jmethodID g_sr_execute_mid = nullptr;
 
     JNIEnv* get_env() {
         JNIEnv* env = nullptr;
@@ -136,6 +141,123 @@ namespace {
         throw_java_runtime(env, msg ? msg : fallback);
     }
 
+    // ── User-data: holds the JNI global ref for a Java callback ──────────────
+
+    // atomic so the early-release in one-shot callbacks can't race with the
+    // tail-end release_fn (both go through exchange()).
+    struct java_user_data {
+        std::atomic<jobject> global_ref{nullptr};
+    };
+
+    // Releases the GlobalRef early so the Java Node's Cleaner can fire.
+    // Without this the wrapper ↔ Node cycle (GlobalRef pins Node, Cleaner
+    // waits on Node unreachability) leaks every node for the process lifetime.
+    void release_global_ref_now(java_user_data* d) noexcept {
+        if (d == nullptr)
+            return;
+        jobject ref = d->global_ref.exchange(nullptr, std::memory_order_acq_rel);
+        if (ref == nullptr)
+            return;
+        if (JNIEnv* env = get_env())
+            env->DeleteGlobalRef(ref);
+    }
+
+    extern "C" void java_user_data_release(void* ud) {
+        auto* d = static_cast<java_user_data*>(ud);
+        if (d == nullptr)
+            return;
+        release_global_ref_now(d); // idempotent
+        delete d;
+    }
+
+    java_user_data* new_user_data(JNIEnv* env, jobject callback) {
+        auto* d = new java_user_data{};
+        jobject ref = env->NewGlobalRef(callback);
+        if (!ref) {
+            delete d;
+            return nullptr;
+        }
+        d->global_ref.store(ref, std::memory_order_release);
+        return d;
+    }
+
+    // ── Java callback bridges (extern "C", invoked by gempba core) ──────────
+
+    gempba_status_t invoke_java_byte_callback(java_user_data* d, jmethodID mid, uint64_t thread_id, gempba_bytes_t args, jlong handle_arg, gempba_buffer_t* out_result) {
+        JNIEnv* env = get_env();
+        if (env == nullptr)
+            return GEMPBA_ERR_RUNTIME;
+
+        jobject ref = d->global_ref.load(std::memory_order_acquire);
+        if (ref == nullptr)
+            return GEMPBA_ERR_RUNTIME; // already released
+
+        jbyteArray j_args = bytes_to_jbytearray(env, args);
+        const jlong j_tid = static_cast<jlong>(thread_id);
+
+        auto j_result = static_cast<jbyteArray>(env->CallObjectMethod(ref, mid, j_tid, j_args, handle_arg));
+
+        if (j_args)
+            env->DeleteLocalRef(j_args);
+
+        if (env->ExceptionCheck()) {
+            env->ExceptionDescribe();
+            env->ExceptionClear();
+            if (j_result)
+                env->DeleteLocalRef(j_result);
+            return GEMPBA_ERR_CALLBACK;
+        }
+
+        *out_result = jbytearray_to_buffer(env, j_result);
+        if (j_result)
+            env->DeleteLocalRef(j_result);
+        return GEMPBA_OK;
+    }
+
+    extern "C" gempba_status_t java_node_runnable_callback(void* user_data, uint64_t thread_id, gempba_bytes_t args, gempba_node_t parent, gempba_buffer_t* out_result) {
+        auto* d = static_cast<java_user_data*>(user_data);
+        const jlong handle = (parent == nullptr) ? 0L : reinterpret_cast<jlong>(parent);
+        const gempba_status_t status = invoke_java_byte_callback(d, g_node_execute_mid, thread_id, args, handle, out_result);
+        release_global_ref_now(d); // node runnables are one-shot
+        return status;
+    }
+
+    extern "C" gempba_status_t java_node_lazy_args_callback(void* user_data, gempba_bool_t* produced, gempba_buffer_t* out_args) {
+        auto* d = static_cast<java_user_data*>(user_data);
+        JNIEnv* env = get_env();
+        if (env == nullptr) {
+            *produced = 0;
+            return GEMPBA_ERR_RUNTIME;
+        }
+
+        jobject ref = d->global_ref.load(std::memory_order_acquire);
+        if (ref == nullptr) {
+            *produced = 0;
+            return GEMPBA_ERR_RUNTIME;
+        }
+        auto j_result = static_cast<jbyteArray>(env->CallObjectMethod(ref, g_node_lazyinit_mid));
+
+        if (env->ExceptionCheck()) {
+            env->ExceptionDescribe();
+            env->ExceptionClear();
+            if (j_result)
+                env->DeleteLocalRef(j_result);
+            *produced = 0;
+            release_global_ref_now(d); // pruned: runnable_callback won't fire
+            return GEMPBA_OK; // Java exception → prune, matches old shim.
+        }
+        if (j_result == nullptr) {
+            *produced = 0;
+            release_global_ref_now(d); // pruned: runnable_callback won't fire
+            return GEMPBA_OK;
+        }
+
+        *produced = 1;
+        *out_args = jbytearray_to_buffer(env, j_result);
+        env->DeleteLocalRef(j_result);
+        return GEMPBA_OK;
+    }
+
     // ── Handle conversion ────────────────────────────────────────────────────
 
     template<typename T>
@@ -153,6 +275,20 @@ namespace {
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /*reserved*/) {
     g_jvm = vm;
+
+    JNIEnv* env = nullptr;
+    if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_24) != JNI_OK)
+        return JNI_ERR;
+
+    jclass node_cls = env->FindClass("io/gempba/core/Node");
+    if (!node_cls)
+        return JNI_ERR;
+    g_node_execute_mid = env->GetMethodID(node_cls, "_execute", "(J[BJ)[B");
+    g_node_lazyinit_mid = env->GetMethodID(node_cls, "_lazyInitArgs", "()[B");
+    if (!g_node_execute_mid || !g_node_lazyinit_mid)
+        return JNI_ERR;
+    env->DeleteLocalRef(node_cls);
+
     return JNI_VERSION_24;
 }
 
@@ -182,6 +318,21 @@ extern "C" {
         gempba_node_t node = nullptr;
         if (gempba_create_dummy_node(lb, &node) != GEMPBA_OK) {
             throw_from_last_error(env, "native createDummyNode failed");
+            return 0L;
+        }
+        return to_jlong(node);
+    }
+
+    JNIEXPORT jlong JNICALL JNI_FN(createSeedNode)(JNIEnv* env, jclass, jlong lb_handle, jobject callback, jbyteArray args_bytes) {
+        auto lb = from_jlong<gempba_load_balancer_t>(lb_handle);
+        auto* ud = new_user_data(env, callback);
+        if (!ud)
+            return 0L;
+
+        auto args_borrow = borrow_jbytearray(env, args_bytes);
+        gempba_node_t node = nullptr;
+        if (gempba_create_seed_node(lb, java_node_runnable_callback, ud, java_user_data_release, args_borrow.bytes, &node) != GEMPBA_OK) {
+            throw_from_last_error(env, "native createSeedNode failed");
             return 0L;
         }
         return to_jlong(node);
