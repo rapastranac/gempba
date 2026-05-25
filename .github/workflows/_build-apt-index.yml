@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  build-apt-index:
+  assemble:
     runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
 
     steps:

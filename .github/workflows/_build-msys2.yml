@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 jobs:
-  build-msys2:
+  package:
     runs-on: ${{ fromJSON(vars.RUNNER_WINDOWS || '["windows-2025"]') }}
     timeout-minutes: 30
 
