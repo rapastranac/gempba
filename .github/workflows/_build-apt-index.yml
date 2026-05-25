@@ -1,0 +1,49 @@
+name: Build APT index (reusable)
+
+on:
+  workflow_call:
+    secrets:
+      GPG_PRIVATE_KEY:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  assemble:
+    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install reprepro
+        run: sudo apt-get update && sudo apt-get install -y reprepro
+
+      - name: Import GPG key
+        run: echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+
+      - name: Set GPG key ID
+        run: |
+          sed -i "s|SIGN_WITH_KEY_ID|${{ vars.GPG_KEY_ID }}|" \
+            apt-repo/conf/distributions
+
+      - name: Download .debs from artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: deb-package-*
+          path: deb-download
+          merge-multiple: true
+
+      - name: Build APT index with reprepro
+        run: |
+          for deb in deb-download/*.deb; do
+            reprepro -b apt-repo includedeb stable "$deb"
+          done
+
+      - name: Upload apt-repo as workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: apt-repo-index
+          path: apt-repo/
+          retention-days: 7

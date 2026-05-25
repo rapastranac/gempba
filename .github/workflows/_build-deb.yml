@@ -1,0 +1,60 @@
+name: Build .deb (reusable)
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        multiprocessing: [ON, OFF]
+    env:
+      CC: gcc-14
+      CXX: g++-14
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref }}
+
+      # MPI dev only on the MP=ON leg — the mt package neither links nor
+      # pulls libopenmpi-dev.
+      - name: Setup Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake gcc-14 g++-14 make libspdlog-dev libfmt-dev libhwloc-dev pkg-config
+          if [ "${{ matrix.multiprocessing }}" = "ON" ]; then
+            sudo apt-get install -y libopenmpi-dev
+          fi
+
+      - name: Configure (Release)
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DGEMPBA_BUILD_TESTS=OFF \
+            -DGEMPBA_DEV_MODE=OFF \
+            -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }}
+
+      - name: Build
+        run: cmake --build build --parallel $(nproc)
+
+      - name: Package .deb
+        run: cd build && cpack -G DEB
+
+      # Per-flavor artifact name so v7's immutable artifacts don't collide
+      # between matrix legs; downstream consumers download with the
+      # `deb-package-*` glob.
+      - name: Upload .deb as workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: deb-package-${{ matrix.multiprocessing }}
+          path: build/*.deb
+          retention-days: 7

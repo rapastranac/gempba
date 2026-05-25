@@ -1,0 +1,100 @@
+name: Release (Ubuntu 24.04)
+
+on:
+  push:
+    tags: [ "v*" ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  build-deb:
+    uses: ./.github/workflows/_build-deb.yml
+
+  build-apt-index:
+    needs: build-deb
+    uses: ./.github/workflows/_build-apt-index.yml
+    secrets: inherit
+
+  release-deb:
+    needs: build-deb
+    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download deb artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: deb-package-*
+          path: deb-download
+          merge-multiple: true
+
+      - name: Upload .deb to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: deb-download/*.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Must live in this workflow rather than its own `release: created` /
+  # `workflow_run` listener: Actions suppresses recursive triggers from
+  # GITHUB_TOKEN-authored events.
+  release-notes:
+    needs: release-deb
+    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout the tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Setup gh CLI
+        uses: ./.github/actions/setup-gh-cli
+
+      - name: Apply release notes to GitHub Release body
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          NOTES="docs/releases/release-notes-v${VERSION}.md"
+          if [[ ! -f "$NOTES" ]]; then
+            echo "::error::missing $NOTES — was the release-notes file curated and merged before tagging?"
+            exit 1
+          fi
+          gh release edit "$TAG" --notes-file "$NOTES"
+
+  deploy-apt-pages:
+    needs: build-apt-index
+    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
+    permissions:
+      contents: read   # required by actions/upload-pages-artifact@v3
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Download apt-repo-index artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: apt-repo-index
+          path: apt-repo
+
+      - name: Stage as Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: apt-repo/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,82 @@
+name: Build MSYS2 package (reusable)
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ${{ fromJSON(vars.RUNNER_WINDOWS || '["windows-2025"]') }}
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref }}
+
+      # cache: false, release: false preserves the preinstalled C:\msys64
+      # on Server 2025 self-hosted runners (see #159).
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          release: false
+          cache: false
+          update: true
+          install: >-
+            base-devel
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-msmpi
+            mingw-w64-x86_64-spdlog
+            mingw-w64-x86_64-fmt
+            mingw-w64-x86_64-hwloc
+            mingw-w64-x86_64-pkgconf
+            git
+            zstd
+
+      - name: Build MSYS2 package
+        shell: msys2 {0}
+        run: |
+          WS=$(cygpath -u "$GITHUB_WORKSPACE")
+          VERSION=$(grep -m1 'project(gempba VERSION' CMakeLists.txt | grep -oP '\d+\.\d+\.\d+')
+
+          git archive --prefix="gempba-${VERSION}/" HEAD \
+            | gzip > "packaging/msys2/gempba-${VERSION}.tar.gz"
+
+          cd packaging/msys2
+          sed -i "s|^pkgver=.*|pkgver=${VERSION}|" PKGBUILD
+          sed -i 's|^source=.*|source=("gempba-${pkgver}.tar.gz")|' PKGBUILD
+          # sha256sums='SKIP' because the local git archive is not the
+          # GitHub release tarball PKGBUILD normally validates against
+          sed -i "s|^sha256sums=.*|sha256sums=('SKIP')|" PKGBUILD
+
+          PKGDEST="$WS" MINGW_ARCH=mingw64 makepkg-mingw --nocheck --noconfirm --noprogressbar
+
+      - name: Upload MSYS2 package as workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: msys2-package
+          path: ${{ github.workspace }}/mingw-w64-x86_64-gempba-*.pkg.tar.zst
+          retention-days: 7
+
+      # Wipe makepkg-mingw fakeroot dirs: read-only files inside trip the
+      # next run's `git clean -ffdx` on self-hosted Windows runners.
+      - name: Clean up makepkg artifacts
+        if: always()
+        shell: pwsh
+        run: |
+          $msys2 = Join-Path $env:GITHUB_WORKSPACE 'packaging\msys2'
+          foreach ($name in 'pkg', 'src') {
+            $path = Join-Path $msys2 $name
+            if (Test-Path -LiteralPath $path) {
+              cmd /c "attrib -R `"$path\*`" /S /D" 2>$null
+              cmd /c "rd /s /q `"$path`""
+            }
+          }
+          Get-ChildItem -LiteralPath $msys2 -Filter 'gempba-*.tar.gz' -ErrorAction SilentlyContinue |
+            Remove-Item -Force

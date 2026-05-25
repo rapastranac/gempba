@@ -3,7 +3,6 @@ name: C/C++ CI (macOS 26)
 on:
   push:
     branches: [ "main", "release" ]
-    tags: [ "v*" ]
   pull_request:
     branches: [ "main", "release" ]
 
