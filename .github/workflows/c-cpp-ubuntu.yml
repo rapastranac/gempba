@@ -3,7 +3,6 @@ name: C/C++ CI (Ubuntu 24.04)
 on:
   push:
     branches: [ "main", "release" ]
-    tags: [ "v*" ]
   pull_request:
     branches: [ "main", "release" ]
 
@@ -263,195 +262,14 @@ jobs:
             -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }}
           cmake --build "$RUNNER_TEMP/gempba-examples-build" --parallel $(nproc)
 
-  publish-deb:
+  build-deb:
     needs: build
-    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'pull_request'
-    permissions:
-      contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        multiprocessing: [ON, OFF]
-    env:
-      CC: gcc-14
-      CXX: g++-14
+    uses: ./.github/workflows/_build-deb.yml
 
-    steps:
-      # 1️⃣ Checkout the repository
-      - name: Checkout repository
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ github.ref }}
-
-      # 2️⃣ Install build dependencies. MPI dev only on the MP=ON leg —
-      #     the mt package neither links nor pulls libopenmpi-dev.
-      - name: Setup Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential cmake gcc-14 g++-14 make libspdlog-dev libfmt-dev libhwloc-dev pkg-config
-          if [ "${{ matrix.multiprocessing }}" = "ON" ]; then
-            sudo apt-get install -y libopenmpi-dev
-          fi
-
-      # 3️⃣ Configure for Release, targeting /usr prefix
-      - name: Configure (Release)
-        run: |
-          cmake -S . -B build \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=/usr \
-            -DGEMPBA_BUILD_TESTS=OFF \
-            -DGEMPBA_DEV_MODE=OFF \
-            -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }}
-
-      # 4️⃣ Build
-      - name: Build
-        run: cmake --build build --parallel $(nproc)
-
-      # 5️⃣ Generate .deb with CPack
-      - name: Package .deb
-        run: cd build && cpack -G DEB
-
-      # 6️⃣a Tag → attach to GitHub Release. Both matrix legs hit the same
-      #      Release with distinct file names (libgempba-dev*.deb and
-      #      libgempba-mpi-dev*.deb), so they coexist on the Release page.
-      - name: Upload .deb to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: build/*.deb
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # 6️⃣b Store as per-flavor workflow artifact so publish-apt-repo can
-      # consume both legs. Always uploaded (tag + PR) so the download step
-      # has a uniform source. Per-flavor name so v4's immutable artifacts
-      # don't collide between matrix legs. The Release attachment in step
-      # 6️⃣a is independent and only fires on tag pushes.
-      - name: Upload .deb as workflow artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: deb-package-${{ matrix.multiprocessing }}
-          path: build/*.deb
-          retention-days: 7
-
-  # Apply the curated release-notes file to the GitHub Release body created by
-  # `publish-deb`. Must live in the same workflow (rather than listening on
-  # `release: created` or `workflow_run`) because Actions suppresses recursive
-  # triggers from `GITHUB_TOKEN`-authored events. Same-workflow guarantees
-  # ordering after the Release exists.
-  set-release-body:
-    needs: publish-deb
-    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
-    if: startsWith(github.ref, 'refs/tags/v')
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout the tag
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ github.ref }}
-
-      - name: Setup gh CLI
-        uses: ./.github/actions/setup-gh-cli
-
-      - name: Apply release notes to GitHub Release body
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          TAG="${GITHUB_REF#refs/tags/}"
-          VERSION="${TAG#v}"
-          NOTES="docs/releases/release-notes-v${VERSION}.md"
-          if [[ ! -f "$NOTES" ]]; then
-            echo "::error::missing $NOTES — was the release-notes file curated and merged before tagging?"
-            exit 1
-          fi
-          gh release edit "$TAG" --notes-file "$NOTES"
-
-  publish-apt-repo:
-    needs: publish-deb
-    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'pull_request'
-    # No github-pages environment here — environment protection rules apply at
-    # the job level, so even guarded steps are blocked on PRs. Deployment is
-    # handled by the separate deploy-apt-pages job (tag-only).
-    permissions:
-      contents: read
-      pages: write      # needed for upload-pages-artifact
-      id-token: write   # needed for upload-pages-artifact
-
-    steps:
-      # 1️⃣ Checkout (needs apt-repo/conf/distributions and pubkey.gpg)
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      # 2️⃣ Install reprepro
-      - name: Install reprepro
-        run: sudo apt-get update && sudo apt-get install -y reprepro
-
-      # 3️⃣ Import GPG private key from Secrets
-      - name: Import GPG key
-        run: echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
-
-      # 4️⃣ Patch distributions with the real key ID from Variables
-      - name: Set GPG key ID
-        run: |
-          sed -i "s|SIGN_WITH_KEY_ID|${{ vars.GPG_KEY_ID }}|" \
-            apt-repo/conf/distributions
-
-      # 5️⃣ Pull every flavor's .deb from the per-flavor workflow artifacts
-      # publish-deb just uploaded. Single code path for both tag and PR — no
-      # `gh release download`, so the self-hosted Linux runner image doesn't
-      # need the gh CLI just for this step. (See #170.)
-      - name: Download .debs from artifacts
-        uses: actions/download-artifact@v8
-        with:
-          pattern: deb-package-*
-          path: deb-download
-          merge-multiple: true
-
-      # 6️⃣ Build the APT index (Packages, Release, InRelease) — runs in both cases.
-      #     The loop already handles N debs, so adding the mpi flavor is a noop.
-      - name: Build APT index with reprepro
-        run: |
-          for deb in deb-download/*.deb; do
-            reprepro -b apt-repo includedeb stable "$deb"
-          done
-
-      # 7️⃣a Tag → stage as Pages artifact for deploy-apt-pages job
-      - name: Upload Pages artifact (tag)
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: apt-repo/
-
-      # 7️⃣b PR → store apt-repo as a workflow artifact for inspection
-      - name: Upload APT index as workflow artifact (PR)
-        if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v7
-        with:
-          name: apt-repo-index
-          path: apt-repo/
-          retention-days: 7
-
-  deploy-apt-pages:
-    needs: publish-apt-repo
-    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
-    # Environment protection rules only apply here — PRs never reach this job
-    if: startsWith(github.ref, 'refs/tags/v')
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+  build-apt-index:
+    needs: build-deb
+    uses: ./.github/workflows/_build-apt-index.yml
+    secrets: inherit
 
   publish-test-results:
     needs: test
