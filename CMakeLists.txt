@@ -85,6 +85,15 @@ elseif (GEMPBA_BUILD_TESTS AND NOT GEMPBA_DEV_MODE)
     message(STATUS "Skipping tests: tests use the explicit gempba::multithreading::* form and require GEMPBA_DEV_MODE=ON")
 endif ()
 
+option(GEMPBA_BUILD_JAVA_BINDING "Build the Java JNI shared library (requires JDK)" OFF)
+if (GEMPBA_BUILD_JAVA_BINDING)
+    if (NOT DEFINED GEMPBA_JNI_CLASSIFIER OR GEMPBA_JNI_CLASSIFIER STREQUAL "")
+        message(FATAL_ERROR
+                "GEMPBA_BUILD_JAVA_BINDING requires -DGEMPBA_JNI_CLASSIFIER=<os>-<arch> "
+                "(e.g. linux-x86_64, win-x86_64, osx-aarch64)")
+    endif ()
+endif ()
+
 # 📄 Main source files
 file(GLOB_RECURSE Sources "src/*.cpp")
 if (NOT GEMPBA_MULTIPROCESSING)
@@ -94,6 +103,14 @@ endif ()
 
 # 🛠️ Create the main library
 add_library(gempba STATIC ${Sources})
+
+# Building gempba_jni links libgempba.a into a SHARED object on Linux/macOS,
+# which requires every translation unit in the static archive to be
+# position-independent.  Without -fPIC the link fails with
+# "relocation R_X86_64_TPOFF32 against `__tls_guard` ... recompile with -fPIC".
+if (GEMPBA_BUILD_JAVA_BINDING)
+    set_target_properties(gempba PROPERTIES POSITION_INDEPENDENT_CODE ON)
+endif ()
 
 target_sources(gempba
         PRIVATE FILE_SET cabi_headers TYPE HEADERS
@@ -172,6 +189,11 @@ endif ()
 
 if (UNIX AND NOT APPLE)
     target_link_options(gempba PUBLIC -rdynamic)
+endif ()
+
+# 📦 JNI binding (built only when GEMPBA_BUILD_JAVA_BINDING=ON; gempba target must exist first)
+if (GEMPBA_BUILD_JAVA_BINDING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/bindings/jni/CMakeLists.txt")
+    add_subdirectory(bindings/jni)
 endif ()
 
 # 📁 Executables output directory
