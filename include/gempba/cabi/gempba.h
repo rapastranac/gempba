@@ -280,6 +280,17 @@ extern "C" {
      * release_fn fires when the last std::function copy is dropped, not necessarily here. */
     void gempba_node_destroy(gempba_node_t node);
 
+    /**
+     * Blocks until the node's runnable has finished and returns the serialised result bytes via *out (caller frees
+     * with gempba_buffer_free).  Wraps gempba::node::get_any_result; the C ABI always instantiates the underlying
+     * node template on <task_packet, task_packet>, so the std::any is unwrapped to the runnable's return bytes
+     * directly without going through the result-serializer path that gempba::node::get_result uses.
+     *
+     * *out is {NULL, 0} when the runnable returned an empty result (prune / void runnable).  Returns
+     * GEMPBA_ERR_INVALID_ARG on null inputs and GEMPBA_ERR_RUNTIME if the wait raised an exception.
+     */
+    gempba_status_t gempba_node_get_result(gempba_node_t node, gempba_buffer_t* out);
+
     /* ─── Multithreaded engine (mt) ─────────────────────────────────────────── */
 
     /**

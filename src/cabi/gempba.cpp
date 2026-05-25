@@ -22,6 +22,7 @@
  * SOFTWARE.
  */
 
+#include <any>
 #include <cstdlib>
 #include <map>
 #include <memory>
@@ -199,6 +200,27 @@ extern "C" {
     }
 
     void gempba_node_destroy(gempba_node_t node) { delete node; }
+
+    gempba_status_t gempba_node_get_result(gempba_node_t node, gempba_buffer_t* out) {
+        GEMPBA_TRY
+            if (node == nullptr || out == nullptr) {
+                set_last_error("node or out is null");
+                return GEMPBA_ERR_INVALID_ARG;
+            }
+            std::any v_any = node->cpp.get_any_result();
+            if (!v_any.has_value()) {
+                *out = gempba_buffer_t{nullptr, 0};
+                return GEMPBA_OK;
+            }
+            // The C ABI always instantiates the underlying node_core_impl on
+            // <task_packet(task_packet)>, so the any unwraps directly without
+            // a result_serializer.  Out-of-band template instantiations would
+            // be a programming error visible here as a bad_any_cast.
+            const auto& pkt = std::any_cast<const gempba::task_packet&>(v_any);
+            *out = buffer_from_packet(pkt);
+            return GEMPBA_OK;
+        GEMPBA_CATCH_RETURN_STATUS
+    }
 
     /* ── multithreading ─────────────────────────────────────────────────────── */
 
