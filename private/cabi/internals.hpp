@@ -38,6 +38,17 @@
 
 #include <string>
 
+#include <gempba/cabi/gempba.h>
+#include <gempba/gempba.hpp>
+
+/**
+ * Opaque-handle definitions, at global scope so the C-linkage `typedef struct
+ * gempba_xxx_s* gempba_xxx_t` declarations in gempba.h refer to the same tag.
+ */
+struct gempba_node_s {
+    gempba::node cpp;
+};
+
 namespace gempba::cabi::detail {
 
     /**
@@ -52,6 +63,8 @@ namespace gempba::cabi::detail {
         thread_local std::string s;
         return s;
     }
+
+    inline void set_last_error(const char* msg) { g_last_error() = msg ? msg : ""; }
 
 } // namespace gempba::cabi::detail
 

@@ -21,32 +21,24 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  *
- * Tests for the process-wide runtime plumbing: gempba_last_error_message,
- * gempba_clear_last_error, and the "no singletons before any factory ran"
- * baseline. Anything else that lives below the load balancer / node
- * manager / scheduler surfaces moves to its own file.
+ * Tests for gempba_mt_create_node_manager / gempba_mp_create_node_manager
+ * and the full gempba_nm_* property-bag surface bindings drive once they
+ * hold a node_manager handle: balancing policy / score / goal / result /
+ * submission / wait / probe entry points.
  */
 
 #include <cabi_test_fixture.hpp>
 
 namespace gempba::cabi_tests {
 
-    class cabi_runtime_test : public cabi_fixture {};
+    class cabi_node_manager_test : public cabi_fixture {};
 
-    TEST_F(cabi_runtime_test, last_error_initially_clear) {
-        gempba_clear_last_error();
-        EXPECT_EQ(gempba_last_error_message(), nullptr);
-    }
-
-    TEST_F(cabi_runtime_test, invalid_arg_sets_last_error) {
-        gempba_load_balancer_t v_lb = gempba_mt_create_load_balancer(GEMPBA_BALANCING_QUASI_HORIZONTAL);
+    TEST_F(cabi_node_manager_test, mt_create_returns_same_as_singleton) {
+        gempba_load_balancer_t v_lb = gempba_mt_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING);
         ASSERT_NE(v_lb, nullptr);
-
-        gempba_status_t v_st = gempba_create_dummy_node(v_lb, /*out=*/nullptr);
-        EXPECT_EQ(v_st, GEMPBA_ERR_INVALID_ARG);
-        EXPECT_NE(gempba_last_error_message(), nullptr);
+        gempba_node_manager_t v_nm = gempba_mt_create_node_manager(v_lb);
+        ASSERT_NE(v_nm, nullptr);
+        EXPECT_EQ(v_nm, gempba_get_node_manager());
     }
-
-    TEST_F(cabi_runtime_test, get_load_balancer_returns_null_before_creation) { EXPECT_EQ(gempba_get_load_balancer(), nullptr); }
 
 } // namespace gempba::cabi_tests
