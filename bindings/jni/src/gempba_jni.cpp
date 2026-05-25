@@ -175,6 +175,62 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /*reserved*/) {
 
 extern "C" {
 
+    // ─── gempba globals ──────────────────────────────────────────────────────────
+
+    JNIEXPORT jlong JNICALL JNI_FN(createDummyNode)(JNIEnv* env, jclass, jlong lb_handle) {
+        auto lb = from_jlong<gempba_load_balancer_t>(lb_handle);
+        gempba_node_t node = nullptr;
+        if (gempba_create_dummy_node(lb, &node) != GEMPBA_OK) {
+            throw_from_last_error(env, "native createDummyNode failed");
+            return 0L;
+        }
+        return to_jlong(node);
+    }
+
+    JNIEXPORT jlong JNICALL JNI_FN(getNodeManagerHandle)(JNIEnv* env, jclass) {
+        auto nm = gempba_get_node_manager();
+        if (nm == nullptr) {
+            throw_from_last_error(env, "native getNodeManagerHandle failed");
+            return 0L;
+        }
+        return to_jlong(nm);
+    }
+
+    JNIEXPORT jlong JNICALL JNI_FN(getLoadBalancerHandle)(JNIEnv*, jclass) { return to_jlong(gempba_get_load_balancer()); }
+
+    JNIEXPORT jint JNICALL JNI_FN(shutdown)(JNIEnv*, jclass) { return gempba_shutdown(); }
+
+    // ─── gempba::node ────────────────────────────────────────────────────────────
+
+    JNIEXPORT void JNICALL JNI_NODE(destroy)(JNIEnv*, jclass, jlong handle) {
+        if (handle == 0L)
+            return;
+        gempba_node_destroy(from_jlong<gempba_node_t>(handle));
+    }
+
+    JNIEXPORT jbyteArray JNICALL JNI_NODE(getResult)(JNIEnv* env, jclass, jlong handle) {
+        if (handle == 0L) {
+            throw_java_runtime(env, "Node.getResult: handle is 0");
+            return nullptr;
+        }
+        gempba_buffer_t buf{nullptr, 0};
+        if (gempba_node_get_result(from_jlong<gempba_node_t>(handle), &buf) != GEMPBA_OK) {
+            throw_from_last_error(env, "native Node.getResult failed");
+            return nullptr;
+        }
+        if (buf.data == nullptr)
+            return nullptr;
+        jbyteArray arr = bytes_to_jbytearray(env, gempba_bytes_t{buf.data, buf.len});
+        gempba_buffer_free(&buf);
+        return arr;
+    }
+
+    // ─── gempba::load_balancer ───────────────────────────────────────────────────
+
+    JNIEXPORT void JNICALL JNI_LB(destroy)(JNIEnv*, jclass, jlong /*handle*/) {
+        // Owned by the gempba singleton; freed via gempba_shutdown().
+    }
+
     // ─── gempba::telemetry (process-wide flag) ───────────────────────────────────
 
     JNIEXPORT void JNICALL JNI_TELEM(enable)(JNIEnv*, jclass) { gempba_telemetry_enable(); }
