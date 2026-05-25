@@ -95,6 +95,12 @@ endif ()
 # 🛠️ Create the main library
 add_library(gempba STATIC ${Sources})
 
+target_sources(gempba
+        PRIVATE FILE_SET cabi_headers TYPE HEADERS
+        BASE_DIRS include
+        FILES include/gempba/cabi/gempba.h
+)
+
 if (GEMPBA_MULTIPROCESSING)
     set(GEMPBA_FLAVOR_TAG mpi)
     set_target_properties(gempba PROPERTIES OUTPUT_NAME gempba_mpi)
