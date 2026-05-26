@@ -83,8 +83,93 @@ jobs:
           path: bindings/java/target/surefire-reports/TEST-*.xml
           if-no-files-found: warn
 
+  build-windows:
+    runs-on: ${{ fromJSON(vars.RUNNER_WINDOWS || '["windows-2025"]') }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: MT
+            mp_flag: 'OFF'
+            mvn_variant: multithreading
+          - variant: MP
+            mp_flag: 'ON'
+            mvn_variant: multiprocessing
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.ref }}
+
+      # MSYS2 + MS-MPI runtime; cache: false, release: false keeps the preinstalled
+      # C:\msys64 on Server 2025 self-hosted runners (see #159), matching the
+      # C/C++ Windows workflow.
+      - name: Setup native deps
+        uses: ./.github/actions/setup-windows-deps
+        with:
+          multiprocessing: ${{ matrix.mp_flag }}
+          tests: 'false'
+          cache: 'false'
+          release: 'false'
+
+      - name: Setup JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Echo versions
+        shell: msys2 {0}
+        run: |
+          echo "g++: $(g++ --version | head -1 | awk '{print $NF}')"
+          echo "cmake: $(cmake --version | head -1 | awk '{print $3}')"
+          echo "java: $(java -version 2>&1 | head -1)"
+
+      # build_jar_windows.sh handles JAVA_HOME / Maven discovery via the Windows
+      # registry, so this works from MSYS2's minimal PATH without further setup.
+      - name: Build native JNI library + variant JAR
+        shell: msys2 {0}
+        run: bash scripts/build_jar_windows.sh ${{ matrix.variant }}
+
+      # Run tests inside MSYS2 too. The JNI .dll is linked against mingw-w64's
+      # libstdc++/libgcc/libwinpthread, which only sit on PATH inside MSYS2 —
+      # launching `mvn test` from cmd would load the .dll and fail to resolve
+      # those imports. Reuse the same PowerShell-registry trick as the build
+      # script to find `mvn` from the minimal MSYS2 PATH.
+      - name: Run Java tests
+        shell: msys2 {0}
+        working-directory: bindings/java
+        run: |
+          if ! command -v mvn >/dev/null; then
+            win_path=$(powershell.exe -NoProfile -Command \
+              "[Environment]::GetEnvironmentVariable('PATH','Machine') + ';' + [Environment]::GetEnvironmentVariable('PATH','User')" \
+              2>/dev/null | tr -d '\r')
+            IFS=';' read -ra entries <<< "$win_path"
+            for e in "${entries[@]}"; do
+              [[ -z "$e" ]] && continue
+              unix_e=$(cygpath -u "$e" 2>/dev/null) || continue
+              if [[ -f "$unix_e/mvn.cmd" ]]; then
+                export PATH="$unix_e:$PATH"
+                break
+              fi
+            done
+          fi
+          mvn -B test -Dgempba.variant=${{ matrix.mvn_variant }}
+
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-windows-${{ matrix.variant }}
+          path: bindings/java/target/surefire-reports/TEST-*.xml
+          if-no-files-found: warn
+
   publish-test-results:
-    needs: [ build-ubuntu ]
+    needs: [ build-ubuntu, build-windows ]
     runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
     if: ${{ !cancelled() }}
 
