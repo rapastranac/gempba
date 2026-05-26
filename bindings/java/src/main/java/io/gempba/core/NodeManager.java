@@ -24,6 +24,8 @@ public final class NodeManager implements AutoCloseable {
 
     /**
      * Pointer to the C++ {@code node_manager*}, cast to {@code jlong}.
+     * Public so the binding's other packages (io.gempba.scheduler) can pass it
+     * through to the JNI surface; not intended for direct user use.
      */
     public final long handle;
 

@@ -29,6 +29,12 @@ public final class RankStats {
      */
     private final Map<String, Number> values;
 
+    /**
+     * Binding-internal constructor (called by io.gempba.scheduler.Scheduler when
+     * unpacking stats from the JNI bridge).  Public so cross-package access works;
+     * not part of the user-facing API — typical callers receive RankStats from
+     * {@code Scheduler.getStats()}.
+     */
     public RankStats(int rank, LinkedHashMap<String, Number> values) {
         this.rank = rank;
         this.values = Collections.unmodifiableMap(values);
