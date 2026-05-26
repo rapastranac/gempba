@@ -13,6 +13,9 @@ public final class LoadBalancer implements AutoCloseable {
 
     /**
      * Pointer to the C++ {@code load_balancer*}, cast to {@code jlong}.
+     * Public so the binding's other packages (io.gempba.scheduler, the variant
+     * GemPBA entry-point) can pass it through to the JNI surface; not part of
+     * the user-facing API.
      */
     public final long handle;
 

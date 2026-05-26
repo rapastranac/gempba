@@ -37,6 +37,12 @@ public final class NodeManager implements AutoCloseable {
     private volatile Object m_javaResult;
     private final Object m_javaResultLock = new Object();
 
+    /**
+     * Binding-internal constructor — called by the variant-specific GemPBA
+     * entry-point after the JNI factory returns a non-zero handle.  Public so
+     * cross-package construction works; users should obtain a NodeManager via
+     * {@code GemPBA.createNodeManager(...)}, not by calling this directly.
+     */
     public NodeManager(long handle) {
         if (handle == 0L) {
             throw new IllegalStateException("Native node manager creation failed (null handle)");
