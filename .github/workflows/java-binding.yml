@@ -1,0 +1,105 @@
+name: Java JNI binding
+
+on:
+  push:
+    branches: [ "main", "release" ]
+  pull_request:
+    branches: [ "main", "release" ]
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build-ubuntu:
+    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: MT
+            mp_flag: 'OFF'
+            mvn_variant: multithreading
+          - variant: MP
+            mp_flag: 'ON'
+            mvn_variant: multiprocessing
+    env:
+      CC: gcc-14
+      CXX: g++-14
+
+    steps:
+      # 1️⃣ Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.ref }}
+
+      # 2️⃣ Native toolchain + MPI when MP — same composite the C/C++ jobs use,
+      # so the JNI library links against the exact deps gempba itself was tested with.
+      - name: Setup native deps
+        uses: ./.github/actions/setup-ubuntu-deps
+        with:
+          multiprocessing: ${{ matrix.mp_flag }}
+          tests: 'false'
+
+      # 3️⃣ Pin the JDK so `mvn` finds it even on minimally-provisioned runners,
+      # and cache ~/.m2 across runs of this workflow.
+      - name: Setup JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Echo versions
+        run: |
+          echo "g++: $($CXX --version | head -1 | awk '{print $4}')"
+          echo "cmake: $(cmake --version | head -1 | awk '{print $3}')"
+          echo "java: $(java -version 2>&1 | head -1)"
+          echo "mvn: $(mvn -v | head -1)"
+
+      # 4️⃣ Builds gempba_jni.so into bindings/java/src/main/resources/natives/<classifier>
+      # and `mvn install -DskipTests`s the variant JAR (mt or mp-mpi). Tests run
+      # in the next step against the just-installed artifacts.
+      - name: Build native JNI library + variant JAR
+        run: bash scripts/build_jar_linux.sh ${{ matrix.variant }}
+
+      - name: Run Java tests
+        working-directory: bindings/java
+        run: mvn -B test -Dgempba.variant=${{ matrix.mvn_variant }}
+
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-ubuntu-${{ matrix.variant }}
+          path: bindings/java/target/surefire-reports/TEST-*.xml
+          if-no-files-found: warn
+
+  publish-test-results:
+    needs: [ build-ubuntu ]
+    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
+    if: ${{ !cancelled() }}
+
+    steps:
+      - name: Download all test results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: test-results-*
+          merge-multiple: true
+
+      - name: Publish JUnit report
+        uses: mikepenz/action-junit-report@v4
+        with:
+          report_paths: 'TEST-*.xml'
+          check_name: 'Java JNI Test Results'
+          fail_on_failure: true
+          detailed_summary: true
+          include_passed: true
