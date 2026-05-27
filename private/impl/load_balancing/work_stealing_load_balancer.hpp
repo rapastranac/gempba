@@ -100,6 +100,7 @@ namespace gempba {
 
         void set_thread_pool_size(const unsigned p_size) override {
             m_thread_pool.reset(p_size);
+            m_thread_pool.submit_task([] {}).wait();
             spdlog::debug("thread pool size: {}", m_thread_pool.get_thread_count());
         }
 
