@@ -54,7 +54,7 @@ native_lib="$native_dir/gempba_jni.dylib"
 rm -f "$native_lib"
 
 # Apple clang doesn't ship with OpenMP support; libomp comes from
-# Homebrew.  Mirrors the OpenMP override block in c-cpp-macos.yml so
+# Homebrew.  Mirrors the OpenMP override block in ci-cpp-macos.yml so
 # the JNI shared library finds the same omp runtime gempba's own tests
 # build against.
 cmake -B "$build_dir" -S "$WORKSPACE" \

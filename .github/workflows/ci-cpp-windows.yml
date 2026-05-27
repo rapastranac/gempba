@@ -1,4 +1,4 @@
-name: C/C++ CI (macOS 26)
+name: C/C++ CI (Windows 2025)
 
 on:
   push:
@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ${{ fromJSON(vars.RUNNER_MACOS || '["macos-26"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_WINDOWS || '["windows-2025"]') }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -25,13 +25,6 @@ jobs:
         multiprocessing: ['ON', 'OFF']
 
     steps:
-      - name: Clean stale .git locks from prior interrupted runs
-        shell: bash
-        run: |
-          if [ -d "$GITHUB_WORKSPACE/.git" ]; then
-            find "$GITHUB_WORKSPACE/.git" -name '*.lock' -delete 2>/dev/null || true
-          fi
-
       # 1️⃣ Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -39,61 +32,45 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ github.ref }}
 
-      # 2️⃣ Bootstrap Homebrew on PATH + install brew packages
+      # 2️⃣ Set up MSYS2 + MS-MPI runtime (cache: false, release: false preserves
+      # the preinstalled C:\msys64 on Server 2025 self-hosted runners — see #159).
       - name: Setup Dependencies
-        uses: ./.github/actions/setup-macos-deps
+        uses: ./.github/actions/setup-windows-deps
         with:
           multiprocessing: ${{ matrix.multiprocessing }}
           tests: ${{ matrix.multiprocessing == 'ON' && 'true' || 'false' }}
+          cache: 'false'
+          release: 'false'
 
       # 3️⃣ Echo versions of installed dependencies
       - name: Echo Dependencies Version
+        shell: msys2 {0}
         run: |
-          echo "g++: $(g++ --version | head -1)"
+          echo "g++: $(g++ --version | head -1 | awk '{print $NF}')"
           echo "cmake: $(cmake --version | head -1 | awk '{print $3}')"
           echo "make: $(make --version | head -1 | awk '{print $3}')"
-          echo "boost: $(brew info boost --json | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["versions"]["stable"])')"
-          echo "hwloc: $(brew info hwloc --json | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["versions"]["stable"])')"
+          echo "mingw-w64-x86_64-boost: $(pacman -Qi mingw-w64-x86_64-boost | grep Version | awk '{print $3}')"
+          echo "mingw-w64-x86_64-hwloc: $(pacman -Qi mingw-w64-x86_64-hwloc | grep Version | awk '{print $3}')"
           if [ "${{ matrix.multiprocessing }}" = "ON" ]; then
-            echo "open-mpi: $(mpicc --showme:version 2>/dev/null || brew info open-mpi --json | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["versions"]["stable"])')"
-            echo "googletest: $(brew info googletest --json | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["versions"]["stable"])')"
+            echo "mingw-w64-x86_64-msmpi: $(pacman -Qi mingw-w64-x86_64-msmpi | grep Version | awk '{print $3}')"
+            echo "mingw-w64-x86_64-gtest: $(pacman -Qi mingw-w64-x86_64-gtest | grep Version | awk '{print $3}')"
           fi
 
-      # 4️⃣ Set up ccache (per-matrix-leg key so MP=ON and MP=OFF don't poison
-      # each other; the MP=ON leg's cache is consumed by the test job below)
-      - name: Setup ccache
-        uses: hendrikmuhs/ccache-action@v1
-        with:
-          key: build-macos-mp${{ matrix.multiprocessing }}
-
-      # 5️⃣ Build the project (no artifact upload — the test job re-runs cmake
-      # configure + cmake --build locally with the same ccache key, so every
-      # CMake-generated path is resolved on the test runner)
-      - name: Build the project
+      # 4️⃣ Build the project (no artifact upload — the test job rebuilds
+      # locally so every CMake-generated path is resolved on the test runner;
+      # ccache wiring for MSYS2+mingw is a separate follow-up)
+      - name: Build
+        shell: msys2 {0}
         run: |
-          cmake -S . -B build \
-            -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }} \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -I$(brew --prefix libomp)/include" \
-            -DOpenMP_CXX_LIB_NAMES="omp" \
-            -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib \
-            -DCMAKE_PREFIX_PATH=$(brew --prefix boost)
-          cmake --build build --parallel $(sysctl -n hw.logicalcpu)
+          cmake -G "MSYS Makefiles" -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }} -S . -B build
+          cmake --build build --parallel $(nproc)
 
   test:
     needs: build
-    runs-on: ${{ fromJSON(vars.RUNNER_MACOS || '["macos-26"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_WINDOWS || '["windows-2025"]') }}
     timeout-minutes: 30
 
     steps:
-      - name: Clean stale .git locks from prior interrupted runs
-        shell: bash
-        run: |
-          if [ -d "$GITHUB_WORKSPACE/.git" ]; then
-            find "$GITHUB_WORKSPACE/.git" -name '*.lock' -delete 2>/dev/null || true
-          fi
-
       # 1️⃣ Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -101,43 +78,31 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ github.ref }}
 
-      # 2️⃣ Bootstrap Homebrew on PATH + install brew packages
+      # 2️⃣ Set up MSYS2 + MS-MPI runtime (same set as build for ABI parity;
+      # cache: false, release: false preserves the preinstalled C:\msys64 — see #159).
       - name: Setup Dependencies
-        uses: ./.github/actions/setup-macos-deps
+        uses: ./.github/actions/setup-windows-deps
         with:
           multiprocessing: 'ON'
           tests: 'true'
+          cache: 'false'
+          release: 'false'
 
-      # 3️⃣ Restore the MP=ON cache that the build job populated. save: false
-      # because this job doesn't add anything new — the build job is the
-      # canonical writer. Tests reference gempba::mp::* directly so we never
-      # exercise the MP=OFF leg here.
-      - name: Setup ccache
-        uses: hendrikmuhs/ccache-action@v1
-        with:
-          key: build-macos-mpON
-          save: false
-
-      # 4️⃣ Configure + build locally with MP=ON. Same flags as the build job
-      # so ccache hashes match; cache hits make this near-instant. cmake-
-      # generated paths (CTestTestfile.cmake, gtest_discover_tests output)
-      # point at this runner's workspace.
-      - name: Configure + cached build
+      # 3️⃣ Build locally with MP=ON so cmake-generated paths point at this
+      # runner's workspace. No ccache on Windows yet (mingw+msys2 PATH plumbing
+      # is a separate follow-up), so this is a full compile every time. Tests
+      # reference gempba::mp::* directly so we never exercise MP=OFF here.
+      - name: Configure + build
+        shell: msys2 {0}
         run: |
-          cmake -S . -B build \
-            -DGEMPBA_MULTIPROCESSING=ON \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -I$(brew --prefix libomp)/include" \
-            -DOpenMP_CXX_LIB_NAMES="omp" \
-            -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib \
-            -DCMAKE_PREFIX_PATH=$(brew --prefix boost)
-          cmake --build build --parallel $(sysctl -n hw.logicalcpu)
+          cmake -G "MSYS Makefiles" -DGEMPBA_MULTIPROCESSING=ON -S . -B build
+          cmake --build build --parallel $(nproc)
 
-      # 5️⃣ Run tests with JUnit XML output
+      # 4️⃣ Run tests with JUnit XML output
       - name: Run tests with retry for flaky tests
+        shell: msys2 {0}
         run: |
-          cd ${{ github.workspace }}/build
+          cd "$GITHUB_WORKSPACE/build"
 
           echo "🟢 Non-flaky tests: single run, must pass"
           ctest --output-on-failure --output-junit test_results_main.xml -E "FLAKY_"
@@ -145,19 +110,19 @@ jobs:
           echo "🟡 Flaky tests: up to 3 attempts each"
           ctest --repeat until-pass:3 --output-on-failure --output-junit test_results_flaky.xml -R "FLAKY_" --no-tests=ignore
 
-      # 6️⃣ Upload test results as artifacts
+      # 5️⃣ Upload test results as artifacts
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: test-results-macos
+          name: test-results-windows
           path: ${{ github.workspace }}/build/test_results_*.xml
           retention-days: 30
 
   # Build the gempba-examples sister repo against an installed gempba built
-  # from THIS branch. See c-cpp-ubuntu.yml for rationale.
+  # from THIS branch. See ci-cpp-ubuntu.yml for rationale.
   build-examples-from-install:
-    runs-on: ${{ fromJSON(vars.RUNNER_MACOS || '["macos-26"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_WINDOWS || '["windows-2025"]') }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -165,17 +130,9 @@ jobs:
         multiprocessing: ['ON', 'OFF']
     env:
       GEMPBA_EXAMPLES_OWNER: ${{ vars.GEMPBA_EXAMPLES_OWNER || github.repository_owner }}
-      GEMPBA_INSTALL_PREFIX: ${{ github.workspace }}/.gempba-install
       GEMPBA_CROSS_REPO_TOKEN: ${{ secrets.GEMPBA_CROSS_REPO_TOKEN || '' }}
 
     steps:
-      - name: Clean stale .git locks from prior interrupted runs
-        shell: bash
-        run: |
-          if [ -d "$GITHUB_WORKSPACE/.git" ]; then
-            find "$GITHUB_WORKSPACE/.git" -name '*.lock' -delete 2>/dev/null || true
-          fi
-
       # 1️⃣ Checkout gempba (this PR's commit)
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -183,30 +140,35 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ github.ref }}
 
-      # 2️⃣ Install dependencies (mirror build job's set)
+      # 2️⃣ Set up MSYS2 + MS-MPI runtime; `extra: git` so the cross-repo clone
+      # step has git available inside the msys2 shell.
       - name: Setup Dependencies
-        uses: ./.github/actions/setup-macos-deps
+        uses: ./.github/actions/setup-windows-deps
         with:
           multiprocessing: ${{ matrix.multiprocessing }}
           tests: 'false'
+          extra: 'git'
+          cache: 'false'
+          release: 'false'
 
       # 3️⃣ Install gempba mt (the base package) into the prefix. The mpi
       #    topping package depends on the mt base for headers and the
       #    gempbaConfig.cmake dispatcher, so the mt install always happens
       #    first — even on the MP=ON matrix leg.
       - name: Install gempba (mt base)
+        shell: msys2 {0}
         run: |
-          cmake -S . -B "$RUNNER_TEMP/gempba-build-mt" \
+          WS=$(cygpath -u "$GITHUB_WORKSPACE")
+          GEMPBA_INSTALL_PREFIX="$WS/.gempba-install"
+          echo "GEMPBA_INSTALL_PREFIX=$GEMPBA_INSTALL_PREFIX" >> "$GITHUB_ENV"
+          cmake -G "MSYS Makefiles" \
+            -S . -B "$RUNNER_TEMP/gempba-build-mt" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="$GEMPBA_INSTALL_PREFIX" \
             -DGEMPBA_BUILD_TESTS=OFF \
             -DGEMPBA_DEV_MODE=OFF \
-            -DGEMPBA_MULTIPROCESSING=OFF \
-            -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -I$(brew --prefix libomp)/include" \
-            -DOpenMP_CXX_LIB_NAMES="omp" \
-            -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib \
-            -DCMAKE_PREFIX_PATH=$(brew --prefix boost)
-          cmake --build "$RUNNER_TEMP/gempba-build-mt" --parallel $(sysctl -n hw.logicalcpu)
+            -DGEMPBA_MULTIPROCESSING=OFF
+          cmake --build "$RUNNER_TEMP/gempba-build-mt" --parallel $(nproc)
           cmake --install "$RUNNER_TEMP/gempba-build-mt"
 
       # 3️⃣bis Layer the mpi topping on top of the mt base when the matrix
@@ -214,23 +176,22 @@ jobs:
       #       so find_package(gempba COMPONENTS mpi) resolves.
       - name: Install gempba (mpi topping)
         if: matrix.multiprocessing == 'ON'
+        shell: msys2 {0}
         run: |
-          cmake -S . -B "$RUNNER_TEMP/gempba-build-mpi" \
+          cmake -G "MSYS Makefiles" \
+            -S . -B "$RUNNER_TEMP/gempba-build-mpi" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="$GEMPBA_INSTALL_PREFIX" \
             -DGEMPBA_BUILD_TESTS=OFF \
             -DGEMPBA_DEV_MODE=OFF \
-            -DGEMPBA_MULTIPROCESSING=ON \
-            -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -I$(brew --prefix libomp)/include" \
-            -DOpenMP_CXX_LIB_NAMES="omp" \
-            -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib \
-            -DCMAKE_PREFIX_PATH=$(brew --prefix boost)
-          cmake --build "$RUNNER_TEMP/gempba-build-mpi" --parallel $(sysctl -n hw.logicalcpu)
+            -DGEMPBA_MULTIPROCESSING=ON
+          cmake --build "$RUNNER_TEMP/gempba-build-mpi" --parallel $(nproc)
           cmake --install "$RUNNER_TEMP/gempba-build-mpi"
 
       # 4️⃣ Resolve sister-repo branch (same-name, fall back to main)
       - name: Resolve gempba-examples ref
         id: examples_ref
+        shell: msys2 {0}
         run: |
           # Override any extraheader/credential helper set by actions/checkout
           # (v6 writes the GITHUB_TOKEN auth header to a separate config file
@@ -260,6 +221,7 @@ jobs:
 
       # 5️⃣ Clone gempba-examples and build it against the installed gempba
       - name: Build gempba-examples
+        shell: msys2 {0}
         run: |
           if [ -n "$GEMPBA_CROSS_REPO_TOKEN" ]; then
             EX_URL="https://x-access-token:${GEMPBA_CROSS_REPO_TOKEN}@github.com/${GEMPBA_EXAMPLES_OWNER}/gempba-examples.git"
@@ -268,14 +230,16 @@ jobs:
           fi
           git -c http."https://github.com/".extraheader= -c credential.helper= clone --depth 1 --branch "${{ steps.examples_ref.outputs.ref }}" \
             "$EX_URL" "$RUNNER_TEMP/gempba-examples-src"
-          cmake -S "$RUNNER_TEMP/gempba-examples-src" -B "$RUNNER_TEMP/gempba-examples-build" \
+          cmake -G "MSYS Makefiles" \
+            -S "$RUNNER_TEMP/gempba-examples-src" -B "$RUNNER_TEMP/gempba-examples-build" \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$GEMPBA_INSTALL_PREFIX;$(brew --prefix boost)" \
-            -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }} \
-            -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -I$(brew --prefix libomp)/include" \
-            -DOpenMP_CXX_LIB_NAMES="omp" \
-            -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib
-          cmake --build "$RUNNER_TEMP/gempba-examples-build" --parallel $(sysctl -n hw.logicalcpu)
+            -DCMAKE_PREFIX_PATH="$GEMPBA_INSTALL_PREFIX" \
+            -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }}
+          cmake --build "$RUNNER_TEMP/gempba-examples-build" --parallel $(nproc)
+
+  build-msys2:
+    needs: build
+    uses: ./.github/workflows/_build-msys2.yml
 
   publish-test-results:
     needs: test
@@ -287,14 +251,14 @@ jobs:
       - name: Download test results
         uses: actions/download-artifact@v8
         with:
-          name: test-results-macos
+          name: test-results-windows
 
       # Publish test results
       - name: Publish Test Report
         uses: mikepenz/action-junit-report@v4
         with:
           report_paths: 'test_results_*.xml'
-          check_name: 'macOS Test Results'
+          check_name: 'Windows Test Results'
           fail_on_failure: true
           detailed_summary: true
           include_passed: true
