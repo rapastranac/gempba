@@ -174,6 +174,18 @@ jobs:
           sed -i -E "s/^sha256sums=.*/sha256sums=('SKIP')/" "$PKGBUILD"
           grep -nE "^(pkgver|sha256sums)=" "$PKGBUILD"
 
+      - name: Bump bindings/java/pom.xml project <version>
+        run: |
+          set -euo pipefail
+          POM=bindings/java/pom.xml
+          sed -i -E "0,/<version>[0-9]+\.[0-9]+\.[0-9]+<\/version>/ s|<version>[0-9]+\.[0-9]+\.[0-9]+</version>|<version>${VERSION}</version>|" "$POM"
+          if ! grep -qE "<version>${VERSION//./\\.}</version>" "$POM"; then
+            echo "::error::bindings/java/pom.xml <version> bump did not take effect"
+            grep -nE "<version>" "$POM" | head -5 || true
+            exit 1
+          fi
+          grep -nE "<version>${VERSION//./\\.}</version>" "$POM" | head -1
+
       - name: Generate release-notes draft
         run: |
           set -euo pipefail
@@ -216,15 +228,16 @@ jobs:
       - name: Commit
         run: |
           set -euo pipefail
-          git add CMakeLists.txt packaging/msys2/PKGBUILD docs/releases/
+          git add CMakeLists.txt packaging/msys2/PKGBUILD bindings/java/pom.xml docs/releases/
           if git diff --cached --quiet; then
             echo "::error::nothing staged — the bumps and notes generation produced no diff"
             exit 1
           fi
-          MSG=$(printf '%s\n\n%s\n%s\n%s' \
+          MSG=$(printf '%s\n\n%s\n%s\n%s\n%s' \
             "Prep release ${TAG}" \
             "- Bump CMakeLists.txt project VERSION + packaging/msys2/PKGBUILD pkgver to ${VERSION}" \
-            "- packaging/msys2/PKGBUILD sha256sums set to 'SKIP' (real sha lands via post-tag-pkgbuild workflow)" \
+            "- Bump bindings/java/pom.xml project <version> to ${VERSION} so the Maven coordinate published by release-java.yml matches the tag" \
+            "- packaging/msys2/PKGBUILD sha256sums set to 'SKIP' (real sha lands via release-arch-pkgbuild workflow)" \
             "- Add docs/releases/release-notes-v${VERSION}.md draft (curate before merging)")
           git commit -m "$MSG"
 
