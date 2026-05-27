@@ -130,26 +130,14 @@ jobs:
       # Run tests inside MSYS2 too. The JNI .dll is linked against mingw-w64's
       # libstdc++/libgcc/libwinpthread, which only sit on PATH inside MSYS2 —
       # launching `mvn test` from cmd would load the .dll and fail to resolve
-      # those imports. Reuse the same PowerShell-registry trick as the build
-      # script to find `mvn` from the minimal MSYS2 PATH.
+      # those imports.  scripts/_msys2_find_mvn.sh is the same helper
+      # build_jar_windows.sh sources, so dev + CI find Maven the same way.
       - name: Run Java tests
         shell: msys2 {0}
         working-directory: bindings/java
         run: |
-          if ! command -v mvn >/dev/null; then
-            win_path=$(powershell.exe -NoProfile -Command \
-              "[Environment]::GetEnvironmentVariable('PATH','Machine') + ';' + [Environment]::GetEnvironmentVariable('PATH','User')" \
-              2>/dev/null | tr -d '\r')
-            IFS=';' read -ra entries <<< "$win_path"
-            for e in "${entries[@]}"; do
-              [[ -z "$e" ]] && continue
-              unix_e=$(cygpath -u "$e" 2>/dev/null) || continue
-              if [[ -f "$unix_e/mvn.cmd" ]]; then
-                export PATH="$unix_e:$PATH"
-                break
-              fi
-            done
-          fi
+          source "$GITHUB_WORKSPACE/scripts/_msys2_find_mvn.sh"
+          setup_mvn_msys2_path
           mvn -B test -Dgempba.variant=${{ matrix.mvn_variant }}
 
       - name: Upload test results
