@@ -30,7 +30,7 @@ on:
     branches: [ "main" ]
     paths:
       - 'packaging/homebrew/**'
-      - '.github/workflows/update-homebrew-tap.yml'
+      - '.github/workflows/release-homebrew-tap.yml'
   workflow_dispatch:
     inputs:
       tag:
