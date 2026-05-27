@@ -52,11 +52,7 @@ jobs:
       # 3️⃣ Pin the JDK so `mvn` finds it even on minimally-provisioned runners,
       # and cache ~/.m2 across runs of this workflow.
       - name: Setup JDK 25
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '25'
-          cache: maven
+        uses: ./.github/actions/setup-java-jdk
 
       - name: Echo versions
         run: |
@@ -116,11 +112,7 @@ jobs:
           release: 'false'
 
       - name: Setup JDK 25
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '25'
-          cache: maven
+        uses: ./.github/actions/setup-java-jdk
 
       - name: Echo versions
         shell: msys2 {0}
@@ -209,11 +201,7 @@ jobs:
           tests: 'false'
 
       - name: Setup JDK 25
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '25'
-          cache: maven
+        uses: ./.github/actions/setup-java-jdk
 
       - name: Echo versions
         run: |
