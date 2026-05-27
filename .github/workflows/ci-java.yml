@@ -243,6 +243,60 @@ jobs:
           path: bindings/java/target/surefire-reports/TEST-*.xml
           if-no-files-found: warn
 
+  # Merge each OS leg's per-OS variant JAR into one fat JAR per variant
+  # containing every platform's native binary.  NativeLoader picks the right
+  # natives/<os>-<arch>/ at runtime, so one merged JAR per variant is the
+  # canonical artifact downstream Maven publish / GitHub Release jobs consume.
+  assemble-multiplatform-jar:
+    needs: [ build-ubuntu, build-windows, build-macos ]
+    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.ref }}
+
+      # `jar` ships with the JDK; the composite pins the same Temurin version
+      # the build legs already used.
+      - name: Setup JDK 25
+        uses: ./.github/actions/setup-java-jdk
+
+      - name: Download all per-OS variant JARs
+        uses: actions/download-artifact@v8
+        with:
+          pattern: jar-*
+          path: per-os/
+
+      - name: Merge natives subtrees per variant
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(grep -m1 '<version>' bindings/java/pom.xml | sed -E 's/[[:space:]]*<version>([^<]+)<\/version>.*/\1/')
+          mkdir -p merged
+          for CLASSIFIER in mt mp-mpi; do
+            JAR="gempba-${VERSION}-${CLASSIFIER}.jar"
+            cp "per-os/jar-ubuntu-${CLASSIFIER}/${JAR}" "merged/${JAR}"
+            for OS in windows macos; do
+              TMP=$(mktemp -d)
+              (cd "$TMP" && jar xf "$GITHUB_WORKSPACE/per-os/jar-${OS}-${CLASSIFIER}/${JAR}" natives)
+              (cd "$TMP" && jar uf "$GITHUB_WORKSPACE/merged/${JAR}" natives)
+              rm -rf "$TMP"
+            done
+            echo "--- merged ${JAR} natives/ ---"
+            jar tf "merged/${JAR}" | grep '^natives/' | sort
+          done
+
+      - name: Upload merged multi-platform JARs
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: gempba-multiplatform-jars
+          path: merged/gempba-*-*.jar
+          if-no-files-found: error
+
   publish-test-results:
     needs: [ build-ubuntu, build-windows, build-macos ]
     runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
