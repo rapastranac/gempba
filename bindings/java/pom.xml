@@ -1,0 +1,459 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>io.gempba</groupId>
+    <artifactId>gempba</artifactId>
+    <version>4.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>gempba</name>
+    <description>Java bindings for the GemPBA parallel branch-and-bound library</description>
+    <url>https://github.com/rapastranac/gempba</url>
+
+    <licenses>
+        <license>
+            <name>MIT License</name>
+            <url>https://opensource.org/licenses/MIT</url>
+        </license>
+    </licenses>
+
+    <properties>
+        <maven.compiler.source>25</maven.compiler.source>
+        <maven.compiler.target>25</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <junit.platform.version>1.10.2</junit.platform.version>
+        <!--
+            Default variant.  Multithreading is the zero-setup default — consumers
+            can `mvn install` and the JAR loads without any external runtime.
+            Multiprocessing requires an IPC backend installed on the host (today:
+            MS-MPI / OpenMPI / MPICH), so it stays opt-in via -Dgempba.variant=multiprocessing.
+            The variant gates the variant-specific source roots (java-multithreading
+            / java-multiprocessing) and surfaces in the JAR's finalName + manifest.
+        -->
+        <gempba.variant>multithreading</gempba.variant>
+
+        <!--
+            Multiprocessing IPC backend.  Only consulted when gempba.variant=multiprocessing.
+            Today's only backend is MPI (linked through MS-MPI on Windows, OpenMPI / MPICH
+            on Linux); the property exists so future backends (UPC++, gRPC, …) can slot
+            in via -Dgempba.ipc.backend=<name> and produce JARs named gempba-...-mp-<name>.jar
+            without renaming the existing mp-mpi artifact.
+        -->
+        <gempba.ipc.backend>mpi</gempba.ipc.backend>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.10.2</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+                <configuration>
+                    <!-- Required on Java 17+ to load the JNI native library without a restricted-method warning becoming an error. -->
+                    <argLine>--enable-native-access=ALL-UNNAMED</argLine>
+                </configuration>
+            </plugin>
+            <!--
+                Variant source-root wiring.  The shared Java sources live in
+                src/main/java; the variant-specific GemPBA (and, for MP, the
+                Scheduler / SerialRunnable family) live under
+                src/main/java-${gempba.variant}.  Mirrors the C++ pattern in
+                gempba.hpp where the multithreading / multiprocessing
+                namespaces are #if'd in or out of the translation unit
+                depending on GEMPBA_MULTIPROCESSING — only one is compiled
+                per consumer build.
+            -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.6.0</version>
+                <executions>
+                    <execution>
+                        <id>add-variant-source</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.basedir}/src/main/java-${gempba.variant}</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>add-variant-test-source</id>
+                        <phase>generate-test-sources</phase>
+                        <goals>
+                            <goal>add-test-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.basedir}/src/test/java-${gempba.variant}</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <!--
+            OS-activated profiles set gempba.jni.classifier automatically.
+            Override with -Dgempba.jni.classifier=<value> when cross-compiling.
+        -->
+        <profile>
+            <id>os-linux-x86_64</id>
+            <activation>
+                <os>
+                    <name>Linux</name>
+                    <arch>amd64</arch>
+                </os>
+            </activation>
+            <properties>
+                <gempba.jni.classifier>linux-x86_64</gempba.jni.classifier>
+            </properties>
+        </profile>
+        <profile>
+            <id>os-linux-aarch64</id>
+            <activation>
+                <os>
+                    <name>Linux</name>
+                    <arch>aarch64</arch>
+                </os>
+            </activation>
+            <properties>
+                <gempba.jni.classifier>linux-aarch64</gempba.jni.classifier>
+            </properties>
+        </profile>
+        <profile>
+            <id>os-windows</id>
+            <activation>
+                <os>
+                    <family>windows</family>
+                </os>
+            </activation>
+            <properties>
+                <gempba.jni.classifier>win-x86_64</gempba.jni.classifier>
+            </properties>
+        </profile>
+        <profile>
+            <id>os-osx-x86_64</id>
+            <activation>
+                <os>
+                    <name>Mac OS X</name>
+                    <arch>x86_64</arch>
+                </os>
+            </activation>
+            <properties>
+                <gempba.jni.classifier>osx-x86_64</gempba.jni.classifier>
+            </properties>
+        </profile>
+        <profile>
+            <id>os-osx-aarch64</id>
+            <activation>
+                <os>
+                    <name>Mac OS X</name>
+                    <arch>aarch64</arch>
+                </os>
+            </activation>
+            <properties>
+                <gempba.jni.classifier>osx-aarch64</gempba.jni.classifier>
+            </properties>
+        </profile>
+
+        <!--
+            Classifier-derivation profiles.  Map gempba.variant (+ gempba.ipc.backend for
+            multiprocessing) to ${gempba.classifier}:
+
+              gempba.variant=multithreading                       → mt
+              gempba.variant=multiprocessing, ipc.backend=mpi     → mp-mpi
+              gempba.variant=multiprocessing, ipc.backend=<other> → mp-<other>
+
+            Consumers MUST specify a classifier in their dependency block — there is no
+            unclassified default.  This mirrors the convention used by every other
+            JVM-native-binding library (JBLAS, OpenCV-Java, native-Netty, LWJGL, JavaCPP,
+            …) and makes the runtime native dependency explicit at compile time.
+        -->
+        <profile>
+            <id>classifier-mt</id>
+            <activation>
+                <property>
+                    <name>gempba.variant</name>
+                    <value>multithreading</value>
+                </property>
+            </activation>
+            <properties>
+                <gempba.classifier>mt</gempba.classifier>
+            </properties>
+        </profile>
+
+        <profile>
+            <id>classifier-mp</id>
+            <activation>
+                <property>
+                    <name>gempba.variant</name>
+                    <value>multiprocessing</value>
+                </property>
+            </activation>
+            <properties>
+                <gempba.classifier>mp-${gempba.ipc.backend}</gempba.classifier>
+            </properties>
+        </profile>
+
+        <!--
+            Convenience IDE / dev profile: flips gempba.variant to multiprocessing so
+            the build-helper's add-source picks src/main/java-multiprocessing as the
+            active variant source root.  Equivalent to `-Dgempba.variant=multiprocessing`
+            on the command line, but toggleable in IntelliJ's Maven tool window so the
+            IDE indexes the right files when you're working on MP-only types
+            (Scheduler, SerialRunnable, MP-flavoured GemPBA).
+        -->
+        <profile>
+            <id>variant-mp</id>
+            <properties>
+                <gempba.variant>multiprocessing</gempba.variant>
+            </properties>
+        </profile>
+
+        <!--
+            Variant JAR profile.  Activates when `-Dgempba.variant=...` is set
+            (multithreading | multiprocessing).
+
+            What it does:
+              - Renames the produced JAR file to gempba-${version}-${classifier}.jar
+                (e.g. gempba-4.0.0-mt.jar or gempba-4.0.0-mp-mpi.jar) via <finalName>,
+                so the file in target/ self-identifies.
+              - Adds a Gempba-Variant header to META-INF/MANIFEST.MF so consumers can
+                inspect a JAR (`unzip -p ... META-INF/MANIFEST.MF`) and know which
+                native flavour it carries.
+              - Attaches the JAR under <classifier>${gempba.classifier}</classifier> via
+                build-helper-maven-plugin so it installs to the canonical classifier'd
+                path in the local m2 repo (gempba-<v>-<classifier>.jar).
+        -->
+        <profile>
+            <id>variant-jar</id>
+            <activation>
+                <property>
+                    <name>gempba.variant</name>
+                </property>
+            </activation>
+            <build>
+                <finalName>${project.artifactId}-${project.version}-${gempba.classifier}</finalName>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-jar-plugin</artifactId>
+                        <version>3.4.1</version>
+                        <configuration>
+                            <archive>
+                                <manifestEntries>
+                                    <Gempba-Variant>${gempba.classifier}</Gempba-Variant>
+                                </manifestEntries>
+                            </archive>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>build-helper-maven-plugin</artifactId>
+                        <version>3.6.0</version>
+                        <executions>
+                            <execution>
+                                <id>attach-variant-jar</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>attach-artifact</goal>
+                                </goals>
+                                <configuration>
+                                    <artifacts>
+                                        <artifact>
+                                            <file>${project.build.directory}/${project.build.finalName}.jar</file>
+                                            <type>jar</type>
+                                            <classifier>${gempba.classifier}</classifier>
+                                        </artifact>
+                                    </artifacts>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!--
+            Distributed scheduler test profile.
+
+            Launches SchedulerNativeTest via the IPC process launcher so every
+            JVM participates as a full peer.  The launcher is currently mpirun
+            (OpenMPI / MPICH / MS-MPI); swap ${gempba.launcher} for upcxx-run
+            or any future backend without touching the test code.
+
+            Usage:
+              mvn test -Pdistributed                              # default: mpirun -n 2
+              mvn test -Pdistributed -Dgempba.np=4               # override process count
+              mvn test -Pdistributed -Dgempba.launcher=mpiexec   # MS-MPI on Windows
+              mvn test -Pdistributed -Dgempba.launcher=upcxx-run # UPC++ backend
+        -->
+        <profile>
+            <id>distributed</id>
+            <properties>
+                <gempba.np>2</gempba.np>
+                <gempba.launcher>mpirun</gempba.launcher>
+            </properties>
+            <!--
+                junit-platform-console-standalone provides ConsoleLauncher, the
+                entry point used by the worker JVMs.  It is a fat JAR so it is
+                scoped to this profile only; normal surefire runs do not see it.
+            -->
+            <dependencies>
+                <dependency>
+                    <groupId>org.junit.platform</groupId>
+                    <artifactId>junit-platform-console-standalone</artifactId>
+                    <version>${junit.platform.version}</version>
+                    <scope>test</scope>
+                </dependency>
+            </dependencies>
+            <build>
+                <plugins>
+                    <!-- Disable the default surefire run so tests don't execute twice -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <version>3.2.5</version>
+                        <configuration>
+                            <skip>true</skip>
+                        </configuration>
+                    </plugin>
+                    <!-- Collect all test-scope JARs into target/dependency/ for the worker classpath -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <version>3.6.1</version>
+                        <executions>
+                            <execution>
+                                <id>copy-test-deps</id>
+                                <phase>test-compile</phase>
+                                <goals>
+                                    <goal>copy-dependencies</goal>
+                                </goals>
+                                <configuration>
+                                    <includeScope>test</includeScope>
+                                    <outputDirectory>${project.build.directory}/dependency</outputDirectory>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <!-- Re-run the scheduler tests through the IPC launcher -->
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.2.0</version>
+                        <executions>
+                            <execution>
+                                <id>distributed-test</id>
+                                <phase>test</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>${gempba.launcher}</executable>
+                                    <arguments>
+                                        <argument>-n</argument>
+                                        <argument>${gempba.np}</argument>
+                                        <argument>java</argument>
+                                        <argument>--enable-native-access=ALL-UNNAMED</argument>
+                                        <argument>-Dgempba.distributed=true</argument>
+                                        <argument>-jar</argument>
+                                        <argument>${project.build.directory}/dependency/junit-platform-console-standalone-${junit.platform.version}.jar</argument>
+                                        <argument>execute</argument>
+                                        <argument>--classpath</argument>
+                                        <argument>${project.build.outputDirectory}</argument>
+                                        <argument>--classpath</argument>
+                                        <argument>${project.build.testOutputDirectory}</argument>
+                                        <argument>--select-class=io.gempba.SchedulerNativeTest</argument>
+                                        <argument>--fail-if-no-tests</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!--
+            Build the native JNI library and bundle it into the JAR.
+
+            Usage:
+              mvn package -Pbuild-native                           # auto-detect OS
+              mvn package -Pbuild-native -Dgempba.jni.classifier=win-x86_64
+
+            Runs cmake configure + cmake - -build against the project root so the
+            .dll/.so ends up in src/main/resources/natives/<classifier>/ where
+            Maven picks it up automatically during the package phase.
+        -->
+        <profile>
+            <id>build-native</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.2.0</version>
+                        <executions>
+                            <execution>
+                                <id>cmake-configure</id>
+                                <phase>generate-resources</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>cmake</executable>
+                                    <workingDirectory>${project.basedir}/..</workingDirectory>
+                                    <arguments>
+                                        <argument>-B</argument>
+                                        <argument>.build</argument>
+                                        <argument>-DGEMPBA_BUILD_JAVA_BINDING=ON</argument>
+                                        <argument>-DGEMPBA_JNI_CLASSIFIER=${gempba.jni.classifier}</argument>
+                                        <argument>-DGEMPBA_BUILD_TESTS=OFF</argument>
+                                        <argument>-DFETCHCONTENT_FULLY_DISCONNECTED=ON</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>cmake-build</id>
+                                <phase>generate-resources</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>cmake</executable>
+                                    <workingDirectory>${project.basedir}/..</workingDirectory>
+                                    <arguments>
+                                        <argument>--build</argument>
+                                        <argument>.build</argument>
+                                        <argument>--target</argument>
+                                        <argument>gempba_jni</argument>
+                                        <argument>-j</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>

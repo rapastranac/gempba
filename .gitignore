@@ -27,6 +27,9 @@ cmake-build-*/
 .claude/
 global.cbp
 
+# ─── Maven ───────────────────────────────────────────────────────────────────
+bindings/java/target/
+
 # ─── Dependencies ────────────────────────────────────────────────────────────
 external/
 !external/CMakeLists.txt
