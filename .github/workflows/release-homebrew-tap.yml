@@ -58,7 +58,7 @@ jobs:
     steps:
       # 1️⃣ Checkout gempba (to read the formula template)
       - name: Checkout gempba
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.ref }}
 
@@ -160,7 +160,7 @@ jobs:
       # 5️⃣a PR → store both rendered formulas as a single workflow artifact
       - name: Upload formulas as workflow artifact (PR)
         if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: homebrew-formulas
           path: out/Formula/
@@ -169,7 +169,7 @@ jobs:
       # 5️⃣b Tag/dispatch → checkout the tap and push both rendered formulas
       - name: Checkout homebrew tap
         if: github.event_name != 'pull_request'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ env.TAP_REPO }}
           # PAT with contents:write on the tap repo; each owner that publishes
