@@ -48,28 +48,13 @@ if [[ -z "${JAVA_HOME:-}" ]]; then
     fi
 fi
 
-if ! command -v mvn >/dev/null; then
-    win_path=$(powershell.exe -NoProfile -Command \
-        "[Environment]::GetEnvironmentVariable('PATH','Machine') + ';' + [Environment]::GetEnvironmentVariable('PATH','User')" \
-        2>/dev/null | tr -d '\r')
-    mvn_dir=""
-    IFS=';' read -ra entries <<< "$win_path"
-    for e in "${entries[@]}"; do
-        [[ -z "$e" ]] && continue
-        unix_e=$(cygpath -u "$e" 2>/dev/null) || continue
-        if [[ -f "$unix_e/mvn.cmd" ]]; then
-            mvn_dir=$unix_e
-            break
-        fi
-    done
-    if [[ -n "$mvn_dir" ]]; then
-        export PATH="$mvn_dir:$PATH"
-    else
-        echo "Apache Maven not found in Windows PATH (Machine or User)." >&2
-        echo "Install Maven from https://maven.apache.org/download.cgi and" >&2
-        echo "add its bin/ to Windows PATH (no MSYS2 changes needed)." >&2
-        exit 2
-    fi
+# shellcheck source=_msys2_find_mvn.sh
+source "$(dirname "$0")/_msys2_find_mvn.sh"
+if ! setup_mvn_msys2_path; then
+    echo "Apache Maven not found in Windows PATH (Machine or User)." >&2
+    echo "Install Maven from https://maven.apache.org/download.cgi and" >&2
+    echo "add its bin/ to Windows PATH (no MSYS2 changes needed)." >&2
+    exit 2
 fi
 
 if ! command -v cmake >/dev/null; then

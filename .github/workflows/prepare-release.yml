@@ -7,7 +7,7 @@ name: Prepare release
 #     legacy `release/v<version>` pattern hit when the target fork has a
 #     long-lived `release` branch — see #197)
 #   - bumps CMakeLists.txt project VERSION + packaging/msys2/PKGBUILD pkgver
-#     (sha256sums set to 'SKIP'; the real sha lands via post-tag-pkgbuild.yml
+#     (sha256sums set to 'SKIP'; the real sha lands via release-arch-pkgbuild.yml
 #     after the tag is pushed)
 #   - drafts docs/releases/release-notes-v<version>.md from `git log`
 #   - opens the PR
@@ -121,7 +121,7 @@ jobs:
           echo "Target branch resolved to '${TARGET}' (${SRC})"
 
       - name: Checkout target branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ env.TARGET_BRANCH }}
           fetch-depth: 0  # need git log history for release-notes generation

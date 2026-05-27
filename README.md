@@ -1,9 +1,9 @@
 # Generic Massive Parallelisation of Branching Algorithms
 
-[![C/C++ CI (Ubuntu 24.04)](https://github.com/rapastranac/gempba/actions/workflows/c-cpp-ubuntu.yml/badge.svg)](https://github.com/rapastranac/gempba/actions/workflows/c-cpp-ubuntu.yml)
-[![C/C++ CI (Windows 2025)](https://github.com/rapastranac/gempba/actions/workflows/c-cpp-windows.yml/badge.svg)](https://github.com/rapastranac/gempba/actions/workflows/c-cpp-windows.yml)
-[![C/C++ CI (macOS 26)](https://github.com/rapastranac/gempba/actions/workflows/c-cpp-macos.yml/badge.svg)](https://github.com/rapastranac/gempba/actions/workflows/c-cpp-macos.yml)
-[![Lint](https://github.com/rapastranac/gempba/actions/workflows/lint.yml/badge.svg)](https://github.com/rapastranac/gempba/actions/workflows/lint.yml)
+[![C/C++ CI (Ubuntu 24.04)](https://github.com/rapastranac/gempba/actions/workflows/ci-cpp-ubuntu.yml/badge.svg)](https://github.com/rapastranac/gempba/actions/workflows/ci-cpp-ubuntu.yml)
+[![C/C++ CI (Windows 2025)](https://github.com/rapastranac/gempba/actions/workflows/ci-cpp-windows.yml/badge.svg)](https://github.com/rapastranac/gempba/actions/workflows/ci-cpp-windows.yml)
+[![C/C++ CI (macOS 26)](https://github.com/rapastranac/gempba/actions/workflows/ci-cpp-macos.yml/badge.svg)](https://github.com/rapastranac/gempba/actions/workflows/ci-cpp-macos.yml)
+[![Lint](https://github.com/rapastranac/gempba/actions/workflows/ci-lint.yml/badge.svg)](https://github.com/rapastranac/gempba/actions/workflows/ci-lint.yml)
 [![codecov](https://codecov.io/gh/rapastranac/gempba/branch/main/graph/badge.svg)](https://codecov.io/gh/rapastranac/gempba)
 ![GitHub License](https://img.shields.io/github/license/rapastranac/gempba)
 ![GitHub Release](https://img.shields.io/github/v/release/rapastranac/gempba)

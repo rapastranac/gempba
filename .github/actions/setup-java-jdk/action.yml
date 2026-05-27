@@ -1,0 +1,14 @@
+name: Setup JDK 25
+description: |
+  Pin Temurin JDK 25 and cache ~/.m2 across runs.  Wraps actions/setup-java@v5
+  so the Temurin distribution, Java version, and Maven cache toggle are set
+  in one place — bump them here, every gempba Java workflow follows.
+runs:
+  using: composite
+  steps:
+    - name: Setup JDK 25
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: '25'
+        cache: maven

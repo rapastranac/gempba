@@ -111,7 +111,7 @@ jobs:
           echo "Target branch resolved to '${TARGET}' (${SRC})"
 
       - name: Checkout target branch (not the tag)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ env.TARGET_BRANCH }}
           fetch-depth: 0
