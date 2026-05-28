@@ -1,0 +1,105 @@
+name: Release Java JARs to GitHub Packages
+
+# GitHub Packages release versions are immutable — bump the pom version via
+# prepare-release.yml and re-tag rather than re-pushing the same v*.
+
+on:
+  push:
+    tags: [ 'v*' ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-java-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Fresh build per tag — don't depend on a stale ci-java.yml artifact from a sibling run.
+  build:
+    uses: ./.github/workflows/_build-java-jars.yml
+
+  publish-maven:
+    needs: [ build ]
+    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.ref }}
+
+      - name: Setup JDK 25
+        uses: ./.github/actions/setup-java-jdk
+
+      - name: Download merged multi-platform JARs
+        uses: actions/download-artifact@v8
+        with:
+          name: gempba-multiplatform-jars
+          path: jars/
+
+      - name: Derive version + extract POM from the mt JAR
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          # refs/tags/v4.1.0 → 4.1.0
+          VERSION="${GITHUB_REF##*/v}"
+          MT_JAR="jars/gempba-${VERSION}-mt.jar"
+          MP_JAR="jars/gempba-${VERSION}-mp-mpi.jar"
+          if [ ! -f "$MT_JAR" ] || [ ! -f "$MP_JAR" ]; then
+            echo "::error::expected jars not present under jars/ — got:"; ls -la jars/; exit 1
+          fi
+          # POM is identical inside both classifier JARs (generated from the
+          # same pom.xml); extract from one.
+          mkdir -p pom-tmp
+          (cd pom-tmp && jar xf "$GITHUB_WORKSPACE/$MT_JAR" META-INF/maven/io.gempba/gempba/pom.xml)
+          cp pom-tmp/META-INF/maven/io.gempba/gempba/pom.xml "gempba-${VERSION}.pom"
+          echo "version=${VERSION}"        >> "$GITHUB_OUTPUT"
+          echo "pom=gempba-${VERSION}.pom" >> "$GITHUB_OUTPUT"
+          echo "mt_jar=${MT_JAR}"          >> "$GITHUB_OUTPUT"
+          echo "mp_jar=${MP_JAR}"          >> "$GITHUB_OUTPUT"
+
+      # Workflow-injected GITHUB_TOKEN (packages: write) — no PAT required.
+      - name: Configure ~/.m2/settings.xml for GitHub Packages auth
+        shell: bash
+        run: |
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml <<'XML'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
+            <servers>
+              <server>
+                <id>github</id>
+                <username>${env.GITHUB_ACTOR}</username>
+                <password>${env.GITHUB_TOKEN}</password>
+              </server>
+            </servers>
+          </settings>
+          XML
+
+      # Single transaction (`-Dfiles` + `-Dclassifiers`) avoids GitHub Packages's
+      # per-version slot-lock race that 409s on sequential classifier uploads.
+      - name: Deploy to GitHub Packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mvn -B deploy:deploy-file \
+            -DrepositoryId=github \
+            -Durl=https://maven.pkg.github.com/${{ github.repository }} \
+            -DgroupId=io.gempba \
+            -DartifactId=gempba \
+            -Dversion=${{ steps.meta.outputs.version }} \
+            -DpomFile=${{ steps.meta.outputs.pom }} \
+            -Dfile=${{ steps.meta.outputs.mt_jar }} \
+            -Dclassifier=mt \
+            -Dfiles=${{ steps.meta.outputs.mp_jar }} \
+            -Dclassifiers=mp-mpi \
+            -Dtypes=jar
