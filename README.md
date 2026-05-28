@@ -43,6 +43,8 @@ The two main research contributions baked into the framework are the **Quasi-Hor
 
 GemPBA ships two distinct flavors that can coexist on a single machine. Multithreading is the default — fast local iteration, no MPI needed. Install the MPI flavor on top when you need to scale across nodes.
 
+### Pre-built packages (C++)
+
 ```bash
 # Debian / Ubuntu (from the project's APT repo)
 sudo apt install libgempba-dev          # multithreading flavor (default)
@@ -62,7 +64,51 @@ brew install gempba       # multithreading flavor (default)
 brew install gempba-mpi   # MPI flavor; depends on gempba
 ```
 
-If you are building from source instead, pick the flavor at configure time and install:
+### Maven dependency (Java)
+
+JARs are published to [GitHub Packages](https://maven.pkg.github.com/rapastranac/gempba) with one classifier per flavor: `mt` (multithreading) and `mp-mpi` (multiprocessing — requires an MPI runtime on the host). One fat JAR per classifier carries every supported OS's native binary; the loader picks the right one at runtime.
+
+**Available versions: `v4.1.0` and later.** Earlier tags predate the publish flow and have no artifact on the registry.
+
+Add the registry to your `pom.xml`:
+
+```xml
+<repositories>
+  <repository>
+    <id>github-gempba</id>
+    <url>https://maven.pkg.github.com/rapastranac/gempba</url>
+  </repository>
+</repositories>
+```
+
+GitHub Packages requires a token even for public packages. Create a PAT at [github.com/settings/tokens](https://github.com/settings/tokens) with the `read:packages` scope and add it to `~/.m2/settings.xml`:
+
+```xml
+<servers>
+  <server>
+    <id>github-gempba</id>
+    <username>YOUR_GITHUB_USERNAME</username>
+    <password>YOUR_PAT</password>
+  </server>
+</servers>
+```
+
+Declare the dependency with the variant classifier:
+
+```xml
+<dependency>
+  <groupId>io.gempba</groupId>
+  <artifactId>gempba</artifactId>
+  <version>VERSION</version>
+  <classifier>mt</classifier>          <!-- or mp-mpi -->
+</dependency>
+```
+
+Worked example: **[gempba-java-examples](https://github.com/rapastranac/gempba-java-examples)**. Full reference in the [docs site](https://rapastranac.github.io/gempba-docs/).
+
+### From source (C++)
+
+When pre-built packages aren't an option (custom configure flags, unsupported distro, contributing back), build the C++ library with CMake. Pick the flavor at configure time and install:
 
 ```bash
 cmake -B build -DGEMPBA_MULTIPROCESSING=ON   # MPI
