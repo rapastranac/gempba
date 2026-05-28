@@ -39,6 +39,16 @@ The two main research contributions baked into the framework are the **Quasi-Hor
 - Windows
 - macOS
 
+Pre-built packages and the Java fat JAR target one architecture per OS:
+
+| OS | Architecture |
+|---|---|
+| Linux | `x86_64` |
+| Windows | `x86_64` |
+| macOS | `aarch64` (Apple Silicon) |
+
+Other architectures work via source build.
+
 ## Installing
 
 GemPBA ships two distinct flavors that can coexist on a single machine. Multithreading is the default — fast local iteration, no MPI needed. Install the MPI flavor on top when you need to scale across nodes.
