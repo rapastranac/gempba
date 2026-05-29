@@ -75,9 +75,6 @@ jobs:
             -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }} \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -I$(brew --prefix libomp)/include" \
-            -DOpenMP_CXX_LIB_NAMES="omp" \
-            -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib \
             -DCMAKE_PREFIX_PATH=$(brew --prefix boost)
           cmake --build build --parallel $(sysctl -n hw.logicalcpu)
 
@@ -128,9 +125,6 @@ jobs:
             -DGEMPBA_MULTIPROCESSING=ON \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -I$(brew --prefix libomp)/include" \
-            -DOpenMP_CXX_LIB_NAMES="omp" \
-            -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib \
             -DCMAKE_PREFIX_PATH=$(brew --prefix boost)
           cmake --build build --parallel $(sysctl -n hw.logicalcpu)
 
@@ -202,9 +196,6 @@ jobs:
             -DGEMPBA_BUILD_TESTS=OFF \
             -DGEMPBA_DEV_MODE=OFF \
             -DGEMPBA_MULTIPROCESSING=OFF \
-            -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -I$(brew --prefix libomp)/include" \
-            -DOpenMP_CXX_LIB_NAMES="omp" \
-            -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib \
             -DCMAKE_PREFIX_PATH=$(brew --prefix boost)
           cmake --build "$RUNNER_TEMP/gempba-build-mt" --parallel $(sysctl -n hw.logicalcpu)
           cmake --install "$RUNNER_TEMP/gempba-build-mt"
@@ -221,9 +212,6 @@ jobs:
             -DGEMPBA_BUILD_TESTS=OFF \
             -DGEMPBA_DEV_MODE=OFF \
             -DGEMPBA_MULTIPROCESSING=ON \
-            -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -I$(brew --prefix libomp)/include" \
-            -DOpenMP_CXX_LIB_NAMES="omp" \
-            -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib \
             -DCMAKE_PREFIX_PATH=$(brew --prefix boost)
           cmake --build "$RUNNER_TEMP/gempba-build-mpi" --parallel $(sysctl -n hw.logicalcpu)
           cmake --install "$RUNNER_TEMP/gempba-build-mpi"
@@ -271,10 +259,7 @@ jobs:
           cmake -S "$RUNNER_TEMP/gempba-examples-src" -B "$RUNNER_TEMP/gempba-examples-build" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH="$GEMPBA_INSTALL_PREFIX;$(brew --prefix boost)" \
-            -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }} \
-            -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -I$(brew --prefix libomp)/include" \
-            -DOpenMP_CXX_LIB_NAMES="omp" \
-            -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib
+            -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }}
           cmake --build "$RUNNER_TEMP/gempba-examples-build" --parallel $(sysctl -n hw.logicalcpu)
 
   publish-test-results:

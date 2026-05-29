@@ -32,7 +32,7 @@ runs:
       env:
         HOMEBREW_NO_AUTO_UPDATE: '1'   # see gempba#239
       run: |
-        brew install cmake pkg-config boost spdlog fmt hwloc libomp
+        brew install cmake pkg-config boost spdlog fmt hwloc
         if [ "${{ inputs.multiprocessing }}" = "ON" ]; then
           brew install open-mpi
         fi

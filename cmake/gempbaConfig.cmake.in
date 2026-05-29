@@ -25,7 +25,6 @@ unset(_gempba_has_mt)
 unset(_gempba_has_mpi)
 
 find_dependency(fmt REQUIRED)
-find_dependency(OpenMP REQUIRED)
 find_dependency(Threads REQUIRED)
 
 if (@GEMPBA_HWLOC@)

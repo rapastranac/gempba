@@ -22,7 +22,7 @@ case "${1:-}" in
 esac
 
 # Fail fast on missing tools instead of letting `set -e` exit silently
-# halfway through.  brew is needed up-front to resolve libomp / boost
+# halfway through.  brew is needed up-front to resolve boost
 # prefixes for the cmake flags below; cmake + mvn are the actual build
 # drivers.
 for tool in brew cmake mvn; do
@@ -53,10 +53,6 @@ native_lib="$native_dir/gempba_jni.dylib"
 # variant's native).  Wipe the file before each cmake build.
 rm -f "$native_lib"
 
-# Apple clang doesn't ship with OpenMP support; libomp comes from
-# Homebrew.  Mirrors the OpenMP override block in ci-cpp-macos.yml so
-# the JNI shared library finds the same omp runtime gempba's own tests
-# build against.
 cmake -B "$build_dir" -S "$WORKSPACE" \
     -DCMAKE_BUILD_TYPE=Release \
     -DGEMPBA_BUILD_JAVA_BINDING=ON \
@@ -66,9 +62,6 @@ cmake -B "$build_dir" -S "$WORKSPACE" \
     -DGEMPBA_DEV_MODE=OFF \
     -DGEMPBA_BUILD_TESTS=OFF \
     -DGEMPBA_DEBUG_COMMENTS=OFF \
-    -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -I$(brew --prefix libomp)/include" \
-    -DOpenMP_CXX_LIB_NAMES="omp" \
-    -DOpenMP_omp_LIBRARY="$(brew --prefix libomp)/lib/libomp.dylib" \
     -DCMAKE_PREFIX_PATH="$(brew --prefix boost)"
 
 cmake --build "$build_dir" --target gempba_jni -j"$(sysctl -n hw.logicalcpu)"

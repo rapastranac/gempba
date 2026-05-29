@@ -192,7 +192,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ github.ref }}
 
-      # Bootstraps Homebrew on PATH and brew-installs boost / hwloc / libomp /
+      # Bootstraps Homebrew on PATH and brew-installs boost / hwloc /
       # (open-mpi when MP). Same composite the C/C++ macOS workflow uses, so
       # the JNI .dylib links against the exact deps gempba itself was tested with.
       - name: Setup native deps
