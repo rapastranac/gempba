@@ -11,10 +11,13 @@ class GempbaMpi < Formula
   depends_on "pkg-config" => :build
   depends_on "boost"
   depends_on "fmt"
-  depends_on "gempba"
   depends_on "hwloc"
   depends_on "open-mpi"
   depends_on "spdlog"
+
+  # Self-contained alternative to gempba: ships the same headers and CMake
+  # config, so the two flavors cannot be linked into one prefix at once.
+  conflicts_with "gempba", because: "both install gempba's headers and CMake config; install one flavor"
 
   resource "BS_thread_pool" do
     url "https://github.com/rapastranac/thread-pool/archive/refs/tags/v5.1.0.1.tar.gz"
@@ -32,6 +35,7 @@ class GempbaMpi < Formula
       "-DGEMPBA_BUILD_TESTS=OFF",
       "-DGEMPBA_DEV_MODE=OFF",
       "-DGEMPBA_MULTIPROCESSING=ON",
+      "-DGEMPBA_INSTALL_SHARED_ARTIFACTS=ON",
       "-DCMAKE_PREFIX_PATH=#{Formula["boost"].opt_prefix}",
       "-DFETCHCONTENT_SOURCE_DIR_BS_THREAD_POOL=#{bs_thread_pool}",
     ]
@@ -54,8 +58,7 @@ class GempbaMpi < Formula
       find_package(gempba REQUIRED COMPONENTS mpi)
     CMAKE
 
-    gempba = Formula["gempba"]
     system "cmake", "-S", testpath, "-B", testpath/"build",
-           "-DCMAKE_PREFIX_PATH=#{opt_prefix};#{gempba.opt_prefix};#{Formula["boost"].opt_prefix}"
+           "-DCMAKE_PREFIX_PATH=#{opt_prefix};#{Formula["boost"].opt_prefix}"
   end
 end
