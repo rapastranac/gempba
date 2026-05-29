@@ -1,27 +1,12 @@
 name: Update Homebrew Tap
 
-# Renders the two formula templates under packaging/homebrew/ and pushes them
-# to a sister tap repo. The tap is its own GitHub repo (Homebrew's convention),
-# so the workflow needs cross-repo write access; that token is the only piece
-# of operator setup beyond creating the tap repo itself.
+# publish depends on verify-macos, so a non-installable formula blocks the PR
+# and aborts the release instead of shipping (gempba#292).
 #
-# Multi-owner model (downstream/upstream coexistence)
-# ---------------------------------------------------
-# Every owner that cuts a gempba release maintains its own pair:
-#   <owner>/gempba              (this repo, the source of truth)
-#   <owner>/homebrew-gempba     (the tap, must exist; can be empty on first run)
-# Defaults below pick the same owner that runs the workflow, so an upstream
-# port (e.g. rapastranac) needs zero source-tree edits — only:
-#   - create rapastranac/homebrew-gempba (empty repo)
-#   - add `secrets.HOMEBREW_TAP_TOKEN` to that owner (PAT with
-#     contents:write on the tap repo)
-#   - (optional) add `secrets.GEMPBA_CROSS_REPO_TOKEN` if the tarball lives
-#     behind a private gempba and the workflow runs from a different owner
-#
-# To publish from one owner into another owner's tap (mixed-owner scenario):
-#   - vars.GEMPBA_PUBLIC_REPO  = <tarball-owner>/gempba
-#   - vars.HOMEBREW_TAP_REPO   = <tap-owner>/homebrew-gempba
-#   - secrets.HOMEBREW_TAP_TOKEN must have write access on <tap-owner>/...
+# Per-owner setup to publish: create <owner>/homebrew-gempba and add
+# secrets.HOMEBREW_TAP_TOKEN (contents:write on the tap). Mixed-owner publish:
+# vars.GEMPBA_PUBLIC_REPO (tarball source), vars.HOMEBREW_TAP_REPO (tap target),
+# secrets.GEMPBA_CROSS_REPO_TOKEN (read on a private tarball source).
 
 on:
   push:
@@ -30,6 +15,9 @@ on:
     branches: [ "main" ]
     paths:
       - 'packaging/homebrew/**'
+      - 'external/**'
+      - 'CMakeLists.txt'
+      - 'cmake/**'
       - '.github/workflows/release-homebrew-tap.yml'
   workflow_dispatch:
     inputs:
@@ -42,27 +30,20 @@ permissions:
   contents: read
 
 jobs:
-  publish-formula:
+  render:
     runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
     timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     env:
-      # Public-facing repo the formula points its homepage/url/head at.
-      # Defaults to the same owner running the workflow; override with
-      # `vars.GEMPBA_PUBLIC_REPO` (e.g. `<owner>/gempba`) to point formulas
-      # at a different gempba (mixed-owner publish).
       PUBLIC_REPO: ${{ vars.GEMPBA_PUBLIC_REPO || github.repository }}
-      # Homebrew tap repo to push the rendered formula to. Defaults to
-      # `<repo-owner>/homebrew-gempba`; override with `vars.HOMEBREW_TAP_REPO`.
-      TAP_REPO: ${{ vars.HOMEBREW_TAP_REPO || format('{0}/homebrew-gempba', github.repository_owner) }}
 
     steps:
-      # 1️⃣ Checkout gempba (to read the formula template)
       - name: Checkout gempba
         uses: actions/checkout@v6
         with:
           ref: ${{ github.ref }}
 
-      # 2️⃣ Resolve tag — either real (push/dispatch) or synthetic (PR preview)
       - name: Resolve tag
         id: tag
         run: |
@@ -85,27 +66,13 @@ jobs:
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Resolved tag: ${TAG}"
 
-      # 3️⃣ Compute tarball sha256 — only on real publish (tag/dispatch). The
-      #    URL must match the one we bake into the formula, so we hit
-      #    PUBLIC_REPO (which may differ from github.repository if this
-      #    workflow runs from a mirror).
-      #
-      #    We use the api.github.com tarball endpoint rather than
-      #    github.com/<owner>/<repo>/archive/... because the latter is the HTML
-      #    download path and ignores `Authorization` headers — anonymous
-      #    requests to a private repo's archive get 404, not 401, regardless of
-      #    token. The api endpoint accepts `GITHUB_TOKEN` (contents:read) and
-      #    Homebrew on the consumer side honours `HOMEBREW_GITHUB_API_TOKEN`
-      #    against it. For a public PUBLIC_REPO the same URL works
-      #    (rate-limited unauth at 60/hr/IP, irrelevant at our scale).
+      # api.github.com tarball endpoint, not github.com/.../archive: the latter
+      # ignores Authorization and 404s on private repos. Honours GITHUB_TOKEN
+      # (and HOMEBREW_GITHUB_API_TOKEN consumer-side).
       - name: Compute tarball sha256
         id: sha
         if: github.event_name != 'pull_request'
         env:
-          # GITHUB_TOKEN works when PUBLIC_REPO is the running repo. When the
-          # mixed-owner scenario points PUBLIC_REPO at a different owner whose
-          # gempba is private, fall through to GEMPBA_CROSS_REPO_TOKEN (the
-          # same org-level PAT used by cross-repo gempba-examples clones).
           GH_TOKEN: ${{ secrets.GEMPBA_CROSS_REPO_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ steps.tag.outputs.tag }}"
@@ -122,12 +89,6 @@ jobs:
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "sha256=${SHA}"
 
-      # 4️⃣ Render both formulas from the in-repo templates:
-      #    - always substitute __OWNER_REPO__ → PUBLIC_REPO
-      #    - on real publish, also patch url/version/sha256 with the resolved tag
-      #    Two coexisting formulas mirror the apt/MSYS2 split:
-      #      gempba      — multithreading flavor (base)
-      #      gempba-mpi  — MPI multiprocessing flavor (depends on gempba)
       - name: Render formulas
         run: |
           mkdir -p out/Formula
@@ -141,14 +102,10 @@ jobs:
             SHA='${{ steps.sha.outputs.sha }}'
             VERSION='${{ steps.sha.outputs.version }}'
             for name in gempba gempba-mpi; do
-              # Anchor on the api.github.com tarball path: the `head` and the
-              # vendored `resource` blocks carry their own url lines.
+              # Anchored substitutions: leave head and the vendored resource
+              # url/sha256 lines untouched.
               sed -i -E "s|^(\s*url\s+\")https://api\.github\.com/repos/.*(\")|\1${URL}\2|" "out/Formula/${name}.rb"
-              # Replace the version line (api.github.com URLs don't encode the
-              # version, so brew can't auto-derive it).
               sed -i -E "s|^(\s*version\s+\").*(\")|\1${VERSION}\2|" "out/Formula/${name}.rb"
-              # Anchor on the 64-zero placeholder: the vendored resources carry
-              # real (non-zero) checksums that must survive.
               sed -i -E "s|^(\s*sha256\s+\")0{64}(\")|\1${SHA}\2|" "out/Formula/${name}.rb"
             done
           fi
@@ -158,31 +115,108 @@ jobs:
             cat "out/Formula/${name}.rb"
           done
 
-      # 5️⃣a PR → store both rendered formulas as a single workflow artifact
-      - name: Upload formulas as workflow artifact (PR)
-        if: github.event_name == 'pull_request'
+      - name: Upload rendered formulas
         uses: actions/upload-artifact@v7
         with:
           name: homebrew-formulas
           path: out/Formula/
           retention-days: 7
 
-      # 5️⃣b Tag/dispatch → checkout the tap and push both rendered formulas
+  verify-macos:
+    needs: render
+    runs-on: ${{ fromJSON(vars.RUNNER_MACOS || '["macos-26"]') }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        flavor: [ gempba, gempba-mpi ]
+
+    steps:
+      - name: Clean stale .git locks from prior interrupted runs
+        shell: bash
+        run: |
+          if [ -d "$GITHUB_WORKSPACE/.git" ]; then
+            find "$GITHUB_WORKSPACE/.git" -name '*.lock' -delete 2>/dev/null || true
+          fi
+
+      - name: Checkout gempba
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Setup macOS deps
+        uses: ./.github/actions/setup-macos-deps
+        with:
+          multiprocessing: 'ON'
+          tests: 'false'
+
+      - name: Download rendered formulas
+        uses: actions/download-artifact@v7
+        with:
+          name: homebrew-formulas
+          path: out/Formula
+
+      - name: Build and test the formula
+        env:
+          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GEMPBA_CROSS_REPO_TOKEN || secrets.GITHUB_TOKEN }}
+          FLAVOR: ${{ matrix.flavor }}
+        run: |
+          set -euo pipefail
+
+          # Verify against a local source tarball, not the api.github.com url:
+          # that url 404s for brew's unauthenticated download on a private repo.
+          SRC="$RUNNER_TEMP/gempba-src.tar.gz"
+          git archive --format=tar.gz --prefix=gempba/ -o "$SRC" HEAD
+          SHA=$(shasum -a 256 "$SRC" | awk '{print $1}')
+          f="out/Formula/${FLAVOR}.rb"
+          sed -i '' -E "s|^([[:space:]]*url[[:space:]]+\")https://api\.github\.com/repos/.*(\")|\1file://${SRC}\2|" "$f"
+          # Range exclusion skips the resource blocks so only the package sha is rewritten.
+          sed -i '' -E "/^[[:space:]]*resource /,/^[[:space:]]*end$/!s|^([[:space:]]*sha256[[:space:]]+\")[0-9a-fA-F]{64}(\")|\1${SHA}\2|" "$f"
+
+          # Persistent runner: hard-reset the tap namespace so a leftover tap
+          # dir from an interrupted run cannot collide.
+          brew uninstall --force gempba-mpi gempba 2>/dev/null || true
+          rm -rf "$(brew --repository)/Library/Taps/gempba"
+          brew tap-new gempba/citest --no-git
+          TAP="$(brew --repository)/Library/Taps/gempba/homebrew-citest/Formula"
+          mkdir -p "$TAP"
+          cp "out/Formula/${FLAVOR}.rb" "$TAP"/
+
+          brew install --build-from-source "gempba/citest/${FLAVOR}"
+          brew test                        "gempba/citest/${FLAVOR}"
+
+      - name: Cleanup tap and kegs
+        if: always()
+        run: |
+          brew uninstall --force gempba-mpi gempba 2>/dev/null || true
+          rm -rf "$(brew --repository)/Library/Taps/gempba"
+
+  publish:
+    needs: [ render, verify-macos ]
+    if: github.event_name != 'pull_request'
+    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
+    timeout-minutes: 5
+    env:
+      TAP_REPO: ${{ vars.HOMEBREW_TAP_REPO || format('{0}/homebrew-gempba', github.repository_owner) }}
+
+    steps:
+      - name: Download rendered formulas
+        uses: actions/download-artifact@v7
+        with:
+          name: homebrew-formulas
+          path: out/Formula
+
       - name: Checkout homebrew tap
-        if: github.event_name != 'pull_request'
         uses: actions/checkout@v6
         with:
           repository: ${{ env.TAP_REPO }}
-          # PAT with contents:write on the tap repo; each owner that publishes
-          # a gempba release issues its own under the same secret name.
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           path: tap
 
       - name: Commit and push
-        if: github.event_name != 'pull_request'
         working-directory: tap
         env:
-          TAG: ${{ steps.tag.outputs.tag }}
+          TAG: ${{ needs.render.outputs.tag }}
         run: |
           mkdir -p Formula
           cp ../out/Formula/gempba.rb     Formula/gempba.rb
@@ -191,10 +225,8 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Stage first, then compare index vs HEAD. `git diff --quiet` (no
-          # --cached) ignores untracked paths, so on a first-ever publish a
-          # newly-cp'd formula would be reported as "no diff" and the commit
-          # would be silently skipped.
+          # Compare index vs HEAD (not working tree): git diff --quiet ignores
+          # untracked paths, so a first-ever publish would skip the commit.
           git add Formula/gempba.rb Formula/gempba-mpi.rb
           if git diff --cached --quiet -- Formula/gempba.rb Formula/gempba-mpi.rb; then
             echo "Formulas already up to date; nothing to commit."
