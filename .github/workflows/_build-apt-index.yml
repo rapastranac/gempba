@@ -28,6 +28,9 @@ jobs:
           sed -i "s|SIGN_WITH_KEY_ID|${{ vars.GPG_KEY_ID }}|" \
             apt-repo/conf/distributions
 
+      - name: Export public key alongside the signed Release
+        run: gpg --export "${{ vars.GPG_KEY_ID }}" > apt-repo/gempba-archive-keyring.gpg
+
       - name: Download .debs from artifacts
         uses: actions/download-artifact@v8
         with:
