@@ -7,5 +7,5 @@ Name: @GEMPBA_PC_NAME@
 Description: Generic Massive Parallelisation of Branching Algorithms — parallel branch-and-bound C++23 framework
 Version: @PROJECT_VERSION@
 Requires: @GEMPBA_PC_REQUIRES@
-Libs: -L${libdir} -l@GEMPBA_PC_LIB@ -lstdc++exp -lgomp -lpthread
+Libs: -L${libdir} -l@GEMPBA_PC_LIB@ -lstdc++exp -lpthread
 Cflags: -I${includedir} -std=c++23 -DSPDLOG_HEADER_ONLY -DGEMPBA_MULTIPROCESSING=@GEMPBA_PC_MP@

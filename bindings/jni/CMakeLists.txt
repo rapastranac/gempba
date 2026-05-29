@@ -29,7 +29,7 @@ target_include_directories(gempba_jni PRIVATE
 # ─── Link ─────────────────────────────────────────────────────────────────────
 # gempba is a STATIC library; linking it into a SHARED lib embeds all its
 # symbols, so Java users only need the single .so / .dll artifact.
-# MPI, OpenMP, fmt and Threads are transitively pulled in from gempba's
+# MPI, fmt and Threads are transitively pulled in from gempba's
 # PUBLIC link interface.
 target_link_libraries(gempba_jni PRIVATE
     gempba

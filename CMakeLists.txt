@@ -51,7 +51,6 @@ else ()
 endif ()
 
 # 📦 Dependencies
-find_package(OpenMP REQUIRED)
 find_package(Threads REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(fmt REQUIRED)
@@ -158,7 +157,6 @@ target_compile_options(gempba PRIVATE
 # Its contents (BS_thread_pool headers, spdlog) are wired in via target_include_directories.
 target_link_libraries(gempba PUBLIC
         Threads::Threads
-        OpenMP::OpenMP_CXX
         fmt::fmt
 )
 
