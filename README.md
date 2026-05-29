@@ -55,8 +55,20 @@ GemPBA ships two distinct flavors that can coexist on a single machine. Multithr
 
 ### Pre-built packages (C++)
 
+**Debian / Ubuntu** — the `.deb`s live in a signed APT repository hosted at `https://rapastranac.github.io/gempba`. Register the repo once, then install:
+
 ```bash
-# Debian / Ubuntu (from the project's APT repo)
+# 1. Trust the gempba signing key (one-time)
+sudo install -d -m 0755 /etc/apt/keyrings
+curl -fsSL https://rapastranac.github.io/gempba/gempba-archive-keyring.gpg \
+  | sudo tee /etc/apt/keyrings/gempba.gpg > /dev/null
+
+# 2. Register the repo (one-time)
+echo "deb [signed-by=/etc/apt/keyrings/gempba.gpg] https://rapastranac.github.io/gempba stable main" \
+  | sudo tee /etc/apt/sources.list.d/gempba.list > /dev/null
+sudo apt update
+
+# 3. Install
 sudo apt install libgempba-dev          # multithreading flavor (default)
 sudo apt install libgempba-mpi-dev      # MPI flavor; depends on libgempba-dev
 ```
