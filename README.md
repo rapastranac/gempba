@@ -87,11 +87,19 @@ curl -LO https://raw.githubusercontent.com/rapastranac/gempba/main/packaging/msy
 makepkg -si
 ```
 
+**macOS** — install from the project's Homebrew tap:
+
 ```bash
-# macOS (from the project's Homebrew tap)
-brew tap <owner>/gempba
-brew install gempba       # multithreading flavor (default)
-brew install gempba-mpi   # MPI flavor; depends on gempba
+brew tap rapastranac/gempba
+brew install gempba       # multithreading (default), or `brew install gempba-mpi` for MPI
+```
+
+To keep **both** flavors on one machine, install the second after unlinking the first, then point each project at the flavor it uses:
+
+```bash
+brew unlink gempba && brew install gempba-mpi
+cmake -B build -DCMAKE_PREFIX_PATH=$(brew --prefix gempba)       # a project built against mt
+cmake -B build -DCMAKE_PREFIX_PATH=$(brew --prefix gempba-mpi)   # a project built against mpi
 ```
 
 ### Maven dependency (Java)
