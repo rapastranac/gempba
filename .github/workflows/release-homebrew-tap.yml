@@ -141,14 +141,15 @@ jobs:
             SHA='${{ steps.sha.outputs.sha }}'
             VERSION='${{ steps.sha.outputs.version }}'
             for name in gempba gempba-mpi; do
-              # Replace the url line (`head "..."` is left intact — the regex
-              # anchors on `url`, not `head`).
-              sed -i -E "s|^(\s*url\s+\").*(\")|\1${URL}\2|" "out/Formula/${name}.rb"
+              # Anchor on the api.github.com tarball path: the `head` and the
+              # vendored `resource` blocks carry their own url lines.
+              sed -i -E "s|^(\s*url\s+\")https://api\.github\.com/repos/.*(\")|\1${URL}\2|" "out/Formula/${name}.rb"
               # Replace the version line (api.github.com URLs don't encode the
               # version, so brew can't auto-derive it).
               sed -i -E "s|^(\s*version\s+\").*(\")|\1${VERSION}\2|" "out/Formula/${name}.rb"
-              # Replace the sha256 line (placeholder is 64 zeros).
-              sed -i -E "s|^(\s*sha256\s+\")[0-9a-fA-F]{64}(\")|\1${SHA}\2|" "out/Formula/${name}.rb"
+              # Anchor on the 64-zero placeholder: the vendored resources carry
+              # real (non-zero) checksums that must survive.
+              sed -i -E "s|^(\s*sha256\s+\")0{64}(\")|\1${SHA}\2|" "out/Formula/${name}.rb"
             done
           fi
 

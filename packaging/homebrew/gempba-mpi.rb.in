@@ -16,13 +16,29 @@ class GempbaMpi < Formula
   depends_on "open-mpi"
   depends_on "spdlog"
 
+  resource "BS_thread_pool" do
+    url "https://github.com/rapastranac/thread-pool/archive/refs/tags/v5.1.0.1.tar.gz"
+    sha256 "08f745882d7fbd6536232d23af5e55e9ab1fb2c9eb1bb8665ec3f3505699d3c2"
+  end
+
+  resource "CPM.cmake" do
+    url "https://github.com/cpm-cmake/CPM.cmake/releases/download/v0.42.3/CPM.cmake"
+    sha256 "a609e875fd532b067174250f6abbc3dac22fe2d64869783fb1e80bda1625c844"
+  end
+
   def install
+    bs_thread_pool = buildpath/"deps/bs_thread_pool"
     args = std_cmake_args + [
       "-DGEMPBA_BUILD_TESTS=OFF",
       "-DGEMPBA_DEV_MODE=OFF",
       "-DGEMPBA_MULTIPROCESSING=ON",
       "-DCMAKE_PREFIX_PATH=#{Formula["boost"].opt_prefix}",
+      "-DFETCHCONTENT_SOURCE_DIR_BS_THREAD_POOL=#{bs_thread_pool}",
     ]
+
+    resource("BS_thread_pool").stage(bs_thread_pool)
+    (buildpath/"build/cmake").mkpath
+    resource("CPM.cmake").stage { cp "CPM.cmake", buildpath/"build/cmake/CPM.cmake" }
 
     system "cmake", "-S", ".", "-B", "build", *args
     system "cmake", "--build", "build", "--parallel"
