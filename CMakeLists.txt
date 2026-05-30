@@ -50,6 +50,19 @@ else ()
     message(STATUS "Using parent project's CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}")
 endif ()
 
+# Per-format override for the shared install artifacts (headers, config.h,
+# gempbaConfig.cmake). Deb ships them only from the mt package so the mpi
+# package does not claim the same paths (dpkg refuses, see #180). Homebrew
+# kegs live in isolated prefixes, so the mpi keg must ship its own copy.
+# Default tracks the deb invariant; Homebrew's gempba-mpi formula flips it.
+if (GEMPBA_MULTIPROCESSING)
+    option(GEMPBA_INSTALL_SHARED_ARTIFACTS
+           "Install headers, config.h and gempbaConfig.cmake into this build's prefix" OFF)
+else ()
+    option(GEMPBA_INSTALL_SHARED_ARTIFACTS
+           "Install headers, config.h and gempbaConfig.cmake into this build's prefix" ON)
+endif ()
+
 # 📦 Dependencies
 find_package(Threads REQUIRED)
 find_package(spdlog REQUIRED)
@@ -225,7 +238,7 @@ install(TARGETS gempba
         INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
-if (NOT GEMPBA_MULTIPROCESSING)
+if (GEMPBA_INSTALL_SHARED_ARTIFACTS)
     # ─── Install: public headers ──────────────────────────────────────────────
     install(DIRECTORY include/gempba
             DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
