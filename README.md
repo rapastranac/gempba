@@ -51,7 +51,12 @@ Other architectures work via source build.
 
 ## Installing
 
-GemPBA ships two distinct flavors that can coexist on a single machine. Multithreading is the default — fast local iteration, no MPI needed. Install the MPI flavor on top when you need to scale across nodes.
+GemPBA comes in two **flavors**, and which one you want depends on where your computation runs:
+
+- **Multithreading** (`mt`) — the default. Uses all the cores of a **single machine**. No MPI to install, nothing to configure; if you're unsure, start here.
+- **Multiprocessing** (`mpi`; the Java artifact calls it `mp-mpi`) — distributes work across **multiple machines/nodes** over MPI. Add it when one machine isn't enough.
+
+Both can be installed side by side on **any** platform. You pick which one a program uses when you build *that* program (see [Selecting a flavor](#selecting-a-flavor)), not when you install.
 
 ### Pre-built packages (C++)
 
