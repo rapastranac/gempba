@@ -51,27 +51,60 @@ Other architectures work via source build.
 
 ## Installing
 
-GemPBA ships two distinct flavors that can coexist on a single machine. Multithreading is the default — fast local iteration, no MPI needed. Install the MPI flavor on top when you need to scale across nodes.
+GemPBA comes in two **flavors**, and which one you want depends on where your computation runs:
+
+- **Multithreading** (`mt`) — the default. Uses all the cores of a **single machine**. No MPI to install, nothing to configure; if you're unsure, start here.
+- **Multiprocessing** (`mpi`; the Java artifact calls it `mp-mpi`) — distributes work across **multiple machines/nodes** over MPI. Add it when one machine isn't enough.
+
+Both can be installed side by side on **any** platform. You pick which one a program uses when you build *that* program (see [Selecting a flavor](#selecting-a-flavor)), not when you install.
 
 ### Pre-built packages (C++)
 
+**Debian / Ubuntu** — the `.deb`s live in a signed APT repository hosted at `https://rapastranac.github.io/gempba`. Register the repo once, then install:
+
 ```bash
-# Debian / Ubuntu (from the project's APT repo)
+# 1. Trust the gempba signing key (one-time)
+sudo install -d -m 0755 /etc/apt/keyrings
+curl -fsSL https://rapastranac.github.io/gempba/gempba-archive-keyring.gpg \
+  | sudo tee /etc/apt/keyrings/gempba.gpg > /dev/null
+
+# 2. Register the repo (one-time)
+echo "deb [signed-by=/etc/apt/keyrings/gempba.gpg] https://rapastranac.github.io/gempba stable main" \
+  | sudo tee /etc/apt/sources.list.d/gempba.list > /dev/null
+sudo apt update
+
+# 3. Install
 sudo apt install libgempba-dev          # multithreading flavor (default)
 sudo apt install libgempba-mpi-dev      # MPI flavor; depends on libgempba-dev
 ```
 
-```bash
-# MSYS2 / MinGW
-pacman -S mingw-w64-x86_64-gempba       # multithreading flavor
-pacman -S mingw-w64-x86_64-gempba-mpi   # MPI flavor; depends on mingw-w64-x86_64-gempba
-```
+**MSYS2 / MinGW** — packages are attached to each GitHub Release rather than served from a custom pacman repo. Download the two `.pkg.tar.zst` assets — their names carry the version (e.g. `mingw-w64-x86_64-gempba-4.1.1-1-any.pkg.tar.zst`) — from the [latest release](https://github.com/rapastranac/gempba/releases/latest), then install them locally:
 
 ```bash
-# macOS (from the project's Homebrew tap)
-brew tap <owner>/gempba
-brew install gempba       # multithreading flavor (default)
-brew install gempba-mpi   # MPI flavor; depends on gempba
+pacman -U mingw-w64-x86_64-gempba-<version>-any.pkg.tar.zst       # multithreading (default)
+pacman -U mingw-w64-x86_64-gempba-mpi-<version>-any.pkg.tar.zst   # MPI; depends on the mt package above
+```
+
+If you'd rather build from `PKGBUILD`:
+
+```bash
+curl -LO https://raw.githubusercontent.com/rapastranac/gempba/main/packaging/msys2/PKGBUILD
+makepkg -si
+```
+
+**macOS** — install from the project's Homebrew tap:
+
+```bash
+brew tap rapastranac/gempba
+brew install gempba       # multithreading (default), or `brew install gempba-mpi` for MPI
+```
+
+To keep **both** flavors on one machine, install the second after unlinking the first, then point each project at the flavor it uses:
+
+```bash
+brew unlink gempba && brew install gempba-mpi
+cmake -B build -DCMAKE_PREFIX_PATH=$(brew --prefix gempba)       # a project built against mt
+cmake -B build -DCMAKE_PREFIX_PATH=$(brew --prefix gempba-mpi)   # a project built against mpi
 ```
 
 ### Maven dependency (Java)
