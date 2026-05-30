@@ -6,19 +6,16 @@ name: Prepare release
 #     (`prep/` namespace avoids the git-ref hierarchy collision that the
 #     legacy `release/v<version>` pattern hit when the target fork has a
 #     long-lived `release` branch — see #197)
-#   - bumps CMakeLists.txt project VERSION + packaging/msys2/PKGBUILD pkgver
-#     (sha256sums set to 'SKIP'; the real sha lands via release-arch-pkgbuild.yml
-#     after the tag is pushed)
+#   - bumps the version in CMakeLists.txt, packaging/msys2/PKGBUILD (pkgver,
+#     sha256sums set to 'SKIP'; the real sha lands via release-arch-pkgbuild.yml
+#     after the tag is pushed), bindings/java/pom.xml, and the
+#     packaging/homebrew/*.rb.in templates
 #   - drafts docs/releases/release-notes-v<version>.md from `git log`
 #   - opens the PR
 #
 # CITATION.cff is intentionally NOT bumped: its `version:` field is the cited
 # version (initial library publication, 2021-07-08), not the current code
 # version, so it does not move with code releases.
-#
-# v3.2.0 foundation scope only. java/pom.xml and packaging/homebrew/*.rb.in
-# bumps will be added as separate follow-up issues in their respective
-# milestones when those files exist.
 
 on:
   workflow_dispatch:
@@ -186,6 +183,19 @@ jobs:
           fi
           grep -nE "<version>${VERSION//./\\.}</version>" "$POM" | head -1
 
+      - name: Bump Homebrew formula templates version
+        run: |
+          set -euo pipefail
+          for f in packaging/homebrew/gempba.rb.in packaging/homebrew/gempba-mpi.rb.in; do
+            sed -i -E "s|^(\s*version \")[0-9]+\.[0-9]+\.[0-9]+(\")|\1${VERSION}\2|" "$f"
+            if ! grep -qE "^\s*version \"${VERSION//./\\.}\"" "$f"; then
+              echo "::error::${f} version bump did not take effect"
+              grep -nE "^\s*version " "$f" || true
+              exit 1
+            fi
+            grep -nE "^\s*version \"${VERSION//./\\.}\"" "$f"
+          done
+
       - name: Generate release-notes draft
         run: |
           set -euo pipefail
@@ -228,15 +238,16 @@ jobs:
       - name: Commit
         run: |
           set -euo pipefail
-          git add CMakeLists.txt packaging/msys2/PKGBUILD bindings/java/pom.xml docs/releases/
+          git add CMakeLists.txt packaging/msys2/PKGBUILD bindings/java/pom.xml packaging/homebrew/gempba.rb.in packaging/homebrew/gempba-mpi.rb.in docs/releases/
           if git diff --cached --quiet; then
             echo "::error::nothing staged — the bumps and notes generation produced no diff"
             exit 1
           fi
-          MSG=$(printf '%s\n\n%s\n%s\n%s\n%s' \
+          MSG=$(printf '%s\n\n%s\n%s\n%s\n%s\n%s' \
             "Prep release ${TAG}" \
             "- Bump CMakeLists.txt project VERSION + packaging/msys2/PKGBUILD pkgver to ${VERSION}" \
             "- Bump bindings/java/pom.xml project <version> to ${VERSION} so the Maven coordinate published by release-java.yml matches the tag" \
+            "- Bump packaging/homebrew/*.rb.in version to ${VERSION} so release-homebrew-tap.yml renders the formula at the tag version" \
             "- packaging/msys2/PKGBUILD sha256sums set to 'SKIP' (real sha lands via release-arch-pkgbuild workflow)" \
             "- Add docs/releases/release-notes-v${VERSION}.md draft (curate before merging)")
           git commit -m "$MSG"
@@ -255,7 +266,7 @@ jobs:
             "" \
             "**Changes**" \
             "" \
-            "- Version bumps applied to \`CMakeLists.txt\` and \`packaging/msys2/PKGBUILD\`." \
+            "- Version bumps applied to \`CMakeLists.txt\`, \`packaging/msys2/PKGBUILD\`, \`bindings/java/pom.xml\`, and \`packaging/homebrew/*.rb.in\`." \
             "- Release-notes draft at \`docs/releases/release-notes-v${VERSION}.md\` — generated from \`git log\`; **curate before merging** (drop CI / internal items, write for end-users)." \
             "- \`packaging/msys2/PKGBUILD\` \`sha256sums\` is the placeholder \`'SKIP'\`. The real sha lands automatically via the \`post-tag-pkgbuild\` workflow after \`${TAG}\` is pushed." \
             "- \`CITATION.cff\` is intentionally NOT bumped — it records the citation for the original library publication, not the current code version." \
