@@ -843,7 +843,7 @@ namespace gempba {
 
         int m_world_rank{}; // get the rank of the process
         int m_world_size{}; // get the number of processes/nodes
-        char m_processor_name[128]{}; // name of the node
+        char m_processor_name[MPI_MAX_PROCESSOR_NAME]{}; // name of the node
 
         int m_nodes_running = 0;
         int m_nodes_available = 0;
