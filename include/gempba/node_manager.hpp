@@ -217,8 +217,6 @@ namespace gempba {
         std::mutex m_ipc_mutex; // mutex to ensure funnel access to IPC
         int m_world_rank = -1; // get the rank of the process
         int m_world_size = -1; // get the number of processes/nodes
-        char m_processor_name[128]{}; // name of the node
-
 
         [[nodiscard]] bool should_update_result(const score& p_new_score) const {
             const bool v_new_max_is_better = m_goal == MAXIMISE && p_new_score > m_score;
