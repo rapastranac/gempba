@@ -25,7 +25,7 @@ makedepends=(
 )
 options=('staticlibs')
 source=("${_realname}-${pkgver}.tar.gz::https://github.com/rapastranac/gempba/archive/refs/tags/v${pkgver}.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('78239fa038047b7052b679aa97b8169de95ad64b88b6e1bffee2cf2badfe5556')
 
 build() {
     # Multithreading flavor (the base package: ships headers, gempbaConfig,
