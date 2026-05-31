@@ -191,33 +191,10 @@ jobs:
       # 4️⃣ Resolve sister-repo branch (same-name, fall back to main)
       - name: Resolve gempba-examples ref
         id: examples_ref
-        shell: msys2 {0}
-        run: |
-          # Override any extraheader/credential helper set by actions/checkout
-          # (v6 writes the GITHUB_TOKEN auth header to a separate config file
-          # that --local --unset-all cannot reach, so the URL-embedded PAT was
-          # being shadowed). -c clears them for THIS command only.
-          if [ -n "$GEMPBA_CROSS_REPO_TOKEN" ]; then
-            EX_URL="https://x-access-token:${GEMPBA_CROSS_REPO_TOKEN}@github.com/${GEMPBA_EXAMPLES_OWNER}/gempba-examples.git"
-          else
-            EX_URL="https://github.com/${GEMPBA_EXAMPLES_OWNER}/gempba-examples.git"
-          fi
-          BRANCH="${{ github.head_ref || github.ref_name }}"
-          set +e
-          LS_OUTPUT=$(git -c http."https://github.com/".extraheader= -c credential.helper= ls-remote --exit-code --heads "$EX_URL" "$BRANCH" 2>&1)
-          LS_EXIT=$?
-          set -e
-          if [ "$LS_EXIT" = "0" ]; then
-            echo "ref=$BRANCH" >> "$GITHUB_OUTPUT"
-            echo "Picked sister branch '$BRANCH' from $GEMPBA_EXAMPLES_OWNER/gempba-examples"
-          elif [ "$LS_EXIT" = "2" ]; then
-            echo "ref=main" >> "$GITHUB_OUTPUT"
-            echo "Sister branch '$BRANCH' not present in $GEMPBA_EXAMPLES_OWNER/gempba-examples; falling back to main"
-          else
-            echo "::error::ls-remote against $GEMPBA_EXAMPLES_OWNER/gempba-examples failed (exit $LS_EXIT)"
-            echo "$LS_OUTPUT"
-            exit "$LS_EXIT"
-          fi
+        uses: ./.github/actions/resolve-examples-ref
+        with:
+          examples-owner: ${{ env.GEMPBA_EXAMPLES_OWNER }}
+          cross-repo-token: ${{ env.GEMPBA_CROSS_REPO_TOKEN }}
 
       # 5️⃣ Clone gempba-examples and build it against the installed gempba
       - name: Build gempba-examples
