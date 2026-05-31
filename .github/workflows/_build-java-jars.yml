@@ -16,34 +16,29 @@ jobs:
         include:
           - variant: MT
             mp_flag: 'OFF'
-            mvn_variant: multithreading
             classifier: mt
           - variant: MP
             mp_flag: 'ON'
-            mvn_variant: multiprocessing
             classifier: mp-mpi
     env:
       CC: gcc-14
       CXX: g++-14
 
     steps:
-      # 1️⃣ Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ github.ref }}
 
-      # 2️⃣ Native toolchain + MPI when MP — same composite the C/C++ jobs use,
-      # so the JNI library links against the exact deps gempba itself was tested with.
+      # Native toolchain + MPI when MP — same composite the C/C++ jobs use, so the
+      # JNI library links against the exact deps gempba itself was tested with.
       - name: Setup native deps
         uses: ./.github/actions/setup-ubuntu-deps
         with:
           multiprocessing: ${{ matrix.mp_flag }}
           tests: 'false'
 
-      # 3️⃣ Pin the JDK so `mvn` finds it even on minimally-provisioned runners,
-      # and cache ~/.m2 across runs of this workflow.
       - name: Setup JDK 25
         uses: ./.github/actions/setup-java-jdk
 
@@ -54,15 +49,11 @@ jobs:
           echo "java: $(java -version 2>&1 | head -1)"
           echo "mvn: $(mvn -v | head -1)"
 
-      # 4️⃣ Builds gempba_jni.so into bindings/java/src/main/resources/natives/<classifier>
-      # and `mvn install -DskipTests`s the variant JAR (mt or mp-mpi). Tests run
-      # in the next step against the just-installed artifacts.
+      # Builds gempba_jni.so into bindings/java/src/main/resources/natives/<arch>
+      # and mvn install -DskipTests's the variant JAR. Tests run in test-ubuntu
+      # against the native lib uploaded below, so a flaky-test rerun never rebuilds.
       - name: Build native JNI library + variant JAR
         run: bash scripts/build_jar_linux.sh ${{ matrix.variant }}
-
-      - name: Run Java tests
-        working-directory: bindings/java
-        run: mvn -B test -Dgempba.variant=${{ matrix.mvn_variant }}
 
       - name: Upload variant JAR
         if: ${{ !cancelled() }}
@@ -71,6 +62,59 @@ jobs:
           name: jar-ubuntu-${{ matrix.classifier }}
           path: bindings/java/target/gempba-*-${{ matrix.classifier }}.jar
           if-no-files-found: error
+
+      - name: Upload native JNI library
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-ubuntu-${{ matrix.classifier }}
+          path: bindings/java/src/main/resources/natives
+          if-no-files-found: error
+
+  test-ubuntu:
+    needs: build-ubuntu
+    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: MT
+            mp_flag: 'OFF'
+            mvn_variant: multithreading
+            classifier: mt
+          - variant: MP
+            mp_flag: 'ON'
+            mvn_variant: multiprocessing
+            classifier: mp-mpi
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.ref }}
+
+      # Runtime deps only (MPI runtime when MP) — what the prebuilt native lib
+      # links against. No toolchain/cmake build in this job.
+      - name: Setup native deps
+        uses: ./.github/actions/setup-ubuntu-deps
+        with:
+          multiprocessing: ${{ matrix.mp_flag }}
+          tests: 'false'
+
+      - name: Setup JDK 25
+        uses: ./.github/actions/setup-java-jdk
+
+      - name: Download prebuilt native library
+        uses: actions/download-artifact@v8
+        with:
+          name: native-ubuntu-${{ matrix.classifier }}
+          path: bindings/java/src/main/resources/natives
+
+      - name: Run Java tests
+        working-directory: bindings/java
+        run: mvn -B test -Dgempba.variant=${{ matrix.mvn_variant }}
 
       - name: Upload test results
         if: ${{ !cancelled() }}
@@ -89,11 +133,9 @@ jobs:
         include:
           - variant: MT
             mp_flag: 'OFF'
-            mvn_variant: multithreading
             classifier: mt
           - variant: MP
             mp_flag: 'ON'
-            mvn_variant: multiprocessing
             classifier: mp-mpi
 
     steps:
@@ -130,19 +172,6 @@ jobs:
         shell: msys2 {0}
         run: bash scripts/build_jar_windows.sh ${{ matrix.variant }}
 
-      # Run tests inside MSYS2 too. The JNI .dll is linked against mingw-w64's
-      # libstdc++/libgcc/libwinpthread, which only sit on PATH inside MSYS2 —
-      # launching `mvn test` from cmd would load the .dll and fail to resolve
-      # those imports.  scripts/_msys2_find_mvn.sh is the same helper
-      # build_jar_windows.sh sources, so dev + CI find Maven the same way.
-      - name: Run Java tests
-        shell: msys2 {0}
-        working-directory: bindings/java
-        run: |
-          source "$GITHUB_WORKSPACE/scripts/_msys2_find_mvn.sh"
-          setup_mvn_msys2_path
-          mvn -B test -Dgempba.variant=${{ matrix.mvn_variant }}
-
       - name: Upload variant JAR
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
@@ -150,6 +179,68 @@ jobs:
           name: jar-windows-${{ matrix.classifier }}
           path: bindings/java/target/gempba-*-${{ matrix.classifier }}.jar
           if-no-files-found: error
+
+      - name: Upload native JNI library
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-windows-${{ matrix.classifier }}
+          path: bindings/java/src/main/resources/natives
+          if-no-files-found: error
+
+  test-windows:
+    needs: build-windows
+    runs-on: ${{ fromJSON(vars.RUNNER_WINDOWS || '["windows-2025"]') }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: MT
+            mp_flag: 'OFF'
+            mvn_variant: multithreading
+            classifier: mt
+          - variant: MP
+            mp_flag: 'ON'
+            mvn_variant: multiprocessing
+            classifier: mp-mpi
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.ref }}
+
+      - name: Setup native deps
+        uses: ./.github/actions/setup-windows-deps
+        with:
+          multiprocessing: ${{ matrix.mp_flag }}
+          tests: 'false'
+          cache: 'false'
+          release: 'false'
+
+      - name: Setup JDK 25
+        uses: ./.github/actions/setup-java-jdk
+
+      - name: Download prebuilt native library
+        uses: actions/download-artifact@v8
+        with:
+          name: native-windows-${{ matrix.classifier }}
+          path: bindings/java/src/main/resources/natives
+
+      # Run tests inside MSYS2: the JNI .dll links against mingw-w64's
+      # libstdc++/libgcc/libwinpthread, which only sit on PATH inside MSYS2 —
+      # launching mvn from cmd would load the .dll and fail to resolve those
+      # imports. _msys2_find_mvn.sh is the same helper build_jar_windows.sh
+      # sources, so dev + CI find Maven the same way.
+      - name: Run Java tests
+        shell: msys2 {0}
+        working-directory: bindings/java
+        run: |
+          source "$GITHUB_WORKSPACE/scripts/_msys2_find_mvn.sh"
+          setup_mvn_msys2_path
+          mvn -B test -Dgempba.variant=${{ matrix.mvn_variant }}
 
       - name: Upload test results
         if: ${{ !cancelled() }}
@@ -168,17 +259,14 @@ jobs:
         include:
           - variant: MT
             mp_flag: 'OFF'
-            mvn_variant: multithreading
             classifier: mt
           - variant: MP
             mp_flag: 'ON'
-            mvn_variant: multiprocessing
             classifier: mp-mpi
 
     steps:
-      # Stale .git locks left by a prior cancelled run break actions/checkout
-      # on long-lived self-hosted macOS runners — same dance the C/C++ macOS
-      # workflow does.
+      # Stale .git locks left by a prior cancelled run break actions/checkout on
+      # long-lived self-hosted macOS runners — same dance the C/C++ macOS workflow does.
       - name: Clean stale .git locks from prior interrupted runs
         shell: bash
         run: |
@@ -192,9 +280,9 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ github.ref }}
 
-      # Bootstraps Homebrew on PATH and brew-installs boost / hwloc /
-      # (open-mpi when MP). Same composite the C/C++ macOS workflow uses, so
-      # the JNI .dylib links against the exact deps gempba itself was tested with.
+      # Bootstraps Homebrew on PATH and brew-installs boost / hwloc / (open-mpi when
+      # MP). Same composite the C/C++ macOS workflow uses, so the JNI .dylib links
+      # against the exact deps gempba itself was tested with.
       - name: Setup native deps
         uses: ./.github/actions/setup-macos-deps
         with:
@@ -214,10 +302,6 @@ jobs:
       - name: Build native JNI library + variant JAR
         run: bash scripts/build_jar_macos.sh ${{ matrix.variant }}
 
-      - name: Run Java tests
-        working-directory: bindings/java
-        run: mvn -B test -Dgempba.variant=${{ matrix.mvn_variant }}
-
       - name: Upload variant JAR
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
@@ -225,6 +309,64 @@ jobs:
           name: jar-macos-${{ matrix.classifier }}
           path: bindings/java/target/gempba-*-${{ matrix.classifier }}.jar
           if-no-files-found: error
+
+      - name: Upload native JNI library
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-macos-${{ matrix.classifier }}
+          path: bindings/java/src/main/resources/natives
+          if-no-files-found: error
+
+  test-macos:
+    needs: build-macos
+    runs-on: ${{ fromJSON(vars.RUNNER_MACOS || '["macos-26"]') }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: MT
+            mp_flag: 'OFF'
+            mvn_variant: multithreading
+            classifier: mt
+          - variant: MP
+            mp_flag: 'ON'
+            mvn_variant: multiprocessing
+            classifier: mp-mpi
+
+    steps:
+      - name: Clean stale .git locks from prior interrupted runs
+        shell: bash
+        run: |
+          if [ -d "$GITHUB_WORKSPACE/.git" ]; then
+            find "$GITHUB_WORKSPACE/.git" -name '*.lock' -delete 2>/dev/null || true
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.ref }}
+
+      - name: Setup native deps
+        uses: ./.github/actions/setup-macos-deps
+        with:
+          multiprocessing: ${{ matrix.mp_flag }}
+          tests: 'false'
+
+      - name: Setup JDK 25
+        uses: ./.github/actions/setup-java-jdk
+
+      - name: Download prebuilt native library
+        uses: actions/download-artifact@v8
+        with:
+          name: native-macos-${{ matrix.classifier }}
+          path: bindings/java/src/main/resources/natives
+
+      - name: Run Java tests
+        working-directory: bindings/java
+        run: mvn -B test -Dgempba.variant=${{ matrix.mvn_variant }}
 
       - name: Upload test results
         if: ${{ !cancelled() }}
@@ -234,10 +376,12 @@ jobs:
           path: bindings/java/target/surefire-reports/TEST-*.xml
           if-no-files-found: warn
 
-  # Merge each OS leg's per-OS variant JAR into one fat JAR per variant
-  # containing every platform's native binary.  NativeLoader picks the right
-  # natives/<os>-<arch>/ at runtime, so one merged JAR per variant is the
-  # canonical artifact downstream Maven publish / GitHub Release jobs consume.
+  # Merge each OS leg's per-OS variant JAR into one fat JAR per variant containing
+  # every platform's native binary. NativeLoader picks the right natives/<os>-<arch>/
+  # at runtime, so one merged JAR per variant is the canonical artifact downstream
+  # Maven publish / GitHub Release jobs consume. Depends on the build legs only —
+  # the JAR is assembled regardless of test outcome; tests gate publish via the
+  # caller's needs: on this whole workflow.
   assemble-multiplatform-jar:
     needs: [ build-ubuntu, build-windows, build-macos ]
     runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
