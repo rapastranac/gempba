@@ -183,6 +183,23 @@ public final class GemPBA {
         return GemPBANative.Telemetry.isEnabled();
     }
 
+    /**
+     * Sets the loopback TCP port the telemetry hub binds (default 9000).  Must
+     * be called before the first {@link #createNodeManager} installs a hub; a
+     * later call does not move an already-bound hub.
+     *
+     * <p>Equivalent to {@code gempba::telemetry::configure_port(port)} in C++.
+     *
+     * @param port TCP port, 0–65535
+     * @throws IllegalArgumentException if {@code port} is outside 0–65535
+     */
+    public static void configureTelemetryPort(int port) {
+        if (port < 0 || port > 0xFFFF) {
+            throw new IllegalArgumentException("telemetry port must be in 0..65535, got " + port);
+        }
+        GemPBANative.Telemetry.configurePort(port);
+    }
+
     // ─── Multiprocessing factories (mirror gempba::multiprocessing::) ───────
 
     /**

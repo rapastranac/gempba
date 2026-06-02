@@ -62,4 +62,14 @@ namespace gempba::cabi_tests {
         EXPECT_EQ(gempba_telemetry_is_enabled(), 0);
     }
 
+    // configure_port is write-only (the bound port is not observable through the
+    // C ABI), so this only asserts the call is safe before any hub install and
+    // leaves the enabled flag untouched.
+    TEST_F(cabi_telemetry_test, configure_port_is_callable_and_independent_of_flag) {
+        ASSERT_EQ(gempba_telemetry_is_enabled(), 1);
+        gempba_telemetry_configure_port(9100);
+        gempba_telemetry_configure_port(0);
+        EXPECT_EQ(gempba_telemetry_is_enabled(), 1);
+    }
+
 } // namespace gempba::cabi_tests

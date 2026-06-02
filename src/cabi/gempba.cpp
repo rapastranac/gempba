@@ -846,6 +846,7 @@ extern "C" {
     void gempba_telemetry_disable(void) { gempba::telemetry::disable(); }
     void gempba_telemetry_enable(void) { gempba::telemetry::enable(); }
     gempba_bool_t gempba_telemetry_is_enabled(void) { return gempba::telemetry::is_enabled() ? 1 : 0; }
+    void gempba_telemetry_configure_port(uint16_t port) { gempba::telemetry::configure_port(port); }
 
 } // extern "C"
 

@@ -584,8 +584,8 @@ extern "C" {
 
     /** ─── Telemetry (process-wide, no handle) ───────────────────────────────────
      *
-     * Mirrors gempba::telemetry::{enable,disable,is_enabled}.  The flag is process-local and sticky: it lives in this
-     * process only and remains in effect across mp::create_* calls until explicitly toggled.
+     * Mirrors gempba::telemetry::{enable,disable,is_enabled,configure_port}.  The flag is process-local and sticky: it
+     * lives in this process only and remains in effect across mp::create_* calls until explicitly toggled.
      *
      * In multi-process (mp) mode the flag MUST be flipped symmetrically on every process — every process or no
      * process.  The telemetry install path goes through a collective IPC handshake; an asymmetric call leaves the
@@ -614,6 +614,12 @@ extern "C" {
      * this process's flag.
      */
     gempba_bool_t gempba_telemetry_is_enabled(void);
+
+    /**
+     * Set the loopback TCP port the telemetry hub binds (default 9000).  Must be called before the first create_*
+     * installs a hub; a later call does not move an already-bound hub.  Mirrors gempba::telemetry::configure_port.
+     */
+    void gempba_telemetry_configure_port(uint16_t port);
 
 #ifdef __cplusplus
 } /* extern "C" */

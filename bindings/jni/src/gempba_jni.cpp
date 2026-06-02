@@ -851,4 +851,6 @@ extern "C" {
 
     JNIEXPORT jboolean JNICALL JNI_TELEM(isEnabled)(JNIEnv*, jclass) { return gempba_telemetry_is_enabled() ? JNI_TRUE : JNI_FALSE; }
 
+    JNIEXPORT void JNICALL JNI_TELEM(configurePort)(JNIEnv*, jclass, jint port) { gempba_telemetry_configure_port(static_cast<uint16_t>(port)); }
+
 } // extern "C"

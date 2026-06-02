@@ -445,7 +445,7 @@ public final class GemPBANative {
     // ─── gempba::telemetry (process-wide flag) ───────────────────────────────
 
     /**
-     * JNI binding for {@code gempba::telemetry::enable / disable / is_enabled}.
+     * JNI binding for {@code gempba::telemetry::enable / disable / is_enabled / configure_port}.
      *
      * <p>The flag is process-local and noexcept on the C++ side; in
      * multiprocessing builds the user is expected to call these symmetrically
@@ -465,5 +465,7 @@ public final class GemPBANative {
         public static native void disable();
 
         public static native boolean isEnabled();
+
+        public static native void configurePort(int port);
     }
 }
