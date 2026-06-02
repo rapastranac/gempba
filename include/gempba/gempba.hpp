@@ -29,6 +29,7 @@
 #include <gempba/detail/nodes/node_core_impl.hpp>
 #include <gempba/detail/runnables/serial_runnable_non_void.hpp>
 #include <gempba/detail/runnables/serial_runnable_void.hpp>
+#include <gempba/telemetry/telemetry_hub.hpp>
 #include <gempba/utils/gempba_utils.hpp>
 
 #if GEMPBA_MULTIPROCESSING
