@@ -4,10 +4,10 @@
     Open an SSH tunnel to a remote gempba center and live-tail its telemetry.
 
 .DESCRIPTION
-    Wraps the two-step "ssh -L <port>:127.0.0.1:<port> ... + watch_telemetry.ps1"
+    Wraps the two-step "ssh -L <port>:127.0.0.1:<port> ... + telemetry_view.ps1"
     workflow into a single command. Spawns `ssh -N -L ...` as a child process,
     waits until the local end of the tunnel accepts TCP connections, then runs
-    watch_telemetry.ps1 against it. Tearing down this script (Ctrl+C, or the
+    telemetry_view.ps1 against it. Tearing down this script (Ctrl+C, or the
     watch script returning) kills the SSH child.
 
     Two modes:
@@ -102,7 +102,7 @@ try {
         }
     }
 
-    & "$PSScriptRoot\watch_telemetry.ps1" -Port $LocalPort
+    & "$PSScriptRoot\telemetry_view.ps1" -Port $LocalPort
 } finally {
     if (-not $ssh.HasExited) {
         Stop-Process -Id $ssh.Id -Force -ErrorAction SilentlyContinue
