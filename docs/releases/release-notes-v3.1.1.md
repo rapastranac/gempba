@@ -1,6 +1,6 @@
 # v3.1.1
 
-<small>May 2, 2026 · [GitHub ↗](https://github.com/rapastranac/gempba/releases/tag/v3.1.1)</small>
+<small>May 19, 2026 · [GitHub ↗](https://github.com/rapastranac/gempba/releases/tag/v3.1.1)</small>
 
 Post-v3.1.0 hygiene release: packaging metadata, coverage scope, CI workflow polish, a test-coverage push, cross-platform fixes, and toolchain bumps. No public API changes.
 

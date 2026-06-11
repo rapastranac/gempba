@@ -1,6 +1,6 @@
 # v1.0.2
 
-<small>June 8, 2025 · [GitHub ↗](https://github.com/rapastranac/gempba/releases/tag/v1.0.2)</small>
+<small>June 7, 2025 · [GitHub ↗](https://github.com/rapastranac/gempba/releases/tag/v1.0.2)</small>
 
 Easier external integration: GemPBA is now a consumable CMake library with a `gempba::gempba` target, a hook to inject a custom initial process topology, and CPM-based dependency fetch.
 

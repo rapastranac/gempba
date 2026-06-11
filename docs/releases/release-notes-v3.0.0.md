@@ -1,6 +1,6 @@
 # v3.0.0
 
-<small>April 19, 2026 · [GitHub ↗](https://github.com/rapastranac/gempba/releases/tag/v3.0.0)</small>
+<small>December 7, 2025 · [GitHub ↗](https://github.com/rapastranac/gempba/releases/tag/v3.0.0)</small>
 
 The largest release in the project's history: a ground-up redesign that replaces the heavy template-driven API with a single-header `gempba::` facade. `branch_handler` becomes `node_manager`, the entire pre-v3 surface (`result_holder`, `dynamic_load_balancer_handler`, `Pool`, `args_handler`, all `*2`-suffixed members) is removed, and the public surface is reorganized under `include/gempba/`.
 
