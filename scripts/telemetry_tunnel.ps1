@@ -60,30 +60,48 @@ if (-not (Get-Command ssh -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
-$sshArgs = @('-N')
 if ($JumpHost) {
-    $sshArgs += @('-J', $JumpHost)
-    Write-Host ("Tunnel: {0} via {1}" -f $SshHost, $JumpHost) -ForegroundColor DarkGray
+    # Compute nodes only trust login-originated ssh, so nest instead of -J.
+    $mid = Get-Random -Minimum 20000 -Maximum 60000
+    $inner = "ssh -N -o ExitOnForwardFailure=yes -o StrictHostKeyChecking=accept-new -L ${mid}:127.0.0.1:${RemotePort} ${SshHost}"
+    $q = [char]39
+    # The remote cat gets EOF when the outer ssh dies, then kills the inner ssh.
+    $remoteCmd = "sh -c ${q}${inner} & p=`$!; cat >/dev/null 2>&1; kill `$p 2>/dev/null${q}"
+    # One string, not an array: Start-Process mangles array elements containing quotes.
+    $argLine = "-o StrictHostKeyChecking=accept-new -L ${LocalPort}:localhost:${mid} ${JumpHost} `"$remoteCmd`""
+    Write-Host ("Tunnel: {0} via {1} (login-originated hop)" -f $SshHost, $JumpHost) -ForegroundColor DarkGray
+    $timeoutSec = 120
 } else {
+    $argLine = "-N -o ExitOnForwardFailure=yes -L ${LocalPort}:127.0.0.1:${RemotePort} ${SshHost}"
     Write-Host ("Tunnel: {0}" -f $SshHost) -ForegroundColor DarkGray
+    $timeoutSec = 15
 }
-$sshArgs += @('-L', "${LocalPort}:127.0.0.1:${RemotePort}", $SshHost)
 
-$ssh = Start-Process -FilePath ssh -ArgumentList $sshArgs -NoNewWindow -PassThru
+$ssh = Start-Process -FilePath ssh -ArgumentList $argLine -NoNewWindow -PassThru
 try {
-    $deadline = (Get-Date).AddSeconds(15)
+    $ready = $false
+    $deadline = (Get-Date).AddSeconds($timeoutSec)
     while ((Get-Date) -lt $deadline) {
         if ($ssh.HasExited) {
             Write-Host ("ERROR: ssh exited (code {0}) before the tunnel was ready." -f $ssh.ExitCode) -ForegroundColor Red
             exit 1
         }
+        # Read a byte, don't just connect: the local listener accepts before the inner hop is up.
         try {
             $probe = [System.Net.Sockets.TcpClient]::new('127.0.0.1', $LocalPort)
-            $probe.Close()
-            break
-        } catch {
-            Start-Sleep -Milliseconds 200
-        }
+            try {
+                $probe.ReceiveTimeout = 1500
+                $buf = New-Object byte[] 1
+                if ($probe.GetStream().Read($buf, 0, 1) -ge 1) { $ready = $true }
+            } finally { $probe.Close() }
+        } catch { }
+        if ($ready) { break }
+        Start-Sleep -Milliseconds 300
+    }
+
+    if (-not $ready) {
+        Write-Host ("ERROR: tunnel did not become ready on 127.0.0.1:{0} within {1}s." -f $LocalPort, $timeoutSec) -ForegroundColor Red
+        exit 1
     }
 
     & "$PSScriptRoot\telemetry_view.ps1" -Port $LocalPort
