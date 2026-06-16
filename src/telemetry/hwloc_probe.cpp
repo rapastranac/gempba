@@ -150,6 +150,22 @@ namespace gempba::telemetry {
         return detail::fill_runtime_from_topology(p_out, v_handle.m_topology);
     }
 
+    int socket_of_cpu_via_hwloc(unsigned p_cpu) noexcept {
+        topology_handle v_handle;
+        if (!v_handle.m_loaded) {
+            return -1; // LCOV_EXCL_LINE
+        }
+        hwloc_obj_t v_pu = hwloc_get_pu_obj_by_os_index(v_handle.m_topology, p_cpu);
+        if (!v_pu) {
+            return -1;
+        }
+        hwloc_obj_t v_package = hwloc_get_ancestor_obj_by_type(v_handle.m_topology, HWLOC_OBJ_PACKAGE, v_pu);
+        if (!v_package) {
+            return -1;
+        }
+        return static_cast<int>(v_package->logical_index);
+    }
+
 } // namespace gempba::telemetry
 
 #else // !GEMPBA_HWLOC
@@ -158,6 +174,7 @@ namespace gempba::telemetry {
 
     bool fill_static_topology_via_hwloc(topology_node& /*p_node*/) noexcept { return false; }
     bool fill_runtime_via_hwloc(node_frame& /*p_out*/) noexcept { return false; }
+    int socket_of_cpu_via_hwloc(unsigned /*p_cpu*/) noexcept { return -1; }
 
 } // namespace gempba::telemetry
 

@@ -105,37 +105,56 @@ namespace gempba::telemetry {
 #endif
         }
 
-        // Bitmap of logical CPUs the current process is allowed to run on.
-        // Capped at 64 to fit worker_identity's POD layout.
-        std::uint64_t query_allowed_cpu_mask() noexcept {
+        // Fill p_mask (CPU_MASK_WORDS words) with the logical CPUs the current
+        // process may run on: bit (w*64 + b) set means CPU w*64+b is allowed.
+        // Covers every CPU up to MAX_LOGICAL_CPUS, not just the low 64.
+        void query_allowed_cpu_mask(std::uint64_t* p_mask) noexcept {
+            for (unsigned v_w = 0; v_w < CPU_MASK_WORDS; ++v_w) {
+                p_mask[v_w] = 0;
+            }
 #if defined(_WIN32)
+            // Windows process affinity is per-processor-group (max 64); report the
+            // primary group, the common single-group case.
             DWORD_PTR v_proc_mask = 0;
             DWORD_PTR v_sys_mask = 0;
             if (GetProcessAffinityMask(GetCurrentProcess(), &v_proc_mask, &v_sys_mask)) {
-                return static_cast<std::uint64_t>(v_proc_mask);
+                p_mask[0] = static_cast<std::uint64_t>(v_proc_mask);
             }
-            return 0;
 #elif defined(__APPLE__)
-            // macOS does not expose process CPU affinity (Apple discourages
-            // pinning). Report "any CPU" within the visible core count.
+            // macOS does not expose process CPU affinity; report "any CPU" within
+            // the visible core count.
             const unsigned v_cores = std::thread::hardware_concurrency();
-            if (v_cores == 0 || v_cores >= 64)
-                return ~static_cast<std::uint64_t>(0);
-            return (static_cast<std::uint64_t>(1) << v_cores) - 1;
+            const unsigned v_max = (v_cores == 0) ? 1u : std::min(v_cores, MAX_LOGICAL_CPUS);
+            for (unsigned v_i = 0; v_i < v_max; ++v_i) {
+                p_mask[v_i / 64u] |= (1ULL << (v_i % 64u));
+            }
 #else
             cpu_set_t v_set;
             CPU_ZERO(&v_set);
             if (sched_getaffinity(0, sizeof(v_set), &v_set) != 0)
-                return 0;
-            std::uint64_t v_mask = 0;
-            const unsigned v_max = std::min(64u, static_cast<unsigned>(CPU_SETSIZE));
+                return;
+            const unsigned v_max = std::min(MAX_LOGICAL_CPUS, static_cast<unsigned>(CPU_SETSIZE));
             for (unsigned v_i = 0; v_i < v_max; ++v_i) {
                 if (CPU_ISSET(static_cast<int>(v_i), &v_set)) {
-                    v_mask |= (1ULL << v_i);
+                    p_mask[v_i / 64u] |= (1ULL << (v_i % 64u));
                 }
             }
-            return v_mask;
 #endif
+        }
+
+        // Lowest allowed CPU index in p_mask, or -1 when none is set.
+        int first_allowed_cpu(const std::uint64_t* p_mask) noexcept {
+            for (unsigned v_w = 0; v_w < CPU_MASK_WORDS; ++v_w) {
+                if (p_mask[v_w] == 0) {
+                    continue;
+                }
+                for (unsigned v_b = 0; v_b < 64u; ++v_b) {
+                    if (p_mask[v_w] & (1ULL << v_b)) {
+                        return static_cast<int>(v_w * 64u + v_b);
+                    }
+                }
+            }
+            return -1;
         }
 
         std::uint64_t query_total_memory_bytes() noexcept {
@@ -175,8 +194,10 @@ namespace gempba::telemetry {
             v_self.m_worker_id = p_worker_id;
             fill_hostname(v_self.m_hostname, sizeof(v_self.m_hostname));
             v_self.m_pid = current_pid();
-            v_self.m_allowed_cpu_mask = query_allowed_cpu_mask();
-            v_self.m_primary_socket = 0;
+            query_allowed_cpu_mask(v_self.m_allowed_cpu_mask);
+            const int v_first_cpu = first_allowed_cpu(v_self.m_allowed_cpu_mask);
+            const int v_socket = (v_first_cpu >= 0) ? socket_of_cpu_via_hwloc(static_cast<unsigned>(v_first_cpu)) : -1;
+            v_self.m_primary_socket = static_cast<std::uint8_t>(v_socket < 0 ? 0 : v_socket);
             return v_self;
         }
 

@@ -10,6 +10,12 @@ namespace gempba::telemetry {
     /// Hard upper bound on per-host socket count; sizes node_frame::m_sockets.
     inline constexpr unsigned MAX_SOCKETS = 8;
 
+    /// Hard upper bound on a node's logical CPU count, and the derived 64-bit word
+    /// count for worker_identity's allowed-CPU bitmap. Covers the widest current
+    /// servers (e.g. dual 192-core SMT) with headroom.
+    inline constexpr unsigned MAX_LOGICAL_CPUS = 1024;
+    inline constexpr unsigned CPU_MASK_WORDS = MAX_LOGICAL_CPUS / 64;
+
     /// Wire-format version stamped into every frame. Bump on any layout change.
     inline constexpr std::uint16_t TELEMETRY_SCHEMA_VERSION = 1;
 
@@ -24,10 +30,12 @@ namespace gempba::telemetry {
         std::uint32_t m_worker_id;
         char m_hostname[64];
         std::uint32_t m_pid;
-        /// Socket the worker is pinned to (0 when affinity is unknown).
+        /// Socket the worker's affinity places it on (0 when affinity is unknown).
         std::uint8_t m_primary_socket;
-        /// Bitmap of logical CPUs this worker is allowed to run on (low 64).
-        std::uint64_t m_allowed_cpu_mask;
+        /// Bitmap of the logical CPUs this worker may run on, one bit per CPU
+        /// across @ref MAX_LOGICAL_CPUS: word @c w bit @c b means CPU @c w*64+b.
+        /// Wide enough to represent every CPU on big nodes, not just the low 64.
+        std::uint64_t m_allowed_cpu_mask[CPU_MASK_WORDS];
     };
 
     /// One outbound edge in @ref worker_frame::m_edges_out.

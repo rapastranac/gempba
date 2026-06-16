@@ -209,12 +209,14 @@ namespace gempba::telemetry {
             emit_u32(p_out, v_id.m_primary_socket);
             p_out += ",\"allowed_cpu_ids\":[";
             bool v_first_cpu = true;
-            for (unsigned v_bit = 0; v_bit < 64u; ++v_bit) {
-                if (v_id.m_allowed_cpu_mask & (1ULL << v_bit)) {
-                    if (!v_first_cpu)
-                        p_out += ',';
-                    emit_u32(p_out, v_bit);
-                    v_first_cpu = false;
+            for (unsigned v_word = 0; v_word < CPU_MASK_WORDS; ++v_word) {
+                for (unsigned v_bit = 0; v_bit < 64u; ++v_bit) {
+                    if (v_id.m_allowed_cpu_mask[v_word] & (1ULL << v_bit)) {
+                        if (!v_first_cpu)
+                            p_out += ',';
+                        emit_u32(p_out, v_word * 64u + v_bit);
+                        v_first_cpu = false;
+                    }
                 }
             }
             p_out += "]}";

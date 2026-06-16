@@ -64,7 +64,12 @@ namespace {
 
     TEST(topology_builder_test, identity_affinity_mask_has_at_least_one_bit_set) {
         const auto v_snap = gempba::telemetry::build_topology_snapshot(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1);
-        EXPECT_NE(0u, v_snap.m_identities.front().m_allowed_cpu_mask);
+        const auto& v_mask = v_snap.m_identities.front().m_allowed_cpu_mask;
+        std::uint64_t v_any = 0;
+        for (const std::uint64_t v_word: v_mask) {
+            v_any |= v_word;
+        }
+        EXPECT_NE(0u, v_any);
     }
 
     // ── per-node topology gather (serialize / deserialize) ─────────────────────
