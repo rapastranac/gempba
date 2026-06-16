@@ -1,6 +1,7 @@
 #include <impl/telemetry/node_probe.hpp>
 
 #include <cstring>
+#include <impl/telemetry/cgroup_memory.hpp>
 #include <impl/telemetry/hwloc_probe.hpp>
 #include <thread>
 
@@ -111,6 +112,53 @@ namespace gempba::telemetry {
         }
 #endif
 
+#if defined(_WIN32) || defined(__APPLE__)
+        void fill_cgroup_memory(std::uint64_t /*p_host_total*/, std::uint64_t& p_used, std::uint64_t& p_limit) noexcept {
+            p_used = 0;
+            p_limit = 0;
+        }
+#else
+        // The job's memory-cgroup usage and limit, or 0 when unconstrained so the
+        // consumer falls back to the host total. Scheduler-agnostic; tries cgroup
+        // v2 then v1, resolving the limit at the enforcing ancestor via
+        // detail::resolve_cgroup_memory.
+        void fill_cgroup_memory(std::uint64_t p_host_total, std::uint64_t& p_used, std::uint64_t& p_limit) noexcept {
+            p_used = 0;
+            p_limit = 0;
+
+            std::ifstream v_cgroup("/proc/self/cgroup");
+            if (!v_cgroup)
+                return;
+
+            std::string v_line;
+            std::string v_v2_path;
+            std::string v_v1_memory_path;
+            while (std::getline(v_cgroup, v_line)) {
+                const auto v_first_colon = v_line.find(':');
+                if (v_first_colon == std::string::npos)
+                    continue;
+                const auto v_second_colon = v_line.find(':', v_first_colon + 1);
+                if (v_second_colon == std::string::npos)
+                    continue;
+                const std::string v_controllers = v_line.substr(v_first_colon + 1, v_second_colon - v_first_colon - 1);
+                const std::string v_path = v_line.substr(v_second_colon + 1);
+                if (v_controllers.empty()) {
+                    v_v2_path = v_path; // cgroup v2 unified hierarchy
+                } else if (v_controllers.find("memory") != std::string::npos) {
+                    v_v1_memory_path = v_path;
+                }
+            }
+
+            if (!v_v2_path.empty()) {
+                detail::resolve_cgroup_memory("/sys/fs/cgroup" + v_v2_path, "/sys/fs/cgroup", "memory.max", "memory.current", p_host_total, p_used, p_limit);
+            }
+            if (p_limit == 0 && p_used == 0 && !v_v1_memory_path.empty()) {
+                detail::resolve_cgroup_memory("/sys/fs/cgroup/memory" + v_v1_memory_path, "/sys/fs/cgroup/memory", "memory.limit_in_bytes", "memory.usage_in_bytes", p_host_total, p_used,
+                                              p_limit);
+            }
+        }
+#endif
+
     } // namespace
 
     node_probe::node_probe() noexcept = default;
@@ -122,6 +170,7 @@ namespace gempba::telemetry {
         p_out.m_logical_cores = (v_cores == 0) ? 1u : v_cores;
 
         fill_memory(p_out.m_mem_total_bytes, p_out.m_mem_avail_bytes);
+        fill_cgroup_memory(p_out.m_mem_total_bytes, p_out.m_cgroup_mem_used_bytes, p_out.m_cgroup_mem_limit_bytes);
 
         if (!fill_runtime_via_hwloc(p_out)) {
             p_out.m_socket_count = 1;

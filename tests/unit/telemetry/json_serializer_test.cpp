@@ -46,6 +46,8 @@ namespace {
         v_n.m_logical_cores = 16;
         v_n.m_mem_total_bytes = 4096;
         v_n.m_mem_avail_bytes = 1024;
+        v_n.m_cgroup_mem_used_bytes = 512;
+        v_n.m_cgroup_mem_limit_bytes = 8192;
         v_n.m_sockets[0].m_socket_id = 0;
         v_n.m_sockets[0].m_cpu_pct = 12.5f;
 
@@ -57,6 +59,8 @@ namespace {
         EXPECT_NE(std::string::npos, v_out.find("\"logical_cores\":16"));
         EXPECT_NE(std::string::npos, v_out.find("\"mem_total_bytes\":4096"));
         EXPECT_NE(std::string::npos, v_out.find("\"mem_avail_bytes\":1024"));
+        EXPECT_NE(std::string::npos, v_out.find("\"cgroup_mem_used_bytes\":512"));
+        EXPECT_NE(std::string::npos, v_out.find("\"cgroup_mem_limit_bytes\":8192"));
         EXPECT_NE(std::string::npos, v_out.find("\"cpu_pct\":12.500"));
     }
 

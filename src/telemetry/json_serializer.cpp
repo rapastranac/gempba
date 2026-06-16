@@ -118,6 +118,10 @@ namespace gempba::telemetry {
         emit_u64(p_out, p_frame.m_mem_total_bytes);
         p_out += ",\"mem_avail_bytes\":";
         emit_u64(p_out, p_frame.m_mem_avail_bytes);
+        p_out += ",\"cgroup_mem_used_bytes\":";
+        emit_u64(p_out, p_frame.m_cgroup_mem_used_bytes);
+        p_out += ",\"cgroup_mem_limit_bytes\":";
+        emit_u64(p_out, p_frame.m_cgroup_mem_limit_bytes);
         p_out += ",\"sockets\":[";
         for (std::uint8_t v_i = 0; v_i < p_frame.m_socket_count && v_i < MAX_SOCKETS; ++v_i) {
             if (v_i > 0)

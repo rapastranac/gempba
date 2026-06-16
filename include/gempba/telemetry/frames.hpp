@@ -120,6 +120,14 @@ namespace gempba::telemetry {
         socket_stats m_sockets[MAX_SOCKETS];
         std::uint64_t m_mem_total_bytes;
         std::uint64_t m_mem_avail_bytes;
+        /// Job-cgroup memory, or 0 when this process is not in a memory cgroup
+        /// (or the limit is effectively unlimited): @c m_cgroup_mem_used_bytes is
+        /// the job-step's current memory on this host and @c m_cgroup_mem_limit_bytes
+        /// its allocation. Lets a consumer show "gempba's memory / its allocation"
+        /// instead of the host-wide total on a shared node. Scheduler-agnostic
+        /// (any cgroup-based scheduler populates these).
+        std::uint64_t m_cgroup_mem_used_bytes;
+        std::uint64_t m_cgroup_mem_limit_bytes;
         net_stats m_net_aggregate;
         disk_stats m_disk_aggregate;
     };
