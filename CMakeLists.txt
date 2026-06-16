@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.28)
 
-project(gempba VERSION 4.1.3 LANGUAGES CXX)
+project(gempba VERSION 4.2.0 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
