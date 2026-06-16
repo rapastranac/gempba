@@ -46,6 +46,8 @@ namespace {
         v_n.m_logical_cores = 16;
         v_n.m_mem_total_bytes = 4096;
         v_n.m_mem_avail_bytes = 1024;
+        v_n.m_cgroup_mem_used_bytes = 512;
+        v_n.m_cgroup_mem_limit_bytes = 8192;
         v_n.m_sockets[0].m_socket_id = 0;
         v_n.m_sockets[0].m_cpu_pct = 12.5f;
 
@@ -57,6 +59,8 @@ namespace {
         EXPECT_NE(std::string::npos, v_out.find("\"logical_cores\":16"));
         EXPECT_NE(std::string::npos, v_out.find("\"mem_total_bytes\":4096"));
         EXPECT_NE(std::string::npos, v_out.find("\"mem_avail_bytes\":1024"));
+        EXPECT_NE(std::string::npos, v_out.find("\"cgroup_mem_used_bytes\":512"));
+        EXPECT_NE(std::string::npos, v_out.find("\"cgroup_mem_limit_bytes\":8192"));
         EXPECT_NE(std::string::npos, v_out.find("\"cpu_pct\":12.500"));
     }
 
@@ -85,7 +89,8 @@ namespace {
         std::strncpy(v_id.m_hostname, "host-a", sizeof(v_id.m_hostname));
         v_id.m_pid = 1234;
         v_id.m_primary_socket = 0;
-        v_id.m_allowed_cpu_mask = 0b1011ULL; // CPUs 0, 1, 3
+        v_id.m_allowed_cpu_mask[0] = 0b1011ULL; // CPUs 0, 1, 3
+        v_id.m_allowed_cpu_mask[1] = 1ULL << 36; // CPU 100 -- past the old 64-bit cap
         v_t.m_identities.push_back(v_id);
 
         std::string v_out;
@@ -101,8 +106,9 @@ namespace {
         EXPECT_NE(std::string::npos, v_out.find("\"physical_cores\":8"));
         EXPECT_NE(std::string::npos, v_out.find("\"cpu_ids\":[0,1,2,3]"));
         EXPECT_NE(std::string::npos, v_out.find("\"pid\":1234"));
-        // Bitmap 0b1011 = bits 0, 1, 3 → JSON list [0,1,3].
-        EXPECT_NE(std::string::npos, v_out.find("\"allowed_cpu_ids\":[0,1,3]"));
+        // Word 0 bits 0,1,3 plus word 1 bit 36 → CPUs 0,1,3,100; the 100 proves
+        // CPUs past the old 64-bit cap survive.
+        EXPECT_NE(std::string::npos, v_out.find("\"allowed_cpu_ids\":[0,1,3,100]"));
     }
 
     TEST(json_serializer_test, broadcast_envelope_carries_version_and_top_level_keys) {

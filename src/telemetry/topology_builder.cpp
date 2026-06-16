@@ -105,37 +105,56 @@ namespace gempba::telemetry {
 #endif
         }
 
-        // Bitmap of logical CPUs the current process is allowed to run on.
-        // Capped at 64 to fit worker_identity's POD layout.
-        std::uint64_t query_allowed_cpu_mask() noexcept {
+        // Fill p_mask (CPU_MASK_WORDS words) with the logical CPUs the current
+        // process may run on: bit (w*64 + b) set means CPU w*64+b is allowed.
+        // Covers every CPU up to MAX_LOGICAL_CPUS, not just the low 64.
+        void query_allowed_cpu_mask(std::uint64_t* p_mask) noexcept {
+            for (unsigned v_w = 0; v_w < CPU_MASK_WORDS; ++v_w) {
+                p_mask[v_w] = 0;
+            }
 #if defined(_WIN32)
+            // Windows process affinity is per-processor-group (max 64); report the
+            // primary group, the common single-group case.
             DWORD_PTR v_proc_mask = 0;
             DWORD_PTR v_sys_mask = 0;
             if (GetProcessAffinityMask(GetCurrentProcess(), &v_proc_mask, &v_sys_mask)) {
-                return static_cast<std::uint64_t>(v_proc_mask);
+                p_mask[0] = static_cast<std::uint64_t>(v_proc_mask);
             }
-            return 0;
 #elif defined(__APPLE__)
-            // macOS does not expose process CPU affinity (Apple discourages
-            // pinning). Report "any CPU" within the visible core count.
+            // macOS does not expose process CPU affinity; report "any CPU" within
+            // the visible core count.
             const unsigned v_cores = std::thread::hardware_concurrency();
-            if (v_cores == 0 || v_cores >= 64)
-                return ~static_cast<std::uint64_t>(0);
-            return (static_cast<std::uint64_t>(1) << v_cores) - 1;
+            const unsigned v_max = (v_cores == 0) ? 1u : std::min(v_cores, MAX_LOGICAL_CPUS);
+            for (unsigned v_i = 0; v_i < v_max; ++v_i) {
+                p_mask[v_i / 64u] |= (1ULL << (v_i % 64u));
+            }
 #else
             cpu_set_t v_set;
             CPU_ZERO(&v_set);
             if (sched_getaffinity(0, sizeof(v_set), &v_set) != 0)
-                return 0;
-            std::uint64_t v_mask = 0;
-            const unsigned v_max = std::min(64u, static_cast<unsigned>(CPU_SETSIZE));
+                return;
+            const unsigned v_max = std::min(MAX_LOGICAL_CPUS, static_cast<unsigned>(CPU_SETSIZE));
             for (unsigned v_i = 0; v_i < v_max; ++v_i) {
                 if (CPU_ISSET(static_cast<int>(v_i), &v_set)) {
-                    v_mask |= (1ULL << v_i);
+                    p_mask[v_i / 64u] |= (1ULL << (v_i % 64u));
                 }
             }
-            return v_mask;
 #endif
+        }
+
+        // Lowest allowed CPU index in p_mask, or -1 when none is set.
+        int first_allowed_cpu(const std::uint64_t* p_mask) noexcept {
+            for (unsigned v_w = 0; v_w < CPU_MASK_WORDS; ++v_w) {
+                if (p_mask[v_w] == 0) {
+                    continue;
+                }
+                for (unsigned v_b = 0; v_b < 64u; ++v_b) {
+                    if (p_mask[v_w] & (1ULL << v_b)) {
+                        return static_cast<int>(v_w * 64u + v_b);
+                    }
+                }
+            }
+            return -1;
         }
 
         std::uint64_t query_total_memory_bytes() noexcept {
@@ -175,8 +194,10 @@ namespace gempba::telemetry {
             v_self.m_worker_id = p_worker_id;
             fill_hostname(v_self.m_hostname, sizeof(v_self.m_hostname));
             v_self.m_pid = current_pid();
-            v_self.m_allowed_cpu_mask = query_allowed_cpu_mask();
-            v_self.m_primary_socket = 0;
+            query_allowed_cpu_mask(v_self.m_allowed_cpu_mask);
+            const int v_first_cpu = first_allowed_cpu(v_self.m_allowed_cpu_mask);
+            const int v_socket = (v_first_cpu >= 0) ? socket_of_cpu_via_hwloc(static_cast<unsigned>(v_first_cpu)) : -1;
+            v_self.m_primary_socket = static_cast<std::uint8_t>(v_socket < 0 ? 0 : v_socket);
             return v_self;
         }
 
@@ -253,9 +274,6 @@ namespace gempba::telemetry {
                     v_node.m_hostname = v_hostname;
                     v_node.m_worker_ids.push_back(v_id.m_worker_id);
                     v_node.m_sentinel_worker_id = v_id.m_worker_id;
-                    if (v_hostname == std::string(v_self.m_hostname)) {
-                        fill_local_host_fields(v_node);
-                    }
                     v_node_index_by_hostname.emplace(v_hostname, v_snapshot.m_nodes.size());
                     v_snapshot.m_nodes.push_back(std::move(v_node));
                 } else {
@@ -267,11 +285,198 @@ namespace gempba::telemetry {
                 }
             }
 
+            // Only each host's sentinel probes and contributes its layout, so a
+            // wide node doesn't multiply the payload across its ranks. Serialize it
+            // for a variable-length gather -- no per-socket CPU-ID cap, so wide
+            // sockets (e.g. 96-core EPYC) come through intact.
+            std::vector<std::uint8_t> v_self_blob;
+            {
+                const auto v_self_it = v_node_index_by_hostname.find(std::string(v_self.m_hostname));
+                const bool v_is_sentinel = v_self_it != v_node_index_by_hostname.end() && v_snapshot.m_nodes[v_self_it->second].m_sentinel_worker_id == p_worker_id;
+                if (v_is_sentinel) {
+                    topology_node v_self_node;
+                    v_self_node.m_hostname = v_self.m_hostname;
+                    fill_local_host_fields(v_self_node);
+                    detail::serialize_node_topology(v_self_blob, v_self_node);
+                }
+            }
+
+            const int v_self_size = static_cast<int>(v_self_blob.size());
+            std::vector<int> v_sizes(p_world_size);
+            MPI_Allgather(&v_self_size, 1, MPI_INT, v_sizes.data(), 1, MPI_INT, MPI_COMM_WORLD);
+
+            std::vector<int> v_displs(p_world_size);
+            int v_total = 0;
+            for (std::uint32_t v_i = 0; v_i < p_world_size; ++v_i) {
+                v_displs[v_i] = v_total;
+                v_total += v_sizes[v_i];
+            }
+
+            std::vector<std::uint8_t> v_gathered(static_cast<std::size_t>(v_total));
+            MPI_Allgatherv(v_self_blob.data(), v_self_size, MPI_BYTE, v_gathered.data(), v_sizes.data(), v_displs.data(), MPI_BYTE, MPI_COMM_WORLD);
+
+            for (std::uint32_t v_i = 0; v_i < p_world_size; ++v_i) {
+                if (v_sizes[v_i] <= 0) {
+                    continue;
+                }
+                topology_node v_fragment;
+                if (!detail::deserialize_node_topology(v_fragment, v_gathered.data() + v_displs[v_i], static_cast<std::size_t>(v_sizes[v_i]))) {
+                    continue;
+                }
+                const auto v_it = v_node_index_by_hostname.find(v_fragment.m_hostname);
+                if (v_it == v_node_index_by_hostname.end()) {
+                    continue;
+                }
+                topology_node& v_node = v_snapshot.m_nodes[v_it->second];
+                v_node.m_total_physical_cores = v_fragment.m_total_physical_cores;
+                v_node.m_total_logical_cores = v_fragment.m_total_logical_cores;
+                v_node.m_mem_total_bytes = v_fragment.m_mem_total_bytes;
+                v_node.m_sockets = std::move(v_fragment.m_sockets);
+            }
+
             return v_snapshot;
         }
 #endif // GEMPBA_MULTIPROCESSING
 
     } // namespace
+
+    namespace detail {
+
+        namespace {
+
+            void put_u8(std::vector<std::uint8_t>& p_buf, std::uint8_t p_v) { p_buf.push_back(p_v); }
+
+            void put_u16(std::vector<std::uint8_t>& p_buf, std::uint16_t p_v) {
+                p_buf.push_back(static_cast<std::uint8_t>(p_v & 0xFFu));
+                p_buf.push_back(static_cast<std::uint8_t>((p_v >> 8) & 0xFFu));
+            }
+
+            void put_u32(std::vector<std::uint8_t>& p_buf, std::uint32_t p_v) {
+                for (int v_i = 0; v_i < 4; ++v_i) {
+                    p_buf.push_back(static_cast<std::uint8_t>((p_v >> (8 * v_i)) & 0xFFu));
+                }
+            }
+
+            void put_u64(std::vector<std::uint8_t>& p_buf, std::uint64_t p_v) {
+                for (int v_i = 0; v_i < 8; ++v_i) {
+                    p_buf.push_back(static_cast<std::uint8_t>((p_v >> (8 * v_i)) & 0xFFu));
+                }
+            }
+
+            void put_str(std::vector<std::uint8_t>& p_buf, const std::string& p_str) {
+                const std::uint16_t v_len = static_cast<std::uint16_t>(std::min<std::size_t>(p_str.size(), 0xFFFFu));
+                put_u16(p_buf, v_len);
+                p_buf.insert(p_buf.end(), p_str.begin(), p_str.begin() + v_len);
+            }
+
+            /**
+             * @brief Bounds-checked little-endian cursor; m_ok latches false on overrun.
+             */
+            struct byte_reader {
+                const std::uint8_t* m_data = nullptr;
+                std::size_t m_size = 0;
+                std::size_t m_pos = 0;
+                bool m_ok = true;
+
+                bool take(std::size_t p_n) {
+                    if (m_pos + p_n > m_size) {
+                        m_ok = false;
+                        return false;
+                    }
+                    return true;
+                }
+
+                std::uint8_t u8() { return take(1) ? m_data[m_pos++] : 0; }
+
+                std::uint16_t u16() {
+                    if (!take(2)) {
+                        return 0;
+                    }
+                    const auto v_value = static_cast<std::uint16_t>(m_data[m_pos] | (m_data[m_pos + 1] << 8));
+                    m_pos += 2;
+                    return v_value;
+                }
+
+                std::uint32_t u32() {
+                    if (!take(4)) {
+                        return 0;
+                    }
+                    std::uint32_t v_value = 0;
+                    for (int v_i = 0; v_i < 4; ++v_i) {
+                        v_value |= static_cast<std::uint32_t>(m_data[m_pos + v_i]) << (8 * v_i);
+                    }
+                    m_pos += 4;
+                    return v_value;
+                }
+
+                std::uint64_t u64() {
+                    if (!take(8)) {
+                        return 0;
+                    }
+                    std::uint64_t v_value = 0;
+                    for (int v_i = 0; v_i < 8; ++v_i) {
+                        v_value |= static_cast<std::uint64_t>(m_data[m_pos + v_i]) << (8 * v_i);
+                    }
+                    m_pos += 8;
+                    return v_value;
+                }
+
+                std::string str() {
+                    const std::uint16_t v_len = u16();
+                    if (!take(v_len)) {
+                        return {};
+                    }
+                    std::string v_value(reinterpret_cast<const char*>(m_data + m_pos), v_len);
+                    m_pos += v_len;
+                    return v_value;
+                }
+            };
+
+        } // namespace
+
+        void serialize_node_topology(std::vector<std::uint8_t>& p_out, const topology_node& p_node) {
+            put_str(p_out, p_node.m_hostname);
+            put_u16(p_out, p_node.m_total_physical_cores);
+            put_u16(p_out, p_node.m_total_logical_cores);
+            put_u64(p_out, p_node.m_mem_total_bytes);
+            put_u16(p_out, static_cast<std::uint16_t>(p_node.m_sockets.size()));
+            for (const topology_socket& v_socket: p_node.m_sockets) {
+                put_u8(p_out, v_socket.m_socket_id);
+                put_u16(p_out, v_socket.m_physical_cores);
+                put_u16(p_out, v_socket.m_logical_cores);
+                put_str(p_out, v_socket.m_name);
+                put_u32(p_out, static_cast<std::uint32_t>(v_socket.m_cpu_ids.size()));
+                for (const std::uint32_t v_cpu_id: v_socket.m_cpu_ids) {
+                    put_u32(p_out, v_cpu_id);
+                }
+            }
+        }
+
+        bool deserialize_node_topology(topology_node& p_node, const std::uint8_t* p_data, std::size_t p_size) {
+            byte_reader v_reader{p_data, p_size};
+            p_node.m_hostname = v_reader.str();
+            p_node.m_total_physical_cores = v_reader.u16();
+            p_node.m_total_logical_cores = v_reader.u16();
+            p_node.m_mem_total_bytes = v_reader.u64();
+            const std::uint16_t v_socket_count = v_reader.u16();
+
+            p_node.m_sockets.clear();
+            for (std::uint16_t v_i = 0; v_i < v_socket_count && v_reader.m_ok; ++v_i) {
+                topology_socket v_socket;
+                v_socket.m_socket_id = v_reader.u8();
+                v_socket.m_physical_cores = v_reader.u16();
+                v_socket.m_logical_cores = v_reader.u16();
+                v_socket.m_name = v_reader.str();
+                const std::uint32_t v_cpu_count = v_reader.u32();
+                for (std::uint32_t v_j = 0; v_j < v_cpu_count && v_reader.m_ok; ++v_j) {
+                    v_socket.m_cpu_ids.push_back(v_reader.u32());
+                }
+                p_node.m_sockets.push_back(std::move(v_socket));
+            }
+            return v_reader.m_ok;
+        }
+
+    } // namespace detail
 
     topology_snapshot build_topology_snapshot(const runtime_mode p_mode, const std::uint32_t p_worker_id, const std::uint32_t p_world_size) {
         switch (p_mode) {
