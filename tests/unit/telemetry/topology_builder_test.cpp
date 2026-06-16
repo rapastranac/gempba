@@ -67,4 +67,75 @@ namespace {
         EXPECT_NE(0u, v_snap.m_identities.front().m_allowed_cpu_mask);
     }
 
+    // ── per-node topology gather (serialize / deserialize) ─────────────────────
+
+    TEST(topology_builder_test, serialize_round_trips_wide_sockets) {
+        using namespace gempba::telemetry;
+        topology_node v_node;
+        v_node.m_hostname = "fc30557";
+        v_node.m_total_physical_cores = 192;
+        v_node.m_total_logical_cores = 192;
+        v_node.m_mem_total_bytes = 755ULL * 1024 * 1024 * 1024;
+        // Two 96-core EPYC sockets -- 96 cpu_ids each, well past any fixed cap.
+        for (std::uint8_t v_s = 0; v_s < 2; ++v_s) {
+            topology_socket v_socket;
+            v_socket.m_socket_id = v_s;
+            v_socket.m_name = "AMD EPYC 9655 96-Core Processor";
+            v_socket.m_physical_cores = 96;
+            v_socket.m_logical_cores = 96;
+            for (std::uint32_t v_c = 0; v_c < 96; ++v_c) {
+                v_socket.m_cpu_ids.push_back(static_cast<std::uint32_t>(v_s) * 96u + v_c);
+            }
+            v_node.m_sockets.push_back(std::move(v_socket));
+        }
+
+        std::vector<std::uint8_t> v_blob;
+        detail::serialize_node_topology(v_blob, v_node);
+
+        topology_node v_back;
+        ASSERT_TRUE(detail::deserialize_node_topology(v_back, v_blob.data(), v_blob.size()));
+        EXPECT_EQ("fc30557", v_back.m_hostname);
+        EXPECT_EQ(192u, v_back.m_total_logical_cores);
+        EXPECT_EQ(v_node.m_mem_total_bytes, v_back.m_mem_total_bytes);
+        ASSERT_EQ(2u, v_back.m_sockets.size());
+        EXPECT_EQ("AMD EPYC 9655 96-Core Processor", v_back.m_sockets[1].m_name);
+        ASSERT_EQ(96u, v_back.m_sockets[0].m_cpu_ids.size());
+        ASSERT_EQ(96u, v_back.m_sockets[1].m_cpu_ids.size());
+        EXPECT_EQ(0u, v_back.m_sockets[0].m_cpu_ids.front());
+        EXPECT_EQ(95u, v_back.m_sockets[0].m_cpu_ids.back());
+        EXPECT_EQ(96u, v_back.m_sockets[1].m_cpu_ids.front());
+        EXPECT_EQ(191u, v_back.m_sockets[1].m_cpu_ids.back());
+    }
+
+    TEST(topology_builder_test, serialize_round_trips_node_with_no_sockets) {
+        using namespace gempba::telemetry;
+        topology_node v_node;
+        v_node.m_hostname = "blank";
+
+        std::vector<std::uint8_t> v_blob;
+        detail::serialize_node_topology(v_blob, v_node);
+
+        topology_node v_back;
+        v_back.m_sockets.emplace_back(); // a pre-existing socket must be cleared
+        ASSERT_TRUE(detail::deserialize_node_topology(v_back, v_blob.data(), v_blob.size()));
+        EXPECT_EQ("blank", v_back.m_hostname);
+        EXPECT_TRUE(v_back.m_sockets.empty());
+    }
+
+    TEST(topology_builder_test, deserialize_rejects_truncated_buffer) {
+        using namespace gempba::telemetry;
+        topology_node v_node;
+        v_node.m_hostname = "fc1";
+        topology_socket v_socket;
+        v_socket.m_cpu_ids = {1, 2, 3, 4};
+        v_node.m_sockets.push_back(std::move(v_socket));
+
+        std::vector<std::uint8_t> v_blob;
+        detail::serialize_node_topology(v_blob, v_node);
+        v_blob.resize(v_blob.size() - 4); // chop the last cpu_id
+
+        topology_node v_back;
+        EXPECT_FALSE(detail::deserialize_node_topology(v_back, v_blob.data(), v_blob.size()));
+    }
+
 } // namespace
