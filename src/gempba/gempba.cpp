@@ -121,7 +121,7 @@ gempba::scheduler* gempba::multiprocessing::create_scheduler(const scheduler_top
     }
     switch (p_topology) {
         case SEMI_CENTRALIZED: {
-            g_scheduler = std::unique_ptr<scheduler>(new mpi_semi_centralized_scheduler(p_timeout));
+            g_scheduler = std::unique_ptr<scheduler>(new mpi_semi_centralized_scheduler());
             break;
         }
         case CENTRALIZED: {
