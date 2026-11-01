@@ -471,9 +471,10 @@ extern "C" {
     /* ─── Scheduler (mp) ────────────────────────────────────────────────────── */
 
     /**
-     * Creates the process-wide scheduler with the given topology and timeout (seconds).  Wraps
+     * Creates the process-wide scheduler with the given topology.  Wraps
      * gempba::mp::create_scheduler.  Calling MPI must already be initialised before this; the scheduler does not own
-     * the MPI lifecycle.
+     * the MPI lifecycle.  `timeout` is ignored: termination does not wait for a quiet period.  It is kept for ABI
+     * compatibility and removed in the next major version.
      */
     gempba_status_t gempba_scheduler_create(gempba_scheduler_topology_t topology, double timeout,
                                             gempba_scheduler_t* out);
