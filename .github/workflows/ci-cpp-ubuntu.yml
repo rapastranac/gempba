@@ -118,6 +118,8 @@ jobs:
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Debug \
             -DGEMPBA_MULTIPROCESSING=ON \
+            -DGEMPBA_MPI_INTEGRATION_TESTS=ON \
+            -DMPIEXEC_PREFLAGS=--oversubscribe \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_FLAGS="--coverage" \

@@ -161,6 +161,10 @@ namespace gempba {
 
         scheduler* create_scheduler(std::unique_ptr<scheduler> p_your_implementation);
 
+        /**
+         * @param p_timeout ignored: termination does not wait for a quiet period. Kept for compatibility and removed in
+         * the next major version.
+         */
         scheduler* create_scheduler(const scheduler_topology& p_topology, double p_timeout = 3.0);
 
         /////////////////////////////////////////////////////////////////////////////////////////////////

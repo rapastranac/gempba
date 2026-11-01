@@ -115,17 +115,17 @@ gempba::scheduler* gempba::multiprocessing::create_scheduler(std::unique_ptr<sch
     return g_scheduler.get();
 }
 
-gempba::scheduler* gempba::multiprocessing::create_scheduler(const scheduler_topology& p_topology, const double p_timeout) {
+gempba::scheduler* gempba::multiprocessing::create_scheduler(const scheduler_topology& p_topology, [[maybe_unused]] const double p_timeout) {
     if (g_scheduler != nullptr) {
         throw std::runtime_error("scheduler already exists!");
     }
     switch (p_topology) {
         case SEMI_CENTRALIZED: {
-            g_scheduler = std::unique_ptr<scheduler>(new mpi_semi_centralized_scheduler(p_timeout));
+            g_scheduler = std::unique_ptr<scheduler>(new mpi_semi_centralized_scheduler());
             break;
         }
         case CENTRALIZED: {
-            g_scheduler = std::unique_ptr<scheduler>(new mpi_centralized_scheduler(p_timeout));
+            g_scheduler = std::unique_ptr<scheduler>(new mpi_centralized_scheduler());
             break;
         }
     }
