@@ -20,8 +20,8 @@ class GempbaMpi < Formula
   conflicts_with "gempba", because: "both install gempba's headers and CMake config; install one flavor"
 
   resource "BS_thread_pool" do
-    url "https://github.com/rapastranac/thread-pool/archive/refs/tags/v5.1.0.1.tar.gz"
-    sha256 "08f745882d7fbd6536232d23af5e55e9ab1fb2c9eb1bb8665ec3f3505699d3c2"
+    url "https://github.com/rapastranac/thread-pool/archive/refs/tags/v5.1.0.2.tar.gz"
+    sha256 "2db598da58e57054d74b60e7a6d46865d31c0c510f715bc65a4dd82e3b940af4"
   end
 
   resource "CPM.cmake" do
