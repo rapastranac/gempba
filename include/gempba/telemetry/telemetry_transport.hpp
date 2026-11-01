@@ -43,6 +43,16 @@ namespace gempba::telemetry {
         virtual void publish_node(const node_frame& p_frame) = 0;
 
         /**
+         * @brief Publish the local worker's last frame before shutdown, so the center can tell it apart.
+         *
+         * Defaults to @ref publish_worker for backends where every frame reaches the center before shutdown.
+         */
+        virtual void publish_final_worker(const worker_frame& p_frame) { publish_worker(p_frame); }
+
+        /// @return How many final worker frames @ref poll has delivered to the center so far.
+        [[nodiscard]] virtual std::uint32_t final_frames_received() const { return 0; }
+
+        /**
          * @brief Drain inbound frames received since the last call.
          *
          * Each callback fires once per frame; sinks must be re-entrant against

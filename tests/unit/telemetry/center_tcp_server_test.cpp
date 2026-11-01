@@ -205,6 +205,98 @@ namespace {
         v_server.stop();
     }
 
+    std::uint16_t free_loopback_port() {
+        const socket_t v_s = ::socket(AF_INET, SOCK_STREAM, 0);
+        sockaddr_in v_addr{};
+        v_addr.sin_family = AF_INET;
+        v_addr.sin_port = 0;
+        v_addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        if (::bind(v_s, reinterpret_cast<sockaddr*>(&v_addr), sizeof(v_addr)) != 0) {
+            close_sock(v_s);
+            return 0;
+        }
+#if defined(_WIN32)
+        int v_len = sizeof(v_addr);
+#else
+        socklen_t v_len = sizeof(v_addr);
+#endif
+        ::getsockname(v_s, reinterpret_cast<sockaddr*>(&v_addr), &v_len);
+        close_sock(v_s);
+        return ntohs(v_addr.sin_port);
+    }
+
+    void set_recv_timeout(socket_t p_s, const int p_ms) {
+#if defined(_WIN32)
+        const auto v_ms = static_cast<DWORD>(p_ms);
+        setsockopt(p_s, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&v_ms), sizeof(v_ms));
+#else
+        timeval v_tv{};
+        v_tv.tv_sec = 0;
+        v_tv.tv_usec = p_ms * 1000;
+        setsockopt(p_s, SOL_SOCKET, SO_RCVTIMEO, &v_tv, sizeof(v_tv));
+#endif
+    }
+
+    std::string read_until_closed(socket_t p_s, std::chrono::milliseconds p_timeout) {
+        const auto v_deadline = std::chrono::steady_clock::now() + p_timeout;
+        std::string v_buf;
+        char v_chunk[4096];
+        while (std::chrono::steady_clock::now() < v_deadline) {
+#if defined(_WIN32)
+            const int v_n = recv(p_s, v_chunk, static_cast<int>(sizeof(v_chunk)), 0);
+#else
+            const ssize_t v_n = recv(p_s, v_chunk, sizeof(v_chunk), 0);
+#endif
+            if (v_n == 0) {
+                break;
+            }
+            if (v_n > 0) {
+                v_buf.append(v_chunk, v_chunk + v_n);
+            }
+        }
+        return v_buf;
+    }
+
+    std::string last_complete_line(const std::string& p_buf) {
+        const auto v_end = p_buf.rfind('\n');
+        if (v_end == std::string::npos) {
+            return {};
+        }
+        const std::string v_complete = p_buf.substr(0, v_end);
+        const auto v_previous = v_complete.rfind('\n');
+        return v_previous == std::string::npos ? v_complete : v_complete.substr(v_previous + 1);
+    }
+
+    TEST_F(tcp_server_test, shutdown_broadcasts_the_final_frame_before_closing) {
+        const std::uint16_t v_port = free_loopback_port();
+        gempba::telemetry::configure_port(v_port);
+
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.set_worker_interval_ms(0);
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/true);
+
+        const socket_t v_client = connect_loopback(v_port);
+        ASSERT_NE(k_invalid, v_client);
+        set_recv_timeout(v_client, 200);
+
+        const std::string v_first = read_one_line(v_client, std::chrono::milliseconds(3000));
+        ASSERT_NE(std::string::npos, v_first.find("\"tasks_local_total\":0"));
+
+        v_hub.set_worker_interval_ms(600'000);
+        // A tick that read the old interval must finish before the counters change, or it could publish them early.
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        for (int v_i = 0; v_i < 5; ++v_i) {
+            v_hub.record_task_local();
+        }
+        v_hub.shutdown();
+
+        const std::string v_rest = read_until_closed(v_client, std::chrono::milliseconds(3000));
+        close_sock(v_client);
+        gempba::telemetry::configure_port(9000);
+
+        EXPECT_NE(std::string::npos, last_complete_line(v_rest).find("\"tasks_local_total\":5"));
+    }
+
     TEST_F(tcp_server_test, malformed_lines_are_ignored_and_do_not_break_subsequent_input) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);

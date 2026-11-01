@@ -82,6 +82,28 @@ namespace {
         EXPECT_NO_THROW(v_hub.shutdown());
     }
 
+    TEST_F(telemetry_hub_test, center_shutdown_waits_at_most_a_second_for_missing_final_frames) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MP_MPI, 0, 3, /*p_start_pump_thread=*/false);
+
+        const auto v_start = std::chrono::steady_clock::now();
+        v_hub.shutdown();
+        const auto v_elapsed = std::chrono::steady_clock::now() - v_start;
+
+        EXPECT_GE(v_elapsed, std::chrono::milliseconds(900));
+        EXPECT_LT(v_elapsed, std::chrono::seconds(3));
+    }
+
+    TEST_F(telemetry_hub_test, single_process_shutdown_does_not_wait_for_final_frames) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+
+        const auto v_start = std::chrono::steady_clock::now();
+        v_hub.shutdown();
+
+        EXPECT_LT(std::chrono::steady_clock::now() - v_start, std::chrono::milliseconds(500));
+    }
+
     TEST_F(telemetry_hub_test, program_elapsed_seconds_is_zero_before_runtime_ready) {
         const gempba::telemetry::telemetry_hub v_hub;
         EXPECT_EQ(0u, v_hub.program_elapsed_seconds());
