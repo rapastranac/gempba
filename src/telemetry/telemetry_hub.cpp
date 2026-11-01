@@ -36,6 +36,8 @@ namespace gempba::telemetry {
         }
 
         constexpr std::chrono::milliseconds k_pump_resolution{50};
+        constexpr std::uint64_t k_final_frame_wait_ms = 1000;
+        constexpr std::chrono::milliseconds k_final_frame_poll{10};
 
         constexpr std::uint16_t k_default_telemetry_port = 9000;
         std::atomic<std::uint16_t> g_configured_port{k_default_telemetry_port};
@@ -127,23 +129,20 @@ namespace gempba::telemetry {
             m_seq_no.fetch_add(1, std::memory_order_relaxed);
             worker_frame v_final{};
             snapshot_worker_frame(v_final);
-            m_transport->publish_worker(v_final);
+            m_transport->publish_final_worker(v_final);
             if (m_is_sentinel.load(std::memory_order_relaxed)) {
                 node_frame v_node_final{};
                 snapshot_node_frame(v_node_final);
                 m_transport->publish_node(v_node_final);
             }
             if (m_aggregator) {
-                m_transport->poll(
-                        [this](const std::uint32_t p_src, const worker_frame& p_frame) {
-                            const std::scoped_lock v_lock(m_aggregator->m_mtx);
-                            m_aggregator->m_latest_worker[p_src] = p_frame;
-                            m_aggregator->m_last_seen_ms[p_src] = monotonic_ms();
-                        },
-                        [this](const std::uint32_t p_src, const node_frame& p_frame) {
-                            const std::scoped_lock v_lock(m_aggregator->m_mtx);
-                            m_aggregator->m_latest_node[p_src] = p_frame;
-                        });
+                drain_inbound_frames();
+                // Ranks shut down independently; give late ranks a bounded window so their final frames reach the dashboard.
+                const std::uint64_t v_deadline = monotonic_ms() + k_final_frame_wait_ms;
+                while (m_world_size > 1 && m_transport->final_frames_received() < m_world_size && monotonic_ms() < v_deadline) {
+                    std::this_thread::sleep_for(k_final_frame_poll);
+                    drain_inbound_frames();
+                }
             }
         }
 
@@ -222,18 +221,22 @@ namespace gempba::telemetry {
         }
 
         if (m_aggregator) {
-            const std::uint64_t v_ts = monotonic_ms();
-            m_transport->poll(
-                    [this, v_ts](const std::uint32_t p_src, const worker_frame& p_frame) {
-                        const std::scoped_lock v_lock(m_aggregator->m_mtx);
-                        m_aggregator->m_latest_worker[p_src] = p_frame;
-                        m_aggregator->m_last_seen_ms[p_src] = v_ts;
-                    },
-                    [this](const std::uint32_t p_src, const node_frame& p_frame) {
-                        const std::scoped_lock v_lock(m_aggregator->m_mtx);
-                        m_aggregator->m_latest_node[p_src] = p_frame;
-                    });
+            drain_inbound_frames();
         }
+    }
+
+    void telemetry_hub::drain_inbound_frames() {
+        const std::uint64_t v_ts = monotonic_ms();
+        m_transport->poll(
+                [this, v_ts](const std::uint32_t p_src, const worker_frame& p_frame) {
+                    const std::scoped_lock v_lock(m_aggregator->m_mtx);
+                    m_aggregator->m_latest_worker[p_src] = p_frame;
+                    m_aggregator->m_last_seen_ms[p_src] = v_ts;
+                },
+                [this](const std::uint32_t p_src, const node_frame& p_frame) {
+                    const std::scoped_lock v_lock(m_aggregator->m_mtx);
+                    m_aggregator->m_latest_node[p_src] = p_frame;
+                });
     }
 
     void telemetry_hub::snapshot_worker_frame(worker_frame& p_out) noexcept {

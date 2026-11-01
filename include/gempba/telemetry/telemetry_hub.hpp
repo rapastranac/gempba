@@ -130,6 +130,8 @@ namespace gempba::telemetry {
         struct counters;
         struct aggregator;
 
+        void drain_inbound_frames();
+
         runtime_mode m_mode = runtime_mode::MT_ONLY;
         std::uint32_t m_worker_id = 0;
         std::uint32_t m_world_size = 1;

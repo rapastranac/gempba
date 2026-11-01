@@ -24,6 +24,8 @@ namespace gempba::telemetry {
 
         void publish_worker(const worker_frame& p_frame) override;
         void publish_node(const node_frame& p_frame) override;
+        void publish_final_worker(const worker_frame& p_frame) override;
+        [[nodiscard]] std::uint32_t final_frames_received() const override;
 
         void poll(const worker_frame_sink& p_worker_sink, const node_frame_sink& p_node_sink) override;
 
