@@ -120,12 +120,6 @@ namespace gempba::telemetry {
             m_timer_thread->join();
         m_timer_thread.reset();
 
-        // Hold one broadcast window so any connected dashboard receives the
-        // trailing publish below before the socket tears down.
-        if (m_tcp_server) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(600));
-        }
-
         // Force a final snapshot so the aggregator (and any consumer reading
         // it) reflects post-wait counters, not the snapshot taken up to one
         // worker_interval_ms before completion.

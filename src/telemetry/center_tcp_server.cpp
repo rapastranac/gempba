@@ -180,6 +180,37 @@ namespace gempba::telemetry {
             return true;
         }
 
+        std::string build_broadcast_line(telemetry_hub& p_hub) {
+            const auto& v_topology = p_hub.current_topology();
+            std::vector<worker_frame> v_workers;
+            std::vector<node_frame> v_nodes;
+            for (const auto& v_node: v_topology.m_nodes) {
+                for (std::uint32_t v_id: v_node.m_worker_ids) {
+                    if (auto v_f = p_hub.latest_worker_frame(v_id)) {
+                        v_workers.push_back(*v_f);
+                    }
+                }
+                if (auto v_n = p_hub.latest_node_frame(v_node.m_sentinel_worker_id)) {
+                    v_nodes.push_back(*v_n);
+                }
+            }
+
+            const auto v_now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+
+            broadcast_payload v_payload{};
+            v_payload.m_now_ms = static_cast<std::uint64_t>(v_now);
+            v_payload.m_elapsed_seconds = p_hub.program_elapsed_seconds();
+            v_payload.m_topology = &v_topology;
+            v_payload.m_workers = &v_workers;
+            v_payload.m_nodes = &v_nodes;
+
+            std::string v_line;
+            v_line.reserve(2048);
+            serialize_broadcast(v_line, v_payload);
+            v_line += '\n';
+            return v_line;
+        }
+
     } // namespace
 
     struct client_state {
@@ -319,34 +350,7 @@ namespace gempba::telemetry {
                 if (!v_impl_ptr->m_running.load(std::memory_order_acquire))
                     break;
 
-                // Build the broadcast payload from the hub's current state.
-                const auto& v_topology = v_impl_ptr->m_hub->current_topology();
-                std::vector<worker_frame> v_workers;
-                std::vector<node_frame> v_nodes;
-                for (const auto& v_node: v_topology.m_nodes) {
-                    for (std::uint32_t v_id: v_node.m_worker_ids) {
-                        if (auto v_f = v_impl_ptr->m_hub->latest_worker_frame(v_id)) {
-                            v_workers.push_back(*v_f);
-                        }
-                    }
-                    if (auto v_n = v_impl_ptr->m_hub->latest_node_frame(v_node.m_sentinel_worker_id)) {
-                        v_nodes.push_back(*v_n);
-                    }
-                }
-
-                const auto v_now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-
-                broadcast_payload v_payload{};
-                v_payload.m_now_ms = static_cast<std::uint64_t>(v_now);
-                v_payload.m_elapsed_seconds = v_impl_ptr->m_hub->program_elapsed_seconds();
-                v_payload.m_topology = &v_topology;
-                v_payload.m_workers = &v_workers;
-                v_payload.m_nodes = &v_nodes;
-
-                std::string v_line;
-                v_line.reserve(2048);
-                serialize_broadcast(v_line, v_payload);
-                v_line += '\n';
+                const std::string v_line = build_broadcast_line(*v_impl_ptr->m_hub);
 
                 std::vector<socket_t> v_dead;
                 {
@@ -401,6 +405,12 @@ namespace gempba::telemetry {
             m_impl->m_broadcast_thread.join();
 
         const std::scoped_lock v_lock(m_impl->m_clients_mtx);
+        if (!m_impl->m_clients.empty()) {
+            const std::string v_line = build_broadcast_line(*m_impl->m_hub);
+            for (const auto& v_cs: m_impl->m_clients) {
+                (void) send_all(v_cs.m_sock, v_line.data(), v_line.size());
+            }
+        }
         for (const auto& v_cs: m_impl->m_clients)
             close_socket(v_cs.m_sock);
         m_impl->m_clients.clear();
