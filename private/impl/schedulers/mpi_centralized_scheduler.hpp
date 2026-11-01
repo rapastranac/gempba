@@ -58,7 +58,6 @@ namespace gempba {
             RUNNABLE_ID = 14,
         };
 
-        std::priority_queue<task_packet, std::vector<task_packet>, task_comparator> m_center_queue; // message, size
         std::priority_queue<task_bundle, std::vector<task_bundle>, task_bundle_comparator> m_center_bundle_queue; // message, size
 
         int m_max_queue_size{};
@@ -151,7 +150,7 @@ namespace gempba {
 
         [[nodiscard]] double elapsed_time() const override { return (m_end_time - m_start_time) - static_cast<double>(m_timeout); }
 
-        [[nodiscard]] std::size_t get_pending_request_count() const override { return m_center_queue.size() + m_center_bundle_queue.size(); }
+        [[nodiscard]] std::size_t get_pending_request_count() const override { return m_center_bundle_queue.size(); }
 
         [[nodiscard]] int world_size() const override { return m_world_size; }
 
@@ -685,7 +684,7 @@ namespace gempba {
                 }
             }
 
-            utils::print_ipc_debug_comments("center received task from {}, current queue size is {}\n", p_status.MPI_SOURCE, m_center_queue.size());
+            utils::print_ipc_debug_comments("center received task from {}, current queue size is {}\n", p_status.MPI_SOURCE, m_center_bundle_queue.size());
         }
 
 
