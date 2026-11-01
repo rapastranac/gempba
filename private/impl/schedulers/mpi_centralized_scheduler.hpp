@@ -455,35 +455,22 @@ namespace gempba {
         }
 
         void clear_buffer() {
-            if (m_center_bundle_queue.empty())
-                return;
+            dispatch_to_available(m_center_bundle_queue, m_process_state, AVAILABLE_STATE, ASSIGNED_STATE, [this](const int p_rank, const task_bundle& p_bundle) {
+                const task_packet v_bytes = p_bundle.get_task_packet();
+                const int v_runnable_id = p_bundle.get_runnable_id();
 
-            for (int v_rank = 1; v_rank < m_world_size; v_rank++) {
-                if (m_process_state[v_rank] == AVAILABLE_STATE) {
+                MPI_Send(v_bytes.data(), static_cast<int>(v_bytes.size()), MPI_BYTE, p_rank, TASK_FROM_CENTER, m_world_communicator);
+                MPI_Send(&v_runnable_id, 1, MPI_INT, p_rank, RUNNABLE_ID, m_world_communicator);
 
-                    task_bundle v_bundle = m_center_bundle_queue.top();
-                    m_center_bundle_queue.pop();
-                    const task_packet v_bytes = v_bundle.get_task_packet();
-                    const int& v_runnable_id = v_bundle.get_runnable_id();
+                m_sent_tasks++;
+                m_total_requests_number++;
+                m_stats.m_sent_task_count++;
+                m_stats.m_total_requested_tasks++;
 
-                    MPI_Send(v_bytes.data(), static_cast<int>(v_bytes.size()), MPI_BYTE, v_rank, TASK_FROM_CENTER, m_world_communicator);
-                    MPI_Send(&v_runnable_id, 1, MPI_INT, v_rank, RUNNABLE_ID, m_world_communicator);
-
-                    m_process_state[v_rank] = ASSIGNED_STATE;
-
-                    m_sent_tasks++;
-                    m_total_requests_number++;
-                    m_stats.m_sent_task_count++;
-                    m_stats.m_total_requested_tasks++;
-
-                    if (auto* v_telemetry = telemetry::get())
-                        v_telemetry->record_send(static_cast<std::uint32_t>(v_rank), static_cast<std::uint64_t>(v_bytes.size()));
-
-                    if (m_center_queue.empty()) {
-                        return;
-                    }
+                if (auto* v_telemetry = telemetry::get()) {
+                    v_telemetry->record_send(static_cast<std::uint32_t>(p_rank), static_cast<std::uint64_t>(v_bytes.size()));
                 }
-            }
+            });
         }
 
         void run(const task_packet& p_seed, const int p_runnable_id) {
