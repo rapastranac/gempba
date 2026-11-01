@@ -119,10 +119,12 @@ namespace {
     };
 
     /**
-     * Rank 0 only sends the seed; workers consume work units or split them off to other workers. In-flight messages
-     * are delivered in a random order, which is a stronger adversary than MPI's per-pair FIFO.
+     * Workers consume work units or split them off. With a seeding root (semi-centralized) rank 0 only sends the seed
+     * and splits go to other workers; with a relaying root (centralized) splits go to rank 0, which queues them and
+     * dispatches them to workers. In-flight messages are delivered in a random order, which is a stronger adversary than
+     * MPI's per-pair FIFO.
      */
-    void simulate(const unsigned p_seed, const int p_world_size, const int p_seed_work) {
+    void simulate(const unsigned p_seed, const int p_world_size, const int p_seed_work, const bool p_root_relays) {
         std::mt19937 v_rng(p_seed);
         std::vector<termination_detector> v_detectors;
         v_detectors.reserve(static_cast<std::size_t>(p_world_size));
@@ -130,6 +132,7 @@ namespace {
             v_detectors.emplace_back(v_rank == 0);
         }
         std::vector<int> v_work(static_cast<std::size_t>(p_world_size), 0);
+        std::vector<int> v_root_queue;
         std::vector<sim_message> v_in_flight;
         int v_consumed = 0;
         bool v_detected = false;
@@ -153,7 +156,8 @@ namespace {
                     v_active.push_back(v_rank);
                 }
             }
-            const std::size_t v_event_count = v_in_flight.size() + v_active.size();
+            const bool v_root_can_dispatch = !v_root_queue.empty();
+            const std::size_t v_event_count = v_in_flight.size() + v_active.size() + (v_root_can_dispatch ? 1 : 0);
             if (v_event_count == 0) {
                 break;
             }
@@ -164,7 +168,11 @@ namespace {
                 const sim_message v_message = v_in_flight[v_event];
                 v_in_flight.erase(v_in_flight.begin() + static_cast<std::ptrdiff_t>(v_event));
                 if (v_message.m_is_task) {
-                    v_work[v_message.m_to] += v_message.m_work;
+                    if (v_message.m_to == 0) {
+                        v_root_queue.push_back(v_message.m_work);
+                    } else {
+                        v_work[v_message.m_to] += v_message.m_work;
+                    }
                     if (const auto v_ack = v_detectors[v_message.m_to].on_task_received(v_message.m_from)) {
                         v_in_flight.push_back({false, v_message.m_to, *v_ack, 0});
                     }
@@ -175,7 +183,7 @@ namespace {
                     v_release_if_passive(v_message.m_to);
                     continue;
                 }
-                if (v_detectors[0].deficit() == 0) {
+                if (v_detectors[0].deficit() == 0 && v_root_queue.empty()) {
                     v_detected = true;
                     ASSERT_TRUE(v_in_flight.empty());
                     ASSERT_TRUE(std::ranges::all_of(v_work, [](const int p_units) { return p_units == 0; }));
@@ -185,12 +193,24 @@ namespace {
                 continue;
             }
 
+            if (v_event == v_in_flight.size() + v_active.size()) {
+                const std::size_t v_index = std::uniform_int_distribution<std::size_t>(0, v_root_queue.size() - 1)(v_rng);
+                const int v_task_work = v_root_queue[v_index];
+                v_root_queue.erase(v_root_queue.begin() + static_cast<std::ptrdiff_t>(v_index));
+                v_detectors[0].on_task_sent();
+                v_in_flight.push_back({true, 0, std::uniform_int_distribution(1, p_world_size - 1)(v_rng), v_task_work});
+                continue;
+            }
+
             const int v_rank = v_active[v_event - v_in_flight.size()];
-            const bool v_can_split = p_world_size > 2 && v_work[v_rank] >= 2;
+            const bool v_can_split = (p_root_relays || p_world_size > 2) && v_work[v_rank] >= 2;
             if (v_can_split && std::bernoulli_distribution(0.5)(v_rng)) {
-                int v_destination = std::uniform_int_distribution(1, p_world_size - 2)(v_rng);
-                if (v_destination >= v_rank) {
-                    ++v_destination;
+                int v_destination = 0;
+                if (!p_root_relays) {
+                    v_destination = std::uniform_int_distribution(1, p_world_size - 2)(v_rng);
+                    if (v_destination >= v_rank) {
+                        ++v_destination;
+                    }
                 }
                 const int v_split = std::uniform_int_distribution(1, v_work[v_rank] - 1)(v_rng);
                 v_work[v_rank] -= v_split;
@@ -206,18 +226,22 @@ namespace {
         ASSERT_TRUE(v_detected);
     }
 
-    TEST(termination_detector_test, root_detects_termination_exactly_when_all_work_is_done_under_any_delivery_order) {
+    void simulate_many(const bool p_root_relays) {
         for (const int v_world_size: {2, 3, 4, 8}) {
             for (const int v_seed_work: {1, 5, 40}) {
                 for (unsigned v_seed = 0; v_seed < 300; ++v_seed) {
                     SCOPED_TRACE(testing::Message() << "world_size=" << v_world_size << " seed_work=" << v_seed_work << " seed=" << v_seed);
-                    simulate(v_seed, v_world_size, v_seed_work);
-                    if (HasFatalFailure()) {
+                    simulate(v_seed, v_world_size, v_seed_work, p_root_relays);
+                    if (testing::Test::HasFatalFailure()) {
                         return;
                     }
                 }
             }
         }
     }
+
+    TEST(termination_detector_test, root_detects_termination_exactly_when_all_work_is_done_under_any_delivery_order) { simulate_many(false); }
+
+    TEST(termination_detector_test, relaying_root_detects_termination_exactly_when_all_work_is_done_under_any_delivery_order) { simulate_many(true); }
 
 } // namespace
