@@ -112,9 +112,12 @@ TEST_F(quasi_horizontal_load_balancer_test, set_thread_pool_size_resizes_pool_an
     EXPECT_EQ(2, v_runs.load());
 }
 
-TEST_F(quasi_horizontal_load_balancer_test, get_idle_time) {
-    const gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_worker_mock);
-    EXPECT_EQ(v_load_balancer.get_idle_time(), 0);
+TEST_F(quasi_horizontal_load_balancer_test, get_idle_time_counts_threads_that_are_still_asleep) {
+    gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    v_load_balancer.set_thread_pool_size(2);
+    const double v_before = v_load_balancer.get_idle_time();
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    EXPECT_GE(v_load_balancer.get_idle_time() - v_before, 0.25);
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, wait_blocks_until_submitted_task_completes) {
