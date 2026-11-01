@@ -82,6 +82,14 @@ TEST_F(quasi_horizontal_load_balancer_test, generate_unique_id) {
     EXPECT_NE(v_id1, v_id2);
 }
 
+TEST_F(quasi_horizontal_load_balancer_test, set_thread_pool_size_returns_with_every_thread_idle) {
+    gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    for (unsigned v_i = 0; v_i < 1000; ++v_i) {
+        v_load_balancer.set_thread_pool_size(1 + v_i % 4);
+        ASSERT_EQ(0u, v_load_balancer.get_tasks_running_count()) << "iteration " << v_i;
+    }
+}
+
 TEST_F(quasi_horizontal_load_balancer_test, set_thread_pool_size_resizes_pool_and_keeps_it_usable) {
     gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_worker_mock);
 
