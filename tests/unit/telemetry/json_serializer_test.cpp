@@ -24,6 +24,20 @@ namespace {
         EXPECT_NE(std::string::npos, v_out.find("\"tasks_sent_total\":8"));
     }
 
+    TEST(json_serializer_test, worker_frame_includes_the_idle_split) {
+        gempba::telemetry::worker_frame v_f{};
+        v_f.m_idle_microseconds_per_worker = 900;
+        v_f.m_idle_microseconds_starved = 600;
+        v_f.m_idle_microseconds_imbalanced = 300;
+
+        std::string v_out;
+        gempba::telemetry::serialize_worker_frame(v_out, v_f);
+
+        EXPECT_NE(std::string::npos, v_out.find("\"idle_microseconds_per_worker\":900"));
+        EXPECT_NE(std::string::npos, v_out.find("\"idle_microseconds_starved\":600"));
+        EXPECT_NE(std::string::npos, v_out.find("\"idle_microseconds_imbalanced\":300"));
+    }
+
     TEST(json_serializer_test, worker_frame_emits_only_non_zero_edges) {
         gempba::telemetry::worker_frame v_f{};
         v_f.m_edges_out[2].m_bytes = 100;
@@ -128,7 +142,7 @@ namespace {
 
         EXPECT_TRUE(v_out.starts_with("{"));
         EXPECT_TRUE(v_out.ends_with("}"));
-        EXPECT_NE(std::string::npos, v_out.find("\"version\":1"));
+        EXPECT_NE(std::string::npos, v_out.find("\"version\":2"));
         EXPECT_NE(std::string::npos, v_out.find("\"ts\":1700000000000"));
         EXPECT_NE(std::string::npos, v_out.find("\"elapsed_seconds\":12345"));
         EXPECT_NE(std::string::npos, v_out.find("\"topology\":"));

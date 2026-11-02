@@ -120,6 +120,40 @@ TEST_F(quasi_horizontal_load_balancer_test, get_idle_time_counts_threads_that_ar
     EXPECT_GE(v_load_balancer.get_idle_time() - v_before, 0.25);
 }
 
+TEST_F(quasi_horizontal_load_balancer_test, get_starved_idle_time_grows_while_no_task_runs) {
+    gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    v_load_balancer.set_thread_pool_size(2);
+    const double v_starved_before = v_load_balancer.get_starved_idle_time();
+    const double v_imbalanced_before = v_load_balancer.get_imbalanced_idle_time();
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    EXPECT_GE(v_load_balancer.get_starved_idle_time() - v_starved_before, 0.25);
+    EXPECT_DOUBLE_EQ(v_imbalanced_before, v_load_balancer.get_imbalanced_idle_time());
+}
+
+TEST_F(quasi_horizontal_load_balancer_test, get_imbalanced_idle_time_grows_while_one_task_runs) {
+    gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    v_load_balancer.set_thread_pool_size(4);
+    std::promise<void> v_started;
+    std::future<void> v_started_future = v_started.get_future();
+    std::promise<void> v_release;
+    std::shared_future<void> v_released = v_release.get_future().share();
+    auto v_task = v_load_balancer.force_local_submit([&v_started, v_released]() -> std::any {
+        v_started.set_value();
+        v_released.wait();
+        return {};
+    });
+    v_started_future.wait();
+    const double v_starved_before = v_load_balancer.get_starved_idle_time();
+    const double v_imbalanced_before = v_load_balancer.get_imbalanced_idle_time();
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    const double v_starved_after = v_load_balancer.get_starved_idle_time();
+    const double v_imbalanced_after = v_load_balancer.get_imbalanced_idle_time();
+    v_release.set_value();
+    v_task.wait();
+    EXPECT_GE(v_imbalanced_after - v_imbalanced_before, 0.2);
+    EXPECT_DOUBLE_EQ(v_starved_before, v_starved_after);
+}
+
 TEST_F(quasi_horizontal_load_balancer_test, wait_blocks_until_submitted_task_completes) {
     gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_worker_mock);
 

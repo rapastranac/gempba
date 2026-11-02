@@ -104,6 +104,10 @@ namespace gempba {
 
         [[nodiscard]] double get_idle_time() const override { return m_thread_pool.get_wall_idle_time(); }
 
+        [[nodiscard]] double get_starved_idle_time() const override { return m_thread_pool.get_wall_starved_idle_time(); }
+
+        [[nodiscard]] double get_imbalanced_idle_time() const override { return m_thread_pool.get_wall_imbalanced_idle_time(); }
+
         void set_root(const std::thread::id p_thread_id, std::shared_ptr<node_core>& p_root) override {
             std::scoped_lock v_lock(m_recursive_mutex);
             if (m_roots.contains(p_thread_id)) {

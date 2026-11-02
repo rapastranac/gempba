@@ -260,6 +260,8 @@ namespace gempba::telemetry {
         if (auto* v_lb = gempba::get_load_balancer()) {
             p_out.m_process_threads = v_lb->get_thread_pool_size() + 1;
             p_out.m_idle_microseconds_per_worker = static_cast<std::uint64_t>(v_lb->get_idle_time() * 1'000'000.0);
+            p_out.m_idle_microseconds_starved = static_cast<std::uint64_t>(v_lb->get_starved_idle_time() * 1'000'000.0);
+            p_out.m_idle_microseconds_imbalanced = static_cast<std::uint64_t>(v_lb->get_imbalanced_idle_time() * 1'000'000.0);
             p_out.m_tasks_running = static_cast<std::uint32_t>(v_lb->get_tasks_running_count());
         }
 
