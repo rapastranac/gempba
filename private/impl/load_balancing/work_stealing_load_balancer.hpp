@@ -89,6 +89,10 @@ namespace gempba {
 
         [[nodiscard]] double get_idle_time() const override { return m_thread_pool.get_wall_idle_time(); }
 
+        [[nodiscard]] double get_starved_idle_time() const override { return m_thread_pool.get_wall_starved_idle_time(); }
+
+        [[nodiscard]] double get_imbalanced_idle_time() const override { return m_thread_pool.get_wall_imbalanced_idle_time(); }
+
         std::shared_ptr<std::shared_ptr<node_core>> get_root(std::thread::id) override {
             // No-op for work stealing load balancer
             return {};

@@ -69,6 +69,16 @@ namespace gempba {
 
         [[nodiscard]] virtual double get_idle_time() const = 0;
 
+        /**
+         * @return seconds per pool thread spent idle while no task ran in the pool; 0 when the balancer does not split its idle time
+         */
+        [[nodiscard]] virtual double get_starved_idle_time() const { return 0.0; }
+
+        /**
+         * @return seconds per pool thread spent idle while other pool threads ran tasks; 0 when the balancer does not split its idle time
+         */
+        [[nodiscard]] virtual double get_imbalanced_idle_time() const { return 0.0; }
+
         virtual void wait() = 0;
 
         [[nodiscard]] virtual bool is_done() const = 0;
