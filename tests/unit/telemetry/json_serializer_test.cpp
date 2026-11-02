@@ -24,6 +24,22 @@ namespace {
         EXPECT_NE(std::string::npos, v_out.find("\"tasks_sent_total\":8"));
     }
 
+    TEST(json_serializer_test, worker_frame_includes_the_transfer_bytes_and_times) {
+        gempba::telemetry::worker_frame v_f{};
+        v_f.m_bytes_sent_total = 31;
+        v_f.m_bytes_recv_total = 32;
+        v_f.m_send_microseconds_total = 33;
+        v_f.m_recv_microseconds_total = 34;
+
+        std::string v_out;
+        gempba::telemetry::serialize_worker_frame(v_out, v_f);
+
+        EXPECT_NE(std::string::npos, v_out.find("\"bytes_sent_total\":31"));
+        EXPECT_NE(std::string::npos, v_out.find("\"bytes_recv_total\":32"));
+        EXPECT_NE(std::string::npos, v_out.find("\"send_microseconds_total\":33"));
+        EXPECT_NE(std::string::npos, v_out.find("\"recv_microseconds_total\":34"));
+    }
+
     TEST(json_serializer_test, worker_frame_includes_the_idle_split) {
         gempba::telemetry::worker_frame v_f{};
         v_f.m_idle_microseconds_per_worker = 900;

@@ -70,6 +70,17 @@ namespace gempba::telemetry {
         std::uint64_t m_tasks_sent_total;
         /** @brief Tasks received from a remote worker. */
         std::uint64_t m_tasks_recv_total;
+        /** @brief Bytes of the tasks sent; the sum of @ref m_edges_out bytes while every destination is below @ref MAX_WORKERS. */
+        std::uint64_t m_bytes_sent_total;
+        /** @brief Bytes of the tasks received. */
+        std::uint64_t m_bytes_recv_total;
+        /**
+         * @brief Microseconds in the MPI calls that send tasks, runnable id included. This is how long the sender stalled, not
+         * wire latency; network delay shows up in assignment latency and waiting time.
+         */
+        std::uint64_t m_send_microseconds_total;
+        /** @brief Microseconds in the MPI calls that receive tasks once a probe found them, runnable id included. */
+        std::uint64_t m_recv_microseconds_total;
         /** @brief Tasks currently executing on the worker's thread pool. */
         std::uint32_t m_tasks_running;
         /** @brief Outstanding requests in the scheduler queue. */

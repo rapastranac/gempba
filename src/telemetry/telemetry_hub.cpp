@@ -55,6 +55,10 @@ namespace gempba::telemetry {
         std::atomic<std::uint64_t> m_tasks_local_total{0};
         std::atomic<std::uint64_t> m_tasks_sent_total{0};
         std::atomic<std::uint64_t> m_tasks_recv_total{0};
+        std::atomic<std::uint64_t> m_bytes_sent_total{0};
+        std::atomic<std::uint64_t> m_bytes_recv_total{0};
+        std::atomic<std::uint64_t> m_send_nanoseconds_total{0};
+        std::atomic<std::uint64_t> m_recv_nanoseconds_total{0};
 
         std::atomic<std::uint64_t> m_center_state_msgs_total{0};
         std::atomic<std::uint64_t> m_center_score_proposals_total{0};
@@ -168,15 +172,21 @@ namespace gempba::telemetry {
         m_aggregator.reset();
     }
 
-    void telemetry_hub::record_send(const std::uint32_t p_dst_worker_id, const std::uint64_t p_bytes) noexcept {
+    void telemetry_hub::record_send(const std::uint32_t p_dst_worker_id, const std::uint64_t p_bytes, const std::chrono::nanoseconds p_elapsed) noexcept {
         if (p_dst_worker_id < MAX_WORKERS) {
             m_counters->m_edges_out_bytes[p_dst_worker_id].fetch_add(p_bytes, std::memory_order_relaxed);
             m_counters->m_edges_out_count[p_dst_worker_id].fetch_add(1, std::memory_order_relaxed);
         }
         m_counters->m_tasks_sent_total.fetch_add(1, std::memory_order_relaxed);
+        m_counters->m_bytes_sent_total.fetch_add(p_bytes, std::memory_order_relaxed);
+        m_counters->m_send_nanoseconds_total.fetch_add(static_cast<std::uint64_t>(p_elapsed.count()), std::memory_order_relaxed);
     }
 
-    void telemetry_hub::record_recv(std::uint32_t, const std::uint64_t) noexcept { m_counters->m_tasks_recv_total.fetch_add(1, std::memory_order_relaxed); }
+    void telemetry_hub::record_recv(std::uint32_t, const std::uint64_t p_bytes, const std::chrono::nanoseconds p_elapsed) noexcept {
+        m_counters->m_tasks_recv_total.fetch_add(1, std::memory_order_relaxed);
+        m_counters->m_bytes_recv_total.fetch_add(p_bytes, std::memory_order_relaxed);
+        m_counters->m_recv_nanoseconds_total.fetch_add(static_cast<std::uint64_t>(p_elapsed.count()), std::memory_order_relaxed);
+    }
 
     void telemetry_hub::record_task_local() noexcept { m_counters->m_tasks_local_total.fetch_add(1, std::memory_order_relaxed); }
 
@@ -326,6 +336,10 @@ namespace gempba::telemetry {
         p_out.m_tasks_local_total = m_counters->m_tasks_local_total.load(std::memory_order_relaxed);
         p_out.m_tasks_sent_total = m_counters->m_tasks_sent_total.load(std::memory_order_relaxed);
         p_out.m_tasks_recv_total = m_counters->m_tasks_recv_total.load(std::memory_order_relaxed);
+        p_out.m_bytes_sent_total = m_counters->m_bytes_sent_total.load(std::memory_order_relaxed);
+        p_out.m_bytes_recv_total = m_counters->m_bytes_recv_total.load(std::memory_order_relaxed);
+        p_out.m_send_microseconds_total = m_counters->m_send_nanoseconds_total.load(std::memory_order_relaxed) / 1000;
+        p_out.m_recv_microseconds_total = m_counters->m_recv_nanoseconds_total.load(std::memory_order_relaxed) / 1000;
         p_out.m_center_state_msgs_total = m_counters->m_center_state_msgs_total.load(std::memory_order_relaxed);
         p_out.m_center_score_proposals_total = m_counters->m_center_score_proposals_total.load(std::memory_order_relaxed);
         p_out.m_center_score_broadcasts_total = m_counters->m_center_score_broadcasts_total.load(std::memory_order_relaxed);

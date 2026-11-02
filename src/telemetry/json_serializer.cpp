@@ -70,6 +70,14 @@ namespace gempba::telemetry {
         emit_u64(p_out, p_frame.m_tasks_sent_total);
         p_out += ",\"tasks_recv_total\":";
         emit_u64(p_out, p_frame.m_tasks_recv_total);
+        p_out += ",\"bytes_sent_total\":";
+        emit_u64(p_out, p_frame.m_bytes_sent_total);
+        p_out += ",\"bytes_recv_total\":";
+        emit_u64(p_out, p_frame.m_bytes_recv_total);
+        p_out += ",\"send_microseconds_total\":";
+        emit_u64(p_out, p_frame.m_send_microseconds_total);
+        p_out += ",\"recv_microseconds_total\":";
+        emit_u64(p_out, p_frame.m_recv_microseconds_total);
         p_out += ",\"tasks_running\":";
         emit_u32(p_out, p_frame.m_tasks_running);
         p_out += ",\"scheduler_pending_count\":";
