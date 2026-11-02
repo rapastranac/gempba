@@ -135,7 +135,48 @@ namespace {
         EXPECT_EQ(0u, v_frame.m_idle_microseconds_per_worker);
         EXPECT_EQ(0u, v_frame.m_idle_microseconds_starved);
         EXPECT_EQ(0u, v_frame.m_idle_microseconds_imbalanced);
+        EXPECT_EQ(0u, v_frame.m_sched_running_microseconds);
+        EXPECT_EQ(0u, v_frame.m_sched_waiting_microseconds);
+        EXPECT_EQ(0u, v_frame.m_assign_count);
+        EXPECT_EQ(0u, v_frame.m_available_microseconds_queue_empty);
         EXPECT_GT(v_frame.m_worker_local_ms, 0u);
+    }
+
+    TEST_F(telemetry_hub_test, worker_scheduler_times_fit_in_the_run_and_stop_at_its_end) {
+        using clock = std::chrono::steady_clock;
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 1, 2, /*p_start_pump_thread=*/false);
+
+        const auto v_before = std::chrono::duration_cast<std::chrono::microseconds>(clock::now().time_since_epoch()).count();
+        v_hub.record_run_start();
+        v_hub.record_worker_waiting();
+        v_hub.record_worker_running();
+        v_hub.record_worker_waiting();
+        v_hub.record_run_end();
+        const auto v_after = std::chrono::duration_cast<std::chrono::microseconds>(clock::now().time_since_epoch()).count();
+
+        gempba::telemetry::worker_frame v_first{};
+        v_hub.snapshot_worker_frame(v_first);
+        gempba::telemetry::worker_frame v_second{};
+        v_hub.snapshot_worker_frame(v_second);
+
+        EXPECT_LE(v_first.m_sched_running_microseconds + v_first.m_sched_waiting_microseconds, static_cast<std::uint64_t>(v_after - v_before));
+        EXPECT_EQ(v_first.m_sched_running_microseconds, v_second.m_sched_running_microseconds);
+        EXPECT_EQ(v_first.m_sched_waiting_microseconds, v_second.m_sched_waiting_microseconds);
+    }
+
+    TEST_F(telemetry_hub_test, center_assignment_reaches_the_frame) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+
+        v_hub.record_assignment(3);
+        v_hub.record_assignment_accepted(3);
+        v_hub.record_assignment_accepted(3);
+
+        gempba::telemetry::worker_frame v_frame{};
+        v_hub.snapshot_worker_frame(v_frame);
+        EXPECT_EQ(1u, v_frame.m_assign_count);
+        EXPECT_EQ(v_frame.m_assign_latency_microseconds_total, v_frame.m_assign_latency_microseconds_max);
     }
 
     TEST_F(telemetry_hub_test, record_send_accumulates_per_destination_edges) {

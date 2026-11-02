@@ -188,6 +188,10 @@ namespace gempba {
         void run(node_manager& p_node_manager, std::map<int, std::shared_ptr<serial_runnable>> p_runnables) {
             MPI_Barrier(m_world_communicator);
             m_start_time = MPI_Wtime();
+            if (auto* v_telemetry = telemetry::get()) {
+                v_telemetry->record_run_start();
+                v_telemetry->record_worker_waiting();
+            }
 
             bool v_is_terminated = false;
             while (true) {
@@ -242,6 +246,9 @@ namespace gempba {
             send_final_solution_to_center(p_node_manager);
             m_end_time = MPI_Wtime();
             m_stats.m_elapsed_time = m_end_time - m_start_time;
+            if (auto* v_telemetry = telemetry::get()) {
+                v_telemetry->record_run_end();
+            }
         }
 
         void send_final_solution_to_center(node_manager& p_node_manager) const;
@@ -401,8 +408,10 @@ namespace gempba {
             m_stats.m_received_task_count++;
             m_stats.m_total_requested_tasks++;
 
-            if (auto* v_telemetry = telemetry::get())
+            if (auto* v_telemetry = telemetry::get()) {
+                v_telemetry->record_worker_running();
                 v_telemetry->record_recv(static_cast<std::uint32_t>(p_status.MPI_SOURCE), static_cast<std::uint64_t>(v_count));
+            }
 
             //  Delegates the processing of the incoming buffer to the node manager and stores the potential returned value in _returned_value_future.
             const auto v_runnable = p_runnables[v_function_id];
@@ -412,6 +421,9 @@ namespace gempba {
 
             task_funneling(p_node_manager);
             notify_available_state();
+            if (auto* v_telemetry = telemetry::get()) {
+                v_telemetry->record_worker_waiting();
+            }
             release_parent_if_passive();
         }
 
@@ -510,7 +522,7 @@ namespace gempba {
         }
 
         void clear_buffer() {
-            dispatch_to_available(m_center_bundle_queue, m_process_state, AVAILABLE_STATE, ASSIGNED_STATE, [this](const int p_rank, const task_bundle& p_bundle) {
+            m_nodes_available -= dispatch_to_available(m_center_bundle_queue, m_process_state, AVAILABLE_STATE, ASSIGNED_STATE, [this](const int p_rank, const task_bundle& p_bundle) {
                 const task_packet v_bytes = p_bundle.get_task_packet();
                 const int v_runnable_id = p_bundle.get_runnable_id();
 
@@ -525,15 +537,26 @@ namespace gempba {
 
                 if (auto* v_telemetry = telemetry::get()) {
                     v_telemetry->record_send(static_cast<std::uint32_t>(p_rank), static_cast<std::uint64_t>(v_bytes.size()));
+                    v_telemetry->record_assignment(static_cast<std::uint32_t>(p_rank));
                 }
             });
+        }
+
+        void record_center_queue() const {
+            if (auto* v_telemetry = telemetry::get()) {
+                v_telemetry->record_center_queue(static_cast<std::uint32_t>(m_nodes_available), m_center_bundle_queue.empty());
+            }
         }
 
         void run(const task_packet& p_seed, const int p_runnable_id) {
             MPI_Barrier(m_world_communicator);
             m_start_time = MPI_Wtime();
+            if (auto* v_telemetry = telemetry::get()) {
+                v_telemetry->record_run_start();
+            }
 
             send_seed(p_seed, p_runnable_id);
+            record_center_queue();
 
             while (true) {
                 MPI_Status v_status = probe_communicators_at_center();
@@ -570,6 +593,7 @@ namespace gempba {
 
                 clear_buffer();
                 monitor_and_notify_center_status();
+                record_center_queue();
 
                 if (auto* v_telemetry = telemetry::get())
                     v_telemetry->tick_if_due();
@@ -589,6 +613,9 @@ namespace gempba {
 
             m_end_time = MPI_Wtime();
             m_stats.m_elapsed_time = m_end_time - m_start_time;
+            if (auto* v_telemetry = telemetry::get()) {
+                v_telemetry->record_run_end();
+            }
         }
 
         MPI_Status probe_communicators_at_center() {
@@ -649,6 +676,9 @@ namespace gempba {
             m_nodes_running++;
             m_total_requests_number++;
             m_stats.m_total_requested_tasks++;
+            if (auto* v_telemetry = telemetry::get()) {
+                v_telemetry->record_assignment_accepted(static_cast<std::uint32_t>(p_status.MPI_SOURCE));
+            }
         }
 
         void process_available(const MPI_Status& p_status) {
@@ -875,8 +905,10 @@ namespace gempba {
             m_stats.m_sent_task_count++;
             m_stats.m_total_requested_tasks++;
 
-            if (auto* v_telemetry = telemetry::get())
+            if (auto* v_telemetry = telemetry::get()) {
                 v_telemetry->record_send(static_cast<std::uint32_t>(DEST), p_packet.size());
+                v_telemetry->record_assignment(static_cast<std::uint32_t>(DEST));
+            }
         }
 
     private:
@@ -968,6 +1000,7 @@ namespace gempba {
         void init_member_variables() {
             m_termination = termination_detector(m_world_rank == CENTER_NODE);
             m_process_state.resize(m_world_size, AVAILABLE_STATE);
+            m_nodes_available = m_world_size - 1;
             m_process_tree.resize(m_world_size);
             m_global_score = score::make(INT_MIN);
             m_transmitting = false;
