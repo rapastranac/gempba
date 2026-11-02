@@ -61,11 +61,11 @@ namespace gempba::telemetry {
         std::uint64_t m_worker_local_ms;
 
         /**
-         * @brief Tasks dispatched to the worker's local thread pool.
-         * Mutually exclusive with @ref m_tasks_sent_total: each task event
-         * is either local-dispatch or a remote send.
+         * @brief Subtrees handed to a pool thread (load_balancer::force_local_submit), received subtrees included, counted at
+         * hand-off rather than completion. Branches explored inline (load_balancer::forward) are not counted. Not exclusive
+         * with @ref m_tasks_sent_total or @ref m_tasks_recv_total.
          */
-        std::uint64_t m_tasks_local_total;
+        std::uint64_t m_tasks_started_total;
         /** @brief Tasks sent to a remote worker. */
         std::uint64_t m_tasks_sent_total;
         /** @brief Tasks received from a remote worker. */
@@ -156,26 +156,12 @@ namespace gempba::telemetry {
         std::uint64_t m_mem_used_bytes;
     };
 
-    /** @brief Host-level network counters, delta-able by the consumer. */
-    struct net_stats {
-        std::uint64_t m_bytes_in;
-        std::uint64_t m_bytes_out;
-        std::uint64_t m_packets_in;
-        std::uint64_t m_packets_out;
-    };
-
-    /** @brief Host-level disk counters, delta-able by the consumer. */
-    struct disk_stats {
-        std::uint64_t m_read_bytes;
-        std::uint64_t m_write_bytes;
-    };
-
     /**
      * @brief Periodic per-host telemetry sample.
      *
      * Emitted by the host's sentinel worker on the node-interval cadence.
-     * Aggregates host-wide signals (CPU, memory, net, disk) that are not
-     * meaningful per-worker.
+     * Aggregates host-wide signals (CPU, memory) that are not meaningful
+     * per-worker.
      */
     struct node_frame {
         std::uint16_t m_version;
@@ -198,8 +184,6 @@ namespace gempba::telemetry {
          */
         std::uint64_t m_cgroup_mem_used_bytes;
         std::uint64_t m_cgroup_mem_limit_bytes;
-        net_stats m_net_aggregate;
-        disk_stats m_disk_aggregate;
     };
 
     /** @brief Tag for client-pushed control messages over the dashboard channel. */

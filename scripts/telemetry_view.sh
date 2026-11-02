@@ -2,7 +2,7 @@
 # Live-tails the GemPBA telemetry stream from a running benchmark.
 #
 # Connects to the center's TCP socket on 127.0.0.1 and prints one formatted
-# line per broadcast frame: timestamp, elapsed, tasks_local_total,
+# line per broadcast frame: timestamp, elapsed, tasks_started_total,
 # tasks_sent_total, process threads, CPU%, and process RSS (KB).
 # Press Ctrl+C to stop.
 #
@@ -95,7 +95,7 @@ fi
 
 echo
 printf '%8s  %10s  %-14s  %-14s  %7s  %7s  %12s\n' \
-    "time" "elapsed" "tasks_local" "tasks_remote" "threads" "cpu%" "rss(KB)"
+    "time" "elapsed" "tasks_started" "tasks_remote" "threads" "cpu%" "rss(KB)"
 printf -- '-%.0s' $(seq 1 95); printf '\n'
 
 while IFS= read -r line <&3; do
@@ -111,7 +111,7 @@ while IFS= read -r line <&3; do
             [
                 (.ts // 0),
                 (.elapsed_seconds // 0),
-                ($w.tasks_local_total // 0),
+                ($w.tasks_started_total // 0),
                 ($w.tasks_sent_total // 0),
                 ($w.process_threads // 0),
                 ($w.process_cpu_pct // 0),
@@ -121,7 +121,7 @@ while IFS= read -r line <&3; do
     ' 2>/dev/null) || continue
     [ "$row" = "SKIP" ] && continue
 
-    IFS=$'\t' read -r ts_ms elapsed_s tasks_local tasks_remote threads cpu_pct rss_bytes <<<"$row"
+    IFS=$'\t' read -r ts_ms elapsed_s tasks_started tasks_remote threads cpu_pct rss_bytes <<<"$row"
 
     ts_sec=$(( ${ts_ms%.*} / 1000 ))
     ts=$(date -d "@$ts_sec" +'%H:%M:%S' 2>/dev/null || echo '??:??:??')
@@ -135,5 +135,5 @@ while IFS= read -r line <&3; do
     rss_kb=$(awk -v b="$rss_bytes" 'BEGIN { printf "%d", b/1024 }')
 
     printf '%8s  %10s  %-14s  %-14s  %7s  %6.1f%%  %12d\n' \
-        "$ts" "$elapsed_fmt" "$tasks_local" "$tasks_remote" "$threads" "$cpu_pct" "$rss_kb"
+        "$ts" "$elapsed_fmt" "$tasks_started" "$tasks_remote" "$threads" "$cpu_pct" "$rss_kb"
 done

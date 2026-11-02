@@ -12,7 +12,7 @@ namespace {
         v_f.m_version = gempba::telemetry::TELEMETRY_SCHEMA_VERSION;
         v_f.m_worker_id = 3;
         v_f.m_seq_no = 7;
-        v_f.m_tasks_local_total = 42;
+        v_f.m_tasks_started_total = 42;
         v_f.m_tasks_sent_total = 8;
 
         std::string v_out;
@@ -20,7 +20,7 @@ namespace {
 
         EXPECT_NE(std::string::npos, v_out.find("\"worker_id\":3"));
         EXPECT_NE(std::string::npos, v_out.find("\"seq_no\":7"));
-        EXPECT_NE(std::string::npos, v_out.find("\"tasks_local_total\":42"));
+        EXPECT_NE(std::string::npos, v_out.find("\"tasks_started_total\":42"));
         EXPECT_NE(std::string::npos, v_out.find("\"tasks_sent_total\":8"));
     }
 
@@ -150,6 +150,18 @@ namespace {
         EXPECT_NE(std::string::npos, v_out.find("\"cgroup_mem_used_bytes\":512"));
         EXPECT_NE(std::string::npos, v_out.find("\"cgroup_mem_limit_bytes\":8192"));
         EXPECT_NE(std::string::npos, v_out.find("\"cpu_pct\":12.500"));
+    }
+
+    TEST(json_serializer_test, node_frame_ends_with_its_sockets) {
+        gempba::telemetry::node_frame v_n{};
+        v_n.m_socket_count = 1;
+
+        std::string v_out;
+        gempba::telemetry::serialize_node_frame(v_out, v_n);
+
+        EXPECT_EQ(std::string::npos, v_out.find("net_aggregate"));
+        EXPECT_EQ(std::string::npos, v_out.find("disk_aggregate"));
+        EXPECT_TRUE(v_out.ends_with("}]}")) << v_out;
     }
 
     TEST(json_serializer_test, topology_includes_node_and_worker_ids) {
