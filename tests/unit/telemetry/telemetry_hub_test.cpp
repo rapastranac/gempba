@@ -1,5 +1,6 @@
 #include <atomic>
 #include <chrono>
+#include <gempba/config.h>
 #include <gempba/telemetry/frames.hpp>
 #include <gempba/telemetry/telemetry_hub.hpp>
 #include <gtest/gtest.h>
@@ -373,6 +374,33 @@ namespace {
 
         const std::vector<std::pair<std::string, std::string>> v_expected{{"label", "baseline"}};
         EXPECT_EQ(v_expected, gempba::telemetry::get()->run_annotations());
+    }
+
+    TEST_F(telemetry_hub_test, describe_run_reports_the_mode_size_version_and_annotations) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MP_MPI, 3, 8, /*p_start_pump_thread=*/false);
+        v_hub.annotate_run("problem", "vertex_cover");
+
+        const gempba::telemetry::run_description v_run = v_hub.describe_run();
+        EXPECT_EQ(gempba::telemetry::runtime_mode::MP_MPI, v_run.m_mode);
+        EXPECT_EQ(8u, v_run.m_world_size);
+        EXPECT_EQ(GEMPBA_VERSION, v_run.m_gempba_version);
+        EXPECT_TRUE(v_run.m_scheduler.empty());
+        EXPECT_TRUE(v_run.m_load_balancer.empty());
+        EXPECT_EQ(0u, v_run.m_threads_per_process);
+        const std::vector<std::pair<std::string, std::string>> v_expected{{"problem", "vertex_cover"}};
+        EXPECT_EQ(v_expected, v_run.m_annotations);
+    }
+
+    TEST_F(telemetry_hub_test, describe_run_names_both_load_balancers_and_the_scheduler) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.describe_scheduler("semi_centralized");
+
+        v_hub.describe_load_balancer(gempba::QUASI_HORIZONTAL);
+        EXPECT_EQ("quasi_horizontal", v_hub.describe_run().m_load_balancer);
+        v_hub.describe_load_balancer(gempba::WORK_STEALING);
+        EXPECT_EQ("work_stealing", v_hub.describe_run().m_load_balancer);
+        EXPECT_EQ("semi_centralized", v_hub.describe_run().m_scheduler);
     }
 
     TEST_F(telemetry_hub_test, record_send_accumulates_per_destination_edges) {

@@ -211,6 +211,78 @@ namespace {
         EXPECT_NE(std::string::npos, v_out.find("\"allowed_cpu_ids\":[0,1,3,100]"));
     }
 
+    gempba::telemetry::topology_snapshot two_rank_topology() {
+        gempba::telemetry::topology_snapshot v_topology;
+        gempba::telemetry::worker_identity v_center{};
+        v_center.m_worker_id = 0;
+        gempba::telemetry::worker_identity v_worker{};
+        v_worker.m_worker_id = 1;
+        v_topology.m_identities = {v_center, v_worker};
+        return v_topology;
+    }
+
+    TEST(json_serializer_test, topology_run_carries_every_field_for_both_schedulers_and_load_balancers) {
+        for (const std::string v_scheduler: {"centralized", "semi_centralized"}) {
+            for (const std::string v_load_balancer: {"quasi_horizontal", "work_stealing"}) {
+                gempba::telemetry::run_description v_run;
+                v_run.m_mode = gempba::telemetry::runtime_mode::MP_MPI;
+                v_run.m_scheduler = v_scheduler;
+                v_run.m_load_balancer = v_load_balancer;
+                v_run.m_world_size = 4;
+                v_run.m_threads_per_process = 8;
+                v_run.m_gempba_version = "4.3.0";
+                v_run.m_annotations = {{"problem", "vertex_cover"}, {"seed", "42"}};
+
+                std::string v_out;
+                gempba::telemetry::serialize_topology(v_out, two_rank_topology(), &v_run);
+
+                std::string v_expected = R"("run":{"scheduler":")";
+                v_expected += v_scheduler;
+                v_expected += R"(","load_balancer":")";
+                v_expected += v_load_balancer;
+                v_expected += R"(","runtime_mode":"multiprocessing","world_size":4,"threads_per_process":8,"gempba_version":"4.3.0",)";
+                v_expected += R"("annotations":{"problem":"vertex_cover","seed":"42"}}})";
+                EXPECT_TRUE(v_out.ends_with(v_expected)) << v_out;
+            }
+        }
+    }
+
+    TEST(json_serializer_test, topology_run_marks_rank_zero_as_the_center_only_under_mpi) {
+        gempba::telemetry::run_description v_run;
+        v_run.m_mode = gempba::telemetry::runtime_mode::MP_MPI;
+
+        std::string v_mpi;
+        gempba::telemetry::serialize_topology(v_mpi, two_rank_topology(), &v_run);
+        EXPECT_NE(std::string::npos, v_mpi.find(R"({"worker_id":0,"hostname":"","pid":0,"primary_socket":0,"role":"center")")) << v_mpi;
+        EXPECT_NE(std::string::npos, v_mpi.find(R"({"worker_id":1,"hostname":"","pid":0,"primary_socket":0,"role":"worker")")) << v_mpi;
+
+        v_run.m_mode = gempba::telemetry::runtime_mode::MT_ONLY;
+        std::string v_mt;
+        gempba::telemetry::serialize_topology(v_mt, two_rank_topology(), &v_run);
+        EXPECT_EQ(std::string::npos, v_mt.find(R"("role":"center")")) << v_mt;
+        EXPECT_NE(std::string::npos, v_mt.find(R"("runtime_mode":"multithreading")")) << v_mt;
+    }
+
+    TEST(json_serializer_test, topology_run_writes_null_for_missing_components_and_escapes_annotations) {
+        gempba::telemetry::run_description v_run;
+        v_run.m_annotations = {{"label", "a \"quoted\" run"}};
+
+        std::string v_out;
+        gempba::telemetry::serialize_topology(v_out, two_rank_topology(), &v_run);
+
+        EXPECT_NE(std::string::npos, v_out.find(R"("run":{"scheduler":null,"load_balancer":null,)")) << v_out;
+        EXPECT_NE(std::string::npos, v_out.find(R"("annotations":{"label":"a \"quoted\" run"}})")) << v_out;
+    }
+
+    TEST(json_serializer_test, topology_without_a_run_has_no_run_or_roles) {
+        std::string v_out;
+        gempba::telemetry::serialize_topology(v_out, two_rank_topology());
+
+        EXPECT_EQ(std::string::npos, v_out.find("\"run\""));
+        EXPECT_EQ(std::string::npos, v_out.find("\"role\""));
+        EXPECT_TRUE(v_out.ends_with("]}")) << v_out;
+    }
+
     TEST(json_serializer_test, broadcast_envelope_carries_version_and_top_level_keys) {
         gempba::telemetry::topology_snapshot v_topo;
         std::vector<gempba::telemetry::worker_frame> v_workers;

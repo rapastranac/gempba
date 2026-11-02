@@ -9,6 +9,7 @@
 #include <gempba/telemetry/runtime_mode.hpp>
 #include <gempba/telemetry/telemetry_transport.hpp>
 #include <gempba/telemetry/topology.hpp>
+#include <gempba/utils/gempba_utils.hpp>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -174,6 +175,15 @@ namespace gempba::telemetry {
         /// @return this run's annotations, in the order their keys were first set.
         [[nodiscard]] std::vector<std::pair<std::string, std::string>> run_annotations() const;
 
+        /// Record the scheduler this run uses, by its scheduler::get_name().
+        void describe_scheduler(std::string_view p_name);
+
+        /// Record the load balancer this run uses.
+        void describe_load_balancer(balancing_policy p_policy);
+
+        /// @return how this run is set up; the thread count comes from the latest worker frames, so only the center fills it.
+        [[nodiscard]] run_description describe_run() const;
+
         /// Set the cadence at which worker frames are emitted. Fans out to other workers.
         void set_worker_interval_ms(std::uint32_t p_interval_ms) noexcept;
 
@@ -228,8 +238,10 @@ namespace gempba::telemetry {
         mutable std::mutex m_pending_fanout_mtx;
         std::vector<control_msg> m_pending_fanout;
 
-        mutable std::mutex m_annotations_mtx;
+        mutable std::mutex m_run_mtx;
         std::vector<std::pair<std::string, std::string>> m_run_annotations;
+        std::string m_scheduler_name;
+        std::string m_load_balancer_name;
     };
 
     /// @return The installed hub, or @c nullptr when none is installed.
