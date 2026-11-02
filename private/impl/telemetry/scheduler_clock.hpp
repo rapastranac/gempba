@@ -92,6 +92,12 @@ namespace gempba::telemetry {
             m_center_full = true;
         }
 
+        void on_global_score_improved(const std::uint64_t p_now) {
+            if (m_in_run) {
+                m_last_score_improvement_ms = (p_now - m_run_start) / 1000;
+            }
+        }
+
         void on_center_free(const std::uint64_t p_now) {
             if (!m_in_run || !m_center_full) {
                 return;
@@ -112,6 +118,7 @@ namespace gempba::telemetry {
             p_out.m_assign_latency_microseconds_max = m_assign_latency_max;
             p_out.m_available_microseconds_queue_empty = m_available_queue_empty + (m_queue_empty ? m_available_ranks * v_open : 0);
             p_out.m_center_full_microseconds = m_center_full_time + (m_center_full ? v_open : 0);
+            p_out.m_last_score_improvement_ms = m_last_score_improvement_ms;
         }
 
     private:
@@ -157,6 +164,8 @@ namespace gempba::telemetry {
 
         bool m_center_full = false;
         std::uint64_t m_center_full_time = 0;
+
+        std::uint64_t m_last_score_improvement_ms = 0;
     };
 
 } // namespace gempba::telemetry

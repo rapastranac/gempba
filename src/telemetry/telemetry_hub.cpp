@@ -63,6 +63,7 @@ namespace gempba::telemetry {
         std::atomic<std::uint64_t> m_center_state_msgs_total{0};
         std::atomic<std::uint64_t> m_center_score_proposals_total{0};
         std::atomic<std::uint64_t> m_center_score_broadcasts_total{0};
+        std::atomic<std::uint64_t> m_score_proposals_sent{0};
         std::atomic<std::uint64_t> m_telemetry_microseconds_total{0};
 
         std::atomic<std::uint64_t> m_edges_out_bytes[MAX_WORKERS]{};
@@ -241,6 +242,13 @@ namespace gempba::telemetry {
         m_counters->m_scheduler_clock.on_center_free(monotonic_us());
     }
 
+    void telemetry_hub::record_score_proposal_sent() noexcept { m_counters->m_score_proposals_sent.fetch_add(1, std::memory_order_relaxed); }
+
+    void telemetry_hub::record_global_score_improved() noexcept {
+        const std::scoped_lock v_lock(m_counters->m_scheduler_mtx);
+        m_counters->m_scheduler_clock.on_global_score_improved(monotonic_us());
+    }
+
     void telemetry_hub::tick_if_due() noexcept {
         if (!m_transport)
             return;
@@ -343,6 +351,7 @@ namespace gempba::telemetry {
         p_out.m_center_state_msgs_total = m_counters->m_center_state_msgs_total.load(std::memory_order_relaxed);
         p_out.m_center_score_proposals_total = m_counters->m_center_score_proposals_total.load(std::memory_order_relaxed);
         p_out.m_center_score_broadcasts_total = m_counters->m_center_score_broadcasts_total.load(std::memory_order_relaxed);
+        p_out.m_score_proposals_sent = m_counters->m_score_proposals_sent.load(std::memory_order_relaxed);
         p_out.m_telemetry_microseconds_total = m_counters->m_telemetry_microseconds_total.load(std::memory_order_relaxed);
 
         for (unsigned v_i = 0; v_i < MAX_WORKERS; ++v_i) {
@@ -363,6 +372,8 @@ namespace gempba::telemetry {
             p_out.m_idle_microseconds_starved = static_cast<std::uint64_t>(v_lb->get_starved_idle_time() * 1'000'000.0);
             p_out.m_idle_microseconds_imbalanced = static_cast<std::uint64_t>(v_lb->get_imbalanced_idle_time() * 1'000'000.0);
             p_out.m_tasks_running = static_cast<std::uint32_t>(v_lb->get_tasks_running_count());
+            p_out.m_spawn_rejected_pool_full = v_lb->get_spawn_rejected_pool_full_count();
+            p_out.m_spawn_remote_rejected = v_lb->get_spawn_remote_rejected_count();
         }
 
 #if GEMPBA_MULTIPROCESSING

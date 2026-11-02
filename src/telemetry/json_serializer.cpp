@@ -78,6 +78,10 @@ namespace gempba::telemetry {
         emit_u64(p_out, p_frame.m_send_microseconds_total);
         p_out += ",\"recv_microseconds_total\":";
         emit_u64(p_out, p_frame.m_recv_microseconds_total);
+        p_out += ",\"spawn_rejected_pool_full\":";
+        emit_u64(p_out, p_frame.m_spawn_rejected_pool_full);
+        p_out += ",\"spawn_remote_rejected\":";
+        emit_u64(p_out, p_frame.m_spawn_remote_rejected);
         p_out += ",\"tasks_running\":";
         emit_u32(p_out, p_frame.m_tasks_running);
         p_out += ",\"scheduler_pending_count\":";
@@ -110,6 +114,10 @@ namespace gempba::telemetry {
         emit_u64(p_out, p_frame.m_center_score_proposals_total);
         p_out += ",\"center_score_broadcasts_total\":";
         emit_u64(p_out, p_frame.m_center_score_broadcasts_total);
+        p_out += ",\"score_proposals_sent\":";
+        emit_u64(p_out, p_frame.m_score_proposals_sent);
+        p_out += ",\"last_score_improvement_ms\":";
+        emit_u64(p_out, p_frame.m_last_score_improvement_ms);
         p_out += ",\"center_full_microseconds\":";
         emit_u64(p_out, p_frame.m_center_full_microseconds);
         p_out += ",\"telemetry_microseconds_total\":";
