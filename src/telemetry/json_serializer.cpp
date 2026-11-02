@@ -1,15 +1,15 @@
 #include <impl/telemetry/json_serializer.hpp>
 
 #include <cstdio>
+#include <string_view>
 
 namespace gempba::telemetry {
 
     namespace {
 
-        void escape_quoted(std::string& p_out, const char* p_str) {
+        void escape_quoted(std::string& p_out, const std::string_view p_str) {
             p_out += '"';
-            for (const char* v_p = p_str; *v_p; ++v_p) {
-                const char v_c = *v_p;
+            for (const char v_c: p_str) {
                 switch (v_c) {
                     case '"':
                         p_out += "\\\"";
@@ -38,8 +38,6 @@ namespace gempba::telemetry {
             }
             p_out += '"';
         }
-
-        void escape_quoted(std::string& p_out, const std::string& p_str) { escape_quoted(p_out, p_str.c_str()); }
 
         void emit_u64(std::string& p_out, std::uint64_t p_v) {
             char v_buf[32];
