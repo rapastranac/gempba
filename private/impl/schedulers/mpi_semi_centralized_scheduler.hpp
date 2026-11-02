@@ -2,6 +2,7 @@
 #define GEMPBA_MPI_SEMI_CENTRALIZED_SCHEDULER_HPP
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cfloat>
 #include <climits>
@@ -289,15 +290,36 @@ namespace gempba {
         }
 
         void process_termination(MPI_Status p_status) {
-
-            MPI_Recv(nullptr, 0, MPI_BYTE, p_status.MPI_SOURCE, TERMINATION, m_world_communicator, &p_status);
+            std::array<int, 2> v_sent_counts{};
+            MPI_Recv(v_sent_counts.data(), static_cast<int>(v_sent_counts.size()), MPI_INT, p_status.MPI_SOURCE, TERMINATION, m_world_communicator, &p_status);
             utils::print_ipc_debug_comments("rank {}, received message from rank {}", m_world_rank, p_status.MPI_SOURCE);
             if (!m_termination.is_quiescent() || !m_tasks_bundle_queue.empty() || m_transmitting.load()) {
                 utils::log_and_throw("rank {} received termination with work in progress: deficit {}, parent {}", m_world_rank, m_termination.deficit(), m_termination.parent());
             }
+            drain_center_messages(v_sent_counts[0], v_sent_counts[1]);
 
             spdlog::debug("rank {} exited\n", m_world_rank);
             MPI_Barrier(m_world_communicator);
+        }
+
+        void drain_center_messages(const int p_score_updates_sent, const int p_next_processes_sent) {
+            const int v_pending_score_updates = p_score_updates_sent - m_score_updates_received;
+            const int v_pending_next_processes = p_next_processes_sent - m_next_processes_received;
+            while (m_score_updates_received < p_score_updates_sent) {
+                MPI_Status v_status;
+                MPI_Probe(CENTER_NODE, SCORE_UPDATE, m_global_score_communicator, &v_status);
+                receive_score_from_center(v_status);
+            }
+            while (m_next_processes_received < p_next_processes_sent) {
+                MPI_Status v_status;
+                MPI_Probe(CENTER_NODE, NEXT_PROCESS, m_next_process_communicator, &v_status);
+                receive_next_process(v_status);
+            }
+            if (m_score_updates_received != p_score_updates_sent || m_next_processes_received != p_next_processes_sent) {
+                utils::log_and_throw("rank {} received more center messages than the center sent: score updates {}/{}, next processes {}/{}", m_world_rank, m_score_updates_received,
+                                     p_score_updates_sent, m_next_processes_received, p_next_processes_sent);
+            }
+            spdlog::debug("rank {} drained {} score updates and {} next-process messages at termination", m_world_rank, v_pending_score_updates, v_pending_next_processes);
         }
 
         void process_task_received_ack(MPI_Status p_status) {
@@ -320,6 +342,7 @@ namespace gempba {
         void receive_score_from_center(MPI_Status p_status) {
             utils::print_ipc_debug_comments("rank {}, about to receive global score from Center\n", m_world_rank);
             MPI_Recv(&m_global_score, sizeof(score), MPI_BYTE, CENTER_NODE, SCORE_UPDATE, m_global_score_communicator, &p_status);
+            ++m_score_updates_received;
             utils::print_ipc_debug_comments("rank {}, received global score: {} from Center\n", m_world_rank, m_global_score.to_string());
         }
 
@@ -328,6 +351,7 @@ namespace gempba {
             MPI_Get_count(&p_status, MPI_INT, &v_count); // 0 < count < world_size   -- safe
             utils::print_ipc_debug_comments("rank {}, about to receive nextProcess from Center, count : {}\n", m_world_rank, v_count);
             MPI_Recv(m_next_processes.data(), v_count, MPI_INT, CENTER_NODE, NEXT_PROCESS, m_next_process_communicator, &p_status);
+            ++m_next_processes_received;
             utils::print_ipc_debug_comments("rank {}, received nextProcess from Center, count : {}\n", m_world_rank, v_count);
         }
 
@@ -603,6 +627,7 @@ namespace gempba {
                 if (v_next > 0) {
                     // put(&nxt, 1, status.MPI_SOURCE, MPI_INT, 0, win_nextProcess);
                     MPI_Send(&v_next, 1, MPI_INT, p_status.MPI_SOURCE, NEXT_PROCESS, m_next_process_communicator);
+                    ++m_next_processes_sent[p_status.MPI_SOURCE];
                     m_process_tree[p_status.MPI_SOURCE].add_next(v_next);
                     m_process_state[v_next] = ASSIGNED_STATE;
                     --m_nodes_available;
@@ -645,6 +670,7 @@ namespace gempba {
                 }
 
                 MPI_Send(&p_status.MPI_SOURCE, 1, MPI_INT, v_rank, NEXT_PROCESS, m_next_process_communicator);
+                ++m_next_processes_sent[v_rank];
 
                 m_process_tree[v_rank].add_next(p_status.MPI_SOURCE); // assigns the returning node as a running node
                 m_process_state[p_status.MPI_SOURCE] = ASSIGNED_STATE; // it flags the returning node as assigned
@@ -673,6 +699,7 @@ namespace gempba {
             for (int v_rank = 1; v_rank < m_world_size; v_rank++) {
                 MPI_Send(&m_global_score, sizeof(score), MPI_BYTE, v_rank, SCORE_UPDATE, m_global_score_communicator);
             }
+            ++m_score_updates_sent;
 
             static int success = 0;
             success++;
@@ -697,6 +724,7 @@ namespace gempba {
                 }
                 if (!v_buffer_tmp.empty()) {
                     MPI_Ssend(v_buffer_tmp.data(), static_cast<int>(v_buffer_tmp.size()), MPI_INT, v_rank, NEXT_PROCESS, m_next_process_communicator);
+                    ++m_next_processes_sent[v_rank];
                 }
             }
         }
@@ -707,7 +735,8 @@ namespace gempba {
 
         void notify_termination() const {
             for (int v_rank = 1; v_rank < m_world_size; v_rank++) {
-                MPI_Send(nullptr, 0, MPI_BYTE, v_rank, TERMINATION, m_world_communicator); // send positive signal
+                const std::array<int, 2> v_sent_counts = {m_score_updates_sent, m_next_processes_sent[v_rank]};
+                MPI_Send(v_sent_counts.data(), static_cast<int>(v_sent_counts.size()), MPI_INT, v_rank, TERMINATION, m_world_communicator);
             }
             MPI_Barrier(m_world_communicator);
         }
@@ -810,6 +839,10 @@ namespace gempba {
 
         int m_nodes_running = 0;
         int m_nodes_available = 0;
+        int m_score_updates_sent = 0;
+        std::vector<int> m_next_processes_sent;
+        int m_score_updates_received = 0;
+        int m_next_processes_received = 0;
         std::vector<int> m_process_state; // state of the nodes: running, assigned or available
         bool m_custom_initial_topology = false; // true if the user has set a custom topology
         tree m_process_tree;
@@ -882,6 +915,7 @@ namespace gempba {
         void init_member_variables() {
             m_termination = termination_detector(m_world_rank == CENTER_NODE);
             m_process_state.resize(m_world_size, AVAILABLE_STATE);
+            m_next_processes_sent.resize(m_world_size, 0);
             m_process_tree.resize(m_world_size);
             m_next_processes.resize(m_world_size, -1);
             m_global_score = score::make(INT_MIN);
