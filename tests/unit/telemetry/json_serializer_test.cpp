@@ -152,6 +152,18 @@ namespace {
         EXPECT_NE(std::string::npos, v_out.find("\"cpu_pct\":12.500"));
     }
 
+    TEST(json_serializer_test, node_frame_ends_with_its_sockets) {
+        gempba::telemetry::node_frame v_n{};
+        v_n.m_socket_count = 1;
+
+        std::string v_out;
+        gempba::telemetry::serialize_node_frame(v_out, v_n);
+
+        EXPECT_EQ(std::string::npos, v_out.find("net_aggregate"));
+        EXPECT_EQ(std::string::npos, v_out.find("disk_aggregate"));
+        EXPECT_TRUE(v_out.ends_with("}]}")) << v_out;
+    }
+
     TEST(json_serializer_test, topology_includes_node_and_worker_ids) {
         gempba::telemetry::topology_snapshot v_t;
         gempba::telemetry::topology_node v_node;

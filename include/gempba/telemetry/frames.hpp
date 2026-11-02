@@ -156,26 +156,12 @@ namespace gempba::telemetry {
         std::uint64_t m_mem_used_bytes;
     };
 
-    /** @brief Host-level network counters, delta-able by the consumer. */
-    struct net_stats {
-        std::uint64_t m_bytes_in;
-        std::uint64_t m_bytes_out;
-        std::uint64_t m_packets_in;
-        std::uint64_t m_packets_out;
-    };
-
-    /** @brief Host-level disk counters, delta-able by the consumer. */
-    struct disk_stats {
-        std::uint64_t m_read_bytes;
-        std::uint64_t m_write_bytes;
-    };
-
     /**
      * @brief Periodic per-host telemetry sample.
      *
      * Emitted by the host's sentinel worker on the node-interval cadence.
-     * Aggregates host-wide signals (CPU, memory, net, disk) that are not
-     * meaningful per-worker.
+     * Aggregates host-wide signals (CPU, memory) that are not meaningful
+     * per-worker.
      */
     struct node_frame {
         std::uint16_t m_version;
@@ -198,8 +184,6 @@ namespace gempba::telemetry {
          */
         std::uint64_t m_cgroup_mem_used_bytes;
         std::uint64_t m_cgroup_mem_limit_bytes;
-        net_stats m_net_aggregate;
-        disk_stats m_disk_aggregate;
     };
 
     /** @brief Tag for client-pushed control messages over the dashboard channel. */

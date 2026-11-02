@@ -183,19 +183,7 @@ namespace gempba::telemetry {
             emit_u64(p_out, v_s.m_mem_used_bytes);
             p_out += '}';
         }
-        p_out += R"(],"net_aggregate":{"bytes_in":)";
-        emit_u64(p_out, p_frame.m_net_aggregate.m_bytes_in);
-        p_out += ",\"bytes_out\":";
-        emit_u64(p_out, p_frame.m_net_aggregate.m_bytes_out);
-        p_out += ",\"packets_in\":";
-        emit_u64(p_out, p_frame.m_net_aggregate.m_packets_in);
-        p_out += ",\"packets_out\":";
-        emit_u64(p_out, p_frame.m_net_aggregate.m_packets_out);
-        p_out += R"(},"disk_aggregate":{"read_bytes":)";
-        emit_u64(p_out, p_frame.m_disk_aggregate.m_read_bytes);
-        p_out += ",\"write_bytes\":";
-        emit_u64(p_out, p_frame.m_disk_aggregate.m_write_bytes);
-        p_out += "}}";
+        p_out += "]}";
     }
 
     void serialize_topology(std::string& p_out, const topology_snapshot& p_topology) {
