@@ -61,11 +61,11 @@ namespace gempba::telemetry {
         std::uint64_t m_worker_local_ms;
 
         /**
-         * @brief Tasks dispatched to the worker's local thread pool.
-         * Mutually exclusive with @ref m_tasks_sent_total: each task event
-         * is either local-dispatch or a remote send.
+         * @brief Subtrees handed to a pool thread (load_balancer::force_local_submit), received subtrees included, counted at
+         * hand-off rather than completion. Branches explored inline (load_balancer::forward) are not counted. Not exclusive
+         * with @ref m_tasks_sent_total or @ref m_tasks_recv_total.
          */
-        std::uint64_t m_tasks_local_total;
+        std::uint64_t m_tasks_started_total;
         /** @brief Tasks sent to a remote worker. */
         std::uint64_t m_tasks_sent_total;
         /** @brief Tasks received from a remote worker. */

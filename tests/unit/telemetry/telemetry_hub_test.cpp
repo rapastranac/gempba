@@ -127,7 +127,7 @@ namespace {
 
         EXPECT_EQ(gempba::telemetry::TELEMETRY_SCHEMA_VERSION, v_frame.m_version);
         EXPECT_EQ(7u, v_frame.m_worker_id);
-        EXPECT_EQ(0u, v_frame.m_tasks_local_total);
+        EXPECT_EQ(0u, v_frame.m_tasks_started_total);
         EXPECT_EQ(0u, v_frame.m_tasks_sent_total);
         EXPECT_EQ(0u, v_frame.m_tasks_recv_total);
         EXPECT_EQ(0u, v_frame.m_bytes_sent_total);
@@ -407,7 +407,7 @@ namespace {
 
         gempba::telemetry::worker_frame v_frame{};
         v_hub.snapshot_worker_frame(v_frame);
-        EXPECT_EQ(2u, v_frame.m_tasks_local_total);
+        EXPECT_EQ(2u, v_frame.m_tasks_started_total);
     }
 
     TEST_F(telemetry_hub_test, snapshot_reports_set_worker_id_when_runtime_ready) {
@@ -453,7 +453,7 @@ namespace {
 
         const auto v_frame = v_hub.latest_worker_frame(0);
         ASSERT_TRUE(v_frame.has_value());
-        EXPECT_EQ(100u, v_frame->m_tasks_local_total);
+        EXPECT_EQ(100u, v_frame->m_tasks_started_total);
     }
 
     TEST_F(telemetry_hub_test, concurrent_record_send_is_lossless) {

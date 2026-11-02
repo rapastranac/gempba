@@ -12,7 +12,7 @@ namespace {
         v_f.m_version = gempba::telemetry::TELEMETRY_SCHEMA_VERSION;
         v_f.m_worker_id = 3;
         v_f.m_seq_no = 7;
-        v_f.m_tasks_local_total = 42;
+        v_f.m_tasks_started_total = 42;
         v_f.m_tasks_sent_total = 8;
 
         std::string v_out;
@@ -20,7 +20,7 @@ namespace {
 
         EXPECT_NE(std::string::npos, v_out.find("\"worker_id\":3"));
         EXPECT_NE(std::string::npos, v_out.find("\"seq_no\":7"));
-        EXPECT_NE(std::string::npos, v_out.find("\"tasks_local_total\":42"));
+        EXPECT_NE(std::string::npos, v_out.find("\"tasks_started_total\":42"));
         EXPECT_NE(std::string::npos, v_out.find("\"tasks_sent_total\":8"));
     }
 

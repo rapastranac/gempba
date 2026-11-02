@@ -64,8 +64,8 @@ namespace gempba::telemetry {
         emit_u32(p_out, p_frame.m_seq_no);
         p_out += ",\"worker_local_ms\":";
         emit_u64(p_out, p_frame.m_worker_local_ms);
-        p_out += ",\"tasks_local_total\":";
-        emit_u64(p_out, p_frame.m_tasks_local_total);
+        p_out += ",\"tasks_started_total\":";
+        emit_u64(p_out, p_frame.m_tasks_started_total);
         p_out += ",\"tasks_sent_total\":";
         emit_u64(p_out, p_frame.m_tasks_sent_total);
         p_out += ",\"tasks_recv_total\":";

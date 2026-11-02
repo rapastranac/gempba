@@ -52,7 +52,7 @@ namespace gempba::telemetry {
     void configure_port(const std::uint16_t p_port) noexcept { g_configured_port.store(p_port, std::memory_order_release); }
 
     struct telemetry_hub::counters {
-        std::atomic<std::uint64_t> m_tasks_local_total{0};
+        std::atomic<std::uint64_t> m_tasks_started_total{0};
         std::atomic<std::uint64_t> m_tasks_sent_total{0};
         std::atomic<std::uint64_t> m_tasks_recv_total{0};
         std::atomic<std::uint64_t> m_bytes_sent_total{0};
@@ -189,7 +189,7 @@ namespace gempba::telemetry {
         m_counters->m_recv_nanoseconds_total.fetch_add(static_cast<std::uint64_t>(p_elapsed.count()), std::memory_order_relaxed);
     }
 
-    void telemetry_hub::record_task_local() noexcept { m_counters->m_tasks_local_total.fetch_add(1, std::memory_order_relaxed); }
+    void telemetry_hub::record_task_local() noexcept { m_counters->m_tasks_started_total.fetch_add(1, std::memory_order_relaxed); }
 
     void telemetry_hub::record_run_start() noexcept {
         const std::scoped_lock v_lock(m_counters->m_scheduler_mtx);
@@ -341,7 +341,7 @@ namespace gempba::telemetry {
         p_out.m_seq_no = m_seq_no.load(std::memory_order_relaxed);
         p_out.m_worker_local_ms = monotonic_ms();
 
-        p_out.m_tasks_local_total = m_counters->m_tasks_local_total.load(std::memory_order_relaxed);
+        p_out.m_tasks_started_total = m_counters->m_tasks_started_total.load(std::memory_order_relaxed);
         p_out.m_tasks_sent_total = m_counters->m_tasks_sent_total.load(std::memory_order_relaxed);
         p_out.m_tasks_recv_total = m_counters->m_tasks_recv_total.load(std::memory_order_relaxed);
         p_out.m_bytes_sent_total = m_counters->m_bytes_sent_total.load(std::memory_order_relaxed);

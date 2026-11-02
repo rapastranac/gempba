@@ -5,7 +5,7 @@
 
 .DESCRIPTION
     Connects to the center's TCP socket on 127.0.0.1 and prints one formatted
-    line per broadcast frame: timestamp, tasks_local_total, process CPU,
+    line per broadcast frame: timestamp, tasks_started_total, process CPU,
     tasks_sent_total, and process RSS. Press Ctrl+C to stop.
 
     The gempba center always binds loopback only — the connection target is
@@ -69,7 +69,7 @@ Write-Host ("Connected to {0}:{1} - streaming frames (Ctrl+C to stop)" -f $Ip, $
 
 if (-not $Raw) {
     Write-Host ""
-    Write-Host ("{0,8}  {1,10}  {2,-14}  {3,-14}  {4,7}  {5,7}  {6,12}" -f "time","elapsed","tasks_local","tasks_remote","threads","cpu%","rss(KB)") -ForegroundColor DarkGray
+    Write-Host ("{0,8}  {1,10}  {2,-14}  {3,-14}  {4,7}  {5,7}  {6,12}" -f "time","elapsed","tasks_started","tasks_remote","threads","cpu%","rss(KB)") -ForegroundColor DarkGray
     Write-Host ("-" * 95) -ForegroundColor DarkGray
 }
 
@@ -100,7 +100,7 @@ try {
         $elapsed = [TimeSpan]::FromSeconds([double]$j.elapsed_seconds)
         $elapsedStr = "{0:0}:{1:00}:{2:00}" -f [int]$elapsed.TotalHours, $elapsed.Minutes, $elapsed.Seconds
 
-        "{0,8}  {1,10}  {2,-14}  {3,-14}  {4,7}  {5,6:N1}%  {6,12:N0}" -f $ts, $elapsedStr, $w.tasks_local_total, $w.tasks_sent_total, $w.process_threads, $w.process_cpu_pct, $rss
+        "{0,8}  {1,10}  {2,-14}  {3,-14}  {4,7}  {5,6:N1}%  {6,12:N0}" -f $ts, $elapsedStr, $w.tasks_started_total, $w.tasks_sent_total, $w.process_threads, $w.process_cpu_pct, $rss
     }
 } finally {
     $reader.Dispose()

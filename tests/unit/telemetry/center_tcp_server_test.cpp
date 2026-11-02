@@ -280,7 +280,7 @@ namespace {
         set_recv_timeout(v_client, 200);
 
         const std::string v_first = read_one_line(v_client, std::chrono::milliseconds(3000));
-        ASSERT_NE(std::string::npos, v_first.find("\"tasks_local_total\":0"));
+        ASSERT_NE(std::string::npos, v_first.find("\"tasks_started_total\":0"));
 
         v_hub.set_worker_interval_ms(600'000);
         // A tick that read the old interval must finish before the counters change, or it could publish them early.
@@ -294,7 +294,7 @@ namespace {
         close_sock(v_client);
         gempba::telemetry::configure_port(9000);
 
-        EXPECT_NE(std::string::npos, last_complete_line(v_rest).find("\"tasks_local_total\":5"));
+        EXPECT_NE(std::string::npos, last_complete_line(v_rest).find("\"tasks_started_total\":5"));
     }
 
     TEST_F(tcp_server_test, malformed_lines_are_ignored_and_do_not_break_subsequent_input) {
