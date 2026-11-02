@@ -92,6 +92,21 @@ namespace gempba::telemetry {
         /// Record the center's available-rank count and queue state after it handled an event.
         void record_center_queue(std::uint32_t p_available_ranks, bool p_queue_empty) noexcept;
 
+        /// Record that the center handled a running or available report. Hot-path; same guarantees as @ref record_send.
+        void record_center_state_msg() noexcept;
+
+        /// Record that the center received a score proposal. Hot-path; same guarantees as @ref record_send.
+        void record_center_score_proposal() noexcept;
+
+        /// Record that the center broadcast a new global score to every worker. Hot-path; same guarantees as @ref record_send.
+        void record_center_score_broadcast() noexcept;
+
+        /// Record that the center told its workers it is full; repeated notices extend the same full period.
+        void record_center_full() noexcept;
+
+        /// Record that the center told its workers it has room again.
+        void record_center_free() noexcept;
+
         /**
          * @brief Emit pending frames if their cadence is due, else return cheaply.
          *
@@ -151,7 +166,7 @@ namespace gempba::telemetry {
         struct counters;
         struct aggregator;
 
-        void drain_inbound_frames();
+        bool drain_inbound_frames();
 
         runtime_mode m_mode = runtime_mode::MT_ONLY;
         std::uint32_t m_worker_id = 0;
