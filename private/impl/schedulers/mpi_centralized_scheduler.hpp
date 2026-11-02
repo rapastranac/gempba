@@ -510,7 +510,7 @@ namespace gempba {
         }
 
         void clear_buffer() {
-            dispatch_to_available(m_center_bundle_queue, m_process_state, AVAILABLE_STATE, ASSIGNED_STATE, [this](const int p_rank, const task_bundle& p_bundle) {
+            m_nodes_available -= dispatch_to_available(m_center_bundle_queue, m_process_state, AVAILABLE_STATE, ASSIGNED_STATE, [this](const int p_rank, const task_bundle& p_bundle) {
                 const task_packet v_bytes = p_bundle.get_task_packet();
                 const int v_runnable_id = p_bundle.get_runnable_id();
 
@@ -968,6 +968,7 @@ namespace gempba {
         void init_member_variables() {
             m_termination = termination_detector(m_world_rank == CENTER_NODE);
             m_process_state.resize(m_world_size, AVAILABLE_STATE);
+            m_nodes_available = m_world_size - 1;
             m_process_tree.resize(m_world_size);
             m_global_score = score::make(INT_MIN);
             m_transmitting = false;
