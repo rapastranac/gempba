@@ -6,6 +6,7 @@
 #include <impl/telemetry/local_transport.hpp>
 #include <impl/telemetry/node_probe.hpp>
 #include <impl/telemetry/process_probe.hpp>
+#include <impl/telemetry/scheduler_clock.hpp>
 #include <impl/telemetry/topology_builder.hpp>
 
 #if GEMPBA_MULTIPROCESSING
@@ -35,6 +36,11 @@ namespace gempba::telemetry {
             return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(clock::now().time_since_epoch()).count());
         }
 
+        std::uint64_t monotonic_us() noexcept {
+            using clock = std::chrono::steady_clock;
+            return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(clock::now().time_since_epoch()).count());
+        }
+
         constexpr std::chrono::milliseconds k_pump_resolution{50};
         constexpr std::uint64_t k_final_frame_wait_ms = 1000;
         constexpr std::chrono::milliseconds k_final_frame_poll{10};
@@ -52,6 +58,9 @@ namespace gempba::telemetry {
 
         std::atomic<std::uint64_t> m_edges_out_bytes[MAX_WORKERS]{};
         std::atomic<std::uint64_t> m_edges_out_count[MAX_WORKERS]{};
+
+        std::mutex m_scheduler_mtx;
+        scheduler_clock m_scheduler_clock;
     };
 
     // Center-side latest-frame state. Lives only on the center role; sparse
@@ -166,6 +175,41 @@ namespace gempba::telemetry {
 
     void telemetry_hub::record_task_local() noexcept { m_counters->m_tasks_local_total.fetch_add(1, std::memory_order_relaxed); }
 
+    void telemetry_hub::record_run_start() noexcept {
+        const std::scoped_lock v_lock(m_counters->m_scheduler_mtx);
+        m_counters->m_scheduler_clock.on_run_start(monotonic_us());
+    }
+
+    void telemetry_hub::record_run_end() noexcept {
+        const std::scoped_lock v_lock(m_counters->m_scheduler_mtx);
+        m_counters->m_scheduler_clock.on_run_end(monotonic_us());
+    }
+
+    void telemetry_hub::record_worker_waiting() noexcept {
+        const std::scoped_lock v_lock(m_counters->m_scheduler_mtx);
+        m_counters->m_scheduler_clock.on_worker_waiting(monotonic_us());
+    }
+
+    void telemetry_hub::record_worker_running() noexcept {
+        const std::scoped_lock v_lock(m_counters->m_scheduler_mtx);
+        m_counters->m_scheduler_clock.on_worker_running(monotonic_us());
+    }
+
+    void telemetry_hub::record_assignment(const std::uint32_t p_worker_id) noexcept {
+        const std::scoped_lock v_lock(m_counters->m_scheduler_mtx);
+        m_counters->m_scheduler_clock.on_assignment(p_worker_id, monotonic_us());
+    }
+
+    void telemetry_hub::record_assignment_accepted(const std::uint32_t p_worker_id) noexcept {
+        const std::scoped_lock v_lock(m_counters->m_scheduler_mtx);
+        m_counters->m_scheduler_clock.on_assignment_accepted(p_worker_id, monotonic_us());
+    }
+
+    void telemetry_hub::record_center_queue(const std::uint32_t p_available_ranks, const bool p_queue_empty) noexcept {
+        const std::scoped_lock v_lock(m_counters->m_scheduler_mtx);
+        m_counters->m_scheduler_clock.on_center_queue(p_available_ranks, p_queue_empty, monotonic_us());
+    }
+
     void telemetry_hub::tick_if_due() noexcept {
         if (!m_transport)
             return;
@@ -253,6 +297,11 @@ namespace gempba::telemetry {
         for (unsigned v_i = 0; v_i < MAX_WORKERS; ++v_i) {
             p_out.m_edges_out[v_i].m_bytes = m_counters->m_edges_out_bytes[v_i].load(std::memory_order_relaxed);
             p_out.m_edges_out[v_i].m_count = m_counters->m_edges_out_count[v_i].load(std::memory_order_relaxed);
+        }
+
+        {
+            const std::scoped_lock v_lock(m_counters->m_scheduler_mtx);
+            m_counters->m_scheduler_clock.fill(p_out, monotonic_us());
         }
 
         m_process_probe->sample(p_out);

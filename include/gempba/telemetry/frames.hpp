@@ -84,6 +84,26 @@ namespace gempba::telemetry {
         /** @brief Part of @ref m_idle_microseconds_per_worker spent while other pool threads ran tasks. */
         std::uint64_t m_idle_microseconds_imbalanced;
 
+        /** @brief Worker: microseconds from receiving a task to reporting available, summed over its tasks. */
+        std::uint64_t m_sched_running_microseconds;
+        /** @brief Worker: microseconds waiting for a task since run start; with @ref m_sched_running_microseconds it adds up to the run time. */
+        std::uint64_t m_sched_waiting_microseconds;
+        /** @brief Worker: milliseconds from run start to its first task; 0 until @ref m_tasks_recv_total is non-zero. */
+        std::uint64_t m_first_task_ms;
+        /** @brief Worker: milliseconds from run start to the end of its latest task. */
+        std::uint64_t m_last_task_ms;
+        /**
+         * @brief Center: microseconds from assigning a rank to that rank reporting running, summed over assignments.
+         * The centralized center assigns by sending a task; the semi-centralized one by naming the rank a push target.
+         */
+        std::uint64_t m_assign_latency_microseconds_total;
+        /** @brief Center: assignments counted in @ref m_assign_latency_microseconds_total. */
+        std::uint64_t m_assign_count;
+        /** @brief Center: longest single assignment latency, in microseconds. */
+        std::uint64_t m_assign_latency_microseconds_max;
+        /** @brief Centralized center: microseconds ranks spent available while its queue was empty, summed over ranks. */
+        std::uint64_t m_available_microseconds_queue_empty;
+
         float m_process_cpu_pct;
         std::uint64_t m_process_rss_bytes;
         std::uint32_t m_process_threads;

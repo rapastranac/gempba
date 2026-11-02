@@ -71,6 +71,27 @@ namespace gempba::telemetry {
         /// Record a task dispatched to the local thread pool. Hot-path; same guarantees as @ref record_send.
         void record_task_local() noexcept;
 
+        /// Record the start of this rank's scheduler run; scheduler times accrue from here and task times are relative to it.
+        void record_run_start() noexcept;
+
+        /// Record the end of this rank's scheduler run; scheduler times stop accruing.
+        void record_run_end() noexcept;
+
+        /// Record that this worker waits for a task: at run start and after reporting available.
+        void record_worker_waiting() noexcept;
+
+        /// Record that this worker received a task and runs it.
+        void record_worker_running() noexcept;
+
+        /// Record that the center assigned @p p_worker_id, which then waits for its task.
+        void record_assignment(std::uint32_t p_worker_id) noexcept;
+
+        /// Record that @p p_worker_id reported running, which ends its pending assignment.
+        void record_assignment_accepted(std::uint32_t p_worker_id) noexcept;
+
+        /// Record the center's available-rank count and queue state after it handled an event.
+        void record_center_queue(std::uint32_t p_available_ranks, bool p_queue_empty) noexcept;
+
         /**
          * @brief Emit pending frames if their cadence is due, else return cheaply.
          *

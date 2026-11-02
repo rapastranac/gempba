@@ -38,6 +38,30 @@ namespace {
         EXPECT_NE(std::string::npos, v_out.find("\"idle_microseconds_imbalanced\":300"));
     }
 
+    TEST(json_serializer_test, worker_frame_includes_the_scheduler_times) {
+        gempba::telemetry::worker_frame v_f{};
+        v_f.m_sched_running_microseconds = 11;
+        v_f.m_sched_waiting_microseconds = 12;
+        v_f.m_first_task_ms = 13;
+        v_f.m_last_task_ms = 14;
+        v_f.m_assign_latency_microseconds_total = 15;
+        v_f.m_assign_count = 16;
+        v_f.m_assign_latency_microseconds_max = 17;
+        v_f.m_available_microseconds_queue_empty = 18;
+
+        std::string v_out;
+        gempba::telemetry::serialize_worker_frame(v_out, v_f);
+
+        EXPECT_NE(std::string::npos, v_out.find("\"sched_running_microseconds\":11"));
+        EXPECT_NE(std::string::npos, v_out.find("\"sched_waiting_microseconds\":12"));
+        EXPECT_NE(std::string::npos, v_out.find("\"first_task_ms\":13"));
+        EXPECT_NE(std::string::npos, v_out.find("\"last_task_ms\":14"));
+        EXPECT_NE(std::string::npos, v_out.find("\"assign_latency_microseconds_total\":15"));
+        EXPECT_NE(std::string::npos, v_out.find("\"assign_count\":16"));
+        EXPECT_NE(std::string::npos, v_out.find("\"assign_latency_microseconds_max\":17"));
+        EXPECT_NE(std::string::npos, v_out.find("\"available_microseconds_queue_empty\":18"));
+    }
+
     TEST(json_serializer_test, worker_frame_emits_only_non_zero_edges) {
         gempba::telemetry::worker_frame v_f{};
         v_f.m_edges_out[2].m_bytes = 100;
