@@ -133,6 +133,8 @@ namespace {
         EXPECT_EQ(0u, v_frame.m_tasks_running);
         EXPECT_EQ(0u, v_frame.m_scheduler_pending_count);
         EXPECT_EQ(0u, v_frame.m_idle_microseconds_per_worker);
+        EXPECT_EQ(0u, v_frame.m_idle_microseconds_starved);
+        EXPECT_EQ(0u, v_frame.m_idle_microseconds_imbalanced);
         EXPECT_GT(v_frame.m_worker_local_ms, 0u);
     }
 

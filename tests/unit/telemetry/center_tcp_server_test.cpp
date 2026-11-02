@@ -102,7 +102,7 @@ namespace {
         v_server.stop();
 
         ASSERT_FALSE(v_line.empty());
-        EXPECT_NE(std::string::npos, v_line.find("\"version\":1"));
+        EXPECT_NE(std::string::npos, v_line.find("\"version\":2"));
         EXPECT_NE(std::string::npos, v_line.find("\"topology\":"));
         EXPECT_NE(std::string::npos, v_line.find("\"workers\":["));
         EXPECT_NE(std::string::npos, v_line.find("\"nodes\":["));

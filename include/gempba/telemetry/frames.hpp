@@ -19,7 +19,7 @@ namespace gempba::telemetry {
     inline constexpr unsigned CPU_MASK_WORDS = MAX_LOGICAL_CPUS / 64;
 
     /** @brief Wire-format version stamped into every frame. Bump on any layout change. */
-    inline constexpr std::uint16_t TELEMETRY_SCHEMA_VERSION = 1;
+    inline constexpr std::uint16_t TELEMETRY_SCHEMA_VERSION = 2;
 
     /**
      * @brief Static, one-shot description of a worker.
@@ -79,6 +79,10 @@ namespace gempba::telemetry {
          * (cumulative pool idle time / pool size).
          */
         std::uint64_t m_idle_microseconds_per_worker;
+        /** @brief Part of @ref m_idle_microseconds_per_worker spent while no task ran in the pool. */
+        std::uint64_t m_idle_microseconds_starved;
+        /** @brief Part of @ref m_idle_microseconds_per_worker spent while other pool threads ran tasks. */
+        std::uint64_t m_idle_microseconds_imbalanced;
 
         float m_process_cpu_pct;
         std::uint64_t m_process_rss_bytes;

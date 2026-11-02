@@ -76,6 +76,10 @@ namespace gempba::telemetry {
         emit_u32(p_out, p_frame.m_scheduler_pending_count);
         p_out += ",\"idle_microseconds_per_worker\":";
         emit_u64(p_out, p_frame.m_idle_microseconds_per_worker);
+        p_out += ",\"idle_microseconds_starved\":";
+        emit_u64(p_out, p_frame.m_idle_microseconds_starved);
+        p_out += ",\"idle_microseconds_imbalanced\":";
+        emit_u64(p_out, p_frame.m_idle_microseconds_imbalanced);
         p_out += ",\"process_cpu_pct\":";
         emit_float(p_out, p_frame.m_process_cpu_pct);
         p_out += ",\"process_rss_bytes\":";
