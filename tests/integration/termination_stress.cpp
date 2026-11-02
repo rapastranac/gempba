@@ -41,6 +41,8 @@
 /**
  * Counts the leaves of a full binary tree across all ranks with many tiny tasks, so that termination races
  * the hand-offs. A premature termination loses subtrees (wrong count), aborts on a stray message, or hangs.
+ * Each leaf's score is its rank-local visit index, so the best score keeps improving and the center keeps
+ * broadcasting score updates until the search ends.
  *
  * Usage: termination_stress <depth> <semi_centralized|centralized>
  */
@@ -68,7 +70,8 @@ namespace {
     private:
         void explore(const int p_depth, const int p_max_depth, const gempba::node& p_parent) {
             if (p_depth == p_max_depth) {
-                m_leaves.fetch_add(1, std::memory_order_relaxed);
+                const long long v_leaf_index = m_leaves.fetch_add(1, std::memory_order_relaxed);
+                m_node_manager.try_update_score_and_invalidate_result(gempba::score::make(static_cast<int>(v_leaf_index)));
                 return;
             }
             gempba::node v_parent = p_parent == nullptr ? gempba::create_dummy_node(m_load_balancer) : p_parent;
