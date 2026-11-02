@@ -2,6 +2,7 @@
 #define GEMPBA_MPI_SCHEDULER_CENTRALIZED_HPP
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cfloat>
 #include <climits>
@@ -298,15 +299,40 @@ namespace gempba {
         }
 
         void process_termination(MPI_Status p_status) {
-
-            MPI_Recv(nullptr, 0, MPI_BYTE, p_status.MPI_SOURCE, TERMINATION, m_world_communicator, &p_status);
+            std::array<int, 2> v_sent_counts{};
+            MPI_Recv(v_sent_counts.data(), static_cast<int>(v_sent_counts.size()), MPI_INT, p_status.MPI_SOURCE, TERMINATION, m_world_communicator, &p_status);
             utils::print_ipc_debug_comments("rank {}, received message from rank {}", m_world_rank, p_status.MPI_SOURCE);
             if (!m_termination.is_quiescent() || !m_tasks_bundle_queue.empty() || m_transmitting.load()) {
                 utils::log_and_throw("rank {} received termination with work in progress: deficit {}, parent {}", m_world_rank, m_termination.deficit(), m_termination.parent());
             }
+            drain_center_messages(v_sent_counts[0], v_sent_counts[1]);
 
             spdlog::debug("rank {} exited\n", m_world_rank);
             MPI_Barrier(m_world_communicator);
+        }
+
+        void drain_center_messages(const int p_score_updates_sent, const int p_fullness_notices_sent) {
+            const int v_pending_score_updates = p_score_updates_sent - m_score_updates_received;
+            const int v_pending_fullness_notices = p_fullness_notices_sent - m_fullness_notices_received;
+            while (m_score_updates_received < p_score_updates_sent) {
+                MPI_Status v_status;
+                MPI_Probe(CENTER_NODE, SCORE_UPDATE, m_global_score_communicator, &v_status);
+                receive_score_from_center(v_status);
+            }
+            while (m_fullness_notices_received < p_fullness_notices_sent) {
+                MPI_Status v_status;
+                MPI_Probe(CENTER_NODE, MPI_ANY_TAG, m_center_fullness_communicator, &v_status);
+                if (v_status.MPI_TAG == CENTER_IS_FULL) {
+                    consume_center_is_full_tag(v_status);
+                } else {
+                    consume_center_is_free_tag(v_status);
+                }
+            }
+            if (m_score_updates_received != p_score_updates_sent || m_fullness_notices_received != p_fullness_notices_sent) {
+                utils::log_and_throw("rank {} received more center messages than the center sent: score updates {}/{}, fullness notices {}/{}", m_world_rank, m_score_updates_received,
+                                     p_score_updates_sent, m_fullness_notices_received, p_fullness_notices_sent);
+            }
+            spdlog::debug("rank {} drained {} score updates and {} fullness notices at termination", m_world_rank, v_pending_score_updates, v_pending_fullness_notices);
         }
 
         void process_task_received_ack(MPI_Status p_status) {
@@ -329,11 +355,13 @@ namespace gempba {
         void receive_score_from_center(MPI_Status p_status) {
             utils::print_ipc_debug_comments("rank {}, about to receive global score from Center\n", m_world_rank);
             MPI_Recv(&m_global_score, sizeof(score), MPI_BYTE, CENTER_NODE, SCORE_UPDATE, m_global_score_communicator, &p_status);
+            ++m_score_updates_received;
             utils::print_ipc_debug_comments("rank {}, received global score: {} from Center\n", m_world_rank, m_global_score.to_string());
         }
 
         void consume_center_is_full_tag(MPI_Status p_status) {
             MPI_Recv(nullptr, 0, MPI_BYTE, CENTER_NODE, CENTER_IS_FULL, m_center_fullness_communicator, &p_status);
+            ++m_fullness_notices_received;
             m_is_center_full = true;
 
             utils::print_ipc_debug_comments("Node {} received full center\n", rank_me());
@@ -341,6 +369,7 @@ namespace gempba {
 
         void consume_center_is_free_tag(MPI_Status p_status) {
             MPI_Recv(nullptr, 0, MPI_BYTE, CENTER_NODE, CENTER_IS_FREE, m_center_fullness_communicator, &p_status);
+            ++m_fullness_notices_received;
             m_is_center_full = false;
 
             utils::print_ipc_debug_comments("Node {} received free center\n", rank_me());
@@ -650,6 +679,7 @@ namespace gempba {
             for (int v_rank = 1; v_rank < m_world_size; v_rank++) {
                 MPI_Send(&m_global_score, sizeof(score), MPI_BYTE, v_rank, SCORE_UPDATE, m_global_score_communicator);
             }
+            ++m_score_updates_sent;
 
             static int success = 0;
             success++;
@@ -718,6 +748,7 @@ namespace gempba {
                 for (int v_rank = 1; v_rank < m_world_size; v_rank++) {
                     MPI_Send(nullptr, 0, MPI_BYTE, v_rank, CENTER_IS_FULL, m_center_fullness_communicator);
                 }
+                ++m_fullness_notices_sent;
                 m_center_last_full_status = true;
                 m_time_centerfull_sent = MPI_Wtime();
 
@@ -732,6 +763,7 @@ namespace gempba {
                 for (int v_rank = 1; v_rank < m_world_size; v_rank++) {
                     MPI_Send(nullptr, 0, MPI_BYTE, v_rank, CENTER_IS_FREE, m_center_fullness_communicator);
                 }
+                ++m_fullness_notices_sent;
                 m_center_last_full_status = false;
 
                 // cout << "CENTER IS NOT FULL ANYMORE" << endl;
@@ -739,8 +771,9 @@ namespace gempba {
         }
 
         void notify_termination() const {
+            const std::array<int, 2> v_sent_counts = {m_score_updates_sent, m_fullness_notices_sent};
             for (int v_rank = 1; v_rank < m_world_size; v_rank++) {
-                MPI_Send(nullptr, 0, MPI_BYTE, v_rank, TERMINATION, m_world_communicator); // send positive signal
+                MPI_Send(v_sent_counts.data(), static_cast<int>(v_sent_counts.size()), MPI_INT, v_rank, TERMINATION, m_world_communicator);
             }
             MPI_Barrier(m_world_communicator);
         }
@@ -860,6 +893,10 @@ namespace gempba {
 
         int m_nodes_running = 0;
         int m_nodes_available = 0;
+        int m_score_updates_sent = 0;
+        int m_fullness_notices_sent = 0;
+        int m_score_updates_received = 0;
+        int m_fullness_notices_received = 0;
         std::vector<int> m_process_state; // state of the nodes: running, assigned or available
         bool m_custom_initial_topology = false; // true if the user has set a custom topology
         tree m_process_tree;
