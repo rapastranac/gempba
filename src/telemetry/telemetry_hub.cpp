@@ -56,6 +56,11 @@ namespace gempba::telemetry {
         std::atomic<std::uint64_t> m_tasks_sent_total{0};
         std::atomic<std::uint64_t> m_tasks_recv_total{0};
 
+        std::atomic<std::uint64_t> m_center_state_msgs_total{0};
+        std::atomic<std::uint64_t> m_center_score_proposals_total{0};
+        std::atomic<std::uint64_t> m_center_score_broadcasts_total{0};
+        std::atomic<std::uint64_t> m_telemetry_microseconds_total{0};
+
         std::atomic<std::uint64_t> m_edges_out_bytes[MAX_WORKERS]{};
         std::atomic<std::uint64_t> m_edges_out_count[MAX_WORKERS]{};
 
@@ -210,12 +215,30 @@ namespace gempba::telemetry {
         m_counters->m_scheduler_clock.on_center_queue(p_available_ranks, p_queue_empty, monotonic_us());
     }
 
+    void telemetry_hub::record_center_state_msg() noexcept { m_counters->m_center_state_msgs_total.fetch_add(1, std::memory_order_relaxed); }
+
+    void telemetry_hub::record_center_score_proposal() noexcept { m_counters->m_center_score_proposals_total.fetch_add(1, std::memory_order_relaxed); }
+
+    void telemetry_hub::record_center_score_broadcast() noexcept { m_counters->m_center_score_broadcasts_total.fetch_add(1, std::memory_order_relaxed); }
+
+    void telemetry_hub::record_center_full() noexcept {
+        const std::scoped_lock v_lock(m_counters->m_scheduler_mtx);
+        m_counters->m_scheduler_clock.on_center_full(monotonic_us());
+    }
+
+    void telemetry_hub::record_center_free() noexcept {
+        const std::scoped_lock v_lock(m_counters->m_scheduler_mtx);
+        m_counters->m_scheduler_clock.on_center_free(monotonic_us());
+    }
+
     void telemetry_hub::tick_if_due() noexcept {
         if (!m_transport)
             return;
 
-        const std::uint64_t v_now = monotonic_ms();
+        const std::uint64_t v_start_us = monotonic_us();
+        const std::uint64_t v_now = v_start_us / 1000;
         const std::uint32_t v_worker_interval = m_worker_interval_ms.load(std::memory_order_relaxed);
+        bool v_moved_frames = false;
 
         if (v_now - m_last_worker_emit_ms.load(std::memory_order_relaxed) >= v_worker_interval) {
             m_seq_no.fetch_add(1, std::memory_order_relaxed);
@@ -223,6 +246,7 @@ namespace gempba::telemetry {
             snapshot_worker_frame(v_frame);
             m_transport->publish_worker(v_frame);
             m_last_worker_emit_ms.store(v_now, std::memory_order_relaxed);
+            v_moved_frames = true;
         }
 
         if (m_is_sentinel.load(std::memory_order_relaxed)) {
@@ -232,6 +256,7 @@ namespace gempba::telemetry {
                 snapshot_node_frame(v_node_frame);
                 m_transport->publish_node(v_node_frame);
                 m_last_node_emit_ms.store(v_now, std::memory_order_relaxed);
+                v_moved_frames = true;
             }
         }
 
@@ -264,23 +289,31 @@ namespace gempba::telemetry {
             }
         }
 
-        if (m_aggregator) {
-            drain_inbound_frames();
+        if (m_aggregator && drain_inbound_frames()) {
+            v_moved_frames = true;
+        }
+
+        if (v_moved_frames) {
+            m_counters->m_telemetry_microseconds_total.fetch_add(monotonic_us() - v_start_us, std::memory_order_relaxed);
         }
     }
 
-    void telemetry_hub::drain_inbound_frames() {
+    bool telemetry_hub::drain_inbound_frames() {
         const std::uint64_t v_ts = monotonic_ms();
+        bool v_received = false;
         m_transport->poll(
-                [this, v_ts](const std::uint32_t p_src, const worker_frame& p_frame) {
+                [this, v_ts, &v_received](const std::uint32_t p_src, const worker_frame& p_frame) {
                     const std::scoped_lock v_lock(m_aggregator->m_mtx);
                     m_aggregator->m_latest_worker[p_src] = p_frame;
                     m_aggregator->m_last_seen_ms[p_src] = v_ts;
+                    v_received = true;
                 },
-                [this](const std::uint32_t p_src, const node_frame& p_frame) {
+                [this, &v_received](const std::uint32_t p_src, const node_frame& p_frame) {
                     const std::scoped_lock v_lock(m_aggregator->m_mtx);
                     m_aggregator->m_latest_node[p_src] = p_frame;
+                    v_received = true;
                 });
+        return v_received;
     }
 
     void telemetry_hub::snapshot_worker_frame(worker_frame& p_out) noexcept {
@@ -293,6 +326,10 @@ namespace gempba::telemetry {
         p_out.m_tasks_local_total = m_counters->m_tasks_local_total.load(std::memory_order_relaxed);
         p_out.m_tasks_sent_total = m_counters->m_tasks_sent_total.load(std::memory_order_relaxed);
         p_out.m_tasks_recv_total = m_counters->m_tasks_recv_total.load(std::memory_order_relaxed);
+        p_out.m_center_state_msgs_total = m_counters->m_center_state_msgs_total.load(std::memory_order_relaxed);
+        p_out.m_center_score_proposals_total = m_counters->m_center_score_proposals_total.load(std::memory_order_relaxed);
+        p_out.m_center_score_broadcasts_total = m_counters->m_center_score_broadcasts_total.load(std::memory_order_relaxed);
+        p_out.m_telemetry_microseconds_total = m_counters->m_telemetry_microseconds_total.load(std::memory_order_relaxed);
 
         for (unsigned v_i = 0; v_i < MAX_WORKERS; ++v_i) {
             p_out.m_edges_out[v_i].m_bytes = m_counters->m_edges_out_bytes[v_i].load(std::memory_order_relaxed);

@@ -119,6 +119,30 @@ namespace {
         EXPECT_EQ(3'000u, v_final.m_available_microseconds_queue_empty);
     }
 
+    TEST(scheduler_clock_test, center_full_time_spans_full_to_free_and_ignores_repeated_notices) {
+        scheduler_clock v_clock;
+        v_clock.on_run_start(0);
+        v_clock.on_center_free(500);
+        v_clock.on_center_full(1'000);
+        v_clock.on_center_full(2'000);
+        v_clock.on_center_free(4'000);
+        v_clock.on_center_free(5'000);
+        EXPECT_EQ(3'000u, fill_at(v_clock, 5'500).m_center_full_microseconds);
+
+        v_clock.on_center_full(6'000);
+        EXPECT_EQ(4'500u, fill_at(v_clock, 7'500).m_center_full_microseconds);
+
+        v_clock.on_run_end(8'000);
+        EXPECT_EQ(5'000u, fill_at(v_clock, 9'000).m_center_full_microseconds);
+    }
+
+    TEST(scheduler_clock_test, center_full_time_does_not_accrue_outside_the_run) {
+        scheduler_clock v_clock;
+        v_clock.on_center_full(0);
+        v_clock.on_run_start(1'000);
+        EXPECT_EQ(0u, fill_at(v_clock, 3'000).m_center_full_microseconds);
+    }
+
     TEST(scheduler_clock_test, center_events_leave_worker_times_at_zero) {
         scheduler_clock v_clock;
         v_clock.on_run_start(0);

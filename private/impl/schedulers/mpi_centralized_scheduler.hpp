@@ -677,6 +677,7 @@ namespace gempba {
             m_total_requests_number++;
             m_stats.m_total_requested_tasks++;
             if (auto* v_telemetry = telemetry::get()) {
+                v_telemetry->record_center_state_msg();
                 v_telemetry->record_assignment_accepted(static_cast<std::uint32_t>(p_status.MPI_SOURCE));
             }
         }
@@ -688,6 +689,9 @@ namespace gempba {
             m_nodes_running--;
             m_total_requests_number++;
             m_stats.m_total_requested_tasks++;
+            if (auto* v_telemetry = telemetry::get()) {
+                v_telemetry->record_center_state_msg();
+            }
         }
 
         /**
@@ -696,6 +700,10 @@ namespace gempba {
          */
         void maybe_broadcast_global_score(const score& p_new_global_score, MPI_Status p_status) {
             utils::print_ipc_debug_comments("center received global score {} from rank {}\n", p_new_global_score.to_string(), p_status.MPI_SOURCE);
+            auto* v_telemetry = telemetry::get();
+            if (v_telemetry) {
+                v_telemetry->record_center_score_proposal();
+            }
 
             const bool v_should_broadcast = should_broadcast_global(m_goal, m_global_score, p_new_global_score);
             if (!v_should_broadcast) {
@@ -710,6 +718,9 @@ namespace gempba {
                 MPI_Send(&m_global_score, sizeof(score), MPI_BYTE, v_rank, SCORE_UPDATE, m_global_score_communicator);
             }
             ++m_score_updates_sent;
+            if (v_telemetry) {
+                v_telemetry->record_center_score_broadcast();
+            }
 
             static int success = 0;
             success++;
@@ -781,6 +792,9 @@ namespace gempba {
                 ++m_fullness_notices_sent;
                 m_center_last_full_status = true;
                 m_time_centerfull_sent = MPI_Wtime();
+                if (auto* v_telemetry = telemetry::get()) {
+                    v_telemetry->record_center_full();
+                }
 
                 // cout << "CENTER IS FULL" << endl;
             }
@@ -795,6 +809,9 @@ namespace gempba {
                 }
                 ++m_fullness_notices_sent;
                 m_center_last_full_status = false;
+                if (auto* v_telemetry = telemetry::get()) {
+                    v_telemetry->record_center_free();
+                }
 
                 // cout << "CENTER IS NOT FULL ANYMORE" << endl;
             }
@@ -838,6 +855,9 @@ namespace gempba {
                         consume_int_flag(v_status, m_world_communicator);
                         m_total_requests_number++;
                         m_stats.m_total_requested_tasks++;
+                        if (auto* v_telemetry = telemetry::get()) {
+                            v_telemetry->record_center_state_msg();
+                        }
                         break;
                     }
                     case HAS_RESULT: {

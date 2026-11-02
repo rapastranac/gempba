@@ -96,6 +96,16 @@ namespace gempba::telemetry {
         emit_u64(p_out, p_frame.m_assign_latency_microseconds_max);
         p_out += ",\"available_microseconds_queue_empty\":";
         emit_u64(p_out, p_frame.m_available_microseconds_queue_empty);
+        p_out += ",\"center_state_msgs_total\":";
+        emit_u64(p_out, p_frame.m_center_state_msgs_total);
+        p_out += ",\"center_score_proposals_total\":";
+        emit_u64(p_out, p_frame.m_center_score_proposals_total);
+        p_out += ",\"center_score_broadcasts_total\":";
+        emit_u64(p_out, p_frame.m_center_score_broadcasts_total);
+        p_out += ",\"center_full_microseconds\":";
+        emit_u64(p_out, p_frame.m_center_full_microseconds);
+        p_out += ",\"telemetry_microseconds_total\":";
+        emit_u64(p_out, p_frame.m_telemetry_microseconds_total);
         p_out += ",\"process_cpu_pct\":";
         emit_float(p_out, p_frame.m_process_cpu_pct);
         p_out += ",\"process_rss_bytes\":";

@@ -62,6 +62,24 @@ namespace {
         EXPECT_NE(std::string::npos, v_out.find("\"available_microseconds_queue_empty\":18"));
     }
 
+    TEST(json_serializer_test, worker_frame_includes_the_center_counters_and_telemetry_time) {
+        gempba::telemetry::worker_frame v_f{};
+        v_f.m_center_state_msgs_total = 21;
+        v_f.m_center_score_proposals_total = 22;
+        v_f.m_center_score_broadcasts_total = 23;
+        v_f.m_center_full_microseconds = 24;
+        v_f.m_telemetry_microseconds_total = 25;
+
+        std::string v_out;
+        gempba::telemetry::serialize_worker_frame(v_out, v_f);
+
+        EXPECT_NE(std::string::npos, v_out.find("\"center_state_msgs_total\":21"));
+        EXPECT_NE(std::string::npos, v_out.find("\"center_score_proposals_total\":22"));
+        EXPECT_NE(std::string::npos, v_out.find("\"center_score_broadcasts_total\":23"));
+        EXPECT_NE(std::string::npos, v_out.find("\"center_full_microseconds\":24"));
+        EXPECT_NE(std::string::npos, v_out.find("\"telemetry_microseconds_total\":25"));
+    }
+
     TEST(json_serializer_test, worker_frame_emits_only_non_zero_edges) {
         gempba::telemetry::worker_frame v_f{};
         v_f.m_edges_out[2].m_bytes = 100;

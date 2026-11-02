@@ -84,6 +84,22 @@ namespace gempba::telemetry {
             m_queue_empty = p_queue_empty;
         }
 
+        void on_center_full(const std::uint64_t p_now) {
+            if (!m_in_run || m_center_full) {
+                return;
+            }
+            accrue(p_now);
+            m_center_full = true;
+        }
+
+        void on_center_free(const std::uint64_t p_now) {
+            if (!m_in_run || !m_center_full) {
+                return;
+            }
+            accrue(p_now);
+            m_center_full = false;
+        }
+
         void fill(worker_frame& p_out, const std::uint64_t p_now) const {
             const std::uint64_t v_open = m_in_run ? p_now - m_since : 0;
 
@@ -95,6 +111,7 @@ namespace gempba::telemetry {
             p_out.m_assign_count = m_assign_count;
             p_out.m_assign_latency_microseconds_max = m_assign_latency_max;
             p_out.m_available_microseconds_queue_empty = m_available_queue_empty + (m_queue_empty ? m_available_ranks * v_open : 0);
+            p_out.m_center_full_microseconds = m_center_full_time + (m_center_full ? v_open : 0);
         }
 
     private:
@@ -111,6 +128,9 @@ namespace gempba::telemetry {
             }
             if (m_queue_empty) {
                 m_available_queue_empty += m_available_ranks * v_elapsed;
+            }
+            if (m_center_full) {
+                m_center_full_time += v_elapsed;
             }
             m_since = p_now;
         }
@@ -134,6 +154,9 @@ namespace gempba::telemetry {
         std::uint64_t m_available_ranks = 0;
         bool m_queue_empty = true;
         std::uint64_t m_available_queue_empty = 0;
+
+        bool m_center_full = false;
+        std::uint64_t m_center_full_time = 0;
     };
 
 } // namespace gempba::telemetry

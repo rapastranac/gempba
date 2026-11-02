@@ -104,6 +104,20 @@ namespace gempba::telemetry {
         /** @brief Centralized center: microseconds ranks spent available while its queue was empty, summed over ranks. */
         std::uint64_t m_available_microseconds_queue_empty;
 
+        /** @brief Center: running and available reports handled. Tasks in and out are @ref m_tasks_recv_total and @ref m_tasks_sent_total. */
+        std::uint64_t m_center_state_msgs_total;
+        /** @brief Center: score proposals received, whether or not they improved the global score. */
+        std::uint64_t m_center_score_proposals_total;
+        /** @brief Center: global score broadcasts, each a message to every worker. */
+        std::uint64_t m_center_score_broadcasts_total;
+        /** @brief Centralized center: microseconds its workers were told the center is full and must not send tasks. */
+        std::uint64_t m_center_full_microseconds;
+        /**
+         * @brief Microseconds this rank spent in telemetry_hub::tick_if_due calls that sent or read a frame; under MPI, time taken
+         * from its scheduler thread. Calls with nothing due are part of the scheduler's polling loop and are not counted.
+         */
+        std::uint64_t m_telemetry_microseconds_total;
+
         float m_process_cpu_pct;
         std::uint64_t m_process_rss_bytes;
         std::uint32_t m_process_threads;
