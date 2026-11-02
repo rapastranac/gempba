@@ -294,7 +294,12 @@ namespace {
         close_sock(v_client);
         gempba::telemetry::configure_port(9000);
 
-        EXPECT_NE(std::string::npos, last_complete_line(v_rest).find("\"tasks_started_total\":5"));
+        const std::string v_last = last_complete_line(v_rest);
+        EXPECT_NE(std::string::npos, v_last.find("\"tasks_started_total\":5"));
+        const std::string v_run_id_key = R"("run_id":")" + v_hub.run_id() + '"';
+        EXPECT_FALSE(v_hub.run_id().empty());
+        EXPECT_NE(std::string::npos, v_first.find(v_run_id_key)) << v_first;
+        EXPECT_NE(std::string::npos, v_last.find(v_run_id_key)) << v_last;
     }
 
     TEST_F(tcp_server_test, malformed_lines_are_ignored_and_do_not_break_subsequent_input) {

@@ -217,6 +217,7 @@ namespace {
         std::vector<gempba::telemetry::node_frame> v_nodes;
 
         gempba::telemetry::broadcast_payload v_p{};
+        v_p.m_run_id = "123e4567-e89b-42d3-a456-426614174000";
         v_p.m_now_ms = 1700000000000ULL;
         v_p.m_elapsed_seconds = 12345ULL;
         v_p.m_topology = &v_topo;
@@ -226,10 +227,8 @@ namespace {
         std::string v_out;
         gempba::telemetry::serialize_broadcast(v_out, v_p);
 
-        EXPECT_TRUE(v_out.starts_with("{"));
+        EXPECT_TRUE(v_out.starts_with(R"({"version":2,"run_id":"123e4567-e89b-42d3-a456-426614174000","ts":1700000000000,)")) << v_out;
         EXPECT_TRUE(v_out.ends_with("}"));
-        EXPECT_NE(std::string::npos, v_out.find("\"version\":2"));
-        EXPECT_NE(std::string::npos, v_out.find("\"ts\":1700000000000"));
         EXPECT_NE(std::string::npos, v_out.find("\"elapsed_seconds\":12345"));
         EXPECT_NE(std::string::npos, v_out.find("\"topology\":"));
         EXPECT_NE(std::string::npos, v_out.find("\"workers\":[]"));

@@ -5,6 +5,8 @@
 #include <gempba/telemetry/topology.hpp>
 
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace gempba::telemetry {
 
@@ -15,6 +17,7 @@ namespace gempba::telemetry {
 
     /// One dashboard broadcast tick: topology + latest worker / node frames.
     struct broadcast_payload {
+        std::string_view m_run_id;
         std::uint64_t m_now_ms;
         std::uint64_t m_elapsed_seconds;
         const topology_snapshot* m_topology;

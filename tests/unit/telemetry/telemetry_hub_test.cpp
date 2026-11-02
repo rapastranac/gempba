@@ -4,6 +4,7 @@
 #include <gempba/telemetry/telemetry_hub.hpp>
 #include <gtest/gtest.h>
 #include <memory>
+#include <regex>
 #include <thread>
 #include <vector>
 
@@ -307,6 +308,21 @@ namespace {
         v_hub.snapshot_worker_frame(v_frame);
         EXPECT_EQ(1u, v_frame.m_assign_count);
         EXPECT_EQ(v_frame.m_assign_latency_microseconds_total, v_frame.m_assign_latency_microseconds_max);
+    }
+
+    TEST_F(telemetry_hub_test, center_generates_a_run_id_per_run_and_workers_have_none) {
+        const std::regex v_uuid_v4{"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"};
+
+        gempba::telemetry::telemetry_hub v_first_run;
+        v_first_run.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+        gempba::telemetry::telemetry_hub v_second_run;
+        v_second_run.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+        gempba::telemetry::telemetry_hub v_worker;
+        v_worker.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 1, 2, /*p_start_pump_thread=*/false);
+
+        EXPECT_TRUE(std::regex_match(v_first_run.run_id(), v_uuid_v4)) << v_first_run.run_id();
+        EXPECT_NE(v_first_run.run_id(), v_second_run.run_id());
+        EXPECT_TRUE(v_worker.run_id().empty());
     }
 
     TEST_F(telemetry_hub_test, record_send_accumulates_per_destination_edges) {
