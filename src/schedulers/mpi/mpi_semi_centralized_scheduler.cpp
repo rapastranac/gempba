@@ -106,6 +106,9 @@ namespace gempba {
             p_node_manager.try_update_score_and_invalidate_result(v_global_score_temp);
         } else if (should_update_global(m_goal, v_global_score_temp, v_local_score_temp)) {
             MPI_Ssend(&v_local_score_temp, sizeof(score), MPI_BYTE, CENTER_NODE, SCORE_PROPOSAL, m_global_score_communicator);
+            if (auto* v_telemetry = telemetry::get()) {
+                v_telemetry->record_score_proposal_sent();
+            }
         }
     }
 

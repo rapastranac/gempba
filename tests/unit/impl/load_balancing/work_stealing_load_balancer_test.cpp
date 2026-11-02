@@ -312,6 +312,8 @@ TEST_F(work_stealing_load_balancer_test, try_local_submit_when_pool_full_falls_b
     EXPECT_TRUE(v_forward_fn_called); // forward() ran the node synchronously
     EXPECT_EQ(nullptr, v_child->get_parent());
     EXPECT_EQ(nullptr, v_child->get_root());
+    EXPECT_EQ(1u, v_load_balancer.get_spawn_rejected_pool_full_count());
+    EXPECT_EQ(0u, v_load_balancer.get_spawn_remote_rejected_count());
 }
 
 TEST_F(work_stealing_load_balancer_test, try_remote_submit_throws_without_scheduler) {
@@ -347,6 +349,8 @@ TEST_F(work_stealing_load_balancer_test, try_remote_submit_falls_back_to_local_w
     EXPECT_TRUE(v_fn_called);
     EXPECT_EQ(nullptr, v_child->get_parent());
     EXPECT_EQ(nullptr, v_child->get_root());
+    EXPECT_EQ(1u, v_load_balancer.get_spawn_remote_rejected_count());
+    EXPECT_EQ(0u, v_load_balancer.get_spawn_rejected_pool_full_count());
 }
 
 TEST_F(work_stealing_load_balancer_test, try_remote_submit_delegates_remotely_when_channel_open) {
@@ -562,4 +566,6 @@ TEST_F(work_stealing_load_balancer_test, send_remote_returns_false_on_mutex_cont
     EXPECT_TRUE(v_fn_b_called);
     EXPECT_EQ(nullptr, v_child_b->get_parent());
     EXPECT_EQ(nullptr, v_child_b->get_root());
+    EXPECT_EQ(1u, v_load_balancer.get_spawn_remote_rejected_count());
+    EXPECT_EQ(0u, v_load_balancer.get_spawn_rejected_pool_full_count());
 }

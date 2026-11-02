@@ -108,6 +108,12 @@ namespace gempba::telemetry {
         /// Record that the center told its workers it has room again.
         void record_center_free() noexcept;
 
+        /// Record that this worker proposed its local best score to the center. Hot-path; same guarantees as @ref record_send.
+        void record_score_proposal_sent() noexcept;
+
+        /// Record that the center's global score improved; its time since run start becomes the latest improvement.
+        void record_global_score_improved() noexcept;
+
         /**
          * @brief Emit pending frames if their cadence is due, else return cheaply.
          *

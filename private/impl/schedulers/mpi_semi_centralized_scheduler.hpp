@@ -742,6 +742,7 @@ namespace gempba {
             ++m_score_updates_sent;
             if (v_telemetry) {
                 v_telemetry->record_center_score_broadcast();
+                v_telemetry->record_global_score_improved();
             }
 
             static int success = 0;

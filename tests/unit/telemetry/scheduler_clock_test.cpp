@@ -143,6 +143,21 @@ namespace {
         EXPECT_EQ(0u, fill_at(v_clock, 3'000).m_center_full_microseconds);
     }
 
+    TEST(scheduler_clock_test, last_score_improvement_is_the_latest_relative_to_run_start) {
+        scheduler_clock v_clock;
+        v_clock.on_global_score_improved(500);
+        EXPECT_EQ(0u, fill_at(v_clock, 600).m_last_score_improvement_ms);
+
+        v_clock.on_run_start(1'000);
+        v_clock.on_global_score_improved(4'000);
+        v_clock.on_global_score_improved(9'000);
+        EXPECT_EQ(8u, fill_at(v_clock, 10'000).m_last_score_improvement_ms);
+
+        v_clock.on_run_end(12'000);
+        v_clock.on_global_score_improved(15'000);
+        EXPECT_EQ(8u, fill_at(v_clock, 16'000).m_last_score_improvement_ms);
+    }
+
     TEST(scheduler_clock_test, center_events_leave_worker_times_at_zero) {
         scheduler_clock v_clock;
         v_clock.on_run_start(0);

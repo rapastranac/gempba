@@ -25,6 +25,7 @@
 #define GEMPBA_WORK_STEALING_LOAD_BALANCER_HPP
 
 #include <BS_thread_pool.hpp>
+#include <atomic>
 #include <gempba/core/load_balancer.hpp>
 #include <gempba/core/node.hpp>
 #include <gempba/telemetry/telemetry_hub.hpp>
@@ -44,6 +45,8 @@ namespace gempba {
         unsigned int m_unique_id_counter = 0;
         std::recursive_mutex m_recursive_mutex;
         std::size_t m_thread_request_count = 0;
+        std::atomic<std::size_t> m_spawn_rejected_pool_full_count{0};
+        std::atomic<std::size_t> m_spawn_remote_rejected_count{0};
 
         scheduler::worker* const m_scheduler_worker;
 
@@ -118,6 +121,10 @@ namespace gempba {
 
         std::size_t get_thread_request_count() const override { return m_thread_request_count; }
 
+        [[nodiscard]] std::size_t get_spawn_rejected_pool_full_count() const override { return m_spawn_rejected_pool_full_count.load(std::memory_order_relaxed); }
+
+        [[nodiscard]] std::size_t get_spawn_remote_rejected_count() const override { return m_spawn_remote_rejected_count.load(std::memory_order_relaxed); }
+
     private:
         /**
          * @brief Utility method to check if the thread_pool can receive another task. Always use within a lock_guard as
@@ -138,6 +145,7 @@ namespace gempba {
                 return false;
             }
             if (is_thread_pool_full()) {
+                m_spawn_rejected_pool_full_count.fetch_add(1, std::memory_order_relaxed);
                 return false;
             }
             // push current node
@@ -164,6 +172,7 @@ namespace gempba {
 
             const std::optional<transmission_guard> v_guard_optional = m_scheduler_worker->try_open_transmission_channel();
             if (!v_guard_optional.has_value()) {
+                m_spawn_remote_rejected_count.fetch_add(1, std::memory_order_relaxed);
                 return false;
             }
             // push current node

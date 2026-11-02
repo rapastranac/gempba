@@ -81,6 +81,13 @@ namespace gempba::telemetry {
         std::uint64_t m_send_microseconds_total;
         /** @brief Microseconds in the MPI calls that receive tasks once a probe found them, runnable id included. */
         std::uint64_t m_recv_microseconds_total;
+        /** @brief Local submissions the load balancer refused because every pool thread was busy; those nodes ran inline. */
+        std::uint64_t m_spawn_rejected_pool_full;
+        /**
+         * @brief Remote submissions refused because the scheduler opened no transmission channel (one already in use, the center
+         * full, or no target rank); those nodes were then tried locally.
+         */
+        std::uint64_t m_spawn_remote_rejected;
         /** @brief Tasks currently executing on the worker's thread pool. */
         std::uint32_t m_tasks_running;
         /** @brief Outstanding requests in the scheduler queue. */
@@ -121,6 +128,10 @@ namespace gempba::telemetry {
         std::uint64_t m_center_score_proposals_total;
         /** @brief Center: global score broadcasts, each a message to every worker. */
         std::uint64_t m_center_score_broadcasts_total;
+        /** @brief Worker: score proposals sent to the center. */
+        std::uint64_t m_score_proposals_sent;
+        /** @brief Center: milliseconds from run start to the latest global score improvement; 0 until @ref m_center_score_broadcasts_total is non-zero. */
+        std::uint64_t m_last_score_improvement_ms;
         /** @brief Centralized center: microseconds its workers were told the center is full and must not send tasks. */
         std::uint64_t m_center_full_microseconds;
         /**

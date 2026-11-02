@@ -40,6 +40,22 @@ namespace {
         EXPECT_NE(std::string::npos, v_out.find("\"recv_microseconds_total\":34"));
     }
 
+    TEST(json_serializer_test, worker_frame_includes_the_spawn_and_score_counters) {
+        gempba::telemetry::worker_frame v_f{};
+        v_f.m_spawn_rejected_pool_full = 41;
+        v_f.m_spawn_remote_rejected = 42;
+        v_f.m_score_proposals_sent = 43;
+        v_f.m_last_score_improvement_ms = 44;
+
+        std::string v_out;
+        gempba::telemetry::serialize_worker_frame(v_out, v_f);
+
+        EXPECT_NE(std::string::npos, v_out.find("\"spawn_rejected_pool_full\":41"));
+        EXPECT_NE(std::string::npos, v_out.find("\"spawn_remote_rejected\":42"));
+        EXPECT_NE(std::string::npos, v_out.find("\"score_proposals_sent\":43"));
+        EXPECT_NE(std::string::npos, v_out.find("\"last_score_improvement_ms\":44"));
+    }
+
     TEST(json_serializer_test, worker_frame_includes_the_idle_split) {
         gempba::telemetry::worker_frame v_f{};
         v_f.m_idle_microseconds_per_worker = 900;

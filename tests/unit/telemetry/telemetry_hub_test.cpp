@@ -148,6 +148,10 @@ namespace {
         EXPECT_EQ(0u, v_frame.m_center_score_broadcasts_total);
         EXPECT_EQ(0u, v_frame.m_center_full_microseconds);
         EXPECT_EQ(0u, v_frame.m_telemetry_microseconds_total);
+        EXPECT_EQ(0u, v_frame.m_spawn_rejected_pool_full);
+        EXPECT_EQ(0u, v_frame.m_spawn_remote_rejected);
+        EXPECT_EQ(0u, v_frame.m_score_proposals_sent);
+        EXPECT_EQ(0u, v_frame.m_last_score_improvement_ms);
         EXPECT_GT(v_frame.m_worker_local_ms, 0u);
     }
 
@@ -185,6 +189,33 @@ namespace {
         gempba::telemetry::worker_frame v_frame{};
         v_hub.snapshot_worker_frame(v_frame);
         EXPECT_EQ(1u, v_frame.m_center_score_broadcasts_total);
+    }
+
+    TEST_F(telemetry_hub_test, score_proposal_counter_accumulates) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 1, 2, /*p_start_pump_thread=*/false);
+
+        v_hub.record_score_proposal_sent();
+        v_hub.record_score_proposal_sent();
+
+        gempba::telemetry::worker_frame v_frame{};
+        v_hub.snapshot_worker_frame(v_frame);
+        EXPECT_EQ(2u, v_frame.m_score_proposals_sent);
+    }
+
+    TEST_F(telemetry_hub_test, last_score_improvement_fits_in_the_run) {
+        using clock = std::chrono::steady_clock;
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+
+        const auto v_before = std::chrono::duration_cast<std::chrono::milliseconds>(clock::now().time_since_epoch()).count();
+        v_hub.record_run_start();
+        v_hub.record_global_score_improved();
+        const auto v_after = std::chrono::duration_cast<std::chrono::milliseconds>(clock::now().time_since_epoch()).count();
+
+        gempba::telemetry::worker_frame v_frame{};
+        v_hub.snapshot_worker_frame(v_frame);
+        EXPECT_LE(v_frame.m_last_score_improvement_ms, static_cast<std::uint64_t>(v_after - v_before));
     }
 
     TEST_F(telemetry_hub_test, center_full_time_fits_in_the_full_period_and_stops_when_free) {
