@@ -6,6 +6,7 @@
 #include <impl/telemetry/local_transport.hpp>
 #include <impl/telemetry/node_probe.hpp>
 #include <impl/telemetry/process_probe.hpp>
+#include <impl/telemetry/run_id.hpp>
 #include <impl/telemetry/scheduler_clock.hpp>
 #include <impl/telemetry/topology_builder.hpp>
 
@@ -106,6 +107,7 @@ namespace gempba::telemetry {
         }
 
         if (p_worker_id == 0) {
+            m_run_id = detail::generate_run_id();
             m_aggregator = std::make_unique<aggregator>();
             if (p_start_pump_thread) {
                 m_tcp_server = std::make_unique<center_tcp_server>(g_configured_port.load(std::memory_order_acquire), *this);
@@ -412,6 +414,8 @@ namespace gempba::telemetry {
     }
 
     const topology_snapshot& telemetry_hub::current_topology() const noexcept { return m_topology; }
+
+    const std::string& telemetry_hub::run_id() const noexcept { return m_run_id; }
 
     std::uint64_t telemetry_hub::program_elapsed_seconds() const noexcept {
         const std::uint64_t v_start = m_start_ms.load(std::memory_order_acquire);

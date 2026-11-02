@@ -11,6 +11,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -146,6 +147,9 @@ namespace gempba::telemetry {
         /// Wall-clock seconds since @ref on_runtime_ready was called; 0 before that.
         [[nodiscard]] std::uint64_t program_elapsed_seconds() const noexcept;
 
+        /// The UUID v4 the center generated for this run at @ref on_runtime_ready; empty on other workers.
+        [[nodiscard]] const std::string& run_id() const noexcept;
+
         /// Set the cadence at which worker frames are emitted. Fans out to other workers.
         void set_worker_interval_ms(std::uint32_t p_interval_ms) noexcept;
 
@@ -185,6 +189,7 @@ namespace gempba::telemetry {
         std::atomic<std::uint64_t> m_last_node_emit_ms{0};
         std::atomic<std::uint32_t> m_seq_no{0};
         std::atomic<std::uint64_t> m_start_ms{0};
+        std::string m_run_id;
 
         std::unique_ptr<counters> m_counters;
         std::unique_ptr<process_probe> m_process_probe;

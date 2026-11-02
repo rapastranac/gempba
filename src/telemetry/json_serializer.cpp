@@ -265,7 +265,9 @@ namespace gempba::telemetry {
     void serialize_broadcast(std::string& p_out, const broadcast_payload& p_payload) {
         p_out += "{\"version\":";
         emit_u32(p_out, TELEMETRY_SCHEMA_VERSION);
-        p_out += ",\"ts\":";
+        p_out += R"(,"run_id":")";
+        p_out += p_payload.m_run_id;
+        p_out += R"(","ts":)";
         emit_u64(p_out, p_payload.m_now_ms);
         p_out += ",\"elapsed_seconds\":";
         emit_u64(p_out, p_payload.m_elapsed_seconds);
