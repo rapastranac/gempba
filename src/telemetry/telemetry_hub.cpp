@@ -21,6 +21,9 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <spdlog/spdlog.h>
+#include <string>
+#include <string_view>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -417,6 +420,32 @@ namespace gempba::telemetry {
 
     const std::string& telemetry_hub::run_id() const noexcept { return m_run_id; }
 
+    bool telemetry_hub::annotate_run(const std::string_view p_key, const std::string_view p_value) {
+        const std::string_view v_shown_key = p_key.substr(0, MAX_RUN_ANNOTATION_KEY_BYTES);
+        if (p_key.empty() || p_key.size() > MAX_RUN_ANNOTATION_KEY_BYTES || p_value.size() > MAX_RUN_ANNOTATION_VALUE_BYTES) {
+            spdlog::warn("telemetry: dropped run annotation '{}': keys take 1 to {} bytes and values up to {}", v_shown_key, MAX_RUN_ANNOTATION_KEY_BYTES, MAX_RUN_ANNOTATION_VALUE_BYTES);
+            return false;
+        }
+        const std::scoped_lock v_lock(m_annotations_mtx);
+        for (auto& [v_key, v_value]: m_run_annotations) {
+            if (v_key == p_key) {
+                v_value = p_value;
+                return true;
+            }
+        }
+        if (m_run_annotations.size() >= MAX_RUN_ANNOTATIONS) {
+            spdlog::warn("telemetry: dropped run annotation '{}': a run keeps at most {} annotations", v_shown_key, MAX_RUN_ANNOTATIONS);
+            return false;
+        }
+        m_run_annotations.emplace_back(p_key, p_value);
+        return true;
+    }
+
+    std::vector<std::pair<std::string, std::string>> telemetry_hub::run_annotations() const {
+        const std::scoped_lock v_lock(m_annotations_mtx);
+        return m_run_annotations;
+    }
+
     std::uint64_t telemetry_hub::program_elapsed_seconds() const noexcept {
         const std::uint64_t v_start = m_start_ms.load(std::memory_order_acquire);
         if (v_start == 0)
@@ -460,6 +489,16 @@ namespace gempba::telemetry {
     }
 
     telemetry_hub* get() noexcept { return g_owner.get(); }
+
+    bool annotate_run(const std::string_view p_key, const std::string_view p_value) {
+        if (auto* v_hub = get()) {
+            return v_hub->annotate_run(p_key, p_value);
+        }
+        if (g_enabled) {
+            spdlog::warn("telemetry: dropped run annotation '{}': no telemetry hub is installed yet", p_key.substr(0, MAX_RUN_ANNOTATION_KEY_BYTES));
+        }
+        return false;
+    }
 
     void install(std::unique_ptr<telemetry_hub> p_hub) noexcept {
         if (!g_enabled) {

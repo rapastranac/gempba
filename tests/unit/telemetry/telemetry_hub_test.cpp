@@ -5,7 +5,9 @@
 #include <gtest/gtest.h>
 #include <memory>
 #include <regex>
+#include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -323,6 +325,54 @@ namespace {
         EXPECT_TRUE(std::regex_match(v_first_run.run_id(), v_uuid_v4)) << v_first_run.run_id();
         EXPECT_NE(v_first_run.run_id(), v_second_run.run_id());
         EXPECT_TRUE(v_worker.run_id().empty());
+    }
+
+    TEST_F(telemetry_hub_test, run_annotations_keep_their_order_and_a_repeated_key_replaces_its_value) {
+        gempba::telemetry::telemetry_hub v_hub;
+
+        EXPECT_TRUE(v_hub.annotate_run("problem", "vertex_cover"));
+        EXPECT_TRUE(v_hub.annotate_run("seed", "42"));
+        EXPECT_TRUE(v_hub.annotate_run("problem", "max_clique"));
+
+        const std::vector<std::pair<std::string, std::string>> v_expected{{"problem", "max_clique"}, {"seed", "42"}};
+        EXPECT_EQ(v_expected, v_hub.run_annotations());
+    }
+
+    TEST_F(telemetry_hub_test, run_annotations_beyond_the_cap_are_dropped) {
+        gempba::telemetry::telemetry_hub v_hub;
+        for (std::size_t v_i = 0; v_i < gempba::telemetry::MAX_RUN_ANNOTATIONS; ++v_i) {
+            EXPECT_TRUE(v_hub.annotate_run("key" + std::to_string(v_i), "v"));
+        }
+
+        EXPECT_FALSE(v_hub.annotate_run("one_too_many", "v"));
+        EXPECT_TRUE(v_hub.annotate_run("key0", "replaced"));
+
+        const auto v_annotations = v_hub.run_annotations();
+        ASSERT_EQ(gempba::telemetry::MAX_RUN_ANNOTATIONS, v_annotations.size());
+        EXPECT_EQ("replaced", v_annotations.front().second);
+    }
+
+    TEST_F(telemetry_hub_test, run_annotations_over_a_length_limit_are_dropped_not_truncated) {
+        gempba::telemetry::telemetry_hub v_hub;
+        const std::string v_long_key(gempba::telemetry::MAX_RUN_ANNOTATION_KEY_BYTES + 1, 'k');
+        const std::string v_long_value(gempba::telemetry::MAX_RUN_ANNOTATION_VALUE_BYTES + 1, 'v');
+
+        EXPECT_FALSE(v_hub.annotate_run(v_long_key, "v"));
+        EXPECT_FALSE(v_hub.annotate_run("key", v_long_value));
+        EXPECT_FALSE(v_hub.annotate_run("", "v"));
+        EXPECT_TRUE(v_hub.annotate_run(std::string(gempba::telemetry::MAX_RUN_ANNOTATION_KEY_BYTES, 'k'), std::string(gempba::telemetry::MAX_RUN_ANNOTATION_VALUE_BYTES, 'v')));
+
+        EXPECT_EQ(1u, v_hub.run_annotations().size());
+    }
+
+    TEST_F(telemetry_hub_test, annotate_run_reaches_the_installed_hub_and_is_dropped_without_one) {
+        EXPECT_FALSE(gempba::telemetry::annotate_run("label", "before_install"));
+
+        gempba::telemetry::install(std::make_unique<gempba::telemetry::telemetry_hub>());
+        EXPECT_TRUE(gempba::telemetry::annotate_run("label", "baseline"));
+
+        const std::vector<std::pair<std::string, std::string>> v_expected{{"label", "baseline"}};
+        EXPECT_EQ(v_expected, gempba::telemetry::get()->run_annotations());
     }
 
     TEST_F(telemetry_hub_test, record_send_accumulates_per_destination_edges) {
