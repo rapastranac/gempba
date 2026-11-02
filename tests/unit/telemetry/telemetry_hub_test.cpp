@@ -130,6 +130,10 @@ namespace {
         EXPECT_EQ(0u, v_frame.m_tasks_local_total);
         EXPECT_EQ(0u, v_frame.m_tasks_sent_total);
         EXPECT_EQ(0u, v_frame.m_tasks_recv_total);
+        EXPECT_EQ(0u, v_frame.m_bytes_sent_total);
+        EXPECT_EQ(0u, v_frame.m_bytes_recv_total);
+        EXPECT_EQ(0u, v_frame.m_send_microseconds_total);
+        EXPECT_EQ(0u, v_frame.m_recv_microseconds_total);
         EXPECT_EQ(0u, v_frame.m_tasks_running);
         EXPECT_EQ(0u, v_frame.m_scheduler_pending_count);
         EXPECT_EQ(0u, v_frame.m_idle_microseconds_per_worker);
@@ -302,18 +306,55 @@ namespace {
         gempba::telemetry::worker_frame v_frame{};
         v_hub.snapshot_worker_frame(v_frame);
         EXPECT_EQ(1u, v_frame.m_tasks_sent_total);
+        EXPECT_EQ(64u, v_frame.m_bytes_sent_total);
     }
 
-    TEST_F(telemetry_hub_test, record_recv_increments_total_only) {
+    TEST_F(telemetry_hub_test, record_send_accumulates_bytes_matching_the_edges_and_time) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
 
-        v_hub.record_recv(3, 1024);
-        v_hub.record_recv(3, 2048);
+        v_hub.record_send(2, 100, std::chrono::microseconds(3));
+        v_hub.record_send(2, 50, std::chrono::microseconds(4));
+        v_hub.record_send(5, 999, std::chrono::microseconds(5));
+
+        gempba::telemetry::worker_frame v_frame{};
+        v_hub.snapshot_worker_frame(v_frame);
+        std::uint64_t v_edge_bytes = 0;
+        for (const auto& v_edge: v_frame.m_edges_out) {
+            v_edge_bytes += v_edge.m_bytes;
+        }
+        EXPECT_EQ(1149u, v_frame.m_bytes_sent_total);
+        EXPECT_EQ(v_edge_bytes, v_frame.m_bytes_sent_total);
+        EXPECT_EQ(12u, v_frame.m_send_microseconds_total);
+    }
+
+    TEST_F(telemetry_hub_test, record_recv_accumulates_count_bytes_and_time) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+
+        v_hub.record_recv(3, 1024, std::chrono::microseconds(7));
+        v_hub.record_recv(3, 2048, std::chrono::microseconds(8));
 
         gempba::telemetry::worker_frame v_frame{};
         v_hub.snapshot_worker_frame(v_frame);
         EXPECT_EQ(2u, v_frame.m_tasks_recv_total);
+        EXPECT_EQ(3072u, v_frame.m_bytes_recv_total);
+        EXPECT_EQ(15u, v_frame.m_recv_microseconds_total);
+    }
+
+    TEST_F(telemetry_hub_test, sub_microsecond_transfer_times_add_up) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+
+        for (int v_i = 0; v_i < 5; ++v_i) {
+            v_hub.record_send(1, 8, std::chrono::nanoseconds(400));
+            v_hub.record_recv(1, 8, std::chrono::nanoseconds(600));
+        }
+
+        gempba::telemetry::worker_frame v_frame{};
+        v_hub.snapshot_worker_frame(v_frame);
+        EXPECT_EQ(2u, v_frame.m_send_microseconds_total);
+        EXPECT_EQ(3u, v_frame.m_recv_microseconds_total);
     }
 
     TEST_F(telemetry_hub_test, snapshot_leaves_runtime_fields_zero_without_load_balancer_or_scheduler) {

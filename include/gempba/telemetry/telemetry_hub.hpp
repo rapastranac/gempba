@@ -2,6 +2,7 @@
 #define GEMPBA_TELEMETRY_TELEMETRY_HUB_HPP
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <gempba/telemetry/frames.hpp>
 #include <gempba/telemetry/runtime_mode.hpp>
@@ -59,14 +60,14 @@ namespace gempba::telemetry {
         void shutdown();
 
         /**
-         * @brief Record an outbound task to a remote worker (bytes + count).
+         * @brief Record an outbound task to a remote worker (bytes + count), and how long its MPI sends took.
          *
          * Atomic, lock-free, allocation-free. Safe to call from any thread.
          */
-        void record_send(std::uint32_t p_dst_worker_id, std::uint64_t p_bytes) noexcept;
+        void record_send(std::uint32_t p_dst_worker_id, std::uint64_t p_bytes, std::chrono::nanoseconds p_elapsed = {}) noexcept;
 
-        /// Record an inbound task from a remote worker. Hot-path; same guarantees as @ref record_send.
-        void record_recv(std::uint32_t p_src_worker_id, std::uint64_t p_bytes) noexcept;
+        /// Record an inbound task from a remote worker, and how long its MPI receives took. Hot-path; same guarantees as @ref record_send.
+        void record_recv(std::uint32_t p_src_worker_id, std::uint64_t p_bytes, std::chrono::nanoseconds p_elapsed = {}) noexcept;
 
         /// Record a task dispatched to the local thread pool. Hot-path; same guarantees as @ref record_send.
         void record_task_local() noexcept;

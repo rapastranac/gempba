@@ -1,3 +1,4 @@
+#include <chrono>
 #include <gempba/node_manager.hpp>
 #include <gempba/telemetry/telemetry_hub.hpp>
 #include <impl/schedulers/mpi_semi_centralized_scheduler.hpp>
@@ -45,10 +46,12 @@ namespace gempba {
                 m_stats.m_sent_task_count++;
                 m_stats.m_total_requested_tasks++;
 
-                if (auto* v_telemetry = telemetry::get())
-                    v_telemetry->record_send(static_cast<std::uint32_t>(m_destination_rank), v_bundle->size());
-
+                const int v_destination = m_destination_rank;
+                const auto v_send_start = std::chrono::steady_clock::now();
                 send_task(*v_bundle);
+                if (auto* v_telemetry = telemetry::get()) {
+                    v_telemetry->record_send(static_cast<std::uint32_t>(v_destination), v_bundle->size(), std::chrono::steady_clock::now() - v_send_start);
+                }
 
                 v_is_pop = m_tasks_bundle_queue.pop(v_bundle);
 

@@ -5,6 +5,7 @@
 #include <array>
 #include <atomic>
 #include <cfloat>
+#include <chrono>
 #include <climits>
 #include <cstdlib> /* srand, rand */
 #include <memory>
@@ -369,6 +370,7 @@ namespace gempba {
             MPI_Get_count(&p_status, MPI_BYTE, &v_count); // receives total number of datatype elements of the message
 
             task_packet v_task_packet(v_count);
+            const auto v_recv_start = std::chrono::steady_clock::now();
             MPI_Recv(v_task_packet.data(), v_count, MPI_BYTE, p_status.MPI_SOURCE, TASK, m_world_communicator, &p_status);
             utils::print_ipc_debug_comments("rank {}, received TASK, count: {}", m_world_rank, p_status.MPI_SOURCE, v_count);
 
@@ -376,6 +378,7 @@ namespace gempba {
             MPI_Status v_status;
             int v_runnable_id;
             MPI_Recv(&v_runnable_id, 1, MPI_INT, p_status.MPI_SOURCE, RUNNABLE_ID, m_world_communicator, &v_status);
+            const auto v_recv_elapsed = std::chrono::steady_clock::now() - v_recv_start;
             utils::print_ipc_debug_comments("rank {}, received RUNNABLE_ID: {}", m_world_rank, v_runnable_id);
             if (const std::optional<int> v_ack = m_termination.on_task_received(p_status.MPI_SOURCE)) {
                 send_task_ack(*v_ack);
@@ -389,7 +392,7 @@ namespace gempba {
 
             if (auto* v_telemetry = telemetry::get()) {
                 v_telemetry->record_worker_running();
-                v_telemetry->record_recv(static_cast<std::uint32_t>(p_status.MPI_SOURCE), static_cast<std::uint64_t>(v_count));
+                v_telemetry->record_recv(static_cast<std::uint32_t>(p_status.MPI_SOURCE), static_cast<std::uint64_t>(v_count), v_recv_elapsed);
             }
 
             //  Delegates the processing of the incoming buffer to the node manager and stores the potential returned value in _returned_value_future.
@@ -849,6 +852,7 @@ namespace gempba {
             // *********************************************
 
             m_termination.on_task_sent();
+            const auto v_send_start = std::chrono::steady_clock::now();
             const int v_err1 = MPI_Ssend(p_packet.data(), static_cast<int>(p_packet.size()), MPI_BYTE, DEST, TASK, m_world_communicator); // send buffer
             if (v_err1 != MPI_SUCCESS) {
                 spdlog::debug("buffer failed to send! \n");
@@ -858,6 +862,7 @@ namespace gempba {
             if (v_err2 != MPI_SUCCESS) {
                 spdlog::debug("runnable id failed to send! \n");
             }
+            const auto v_send_elapsed = std::chrono::steady_clock::now() - v_send_start;
 
             spdlog::debug("Seed sent \n");
             m_sent_tasks++;
@@ -866,7 +871,7 @@ namespace gempba {
             m_stats.m_total_requested_tasks++;
 
             if (auto* v_telemetry = telemetry::get()) {
-                v_telemetry->record_send(static_cast<std::uint32_t>(DEST), p_packet.size());
+                v_telemetry->record_send(static_cast<std::uint32_t>(DEST), p_packet.size(), v_send_elapsed);
                 v_telemetry->record_assignment(static_cast<std::uint32_t>(DEST));
             }
         }
