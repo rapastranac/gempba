@@ -84,6 +84,16 @@ namespace gempba {
         [[nodiscard]] virtual bool is_done() const = 0;
 
         [[nodiscard]] virtual std::size_t get_thread_request_count() const = 0;
+
+        /**
+         * @return local submissions refused because every pool thread was busy; 0 when the balancer does not count them
+         */
+        [[nodiscard]] virtual std::size_t get_spawn_rejected_pool_full_count() const { return 0; }
+
+        /**
+         * @return remote submissions refused because the scheduler opened no transmission channel; 0 when the balancer does not count them
+         */
+        [[nodiscard]] virtual std::size_t get_spawn_remote_rejected_count() const { return 0; }
     };
 } // namespace gempba
 

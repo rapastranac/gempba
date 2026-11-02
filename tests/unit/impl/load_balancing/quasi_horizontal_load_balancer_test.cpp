@@ -898,6 +898,39 @@ TEST_F(quasi_horizontal_load_balancer_test, try_remote_submit_falls_back_to_loca
 
     EXPECT_FALSE(v_result);
     EXPECT_TRUE(v_fn_called);
+    EXPECT_EQ(1u, v_balancer.get_spawn_remote_rejected_count());
+    EXPECT_EQ(0u, v_balancer.get_spawn_rejected_pool_full_count());
+}
+
+TEST_F(quasi_horizontal_load_balancer_test, try_local_submit_when_pool_full_falls_back_to_forward) {
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    v_balancer.set_thread_pool_size(1);
+
+    std::promise<void> v_started;
+    std::promise<void> v_release;
+    auto v_release_future = v_release.get_future().share();
+    v_balancer.force_local_submit([&v_started, v_release_future]() -> std::any {
+        v_started.set_value();
+        v_release_future.wait();
+        return {};
+    });
+    v_started.get_future().wait();
+
+    bool v_fn_called = false;
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node&) { v_fn_called = true; };
+    auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_balancer);
+    auto v_child = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_parent, v_fn, std::make_tuple(0));
+
+    gempba::node v_node(v_child);
+    const bool v_result = v_balancer.try_local_submit(v_node);
+
+    v_release.set_value();
+    v_balancer.wait();
+
+    EXPECT_FALSE(v_result);
+    EXPECT_TRUE(v_fn_called);
+    EXPECT_EQ(1u, v_balancer.get_spawn_rejected_pool_full_count());
+    EXPECT_EQ(0u, v_balancer.get_spawn_remote_rejected_count());
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, get_root_returns_null_for_unknown_thread) {
@@ -1113,6 +1146,8 @@ TEST_F(quasi_horizontal_load_balancer_test, send_remote_returns_false_on_mutex_c
 
     EXPECT_FALSE(v_result);
     EXPECT_TRUE(v_fn_b_called);
+    EXPECT_EQ(1u, v_balancer.get_spawn_remote_rejected_count());
+    EXPECT_EQ(0u, v_balancer.get_spawn_rejected_pool_full_count());
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, try_push_root_level_node_locally_throws_on_consumed_top) {
