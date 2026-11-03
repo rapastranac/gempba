@@ -18,6 +18,7 @@
 #include <string_view>
 #include <system_error>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #if defined(_WIN32)
@@ -98,6 +99,7 @@ namespace gempba::telemetry {
 
         constexpr std::chrono::milliseconds k_min_broadcast_interval{50};
         constexpr std::chrono::milliseconds k_control_poll_interval{500};
+        constexpr std::chrono::milliseconds k_snapshot_poll_interval{10};
 
         std::chrono::milliseconds broadcast_interval(const telemetry_hub& p_hub) { return std::max(std::chrono::milliseconds(p_hub.worker_interval_ms()), k_min_broadcast_interval); }
 
@@ -265,10 +267,12 @@ namespace gempba::telemetry {
                 return false;
             }
             const auto v_kind_trimmed = trim(*v_kind_str);
-            if (v_kind_trimmed == "pause" || v_kind_trimmed == "resume") {
-                p_out_kind = v_kind_trimmed == "pause" ? control_kind::PAUSE : control_kind::RESUME;
-                p_out_value = 0;
-                return true;
+            for (const auto& [v_name, v_kind]: {std::pair{"pause", control_kind::PAUSE}, std::pair{"resume", control_kind::RESUME}, std::pair{"snapshot", control_kind::SNAPSHOT}}) {
+                if (v_kind_trimmed == v_name) {
+                    p_out_kind = v_kind;
+                    p_out_value = 0;
+                    return true;
+                }
             }
             const auto v_value = find_uint_field(p_line, "value");
             if (!v_value) {
@@ -470,11 +474,13 @@ namespace gempba::telemetry {
 
             const auto v_stopped = [v_impl_ptr] { return !v_impl_ptr->m_running.load(std::memory_order_acquire); };
             auto v_last_broadcast = std::chrono::steady_clock::now();
+            std::uint32_t v_broadcast_snapshot = 0;
             while (!v_stopped()) {
                 {
                     const auto v_due = v_last_broadcast + broadcast_interval(*v_impl_ptr->m_hub);
+                    const auto v_poll = v_impl_ptr->m_hub->snapshot_requested() != v_broadcast_snapshot ? k_snapshot_poll_interval : k_control_poll_interval;
                     std::unique_lock v_wake_lock(v_impl_ptr->m_wake_mtx);
-                    v_impl_ptr->m_wake_cv.wait_until(v_wake_lock, std::min(v_due, std::chrono::steady_clock::now() + k_control_poll_interval), v_stopped);
+                    v_impl_ptr->m_wake_cv.wait_until(v_wake_lock, std::min(v_due, std::chrono::steady_clock::now() + v_poll), v_stopped);
                 }
                 if (v_stopped()) {
                     break;
@@ -490,9 +496,14 @@ namespace gempba::telemetry {
                     }
                 }
 
-                if (std::chrono::steady_clock::now() >= v_last_broadcast + broadcast_interval(*v_impl_ptr->m_hub)) {
+                const std::uint32_t v_snapshot = v_impl_ptr->m_hub->snapshot_requested();
+                const bool v_snapshot_ready = v_snapshot != v_broadcast_snapshot && !v_impl_ptr->m_hub->snapshot_outstanding();
+                if (v_snapshot_ready || std::chrono::steady_clock::now() >= v_last_broadcast + broadcast_interval(*v_impl_ptr->m_hub)) {
                     v_last_broadcast = std::chrono::steady_clock::now();
-                    const std::string v_line = build_broadcast_line(*v_impl_ptr->m_hub, !v_impl_ptr->m_hub->paused());
+                    if (v_snapshot_ready) {
+                        v_broadcast_snapshot = v_snapshot;
+                    }
+                    const std::string v_line = build_broadcast_line(*v_impl_ptr->m_hub, v_snapshot_ready || !v_impl_ptr->m_hub->paused());
                     const std::scoped_lock v_lock(v_impl_ptr->m_clients_mtx);
                     for (const auto& v_cs: v_impl_ptr->m_clients) {
                         const bool v_already_dead = std::find(v_dead.begin(), v_dead.end(), v_cs.m_sock) != v_dead.end();

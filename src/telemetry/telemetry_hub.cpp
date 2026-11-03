@@ -49,6 +49,8 @@ namespace gempba::telemetry {
         constexpr std::chrono::milliseconds k_pump_resolution{50};
         constexpr std::uint64_t k_final_frame_wait_ms = 1000;
         constexpr std::chrono::milliseconds k_final_frame_poll{10};
+        constexpr std::uint64_t k_snapshot_floor_ms = 50;
+        constexpr std::uint64_t k_snapshot_wait_ms = 1000;
 
         constexpr std::uint16_t k_default_telemetry_port = 9000;
         std::atomic<std::uint16_t> g_configured_port{k_default_telemetry_port};
@@ -284,11 +286,18 @@ namespace gempba::telemetry {
                 case control_kind::RESUME:
                     m_paused.store(false, std::memory_order_relaxed);
                     break;
+                case control_kind::SNAPSHOT:
+                    m_snapshot_due.store(v_ctrl->m_value, std::memory_order_relaxed);
+                    break;
             }
         }
 
+        const std::uint32_t v_snapshot = m_snapshot_due.exchange(0, std::memory_order_relaxed);
         const std::uint32_t v_worker_interval = m_worker_interval_ms.load(std::memory_order_relaxed);
-        if (!paused() && v_now - m_last_worker_emit_ms.load(std::memory_order_relaxed) >= v_worker_interval) {
+        if (v_snapshot != 0 || (!paused() && v_now - m_last_worker_emit_ms.load(std::memory_order_relaxed) >= v_worker_interval)) {
+            if (v_snapshot != 0) {
+                m_snapshot_answered.store(v_snapshot, std::memory_order_relaxed);
+            }
             m_seq_no.fetch_add(1, std::memory_order_relaxed);
             worker_frame v_frame{};
             snapshot_worker_frame(v_frame);
@@ -315,7 +324,7 @@ namespace gempba::telemetry {
             }
         }
 
-        if (m_aggregator && !paused() && drain_inbound_frames()) {
+        if (m_aggregator && (!paused() || snapshot_outstanding()) && drain_inbound_frames()) {
             v_moved_frames = true;
         }
 
@@ -347,6 +356,7 @@ namespace gempba::telemetry {
         p_out.m_version = TELEMETRY_SCHEMA_VERSION;
         p_out.m_worker_id = m_worker_id;
         p_out.m_seq_no = m_seq_no.load(std::memory_order_relaxed);
+        p_out.m_snapshot_id = m_snapshot_answered.load(std::memory_order_relaxed);
         p_out.m_worker_local_ms = monotonic_ms();
 
         p_out.m_tasks_started_total = m_counters->m_tasks_started_total.load(std::memory_order_relaxed);
@@ -532,6 +542,23 @@ namespace gempba::telemetry {
 
     bool telemetry_hub::paused() const noexcept { return m_paused.load(std::memory_order_relaxed); }
 
+    std::uint32_t telemetry_hub::snapshot_requested() const noexcept { return m_snapshot_requested.load(std::memory_order_acquire); }
+
+    bool telemetry_hub::snapshot_outstanding() const {
+        const std::uint32_t v_id = snapshot_requested();
+        if (v_id == 0 || !m_aggregator || monotonic_ms() - m_snapshot_requested_ms.load(std::memory_order_relaxed) >= k_snapshot_wait_ms) {
+            return false;
+        }
+        const std::scoped_lock v_lock(m_aggregator->m_mtx);
+        for (std::uint32_t v_rank = 0; v_rank < m_world_size; ++v_rank) {
+            const auto v_it = m_aggregator->m_latest_worker.find(v_rank);
+            if (v_it == m_aggregator->m_latest_worker.end() || v_it->second.m_snapshot_id < v_id) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     void telemetry_hub::apply_control_from_client(const control_kind p_kind, const std::uint32_t p_value) noexcept {
         constexpr std::uint32_t k_min_interval_ms = 50;
         constexpr std::uint32_t k_max_interval_ms = 600'000;
@@ -548,6 +575,20 @@ namespace gempba::telemetry {
             case control_kind::RESUME:
                 m_paused.store(false, std::memory_order_relaxed);
                 break;
+            case control_kind::SNAPSHOT: {
+                const std::uint64_t v_now = monotonic_ms();
+                const std::scoped_lock v_lock(m_pending_fanout_mtx);
+                const std::uint32_t v_last = m_snapshot_requested.load(std::memory_order_relaxed);
+                if (v_last != 0 && v_now - m_snapshot_requested_ms.load(std::memory_order_relaxed) < k_snapshot_floor_ms) {
+                    return;
+                }
+                v_msg.m_value = v_last + 1;
+                m_snapshot_requested_ms.store(v_now, std::memory_order_relaxed);
+                m_snapshot_due.store(v_msg.m_value, std::memory_order_relaxed);
+                m_snapshot_requested.store(v_msg.m_value, std::memory_order_release);
+                m_pending_fanout.push_back(v_msg);
+                return;
+            }
             case control_kind::UNSPECIFIED:
             case control_kind::BE_NODE_SENTINEL:
                 return;

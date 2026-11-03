@@ -389,6 +389,34 @@ namespace {
         EXPECT_NE(std::string::npos, v_last.find("\"tasks_started_total\":5")) << v_last;
     }
 
+    TEST_F(tcp_server_test, a_snapshot_request_is_answered_with_a_full_broadcast_while_paused_at_a_long_interval) {
+        const std::uint16_t v_port = free_loopback_port();
+        gempba::telemetry::configure_port(v_port);
+
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.set_worker_interval_ms(600'000);
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/true);
+        v_hub.apply_control_from_client(gempba::telemetry::control_kind::PAUSE, 0);
+
+        const socket_t v_client = connect_loopback(v_port);
+        ASSERT_NE(k_invalid, v_client);
+        set_recv_timeout(v_client, 100);
+        for (int v_i = 0; v_i < 4; ++v_i) {
+            v_hub.record_task_local();
+        }
+
+        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"snapshot\"}\n"));
+        const std::string v_line = read_one_line(v_client, std::chrono::milliseconds(2000));
+        close_sock(v_client);
+        v_hub.shutdown();
+        gempba::telemetry::configure_port(9000);
+
+        EXPECT_EQ(1u, v_hub.snapshot_requested());
+        EXPECT_NE(std::string::npos, v_line.find(R"("paused":true,"topology":)")) << v_line;
+        EXPECT_NE(std::string::npos, v_line.find(R"("workers":[{"worker_id":0,)")) << v_line;
+        EXPECT_NE(std::string::npos, v_line.find(R"("tasks_started_total":4,)")) << v_line;
+    }
+
     TEST_F(tcp_server_test, client_markers_are_unescaped_recorded_from_the_dashboard_and_broadcast) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
