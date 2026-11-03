@@ -21,11 +21,13 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+#include <chrono>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <map>
 #include <memory>
 #include <optional>
+#include <thread>
 
 #include <gempba/gempba.hpp>
 #include <gempba/node_manager.hpp>
@@ -178,6 +180,47 @@ TEST_F(gempba_test, mp_create_scheduler_custom_implementation) {
     ASSERT_NE(nullptr, v_sched);
     EXPECT_EQ(v_raw, v_sched);
     EXPECT_EQ(v_sched, gempba::get_scheduler());
+}
+
+TEST_F(gempba_test, mp_unnamed_scheduler_is_described_to_telemetry_as_custom) {
+    gempba::multiprocessing::create_scheduler(std::make_unique<scheduler_stub>());
+    ASSERT_NE(nullptr, gempba::telemetry::get());
+    EXPECT_EQ("custom", gempba::telemetry::get()->describe_run().m_scheduler);
+}
+
+TEST_F(gempba_test, mp_load_balancer_created_after_the_hub_is_described_to_telemetry) {
+    gempba::multiprocessing::create_scheduler(std::make_unique<scheduler_stub>());
+    ASSERT_NE(nullptr, gempba::telemetry::get());
+    EXPECT_TRUE(gempba::telemetry::get()->describe_run().m_load_balancer.empty());
+
+    gempba::multiprocessing::create_load_balancer(gempba::QUASI_HORIZONTAL, nullptr);
+    EXPECT_EQ("quasi_horizontal", gempba::telemetry::get()->describe_run().m_load_balancer);
+}
+
+TEST_F(gempba_test, mt_load_balancer_created_before_the_hub_is_described_to_telemetry) {
+    gempba::load_balancer* v_lb = gempba::multithreading::create_load_balancer(gempba::WORK_STEALING);
+    gempba::multithreading::create_node_manager(v_lb);
+    ASSERT_NE(nullptr, gempba::telemetry::get());
+
+    const gempba::telemetry::run_description v_run = gempba::telemetry::get()->describe_run();
+    EXPECT_EQ("work_stealing", v_run.m_load_balancer);
+    EXPECT_TRUE(v_run.m_scheduler.empty());
+    EXPECT_EQ(gempba::telemetry::runtime_mode::MT_ONLY, v_run.m_mode);
+}
+
+TEST_F(gempba_test, mt_threads_per_process_is_the_pool_size_the_worker_frames_report) {
+    gempba::load_balancer* v_lb = gempba::multithreading::create_load_balancer(gempba::QUASI_HORIZONTAL);
+    v_lb->set_thread_pool_size(3);
+    gempba::multithreading::create_node_manager(v_lb);
+    auto* v_hub = gempba::telemetry::get();
+    ASSERT_NE(nullptr, v_hub);
+    v_hub->set_worker_interval_ms(0);
+
+    const auto v_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    while (v_hub->describe_run().m_threads_per_process == 0 && std::chrono::steady_clock::now() < v_deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    EXPECT_EQ(3u, v_hub->describe_run().m_threads_per_process);
 }
 
 TEST_F(gempba_test, mp_create_scheduler_throws_if_already_exists) {

@@ -28,6 +28,12 @@ namespace {
         }
         auto v_hub = std::make_unique<gempba::telemetry::telemetry_hub>();
         if (g_scheduler) {
+            v_hub->describe_scheduler(g_scheduler->get_name());
+        }
+        if (g_load_balancer) {
+            v_hub->describe_load_balancer(g_load_balancer->get_balancing_policy());
+        }
+        if (g_scheduler) {
             v_hub->on_runtime_ready(gempba::telemetry::runtime_mode::MP_MPI, static_cast<std::uint32_t>(g_scheduler->rank_me()), static_cast<std::uint32_t>(g_scheduler->world_size()));
         } else {
             v_hub->on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1);
@@ -35,11 +41,18 @@ namespace {
         gempba::telemetry::install(std::move(v_hub));
     }
 
+    void describe_load_balancer_to_telemetry() {
+        if (auto* v_telemetry = gempba::telemetry::get()) {
+            v_telemetry->describe_load_balancer(g_load_balancer->get_balancing_policy());
+        }
+    }
+
     gempba::load_balancer* assign_load_balancer(std::unique_ptr<gempba::load_balancer> p_implementation) {
         if (g_load_balancer != nullptr) {
             throw std::runtime_error("load_balancer already exists!");
         }
         g_load_balancer = std::move(p_implementation);
+        describe_load_balancer_to_telemetry();
         return g_load_balancer.get();
     }
 
@@ -57,6 +70,7 @@ namespace {
                 break;
             }
         }
+        describe_load_balancer_to_telemetry();
         return g_load_balancer.get();
     }
 

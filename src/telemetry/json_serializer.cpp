@@ -1,15 +1,15 @@
 #include <impl/telemetry/json_serializer.hpp>
 
 #include <cstdio>
+#include <string_view>
 
 namespace gempba::telemetry {
 
     namespace {
 
-        void escape_quoted(std::string& p_out, const char* p_str) {
+        void escape_quoted(std::string& p_out, const std::string_view p_str) {
             p_out += '"';
-            for (const char* v_p = p_str; *v_p; ++v_p) {
-                const char v_c = *v_p;
+            for (const char v_c: p_str) {
                 switch (v_c) {
                     case '"':
                         p_out += "\\\"";
@@ -39,7 +39,13 @@ namespace gempba::telemetry {
             p_out += '"';
         }
 
-        void escape_quoted(std::string& p_out, const std::string& p_str) { escape_quoted(p_out, p_str.c_str()); }
+        void emit_quoted_or_null(std::string& p_out, const std::string_view p_str) {
+            if (p_str.empty()) {
+                p_out += "null";
+            } else {
+                escape_quoted(p_out, p_str);
+            }
+        }
 
         void emit_u64(std::string& p_out, std::uint64_t p_v) {
             char v_buf[32];
@@ -186,7 +192,7 @@ namespace gempba::telemetry {
         p_out += "]}";
     }
 
-    void serialize_topology(std::string& p_out, const topology_snapshot& p_topology) {
+    void serialize_topology(std::string& p_out, const topology_snapshot& p_topology, const run_description* p_run) {
         p_out += "{\"nodes\":[";
         for (std::size_t v_i = 0; v_i < p_topology.m_nodes.size(); ++v_i) {
             if (v_i > 0)
@@ -245,6 +251,10 @@ namespace gempba::telemetry {
             emit_u32(p_out, v_id.m_pid);
             p_out += ",\"primary_socket\":";
             emit_u32(p_out, v_id.m_primary_socket);
+            if (p_run) {
+                const bool v_is_center = p_run->m_mode == runtime_mode::MP_MPI && v_id.m_worker_id == 0;
+                p_out += v_is_center ? R"(,"role":"center")" : R"(,"role":"worker")";
+            }
             p_out += ",\"allowed_cpu_ids\":[";
             bool v_first_cpu = true;
             for (unsigned v_word = 0; v_word < CPU_MASK_WORDS; ++v_word) {
@@ -259,7 +269,31 @@ namespace gempba::telemetry {
             }
             p_out += "]}";
         }
-        p_out += "]}";
+        p_out += ']';
+        if (p_run) {
+            p_out += R"(,"run":{"scheduler":)";
+            emit_quoted_or_null(p_out, p_run->m_scheduler);
+            p_out += ",\"load_balancer\":";
+            emit_quoted_or_null(p_out, p_run->m_load_balancer);
+            p_out += p_run->m_mode == runtime_mode::MP_MPI ? R"(,"runtime_mode":"multiprocessing")" : R"(,"runtime_mode":"multithreading")";
+            p_out += ",\"world_size\":";
+            emit_u32(p_out, p_run->m_world_size);
+            p_out += ",\"threads_per_process\":";
+            emit_u32(p_out, p_run->m_threads_per_process);
+            p_out += ",\"gempba_version\":";
+            escape_quoted(p_out, p_run->m_gempba_version);
+            p_out += ",\"annotations\":{";
+            for (std::size_t v_i = 0; v_i < p_run->m_annotations.size(); ++v_i) {
+                if (v_i > 0) {
+                    p_out += ',';
+                }
+                escape_quoted(p_out, p_run->m_annotations[v_i].first);
+                p_out += ':';
+                escape_quoted(p_out, p_run->m_annotations[v_i].second);
+            }
+            p_out += "}}";
+        }
+        p_out += '}';
     }
 
     void serialize_broadcast(std::string& p_out, const broadcast_payload& p_payload) {
@@ -274,7 +308,7 @@ namespace gempba::telemetry {
 
         p_out += ",\"topology\":";
         if (p_payload.m_topology) {
-            serialize_topology(p_out, *p_payload.m_topology);
+            serialize_topology(p_out, *p_payload.m_topology, p_payload.m_run);
         } else {
             p_out += "null";
         }

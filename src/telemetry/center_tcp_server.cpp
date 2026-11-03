@@ -197,11 +197,14 @@ namespace gempba::telemetry {
 
             const auto v_now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 
+            const run_description v_run = p_hub.describe_run();
+
             broadcast_payload v_payload{};
             v_payload.m_run_id = p_hub.run_id();
             v_payload.m_now_ms = static_cast<std::uint64_t>(v_now);
             v_payload.m_elapsed_seconds = p_hub.program_elapsed_seconds();
             v_payload.m_topology = &v_topology;
+            v_payload.m_run = &v_run;
             v_payload.m_workers = &v_workers;
             v_payload.m_nodes = &v_nodes;
 

@@ -153,6 +153,8 @@ namespace gempba {
 
         [[nodiscard]] std::size_t get_pending_request_count() const override { return m_center_bundle_queue.size(); }
 
+        [[nodiscard]] std::string_view get_name() const override { return "centralized"; }
+
         [[nodiscard]] int world_size() const override { return m_world_size; }
 
         void barrier() override {

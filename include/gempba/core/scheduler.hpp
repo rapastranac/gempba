@@ -13,6 +13,7 @@
 #include <gempba/utils/tree.hpp>
 #include <map>
 #include <memory>
+#include <string_view>
 
 namespace gempba {
 
@@ -30,6 +31,11 @@ namespace gempba {
         [[nodiscard]] virtual double elapsed_time() const = 0;
 
         [[nodiscard]] virtual std::size_t get_pending_request_count() const = 0;
+
+        /**
+         * @return the name telemetry reports for this scheduler; "custom" for schedulers that do not name themselves
+         */
+        [[nodiscard]] virtual std::string_view get_name() const { return "custom"; }
 
         virtual void set_goal(goal p_goal, score_type p_type) = 0;
 

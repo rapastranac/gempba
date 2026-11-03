@@ -138,6 +138,8 @@ namespace gempba {
 
         [[nodiscard]] std::size_t get_pending_request_count() const override { return 0; }
 
+        [[nodiscard]] std::string_view get_name() const override { return "semi_centralized"; }
+
     private:
         [[nodiscard]] int next_process() const { return this->m_next_process; }
 

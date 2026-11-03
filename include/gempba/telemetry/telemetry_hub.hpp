@@ -3,19 +3,30 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <gempba/telemetry/frames.hpp>
 #include <gempba/telemetry/runtime_mode.hpp>
 #include <gempba/telemetry/telemetry_transport.hpp>
 #include <gempba/telemetry/topology.hpp>
+#include <gempba/utils/gempba_utils.hpp>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <thread>
+#include <utility>
 #include <vector>
 
 namespace gempba::telemetry {
+
+    /** @brief Most annotations one run keeps; see @ref telemetry_hub::annotate_run. */
+    inline constexpr std::size_t MAX_RUN_ANNOTATIONS = 8;
+    /** @brief Longest annotation key, in bytes. */
+    inline constexpr std::size_t MAX_RUN_ANNOTATION_KEY_BYTES = 32;
+    /** @brief Longest annotation value, in bytes. */
+    inline constexpr std::size_t MAX_RUN_ANNOTATION_VALUE_BYTES = 64;
 
     class process_probe;
     class node_probe;
@@ -150,6 +161,29 @@ namespace gempba::telemetry {
         /// The UUID v4 the center generated for this run at @ref on_runtime_ready; empty on other workers.
         [[nodiscard]] const std::string& run_id() const noexcept;
 
+        /**
+         * @brief Attach @p p_value to this run under @p p_key, e.g. a run label, problem name or seed.
+         *
+         * The center broadcasts its annotations with the run setup. Keeps up to @ref MAX_RUN_ANNOTATIONS pairs, keys of 1 to
+         * @ref MAX_RUN_ANNOTATION_KEY_BYTES bytes and values up to @ref MAX_RUN_ANNOTATION_VALUE_BYTES bytes; a pair over a limit
+         * is dropped with a warning, never truncated. Annotating a key again replaces its value.
+         *
+         * @return whether the pair was kept
+         */
+        bool annotate_run(std::string_view p_key, std::string_view p_value);
+
+        /// @return this run's annotations, in the order their keys were first set.
+        [[nodiscard]] std::vector<std::pair<std::string, std::string>> run_annotations() const;
+
+        /// Record the scheduler this run uses, by its scheduler::get_name().
+        void describe_scheduler(std::string_view p_name);
+
+        /// Record the load balancer this run uses.
+        void describe_load_balancer(balancing_policy p_policy);
+
+        /// @return how this run is set up; the thread count comes from the latest worker frames, so only the center fills it.
+        [[nodiscard]] run_description describe_run() const;
+
         /// Set the cadence at which worker frames are emitted. Fans out to other workers.
         void set_worker_interval_ms(std::uint32_t p_interval_ms) noexcept;
 
@@ -203,10 +237,24 @@ namespace gempba::telemetry {
 
         mutable std::mutex m_pending_fanout_mtx;
         std::vector<control_msg> m_pending_fanout;
+
+        mutable std::mutex m_run_mtx;
+        std::vector<std::pair<std::string, std::string>> m_run_annotations;
+        std::string m_scheduler_name;
+        std::string m_load_balancer_name;
     };
 
     /// @return The installed hub, or @c nullptr when none is installed.
     telemetry_hub* get() noexcept;
+
+    /**
+     * @brief Annotate the current run on the installed hub; see @ref telemetry_hub::annotate_run.
+     *
+     * With telemetry enabled but no hub installed yet, the pair is dropped with a warning.
+     *
+     * @return whether the pair was kept
+     */
+    bool annotate_run(std::string_view p_key, std::string_view p_value);
 
     /// Install @p p_hub as the process-wide singleton; transfers ownership.
     void install(std::unique_ptr<telemetry_hub> p_hub) noexcept;

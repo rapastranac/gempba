@@ -1,3 +1,4 @@
+#include <gempba/config.h>
 #include <gempba/core/load_balancer.hpp>
 #include <gempba/core/scheduler.hpp>
 #include <gempba/gempba.hpp>
@@ -21,6 +22,9 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <spdlog/spdlog.h>
+#include <string>
+#include <string_view>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -417,6 +421,72 @@ namespace gempba::telemetry {
 
     const std::string& telemetry_hub::run_id() const noexcept { return m_run_id; }
 
+    bool telemetry_hub::annotate_run(const std::string_view p_key, const std::string_view p_value) {
+        const std::string_view v_shown_key = p_key.substr(0, MAX_RUN_ANNOTATION_KEY_BYTES);
+        if (p_key.empty() || p_key.size() > MAX_RUN_ANNOTATION_KEY_BYTES || p_value.size() > MAX_RUN_ANNOTATION_VALUE_BYTES) {
+            spdlog::warn("telemetry: dropped run annotation '{}': keys take 1 to {} bytes and values up to {}", v_shown_key, MAX_RUN_ANNOTATION_KEY_BYTES, MAX_RUN_ANNOTATION_VALUE_BYTES);
+            return false;
+        }
+        const std::scoped_lock v_lock(m_run_mtx);
+        for (auto& [v_key, v_value]: m_run_annotations) {
+            if (v_key == p_key) {
+                v_value = p_value;
+                return true;
+            }
+        }
+        if (m_run_annotations.size() >= MAX_RUN_ANNOTATIONS) {
+            spdlog::warn("telemetry: dropped run annotation '{}': a run keeps at most {} annotations", v_shown_key, MAX_RUN_ANNOTATIONS);
+            return false;
+        }
+        m_run_annotations.emplace_back(p_key, p_value);
+        return true;
+    }
+
+    std::vector<std::pair<std::string, std::string>> telemetry_hub::run_annotations() const {
+        const std::scoped_lock v_lock(m_run_mtx);
+        return m_run_annotations;
+    }
+
+    void telemetry_hub::describe_scheduler(const std::string_view p_name) {
+        const std::scoped_lock v_lock(m_run_mtx);
+        m_scheduler_name = p_name;
+    }
+
+    void telemetry_hub::describe_load_balancer(const balancing_policy p_policy) {
+        const std::scoped_lock v_lock(m_run_mtx);
+        switch (p_policy) {
+            case QUASI_HORIZONTAL:
+                m_load_balancer_name = "quasi_horizontal";
+                break;
+            case WORK_STEALING:
+                m_load_balancer_name = "work_stealing";
+                break;
+        }
+    }
+
+    run_description telemetry_hub::describe_run() const {
+        run_description v_run;
+        v_run.m_mode = m_mode;
+        v_run.m_world_size = m_world_size;
+        v_run.m_gempba_version = GEMPBA_VERSION;
+        {
+            const std::scoped_lock v_lock(m_run_mtx);
+            v_run.m_scheduler = m_scheduler_name;
+            v_run.m_load_balancer = m_load_balancer_name;
+            v_run.m_annotations = m_run_annotations;
+        }
+        if (m_aggregator) {
+            const std::scoped_lock v_lock(m_aggregator->m_mtx);
+            for (const auto& [v_id, v_frame]: m_aggregator->m_latest_worker) {
+                const bool v_is_center = m_mode == runtime_mode::MP_MPI && v_id == 0;
+                if (!v_is_center && v_frame.m_process_threads > 0) {
+                    v_run.m_threads_per_process = std::max(v_run.m_threads_per_process, v_frame.m_process_threads - 1);
+                }
+            }
+        }
+        return v_run;
+    }
+
     std::uint64_t telemetry_hub::program_elapsed_seconds() const noexcept {
         const std::uint64_t v_start = m_start_ms.load(std::memory_order_acquire);
         if (v_start == 0)
@@ -460,6 +530,16 @@ namespace gempba::telemetry {
     }
 
     telemetry_hub* get() noexcept { return g_owner.get(); }
+
+    bool annotate_run(const std::string_view p_key, const std::string_view p_value) {
+        if (auto* v_hub = get()) {
+            return v_hub->annotate_run(p_key, p_value);
+        }
+        if (g_enabled) {
+            spdlog::warn("telemetry: dropped run annotation '{}': no telemetry hub is installed yet", p_key.substr(0, MAX_RUN_ANNOTATION_KEY_BYTES));
+        }
+        return false;
+    }
 
     void install(std::unique_ptr<telemetry_hub> p_hub) noexcept {
         if (!g_enabled) {
