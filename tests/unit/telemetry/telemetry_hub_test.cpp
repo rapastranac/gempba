@@ -361,6 +361,69 @@ namespace {
         EXPECT_EQ(320u, v_frame->m_bytes_sent_total);
     }
 
+    TEST_F(telemetry_hub_test, a_snapshot_publishes_one_frame_at_once_whatever_the_interval_or_a_pause) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+        v_hub.set_worker_interval_ms(0);
+        v_hub.tick_if_due();
+        v_hub.set_worker_interval_ms(600'000);
+        v_hub.apply_control_from_client(gempba::telemetry::control_kind::PAUSE, 0);
+        for (int v_i = 0; v_i < 3; ++v_i) {
+            v_hub.record_task_local();
+        }
+        EXPECT_EQ(0u, v_hub.snapshot_requested());
+        EXPECT_FALSE(v_hub.snapshot_outstanding());
+
+        v_hub.apply_control_from_client(gempba::telemetry::control_kind::SNAPSHOT, 0);
+        EXPECT_EQ(1u, v_hub.snapshot_requested());
+        EXPECT_TRUE(v_hub.snapshot_outstanding());
+        v_hub.tick_if_due();
+
+        const auto v_snapshot = v_hub.latest_worker_frame(0);
+        EXPECT_EQ(1u, v_snapshot->m_snapshot_id);
+        EXPECT_EQ(3u, v_snapshot->m_tasks_started_total);
+        EXPECT_FALSE(v_hub.snapshot_outstanding());
+        EXPECT_TRUE(v_hub.paused());
+
+        v_hub.record_task_local();
+        for (int v_i = 0; v_i < 10; ++v_i) {
+            v_hub.tick_if_due();
+        }
+        EXPECT_EQ(v_snapshot->m_seq_no, v_hub.latest_worker_frame(0)->m_seq_no);
+    }
+
+    TEST_F(telemetry_hub_test, snapshot_requests_within_the_floor_collapse_into_one) {
+        using clock = std::chrono::steady_clock;
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+
+        const auto v_start = clock::now();
+        for (int v_i = 0; v_i < 3; ++v_i) {
+            v_hub.apply_control_from_client(gempba::telemetry::control_kind::SNAPSHOT, 0);
+        }
+        if (clock::now() - v_start >= std::chrono::milliseconds(49)) {
+            GTEST_SKIP() << "the requests took longer than the 50 ms floor";
+        }
+        EXPECT_EQ(1u, v_hub.snapshot_requested());
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(60));
+        v_hub.apply_control_from_client(gempba::telemetry::control_kind::SNAPSHOT, 0);
+        EXPECT_EQ(2u, v_hub.snapshot_requested());
+    }
+
+    TEST_F(telemetry_hub_test, a_snapshot_stops_waiting_a_second_after_the_request_for_a_silent_rank) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 2, /*p_start_pump_thread=*/false);
+
+        v_hub.apply_control_from_client(gempba::telemetry::control_kind::SNAPSHOT, 0);
+        v_hub.tick_if_due();
+        EXPECT_EQ(1u, v_hub.latest_worker_frame(0)->m_snapshot_id);
+        EXPECT_TRUE(v_hub.snapshot_outstanding());
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(1050));
+        EXPECT_FALSE(v_hub.snapshot_outstanding());
+    }
+
     TEST_F(telemetry_hub_test, worker_scheduler_times_fit_in_the_run_and_stop_at_its_end) {
         using clock = std::chrono::steady_clock;
         gempba::telemetry::telemetry_hub v_hub;

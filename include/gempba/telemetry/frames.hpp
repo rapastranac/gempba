@@ -59,6 +59,8 @@ namespace gempba::telemetry {
         std::uint16_t m_version;
         std::uint32_t m_worker_id;
         std::uint32_t m_seq_no;
+        /** @brief Id of the latest @ref control_kind::SNAPSHOT request this rank answered; 0 before any. */
+        std::uint32_t m_snapshot_id;
         std::uint64_t m_worker_local_ms;
 
         /**
@@ -205,6 +207,11 @@ namespace gempba::telemetry {
         PAUSE = 3,
         /** @brief Publish and ingest frames again at the current interval. */
         RESUME = 4,
+        /**
+         * @brief Publish one worker frame, and a sentinel's node frame, on the next tick regardless of the interval or a pause;
+         * @c m_value is the request id the frame echoes in @ref worker_frame_header::m_snapshot_id.
+         */
+        SNAPSHOT = 5,
     };
 
     /** @brief Control message body. The semantics of @ref m_value depend on @ref m_kind. */

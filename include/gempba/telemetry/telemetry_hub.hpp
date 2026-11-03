@@ -216,6 +216,18 @@ namespace gempba::telemetry {
         [[nodiscard]] bool paused() const noexcept;
 
         /**
+         * @return the id of the latest accepted @ref control_kind::SNAPSHOT request, counting from 1; 0 before any. A request
+         * within 50 ms of the last accepted one collapses into it.
+         */
+        [[nodiscard]] std::uint32_t snapshot_requested() const noexcept;
+
+        /**
+         * @return whether the center still waits for a frame from some rank answering the latest snapshot request. It ingests
+         * frames while it waits, even when paused, and gives up one second after the request.
+         */
+        [[nodiscard]] bool snapshot_outstanding() const;
+
+        /**
          * @brief Apply one control message received from the dashboard.
          *
          * Routed by the center role; workers act on it locally. See
@@ -235,6 +247,10 @@ namespace gempba::telemetry {
         std::atomic<bool> m_is_sentinel{false};
         std::atomic<std::uint32_t> m_worker_interval_ms{500};
         std::atomic<bool> m_paused{false};
+        std::atomic<std::uint32_t> m_snapshot_requested{0};
+        std::atomic<std::uint64_t> m_snapshot_requested_ms{0};
+        std::atomic<std::uint32_t> m_snapshot_due{0};
+        std::atomic<std::uint32_t> m_snapshot_answered{0};
         std::atomic<std::uint64_t> m_last_worker_emit_ms{0};
         std::atomic<std::uint32_t> m_seq_no{0};
         std::atomic<std::uint64_t> m_start_ms{0};
