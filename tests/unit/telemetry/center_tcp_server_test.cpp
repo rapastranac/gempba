@@ -6,6 +6,7 @@
 #include <impl/telemetry/center_tcp_server.hpp>
 #include <string>
 #include <thread>
+#include <vector>
 
 #if defined(_WIN32)
     #include <winsock2.h>
@@ -279,7 +280,11 @@ namespace {
         ASSERT_NE(k_invalid, v_client);
         set_recv_timeout(v_client, 200);
 
-        const std::string v_first = read_one_line(v_client, std::chrono::milliseconds(3000));
+        std::string v_first;
+        const auto v_first_deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(3000);
+        while (v_first.find("\"tasks_started_total\":0") == std::string::npos && std::chrono::steady_clock::now() < v_first_deadline) {
+            v_first = read_one_line(v_client, std::chrono::milliseconds(500));
+        }
         ASSERT_NE(std::string::npos, v_first.find("\"tasks_started_total\":0"));
 
         v_hub.set_worker_interval_ms(600'000);
@@ -300,6 +305,106 @@ namespace {
         EXPECT_FALSE(v_hub.run_id().empty());
         EXPECT_NE(std::string::npos, v_first.find(v_run_id_key)) << v_first;
         EXPECT_NE(std::string::npos, v_last.find(v_run_id_key)) << v_last;
+    }
+
+    std::vector<std::chrono::steady_clock::time_point> line_arrivals(socket_t p_s, const std::size_t p_count, std::chrono::milliseconds p_timeout) {
+        const auto v_deadline = std::chrono::steady_clock::now() + p_timeout;
+        std::vector<std::chrono::steady_clock::time_point> v_arrivals;
+        char v_chunk[4096];
+        while (v_arrivals.size() < p_count && std::chrono::steady_clock::now() < v_deadline) {
+#if defined(_WIN32)
+            const int v_n = recv(p_s, v_chunk, static_cast<int>(sizeof(v_chunk)), 0);
+#else
+            const ssize_t v_n = recv(p_s, v_chunk, sizeof(v_chunk), 0);
+#endif
+            const auto v_now = std::chrono::steady_clock::now();
+            for (int v_i = 0; v_i < static_cast<int>(v_n); ++v_i) {
+                if (v_chunk[v_i] == '\n') {
+                    v_arrivals.push_back(v_now);
+                }
+            }
+        }
+        return v_arrivals;
+    }
+
+    TEST_F(tcp_server_test, broadcast_follows_a_short_worker_interval) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+        v_hub.set_worker_interval_ms(100);
+        gempba::telemetry::center_tcp_server v_server(0, v_hub);
+        ASSERT_TRUE(v_server.start());
+        const socket_t v_client = connect_loopback(v_server.bound_port());
+        ASSERT_NE(k_invalid, v_client);
+        set_recv_timeout(v_client, 100);
+
+        // Three lines at the old fixed 500 ms cadence take at least 1.5 s.
+        const auto v_arrivals = line_arrivals(v_client, 3, std::chrono::milliseconds(1400));
+        close_sock(v_client);
+        v_server.stop();
+
+        EXPECT_EQ(3u, v_arrivals.size());
+    }
+
+    TEST_F(tcp_server_test, broadcast_waits_for_a_long_worker_interval) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+        v_hub.set_worker_interval_ms(1000);
+        gempba::telemetry::center_tcp_server v_server(0, v_hub);
+        ASSERT_TRUE(v_server.start());
+        const socket_t v_client = connect_loopback(v_server.bound_port());
+        ASSERT_NE(k_invalid, v_client);
+        set_recv_timeout(v_client, 100);
+
+        const auto v_arrivals = line_arrivals(v_client, 2, std::chrono::milliseconds(3500));
+        close_sock(v_client);
+        v_server.stop();
+
+        ASSERT_EQ(2u, v_arrivals.size());
+        EXPECT_GE(v_arrivals[1] - v_arrivals[0], std::chrono::milliseconds(700));
+    }
+
+    TEST_F(tcp_server_test, client_rate_change_applies_to_the_broadcast_without_a_restart) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+        v_hub.set_worker_interval_ms(5000);
+        gempba::telemetry::center_tcp_server v_server(0, v_hub);
+        ASSERT_TRUE(v_server.start());
+        const socket_t v_client = connect_loopback(v_server.bound_port());
+        ASSERT_NE(k_invalid, v_client);
+        set_recv_timeout(v_client, 100);
+
+        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"set_worker_interval_ms\",\"value\":100}\n"));
+        const auto v_arrivals = line_arrivals(v_client, 3, std::chrono::milliseconds(1400));
+        close_sock(v_client);
+        v_server.stop();
+
+        EXPECT_EQ(100u, v_hub.worker_interval_ms());
+        EXPECT_EQ(3u, v_arrivals.size());
+    }
+
+    TEST_F(tcp_server_test, stop_is_prompt_and_sends_the_final_line_with_a_long_worker_interval) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+        v_hub.set_worker_interval_ms(50);
+        gempba::telemetry::center_tcp_server v_server(0, v_hub);
+        ASSERT_TRUE(v_server.start());
+        const socket_t v_client = connect_loopback(v_server.bound_port());
+        ASSERT_NE(k_invalid, v_client);
+        set_recv_timeout(v_client, 100);
+        ASSERT_EQ(1u, line_arrivals(v_client, 1, std::chrono::milliseconds(2000)).size());
+        v_hub.set_worker_interval_ms(600'000);
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+        const auto v_start = std::chrono::steady_clock::now();
+        v_server.stop();
+        const auto v_stop_took = std::chrono::steady_clock::now() - v_start;
+
+        set_recv_timeout(v_client, 200);
+        const std::string v_rest = read_until_closed(v_client, std::chrono::milliseconds(2000));
+        close_sock(v_client);
+
+        EXPECT_LT(v_stop_took, std::chrono::milliseconds(1000));
+        EXPECT_NE(std::string::npos, v_rest.find("\"version\":2")) << v_rest;
     }
 
     TEST_F(tcp_server_test, malformed_lines_are_ignored_and_do_not_break_subsequent_input) {
