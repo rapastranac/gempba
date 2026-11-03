@@ -61,6 +61,18 @@ namespace gempba::telemetry {
             p_out += v_buf;
         }
 
+        void emit_broadcast_header(std::string& p_out, const broadcast_payload& p_payload, const bool p_paused) {
+            p_out += "{\"version\":";
+            emit_u32(p_out, TELEMETRY_SCHEMA_VERSION);
+            p_out += R"(,"run_id":")";
+            p_out += p_payload.m_run_id;
+            p_out += R"(","ts":)";
+            emit_u64(p_out, p_payload.m_now_ms);
+            p_out += ",\"elapsed_seconds\":";
+            emit_u64(p_out, p_payload.m_elapsed_seconds);
+            p_out += p_paused ? R"(,"paused":true)" : R"(,"paused":false)";
+        }
+
     } // namespace
 
     void serialize_worker_frame(std::string& p_out, const worker_frame& p_frame) {
@@ -299,14 +311,7 @@ namespace gempba::telemetry {
     }
 
     void serialize_broadcast(std::string& p_out, const broadcast_payload& p_payload) {
-        p_out += "{\"version\":";
-        emit_u32(p_out, TELEMETRY_SCHEMA_VERSION);
-        p_out += R"(,"run_id":")";
-        p_out += p_payload.m_run_id;
-        p_out += R"(","ts":)";
-        emit_u64(p_out, p_payload.m_now_ms);
-        p_out += ",\"elapsed_seconds\":";
-        emit_u64(p_out, p_payload.m_elapsed_seconds);
+        emit_broadcast_header(p_out, p_payload, p_payload.m_paused);
 
         p_out += ",\"topology\":";
         if (p_payload.m_topology) {
@@ -332,6 +337,11 @@ namespace gempba::telemetry {
             }
         }
         p_out += "]}";
+    }
+
+    void serialize_paused_broadcast(std::string& p_out, const broadcast_payload& p_payload) {
+        emit_broadcast_header(p_out, p_payload, true);
+        p_out += '}';
     }
 
 } // namespace gempba::telemetry

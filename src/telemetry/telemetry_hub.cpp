@@ -266,22 +266,7 @@ namespace gempba::telemetry {
 
         const std::uint64_t v_start_us = monotonic_us();
         const std::uint64_t v_now = v_start_us / 1000;
-        const std::uint32_t v_worker_interval = m_worker_interval_ms.load(std::memory_order_relaxed);
         bool v_moved_frames = false;
-
-        if (v_now - m_last_worker_emit_ms.load(std::memory_order_relaxed) >= v_worker_interval) {
-            m_seq_no.fetch_add(1, std::memory_order_relaxed);
-            worker_frame v_frame{};
-            snapshot_worker_frame(v_frame);
-            m_transport->publish_worker(v_frame);
-            if (m_is_sentinel.load(std::memory_order_relaxed)) {
-                node_frame v_node_frame{};
-                snapshot_node_frame(v_node_frame);
-                m_transport->publish_node(v_node_frame);
-            }
-            m_last_worker_emit_ms.store(v_now, std::memory_order_relaxed);
-            v_moved_frames = true;
-        }
 
         while (auto v_ctrl = m_transport->try_recv_control()) {
             switch (v_ctrl->m_kind) {
@@ -293,7 +278,28 @@ namespace gempba::telemetry {
                 case control_kind::BE_NODE_SENTINEL:
                     m_is_sentinel.store(true, std::memory_order_relaxed);
                     break;
+                case control_kind::PAUSE:
+                    m_paused.store(true, std::memory_order_relaxed);
+                    break;
+                case control_kind::RESUME:
+                    m_paused.store(false, std::memory_order_relaxed);
+                    break;
             }
+        }
+
+        const std::uint32_t v_worker_interval = m_worker_interval_ms.load(std::memory_order_relaxed);
+        if (!paused() && v_now - m_last_worker_emit_ms.load(std::memory_order_relaxed) >= v_worker_interval) {
+            m_seq_no.fetch_add(1, std::memory_order_relaxed);
+            worker_frame v_frame{};
+            snapshot_worker_frame(v_frame);
+            m_transport->publish_worker(v_frame);
+            if (m_is_sentinel.load(std::memory_order_relaxed)) {
+                node_frame v_node_frame{};
+                snapshot_node_frame(v_node_frame);
+                m_transport->publish_node(v_node_frame);
+            }
+            m_last_worker_emit_ms.store(v_now, std::memory_order_relaxed);
+            v_moved_frames = true;
         }
 
         std::vector<control_msg> v_pending;
@@ -309,7 +315,7 @@ namespace gempba::telemetry {
             }
         }
 
-        if (m_aggregator && drain_inbound_frames()) {
+        if (m_aggregator && !paused() && drain_inbound_frames()) {
             v_moved_frames = true;
         }
 
@@ -500,18 +506,31 @@ namespace gempba::telemetry {
 
     std::uint32_t telemetry_hub::worker_interval_ms() const noexcept { return m_worker_interval_ms.load(std::memory_order_relaxed); }
 
+    bool telemetry_hub::paused() const noexcept { return m_paused.load(std::memory_order_relaxed); }
+
     void telemetry_hub::apply_control_from_client(const control_kind p_kind, const std::uint32_t p_value) noexcept {
         constexpr std::uint32_t k_min_interval_ms = 50;
         constexpr std::uint32_t k_max_interval_ms = 600'000;
 
-        if (p_kind != control_kind::SET_WORKER_INTERVAL_MS) {
-            return;
+        control_msg v_msg{TELEMETRY_SCHEMA_VERSION, p_kind, 0};
+        switch (p_kind) {
+            case control_kind::SET_WORKER_INTERVAL_MS:
+                v_msg.m_value = std::clamp(p_value, k_min_interval_ms, k_max_interval_ms);
+                m_worker_interval_ms.store(v_msg.m_value, std::memory_order_relaxed);
+                break;
+            case control_kind::PAUSE:
+                m_paused.store(true, std::memory_order_relaxed);
+                break;
+            case control_kind::RESUME:
+                m_paused.store(false, std::memory_order_relaxed);
+                break;
+            case control_kind::UNSPECIFIED:
+            case control_kind::BE_NODE_SENTINEL:
+                return;
         }
-        const std::uint32_t v_value = std::clamp(p_value, k_min_interval_ms, k_max_interval_ms);
-        m_worker_interval_ms.store(v_value, std::memory_order_relaxed);
 
         const std::scoped_lock v_lock(m_pending_fanout_mtx);
-        m_pending_fanout.push_back(control_msg{TELEMETRY_SCHEMA_VERSION, p_kind, v_value});
+        m_pending_fanout.push_back(v_msg);
     }
 
     telemetry_hub* get() noexcept { return g_owner.get(); }

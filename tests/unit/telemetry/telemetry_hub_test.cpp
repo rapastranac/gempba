@@ -294,6 +294,73 @@ namespace {
         EXPECT_EQ(v_before.m_telemetry_microseconds_total, v_after.m_telemetry_microseconds_total);
     }
 
+    TEST_F(telemetry_hub_test, a_paused_hub_neither_publishes_nor_ingests_frames) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+        v_hub.set_worker_interval_ms(0);
+        v_hub.tick_if_due();
+        const auto v_worker = v_hub.latest_worker_frame(0);
+        const auto v_node = v_hub.latest_node_frame(0);
+        ASSERT_TRUE(v_worker.has_value());
+        ASSERT_TRUE(v_node.has_value());
+
+        v_hub.apply_control_from_client(gempba::telemetry::control_kind::PAUSE, 0);
+        EXPECT_TRUE(v_hub.paused());
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        for (int v_i = 0; v_i < 100; ++v_i) {
+            v_hub.tick_if_due();
+        }
+
+        EXPECT_EQ(v_worker->m_seq_no, v_hub.latest_worker_frame(0)->m_seq_no);
+        EXPECT_EQ(v_node->m_sentinel_local_ms, v_hub.latest_node_frame(0)->m_sentinel_local_ms);
+    }
+
+    TEST_F(telemetry_hub_test, paused_ticks_add_no_time) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+        v_hub.set_worker_interval_ms(0);
+        v_hub.apply_control_from_client(gempba::telemetry::control_kind::PAUSE, 0);
+
+        gempba::telemetry::worker_frame v_before{};
+        v_hub.snapshot_worker_frame(v_before);
+        for (int v_i = 0; v_i < 1000; ++v_i) {
+            v_hub.tick_if_due();
+        }
+        gempba::telemetry::worker_frame v_after{};
+        v_hub.snapshot_worker_frame(v_after);
+
+        EXPECT_EQ(v_before.m_telemetry_microseconds_total, v_after.m_telemetry_microseconds_total);
+    }
+
+    TEST_F(telemetry_hub_test, resume_publishes_at_the_earlier_interval_with_what_was_counted_while_paused) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+        v_hub.set_worker_interval_ms(0);
+        v_hub.tick_if_due();
+        v_hub.apply_control_from_client(gempba::telemetry::control_kind::SET_WORKER_INTERVAL_MS, 50);
+
+        v_hub.apply_control_from_client(gempba::telemetry::control_kind::PAUSE, 0);
+        for (int v_i = 0; v_i < 5; ++v_i) {
+            v_hub.record_task_local();
+            v_hub.record_send(0, 64);
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(60));
+        for (int v_i = 0; v_i < 10; ++v_i) {
+            v_hub.tick_if_due();
+        }
+        EXPECT_EQ(0u, v_hub.latest_worker_frame(0)->m_tasks_started_total);
+
+        v_hub.apply_control_from_client(gempba::telemetry::control_kind::RESUME, 0);
+        EXPECT_FALSE(v_hub.paused());
+        EXPECT_EQ(50u, v_hub.worker_interval_ms());
+        v_hub.tick_if_due();
+
+        const auto v_frame = v_hub.latest_worker_frame(0);
+        EXPECT_EQ(5u, v_frame->m_tasks_started_total);
+        EXPECT_EQ(5u, v_frame->m_tasks_sent_total);
+        EXPECT_EQ(320u, v_frame->m_bytes_sent_total);
+    }
+
     TEST_F(telemetry_hub_test, worker_scheduler_times_fit_in_the_run_and_stop_at_its_end) {
         using clock = std::chrono::steady_clock;
         gempba::telemetry::telemetry_hub v_hub;
