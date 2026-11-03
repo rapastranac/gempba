@@ -8,6 +8,7 @@
 #include <cctype>
 #include <charconv>
 #include <chrono>
+#include <condition_variable>
 #include <cstring>
 #include <limits>
 #include <mutex>
@@ -94,7 +95,10 @@ namespace gempba::telemetry {
         }
 #endif
 
-        constexpr std::chrono::milliseconds k_broadcast_interval{500};
+        constexpr std::chrono::milliseconds k_min_broadcast_interval{50};
+        constexpr std::chrono::milliseconds k_control_poll_interval{500};
+
+        std::chrono::milliseconds broadcast_interval(const telemetry_hub& p_hub) { return std::max(std::chrono::milliseconds(p_hub.worker_interval_ms()), k_min_broadcast_interval); }
 
         constexpr std::size_t k_inbox_cap = 4096;
 
@@ -231,6 +235,8 @@ namespace gempba::telemetry {
         std::atomic<bool> m_running{false};
         std::thread m_accept_thread;
         std::thread m_broadcast_thread;
+        std::mutex m_wake_mtx;
+        std::condition_variable m_wake_cv;
 
         std::mutex m_clients_mtx;
         std::vector<client_state> m_clients;
@@ -349,12 +355,17 @@ namespace gempba::telemetry {
                 return true;
             };
 
-            while (v_impl_ptr->m_running.load(std::memory_order_acquire)) {
-                std::this_thread::sleep_for(k_broadcast_interval);
-                if (!v_impl_ptr->m_running.load(std::memory_order_acquire))
+            const auto v_stopped = [v_impl_ptr] { return !v_impl_ptr->m_running.load(std::memory_order_acquire); };
+            auto v_last_broadcast = std::chrono::steady_clock::now();
+            while (!v_stopped()) {
+                {
+                    const auto v_due = v_last_broadcast + broadcast_interval(*v_impl_ptr->m_hub);
+                    std::unique_lock v_wake_lock(v_impl_ptr->m_wake_mtx);
+                    v_impl_ptr->m_wake_cv.wait_until(v_wake_lock, std::min(v_due, std::chrono::steady_clock::now() + k_control_poll_interval), v_stopped);
+                }
+                if (v_stopped()) {
                     break;
-
-                const std::string v_line = build_broadcast_line(*v_impl_ptr->m_hub);
+                }
 
                 std::vector<socket_t> v_dead;
                 {
@@ -362,12 +373,24 @@ namespace gempba::telemetry {
                     for (auto& v_cs: v_impl_ptr->m_clients) {
                         if (!v_drain_inbound(v_cs)) {
                             v_dead.push_back(v_cs.m_sock);
-                            continue;
                         }
-                        if (!send_all(v_cs.m_sock, v_line.data(), v_line.size())) {
+                    }
+                }
+
+                if (std::chrono::steady_clock::now() >= v_last_broadcast + broadcast_interval(*v_impl_ptr->m_hub)) {
+                    v_last_broadcast = std::chrono::steady_clock::now();
+                    const std::string v_line = build_broadcast_line(*v_impl_ptr->m_hub);
+                    const std::scoped_lock v_lock(v_impl_ptr->m_clients_mtx);
+                    for (const auto& v_cs: v_impl_ptr->m_clients) {
+                        const bool v_already_dead = std::find(v_dead.begin(), v_dead.end(), v_cs.m_sock) != v_dead.end();
+                        if (!v_already_dead && !send_all(v_cs.m_sock, v_line.data(), v_line.size())) {
                             v_dead.push_back(v_cs.m_sock);
                         }
                     }
+                }
+
+                {
+                    const std::scoped_lock v_lock(v_impl_ptr->m_clients_mtx);
                     if (!v_dead.empty()) {
                         v_impl_ptr->m_clients.erase(std::remove_if(v_impl_ptr->m_clients.begin(), v_impl_ptr->m_clients.end(),
                                                                    [&](const client_state& p_cs) { return std::find(v_dead.begin(), v_dead.end(), p_cs.m_sock) != v_dead.end(); }),
@@ -394,6 +417,10 @@ namespace gempba::telemetry {
             }
             return;
         }
+        {
+            const std::scoped_lock v_lock(m_impl->m_wake_mtx);
+        }
+        m_impl->m_wake_cv.notify_all();
 
         if (m_impl->m_listen_sock != k_invalid_socket) {
             // shutdown() before close() so the accept thread, blocked in
