@@ -420,7 +420,7 @@ namespace {
                 << v_line;
     }
 
-    TEST_F(tcp_server_test, malformed_or_over_limit_markers_are_dropped) {
+    TEST_F(tcp_server_test, client_marker_labels_decode_every_json_escape) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
 
@@ -429,9 +429,33 @@ namespace {
         const socket_t v_client = connect_loopback(v_server.bound_port());
         ASSERT_NE(k_invalid, v_client);
 
+        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"mark\",\"label\":\"\\b\\f\\n\\r\\t \\u0041 \\u20ac\"}\n"));
+        EXPECT_TRUE(wait_for([&] { return !v_hub.run_markers().empty(); }, std::chrono::milliseconds(2000)));
+        close_sock(v_client);
+        v_server.stop();
+
+        const auto v_markers = v_hub.run_markers();
+        ASSERT_EQ(1u, v_markers.size());
+        EXPECT_EQ("\b\f\n\r\t A \xE2\x82\xAC", v_markers[0].m_label);
+    }
+
+    TEST_F(tcp_server_test, malformed_or_over_limit_markers_are_dropped) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+        v_hub.set_worker_interval_ms(500);
+
+        gempba::telemetry::center_tcp_server v_server(0, v_hub);
+        ASSERT_TRUE(v_server.start());
+        const socket_t v_client = connect_loopback(v_server.bound_port());
+        ASSERT_NE(k_invalid, v_client);
+
+        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"set_worker_interval_ms\",\"value\":99999999999}\n"));
+        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"set_worker_interval_ms\",\"value\":\"fast\"}\n"));
         ASSERT_TRUE(send_all(v_client, "{\"kind\":\"mark\"}\n"));
         ASSERT_TRUE(send_all(v_client, "{\"kind\":\"mark\",\"label\":\"bad \\x escape\"}\n"));
         ASSERT_TRUE(send_all(v_client, "{\"kind\":\"mark\",\"label\":\"lone \\ud83d surrogate\"}\n"));
+        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"mark\",\"label\":\"bad \\uZZZZ hex\"}\n"));
+        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"mark\",\"label\":\"cut \\u12\n"));
         ASSERT_TRUE(send_all(v_client, "{\"kind\":\"mark\",\"label\":\"unterminated}\n"));
         ASSERT_TRUE(send_all(v_client, "{\"kind\":\"mark\",\"label\":\"" + std::string(gempba::telemetry::MAX_RUN_MARKER_LABEL_BYTES + 1, 'x') + "\"}\n"));
         ASSERT_TRUE(send_all(v_client, "{\"kind\":\"mark\",\"label\":\"ok\"}\n"));
@@ -443,6 +467,7 @@ namespace {
         const auto v_markers = v_hub.run_markers();
         ASSERT_EQ(1u, v_markers.size());
         EXPECT_EQ("ok", v_markers[0].m_label);
+        EXPECT_EQ(500u, v_hub.worker_interval_ms());
     }
 
     std::vector<std::chrono::steady_clock::time_point> line_arrivals(socket_t p_s, const std::size_t p_count, std::chrono::milliseconds p_timeout) {
