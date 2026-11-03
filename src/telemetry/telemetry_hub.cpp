@@ -269,19 +269,13 @@ namespace gempba::telemetry {
             worker_frame v_frame{};
             snapshot_worker_frame(v_frame);
             m_transport->publish_worker(v_frame);
-            m_last_worker_emit_ms.store(v_now, std::memory_order_relaxed);
-            v_moved_frames = true;
-        }
-
-        if (m_is_sentinel.load(std::memory_order_relaxed)) {
-            const std::uint32_t v_node_interval = m_node_interval_ms.load(std::memory_order_relaxed);
-            if (v_now - m_last_node_emit_ms.load(std::memory_order_relaxed) >= v_node_interval) {
+            if (m_is_sentinel.load(std::memory_order_relaxed)) {
                 node_frame v_node_frame{};
                 snapshot_node_frame(v_node_frame);
                 m_transport->publish_node(v_node_frame);
-                m_last_node_emit_ms.store(v_now, std::memory_order_relaxed);
-                v_moved_frames = true;
             }
+            m_last_worker_emit_ms.store(v_now, std::memory_order_relaxed);
+            v_moved_frames = true;
         }
 
         while (auto v_ctrl = m_transport->try_recv_control()) {
@@ -290,9 +284,6 @@ namespace gempba::telemetry {
                     break;
                 case control_kind::SET_WORKER_INTERVAL_MS:
                     m_worker_interval_ms.store(v_ctrl->m_value, std::memory_order_relaxed);
-                    break;
-                case control_kind::SET_NODE_INTERVAL_MS:
-                    m_node_interval_ms.store(v_ctrl->m_value, std::memory_order_relaxed);
                     break;
                 case control_kind::BE_NODE_SENTINEL:
                     m_is_sentinel.store(true, std::memory_order_relaxed);
@@ -497,33 +488,19 @@ namespace gempba::telemetry {
 
     void telemetry_hub::set_worker_interval_ms(const std::uint32_t p_interval_ms) noexcept { m_worker_interval_ms.store(p_interval_ms, std::memory_order_relaxed); }
 
-    void telemetry_hub::set_node_interval_ms(const std::uint32_t p_interval_ms) noexcept { m_node_interval_ms.store(p_interval_ms, std::memory_order_relaxed); }
-
     void telemetry_hub::mark_as_node_sentinel() noexcept { m_is_sentinel.store(true, std::memory_order_relaxed); }
 
     std::uint32_t telemetry_hub::worker_interval_ms() const noexcept { return m_worker_interval_ms.load(std::memory_order_relaxed); }
-
-    std::uint32_t telemetry_hub::node_interval_ms() const noexcept { return m_node_interval_ms.load(std::memory_order_relaxed); }
 
     void telemetry_hub::apply_control_from_client(const control_kind p_kind, const std::uint32_t p_value) noexcept {
         constexpr std::uint32_t k_min_interval_ms = 50;
         constexpr std::uint32_t k_max_interval_ms = 600'000;
 
-        std::uint32_t v_value = p_value;
-        switch (p_kind) {
-            case control_kind::SET_WORKER_INTERVAL_MS:
-            case control_kind::SET_NODE_INTERVAL_MS:
-                v_value = std::clamp(v_value, k_min_interval_ms, k_max_interval_ms);
-                break;
-            default:
-                return;
+        if (p_kind != control_kind::SET_WORKER_INTERVAL_MS) {
+            return;
         }
-
-        if (p_kind == control_kind::SET_WORKER_INTERVAL_MS) {
-            m_worker_interval_ms.store(v_value, std::memory_order_relaxed);
-        } else {
-            m_node_interval_ms.store(v_value, std::memory_order_relaxed);
-        }
+        const std::uint32_t v_value = std::clamp(p_value, k_min_interval_ms, k_max_interval_ms);
+        m_worker_interval_ms.store(v_value, std::memory_order_relaxed);
 
         const std::scoped_lock v_lock(m_pending_fanout_mtx);
         m_pending_fanout.push_back(control_msg{TELEMETRY_SCHEMA_VERSION, p_kind, v_value});

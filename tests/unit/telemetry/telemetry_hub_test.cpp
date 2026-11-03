@@ -256,14 +256,32 @@ namespace {
         EXPECT_GT(v_frame.m_telemetry_microseconds_total, 0u);
     }
 
+    TEST_F(telemetry_hub_test, sentinel_publishes_its_node_frame_at_the_worker_interval) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+        v_hub.set_worker_interval_ms(0);
+        v_hub.tick_if_due();
+        const auto v_first = v_hub.latest_node_frame(0);
+        ASSERT_TRUE(v_first.has_value());
+
+        v_hub.set_worker_interval_ms(600'000);
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        for (int v_i = 0; v_i < 100; ++v_i) {
+            v_hub.tick_if_due();
+        }
+        EXPECT_EQ(v_first->m_sentinel_local_ms, v_hub.latest_node_frame(0)->m_sentinel_local_ms);
+
+        v_hub.set_worker_interval_ms(0);
+        v_hub.tick_if_due();
+        EXPECT_GT(v_hub.latest_node_frame(0)->m_sentinel_local_ms, v_first->m_sentinel_local_ms);
+    }
+
     TEST_F(telemetry_hub_test, tick_if_due_with_nothing_due_adds_no_time) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 1, 2, /*p_start_pump_thread=*/false);
         v_hub.set_worker_interval_ms(0);
-        v_hub.set_node_interval_ms(0);
         v_hub.tick_if_due();
         v_hub.set_worker_interval_ms(600'000);
-        v_hub.set_node_interval_ms(600'000);
 
         gempba::telemetry::worker_frame v_before{};
         v_hub.snapshot_worker_frame(v_before);

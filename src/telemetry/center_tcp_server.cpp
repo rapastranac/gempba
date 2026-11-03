@@ -176,7 +176,8 @@ namespace gempba::telemetry {
             if (v_kind_trimmed == "set_worker_interval_ms") {
                 p_out_kind = control_kind::SET_WORKER_INTERVAL_MS;
             } else if (v_kind_trimmed == "set_node_interval_ms") {
-                p_out_kind = control_kind::SET_NODE_INTERVAL_MS;
+                // Sent by dashboards from before #367 folded the node rate into the worker rate; accepted and ignored for v4.3.0, to be removed in the next breaking release.
+                p_out_kind = control_kind::UNSPECIFIED;
             } else {
                 return false;
             }
