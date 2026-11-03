@@ -57,8 +57,10 @@
  * Runs the leaf count and checks what telemetry reports about it across ranks: each rank's own frame, totals
  * gathered to rank 0, and the center's final broadcast as a dashboard connected to its TCP port receives it.
  * Then the center pauses telemetry and resumes it, each step between barriers: the pause must reach every worker
- * and stop all frames, and after the resume the center must receive the tasks the workers counted while paused.
- * Every check compares totals or waits for a state with a generous deadline; none depends on timing.
+ * and stop all frames, a snapshot requested while paused must bring every rank's frame to the center and the
+ * dashboard, and after the resume the center must receive the tasks the workers counted while paused.
+ * Every check compares totals or waits for a state with a generous deadline; only the snapshot needs every worker,
+ * ticking every few milliseconds, to answer within the center's one-second wait.
  *
  * Usage: telemetry_stress <depth> <semi_centralized|centralized>
  */
@@ -193,10 +195,10 @@ namespace {
         return p_done();
     }
 
-    std::uint32_t own_seq_no(gempba::telemetry::telemetry_hub& p_hub) {
+    gempba::telemetry::worker_frame own_frame(gempba::telemetry::telemetry_hub& p_hub) {
         gempba::telemetry::worker_frame v_frame;
         p_hub.snapshot_worker_frame(v_frame);
-        return v_frame.m_seq_no;
+        return v_frame;
     }
 } // namespace
 
@@ -290,7 +292,7 @@ int main(const int p_argc, char* p_argv[]) {
     v_scheduler->barrier();
 
     constexpr unsigned long long k_paused_tasks = 7;
-    const std::uint32_t v_paused_seq_no = own_seq_no(v_hub);
+    const std::uint32_t v_paused_seq_no = own_frame(v_hub).m_seq_no;
     std::vector<std::uint32_t> v_ingested_seq_nos(static_cast<std::size_t>(v_world_size));
     if (v_rank == 0) {
         for (int v_r = 1; v_r < v_world_size; ++v_r) {
@@ -310,7 +312,7 @@ int main(const int p_argc, char* p_argv[]) {
         const std::scoped_lock v_lock(v_dashboard_mtx);
         return v_rank != 0 || v_dashboard_stream.find(R"("paused":true})") != std::string::npos;
     });
-    v_checks.expect(own_seq_no(v_hub) == v_paused_seq_no, "a paused rank published a frame");
+    v_checks.expect(own_frame(v_hub).m_seq_no == v_paused_seq_no, "a paused rank published a frame");
     if (v_rank == 0) {
         v_checks.expect(v_paused_window_done, "the dashboard received no paused broadcast");
         for (int v_r = 1; v_r < v_world_size; ++v_r) {
@@ -320,11 +322,40 @@ int main(const int p_argc, char* p_argv[]) {
     }
     v_scheduler->barrier();
 
+    constexpr unsigned long long k_tasks_after_snapshot = 5;
+    if (v_rank == 0) {
+        v_hub.apply_control_from_client(gempba::telemetry::control_kind::SNAPSHOT, 0);
+        const std::uint32_t v_snapshot_id = v_hub.snapshot_requested();
+        const bool v_answered = tick_until(v_hub, [&] {
+            for (std::size_t v_r = 0; std::cmp_less(v_r, v_world_size); ++v_r) {
+                const auto v_latest = v_hub.latest_worker_frame(static_cast<std::uint32_t>(v_r));
+                if (!v_latest || v_latest->m_snapshot_id != v_snapshot_id || (v_r != 0 && v_latest->m_tasks_started_total != v_all[v_r * k_fields + 6] + k_paused_tasks)) {
+                    return false;
+                }
+            }
+            return true;
+        });
+        v_checks.expect(v_snapshot_id == 1 && v_answered, "the paused center lacks a rank's snapshot frame");
+        const bool v_broadcast = tick_until(v_hub, [&] {
+            const std::scoped_lock v_lock(v_dashboard_mtx);
+            return v_dashboard_stream.find(R"("paused":true,"topology":)") != std::string::npos;
+        });
+        v_checks.expect(v_broadcast, "the dashboard received no snapshot while paused");
+        v_checks.expect(v_hub.paused(), "the snapshot ended the pause");
+    } else {
+        v_checks.expect(tick_until(v_hub, [&] { return own_frame(v_hub).m_snapshot_id != 0; }), "this worker did not answer the snapshot");
+        for (unsigned long long v_i = 0; v_i < k_tasks_after_snapshot; ++v_i) {
+            v_hub.record_task_local();
+        }
+    }
+    v_scheduler->barrier();
+
+    const std::uint32_t v_snapshot_seq_no = own_frame(v_hub).m_seq_no;
     if (v_rank == 0) {
         v_hub.apply_control_from_client(gempba::telemetry::control_kind::RESUME, 0);
         v_hub.tick_if_due();
     } else {
-        v_checks.expect(tick_until(v_hub, [&] { return !v_hub.paused() && own_seq_no(v_hub) != v_paused_seq_no; }),
+        v_checks.expect(tick_until(v_hub, [&] { return !v_hub.paused() && own_frame(v_hub).m_seq_no != v_snapshot_seq_no; }),
                         "the resume did not reach this worker, or it published no frame after it");
     }
     v_scheduler->barrier();
@@ -332,7 +363,7 @@ int main(const int p_argc, char* p_argv[]) {
         const bool v_caught_up = tick_until(v_hub, [&] {
             for (std::size_t v_r = 1; std::cmp_less(v_r, v_world_size); ++v_r) {
                 const auto v_latest = v_hub.latest_worker_frame(static_cast<std::uint32_t>(v_r));
-                if (!v_latest || v_latest->m_tasks_started_total != v_all[v_r * k_fields + 6] + k_paused_tasks) {
+                if (!v_latest || v_latest->m_tasks_started_total != v_all[v_r * k_fields + 6] + k_paused_tasks + k_tasks_after_snapshot) {
                     return false;
                 }
             }
