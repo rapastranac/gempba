@@ -540,6 +540,10 @@ namespace gempba::telemetry {
 
     std::uint32_t telemetry_hub::worker_interval_ms() const noexcept { return m_worker_interval_ms.load(std::memory_order_relaxed); }
 
+    void telemetry_hub::set_node_interval_ms(std::uint32_t) noexcept {}
+
+    std::uint32_t telemetry_hub::node_interval_ms() const noexcept { return worker_interval_ms(); }
+
     bool telemetry_hub::paused() const noexcept { return m_paused.load(std::memory_order_relaxed); }
 
     std::uint32_t telemetry_hub::snapshot_requested() const noexcept { return m_snapshot_requested.load(std::memory_order_acquire); }

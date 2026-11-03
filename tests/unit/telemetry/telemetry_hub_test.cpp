@@ -424,6 +424,20 @@ namespace {
         EXPECT_FALSE(v_hub.snapshot_outstanding());
     }
 
+    TEST_F(telemetry_hub_test, the_deprecated_node_interval_calls_follow_the_worker_interval) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.set_worker_interval_ms(250);
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+        v_hub.set_node_interval_ms(2000);
+        const std::uint32_t v_node_interval = v_hub.node_interval_ms();
+#pragma GCC diagnostic pop
+
+        EXPECT_EQ(250u, v_node_interval);
+        EXPECT_EQ(250u, v_hub.worker_interval_ms());
+    }
+
     TEST_F(telemetry_hub_test, worker_scheduler_times_fit_in_the_run_and_stop_at_its_end) {
         using clock = std::chrono::steady_clock;
         gempba::telemetry::telemetry_hub v_hub;

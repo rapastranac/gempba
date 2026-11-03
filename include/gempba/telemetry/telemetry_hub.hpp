@@ -206,11 +206,17 @@ namespace gempba::telemetry {
         /// Set the cadence at which worker frames, and each host sentinel's node frame, are emitted. Fans out to other workers.
         void set_worker_interval_ms(std::uint32_t p_interval_ms) noexcept;
 
+        /// @deprecated Does nothing: node frames follow @ref set_worker_interval_ms since v4.3.0. Removed in the next breaking release.
+        [[deprecated("node frames follow set_worker_interval_ms")]] void set_node_interval_ms(std::uint32_t p_interval_ms) noexcept;
+
         /// Promote this worker to its host's sentinel; it will start emitting node frames.
         void mark_as_node_sentinel() noexcept;
 
         /// @return The current worker-frame emission interval, in milliseconds.
         [[nodiscard]] std::uint32_t worker_interval_ms() const noexcept;
+
+        /// @deprecated Node frames follow the worker interval since v4.3.0, so this returns @ref worker_interval_ms. Removed in the next breaking release.
+        [[deprecated("node frames follow worker_interval_ms")]] [[nodiscard]] std::uint32_t node_interval_ms() const noexcept;
 
         /// @return whether a @ref control_kind::PAUSE holds; frames are neither published nor ingested until a @ref control_kind::RESUME.
         [[nodiscard]] bool paused() const noexcept;
