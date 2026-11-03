@@ -54,6 +54,20 @@ namespace gempba::telemetry {
         std::vector<worker_identity> m_identities;
     };
 
+    /** @brief Who recorded a @ref run_marker. */
+    enum class marker_source : std::uint8_t {
+        CODE,
+        DASHBOARD,
+    };
+
+    /** @brief A labelled moment of the run; see @ref telemetry_hub::mark_run. */
+    struct run_marker {
+        /// Milliseconds since telemetry came up, the clock the broadcast's @c elapsed_seconds counts.
+        std::uint64_t m_elapsed_ms = 0;
+        std::string m_label;
+        marker_source m_source = marker_source::CODE;
+    };
+
     /**
      * @brief How a run is set up, as the center describes it in each broadcast.
      *
@@ -70,6 +84,8 @@ namespace gempba::telemetry {
         std::uint32_t m_threads_per_process = 0;
         std::string m_gempba_version;
         std::vector<std::pair<std::string, std::string>> m_annotations;
+        /// The center's markers, in the order they were recorded.
+        std::vector<run_marker> m_markers;
     };
 
 } // namespace gempba::telemetry

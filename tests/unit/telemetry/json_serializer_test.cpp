@@ -238,7 +238,7 @@ namespace {
                 v_expected += R"(","load_balancer":")";
                 v_expected += v_load_balancer;
                 v_expected += R"(","runtime_mode":"multiprocessing","world_size":4,"threads_per_process":8,"gempba_version":"4.3.0",)";
-                v_expected += R"("annotations":{"problem":"vertex_cover","seed":"42"}}})";
+                v_expected += R"("annotations":{"problem":"vertex_cover","seed":"42"},"markers":[]}})";
                 EXPECT_TRUE(v_out.ends_with(v_expected)) << v_out;
             }
         }
@@ -268,7 +268,18 @@ namespace {
         gempba::telemetry::serialize_topology(v_out, two_rank_topology(), &v_run);
 
         EXPECT_NE(std::string::npos, v_out.find(R"("run":{"scheduler":null,"load_balancer":null,)")) << v_out;
-        EXPECT_NE(std::string::npos, v_out.find(R"("annotations":{"label":"a \"quoted\" run"}})")) << v_out;
+        EXPECT_NE(std::string::npos, v_out.find(R"("annotations":{"label":"a \"quoted\" run"},)")) << v_out;
+    }
+
+    TEST(json_serializer_test, topology_run_lists_the_markers_in_order_with_their_time_and_source) {
+        gempba::telemetry::run_description v_run;
+        v_run.m_markers = {{120, "setup done", gempba::telemetry::marker_source::CODE}, {4500, "phase \"2\"\n", gempba::telemetry::marker_source::DASHBOARD}};
+
+        std::string v_out;
+        gempba::telemetry::serialize_topology(v_out, two_rank_topology(), &v_run);
+
+        const std::string v_expected = R"("markers":[{"elapsed_ms":120,"label":"setup done","source":"code"},{"elapsed_ms":4500,"label":"phase \"2\"\n","source":"dashboard"}]}})";
+        EXPECT_TRUE(v_out.ends_with(v_expected)) << v_out;
     }
 
     TEST(json_serializer_test, topology_without_a_run_has_no_run_or_roles) {

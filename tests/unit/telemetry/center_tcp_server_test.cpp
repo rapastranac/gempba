@@ -389,6 +389,62 @@ namespace {
         EXPECT_NE(std::string::npos, v_last.find("\"tasks_started_total\":5")) << v_last;
     }
 
+    TEST_F(tcp_server_test, client_markers_are_unescaped_recorded_from_the_dashboard_and_broadcast) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+        v_hub.set_worker_interval_ms(50);
+
+        gempba::telemetry::center_tcp_server v_server(0, v_hub);
+        ASSERT_TRUE(v_server.start());
+        const socket_t v_client = connect_loopback(v_server.bound_port());
+        ASSERT_NE(k_invalid, v_client);
+        set_recv_timeout(v_client, 100);
+
+        ASSERT_TRUE(send_all(v_client, R"({"kind":"mark","label":"phase \"2\" \u00e9 \ud83d\ude80 \/\\"})"
+                                       "\n"));
+        ASSERT_TRUE(wait_for([&] { return v_hub.run_markers().size() == 1; }, std::chrono::milliseconds(2000)));
+        std::string v_line;
+        const auto v_deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(2000);
+        while (v_line.find(R"("source":"dashboard")") == std::string::npos && std::chrono::steady_clock::now() < v_deadline) {
+            v_line = read_one_line(v_client, std::chrono::milliseconds(500));
+        }
+        close_sock(v_client);
+        v_server.stop();
+
+        const auto v_marker = v_hub.run_markers().front();
+        EXPECT_EQ("phase \"2\" \xC3\xA9 \xF0\x9F\x9A\x80 /\\", v_marker.m_label);
+        EXPECT_EQ(gempba::telemetry::marker_source::DASHBOARD, v_marker.m_source);
+        EXPECT_NE(std::string::npos, v_line.find(R"(,"label":"phase \"2\" )"
+                                                 "\xC3\xA9 \xF0\x9F\x9A\x80"
+                                                 R"( /\\","source":"dashboard"}])"))
+                << v_line;
+    }
+
+    TEST_F(tcp_server_test, malformed_or_over_limit_markers_are_dropped) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+
+        gempba::telemetry::center_tcp_server v_server(0, v_hub);
+        ASSERT_TRUE(v_server.start());
+        const socket_t v_client = connect_loopback(v_server.bound_port());
+        ASSERT_NE(k_invalid, v_client);
+
+        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"mark\"}\n"));
+        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"mark\",\"label\":\"bad \\x escape\"}\n"));
+        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"mark\",\"label\":\"lone \\ud83d surrogate\"}\n"));
+        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"mark\",\"label\":\"unterminated}\n"));
+        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"mark\",\"label\":\"" + std::string(gempba::telemetry::MAX_RUN_MARKER_LABEL_BYTES + 1, 'x') + "\"}\n"));
+        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"mark\",\"label\":\"ok\"}\n"));
+
+        EXPECT_TRUE(wait_for([&] { return !v_hub.run_markers().empty(); }, std::chrono::milliseconds(2000)));
+        close_sock(v_client);
+        v_server.stop();
+
+        const auto v_markers = v_hub.run_markers();
+        ASSERT_EQ(1u, v_markers.size());
+        EXPECT_EQ("ok", v_markers[0].m_label);
+    }
+
     std::vector<std::chrono::steady_clock::time_point> line_arrivals(socket_t p_s, const std::size_t p_count, std::chrono::milliseconds p_timeout) {
         const auto v_deadline = std::chrono::steady_clock::now() + p_timeout;
         std::vector<std::chrono::steady_clock::time_point> v_arrivals;
