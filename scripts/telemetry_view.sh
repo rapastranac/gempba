@@ -1,29 +1,22 @@
 #!/usr/bin/env bash
-# Live-tails the GemPBA telemetry stream from a running benchmark.
+# Live-tails the GemPBA telemetry stream of a run on this machine.
 #
-# Connects to the center's TCP socket on 127.0.0.1 and prints one formatted
-# line per broadcast frame: timestamp, elapsed, tasks_started_total,
-# tasks_sent_total, process threads, CPU%, and process RSS (KB).
+# Connects to the center's TCP socket on 127.0.0.1 and prints, for each
+# broadcast, one row per rank: its role, tasks started, sent and received,
+# thread count, CPU% and RSS (KB). A paused stream prints a "paused" row per
+# broadcast, and each run marker is printed once, when it first appears.
 # Press Ctrl+C to stop.
 #
-# The gempba center always binds loopback only -- the connection target is
-# therefore always 127.0.0.1, either directly when running on the same host
-# or as the local end of an SSH tunnel for remote dashboards. Pass --port to
-# match whatever port the gempba binary was launched with (-telemetry_port).
+# The gempba center binds loopback only, so the viewer connects to
+# 127.0.0.1. Pass --port to match the port the program set with
+# gempba::telemetry::configure_port (default 9000). To watch a run on another
+# machine, use the GemPBA Dashboard, which opens the SSH tunnel itself.
 #
-# The gempba binary must be built with -DGEMPBA_TELEMETRY=ON.
-#
-# Dependencies: bash 4+ (for /dev/tcp), jq, GNU date (Linux default).
+# Dependencies: bash 4+ (for /dev/tcp) and jq 1.6+.
 #
 # Usage:
-#   scripts/telemetry_view.sh                       # 127.0.0.1:9000, formatted summary
+#   scripts/telemetry_view.sh                       # 127.0.0.1:9000, one row per rank
 #   scripts/telemetry_view.sh --port 9100 --raw     # non-default port, pretty-printed JSON
-#
-# Remote (SSH tunnel) example:
-#   # In one shell:
-#   ssh -J user@login.cluster.edu -L 9000:127.0.0.1:9000 user@compute-12
-#   # In a second shell:
-#   scripts/telemetry_view.sh
 
 set -u
 set -o pipefail
@@ -36,8 +29,8 @@ usage() {
 Usage: $(basename "$0") [-p|--port <port>] [-r|--raw] [-h|--help]
 
   -p, --port <port>   TCP port to connect to on 127.0.0.1 (default: 9000).
-  -r, --raw           Print full pretty-printed JSON for each frame instead of
-                      the formatted one-line summary.
+  -r, --raw           Print full pretty-printed JSON for each broadcast instead
+                      of one row per rank.
   -h, --help          Show this help.
 EOF
 }
@@ -67,22 +60,21 @@ done
 IP=127.0.0.1
 
 if ! command -v jq >/dev/null 2>&1; then
-    echo "ERROR: jq is required. Install via your package manager (e.g. apt install jq, dnf install jq)." >&2
+    echo "ERROR: jq is required. Install via your package manager (e.g. apt install jq, dnf install jq, brew install jq)." >&2
     exit 1
 fi
 
 # Open the TCP connection on fd 3 (bash built-in; no nc needed).
-if ! exec 3<>"/dev/tcp/$IP/$PORT" 2>/dev/null; then
+if ! { exec 3<>"/dev/tcp/$IP/$PORT"; } 2>/dev/null; then
     echo "ERROR: cannot connect to $IP:$PORT" >&2
-    echo "  - Is the benchmark running and the SSH tunnel (if any) still up?" >&2
-    echo "  - Was the benchmark built with -DGEMPBA_TELEMETRY=ON ?" >&2
-    echo "  - If the benchmark was launched with -telemetry_port <n>, pass --port <n> here too." >&2
+    echo "  - Is the gempba program running on this machine?" >&2
+    echo "  - If it set another port with gempba::telemetry::configure_port, pass --port <n> here too." >&2
     exit 1
 fi
 
 trap 'exec 3<&- 2>/dev/null; exec 3>&- 2>/dev/null' EXIT INT TERM
 
-echo "Connected to $IP:$PORT - streaming frames (Ctrl+C to stop)"
+echo "Connected to $IP:$PORT - streaming broadcasts (Ctrl+C to stop)"
 
 if [ "$RAW" -eq 1 ]; then
     while IFS= read -r line <&3; do
@@ -93,47 +85,76 @@ if [ "$RAW" -eq 1 ]; then
     exit 0
 fi
 
-echo
-printf '%8s  %10s  %-14s  %-14s  %7s  %7s  %12s\n' \
-    "time" "elapsed" "tasks_started" "tasks_remote" "threads" "cpu%" "rss(KB)"
-printf -- '-%.0s' $(seq 1 95); printf '\n'
+# One broadcast in, tab-separated records out: S (run id and marker count),
+# M (a marker not printed yet), P (a paused line) and R (one rank's row).
+# $run and $seen say which markers this run has printed already.
+SUMMARY=$(cat <<'JQ'
+def pad2: tostring | if length < 2 then "0" + . else . end;
+def clock: . / 1000 | floor | strflocaltime("%H:%M:%S");
+def hms: floor as $s | "\($s / 3600 | floor):\($s % 3600 / 60 | floor | pad2):\($s % 60 | pad2)";
+(.ts // 0 | clock) as $time
+| (.elapsed_seconds // 0 | hms) as $elapsed
+| if .paused == true and .workers == null then
+    ["P", $time, $elapsed] | @tsv
+  else
+    ((.topology.identities // []) | map({key: (.worker_id | tostring), value: (.role // "-")}) | from_entries) as $roles
+    | (.topology.run.markers // []) as $markers
+    | (if (.run_id // "") == $run then $seen else 0 end) as $from
+    | (["S", (.run_id // ""), ($markers | length)] | @tsv),
+      ($markers[$from:][] | ["M", .elapsed_ms, .label, .source] | @tsv),
+      ((.workers // []) | sort_by(.worker_id)[]
+        | ["R", $time, $elapsed, .worker_id, ($roles[.worker_id | tostring] // "-"), .tasks_started_total, .tasks_sent_total,
+           .tasks_recv_total, .process_threads, .process_cpu_pct, ((.process_rss_bytes // 0) / 1024 | floor)] | @tsv)
+  end
+JQ
+)
 
+ms_to_hms() {
+    local ms=$1 s
+    s=$(( ms / 1000 ))
+    printf '%d:%02d:%02d.%03d' $(( s / 3600 )) $(( s % 3600 / 60 )) $(( s % 60 )) $(( ms % 1000 ))
+}
+
+print_header() {
+    printf '%8s  %12s  %4s  %-6s  %13s  %10s  %10s  %7s  %6s  %10s\n' "$@"
+}
+
+print_row() {
+    printf '%8s  %12s  %4s  %-6s  %13s  %10s  %10s  %7s  %5.1f%%  %10s\n' "$@"
+}
+
+echo
+print_header "time" "elapsed" "rank" "role" "tasks_started" "tasks_sent" "tasks_recv" "threads" "cpu%" "rss(KB)"
+printf -- '-%.0s' $(seq 1 104); printf '\n'
+
+RUN_ID=""
+SEEN=0
 while IFS= read -r line <&3; do
     [ -z "${line//[[:space:]]/}" ] && continue
-
-    # Extract fields; emit "SKIP" when no worker frames yet (center just
-    # started, aggregator hasn't produced its first publish).
-    row=$(printf '%s' "$line" | jq -r '
-        if (.workers // [] | length) == 0 then
-            "SKIP"
-        else
-            .workers[0] as $w |
-            [
-                (.ts // 0),
-                (.elapsed_seconds // 0),
-                ($w.tasks_started_total // 0),
-                ($w.tasks_sent_total // 0),
-                ($w.process_threads // 0),
-                ($w.process_cpu_pct // 0),
-                ($w.process_rss_bytes // 0)
-            ] | @tsv
-        end
-    ' 2>/dev/null) || continue
-    [ "$row" = "SKIP" ] && continue
-
-    IFS=$'\t' read -r ts_ms elapsed_s tasks_started tasks_remote threads cpu_pct rss_bytes <<<"$row"
-
-    ts_sec=$(( ${ts_ms%.*} / 1000 ))
-    ts=$(date -d "@$ts_sec" +'%H:%M:%S' 2>/dev/null || echo '??:??:??')
-
-    elapsed_int=${elapsed_s%.*}
-    h=$(( elapsed_int / 3600 ))
-    m=$(( (elapsed_int % 3600) / 60 ))
-    s=$(( elapsed_int % 60 ))
-    elapsed_fmt=$(printf '%d:%02d:%02d' "$h" "$m" "$s")
-
-    rss_kb=$(awk -v b="$rss_bytes" 'BEGIN { printf "%d", b/1024 }')
-
-    printf '%8s  %10s  %-14s  %-14s  %7s  %6.1f%%  %12d\n' \
-        "$ts" "$elapsed_fmt" "$tasks_started" "$tasks_remote" "$threads" "$cpu_pct" "$rss_kb"
+    records=$(printf '%s' "$line" | jq -r --arg run "$RUN_ID" --argjson seen "$SEEN" "$SUMMARY" 2>/dev/null) || continue
+    # A native Windows jq ends its lines with CRLF.
+    records=${records//$'\r'/}
+    first=1
+    while IFS=$'\t' read -r kind a b c d e f g h i j; do
+        case "$kind" in
+            S)
+                RUN_ID=$a
+                SEEN=$b
+                ;;
+            M)
+                printf '%8s  %12s  marker: %s (%s)\n' "" "$(ms_to_hms "$a")" "$b" "$c"
+                ;;
+            P)
+                printf '%8s  %12s  paused\n' "$a" "$b"
+                ;;
+            R)
+                if [ "$first" -eq 1 ]; then
+                    first=0
+                else
+                    a=""; b=""
+                fi
+                print_row "$a" "$b" "$c" "$d" "$e" "$f" "$g" "$h" "$i" "$j"
+                ;;
+        esac
+    done <<<"$records"
 done
