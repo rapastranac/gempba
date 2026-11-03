@@ -138,17 +138,19 @@ namespace gempba::telemetry {
         // Sparse: only non-zero entries are emitted.
         p_out += ",\"edges_out\":[";
         bool v_first = true;
-        for (std::uint32_t v_i = 0; v_i < MAX_WORKERS; ++v_i) {
-            if (p_frame.m_edges_out[v_i].m_count == 0)
+        for (const edge_counter& v_edge: p_frame.m_edges_out) {
+            if (v_edge.m_count == 0) {
                 continue;
-            if (!v_first)
+            }
+            if (!v_first) {
                 p_out += ',';
+            }
             p_out += "{\"to\":";
-            emit_u32(p_out, v_i);
+            emit_u32(p_out, v_edge.m_dst_worker_id);
             p_out += ",\"bytes\":";
-            emit_u64(p_out, p_frame.m_edges_out[v_i].m_bytes);
+            emit_u64(p_out, v_edge.m_bytes);
             p_out += ",\"count\":";
-            emit_u64(p_out, p_frame.m_edges_out[v_i].m_count);
+            emit_u64(p_out, v_edge.m_count);
             p_out += '}';
             v_first = false;
         }

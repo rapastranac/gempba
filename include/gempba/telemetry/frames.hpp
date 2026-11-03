@@ -2,10 +2,11 @@
 #define GEMPBA_TELEMETRY_FRAMES_HPP
 
 #include <cstdint>
+#include <vector>
 
 namespace gempba::telemetry {
 
-    /** @brief Hard upper bound on worker_id values; sizes the worker-fanout arrays. */
+    /** @brief Hard upper bound on worker_id values in the local transport and the center's assignment table; edges are not capped. */
     inline constexpr unsigned MAX_WORKERS = 1024;
     /** @brief Hard upper bound on per-host socket count; sizes node_frame::m_sockets. */
     inline constexpr unsigned MAX_SOCKETS = 8;
@@ -42,19 +43,19 @@ namespace gempba::telemetry {
         std::uint64_t m_allowed_cpu_mask[CPU_MASK_WORDS];
     };
 
-    /** @brief One outbound edge in @ref worker_frame::m_edges_out. */
+    /** @brief Traffic to one destination in @ref worker_frame::m_edges_out. */
     struct edge_counter {
+        std::uint32_t m_dst_worker_id;
         std::uint64_t m_bytes;
         std::uint64_t m_count;
     };
 
     /**
-     * @brief Periodic per-worker telemetry sample.
+     * @brief The fixed-size part of a @ref worker_frame; it travels over MPI as one block ahead of the edges.
      *
-     * Emitted on the worker-interval cadence. Counters are cumulative since
-     * worker startup; consumers compute deltas if they want rate-of-change.
+     * Counters are cumulative since worker startup; consumers compute deltas if they want rate-of-change.
      */
-    struct worker_frame {
+    struct worker_frame_header {
         std::uint16_t m_version;
         std::uint32_t m_worker_id;
         std::uint32_t m_seq_no;
@@ -70,7 +71,7 @@ namespace gempba::telemetry {
         std::uint64_t m_tasks_sent_total;
         /** @brief Tasks received from a remote worker. */
         std::uint64_t m_tasks_recv_total;
-        /** @brief Bytes of the tasks sent; the sum of @ref m_edges_out bytes while every destination is below @ref MAX_WORKERS. */
+        /** @brief Bytes of the tasks sent; the sum of @ref worker_frame::m_edges_out bytes. */
         std::uint64_t m_bytes_sent_total;
         /** @brief Bytes of the tasks received. */
         std::uint64_t m_bytes_recv_total;
@@ -143,9 +144,16 @@ namespace gempba::telemetry {
         float m_process_cpu_pct;
         std::uint64_t m_process_rss_bytes;
         std::uint32_t m_process_threads;
+    };
 
-        /** @brief Per-destination outbound traffic. Index = destination worker_id. */
-        edge_counter m_edges_out[MAX_WORKERS];
+    /**
+     * @brief Periodic per-worker telemetry sample, emitted on the worker-interval cadence.
+     *
+     * Its size follows the destinations the worker actually sent tasks to, not the size of the run.
+     */
+    struct worker_frame : worker_frame_header {
+        /** @brief One entry per destination this worker sent tasks to, in ascending @c m_dst_worker_id; others are absent. */
+        std::vector<edge_counter> m_edges_out;
     };
 
     /** @brief Per-socket CPU + memory stats inside @ref node_frame::m_sockets. */

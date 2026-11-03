@@ -114,10 +114,7 @@ namespace {
 
     TEST(json_serializer_test, worker_frame_emits_only_non_zero_edges) {
         gempba::telemetry::worker_frame v_f{};
-        v_f.m_edges_out[2].m_bytes = 100;
-        v_f.m_edges_out[2].m_count = 5;
-        v_f.m_edges_out[7].m_bytes = 0;
-        v_f.m_edges_out[7].m_count = 0;
+        v_f.m_edges_out = {{2, 100, 5}, {7, 0, 0}};
 
         std::string v_out;
         gempba::telemetry::serialize_worker_frame(v_out, v_f);
