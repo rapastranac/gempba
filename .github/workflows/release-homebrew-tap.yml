@@ -124,7 +124,7 @@ jobs:
 
   verify-macos:
     needs: render
-    runs-on: ${{ fromJSON(vars.RUNNER_MACOS || '["macos-26"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_MACOS_INTEL || '["macos-26-intel"]') }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
