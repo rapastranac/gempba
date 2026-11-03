@@ -27,6 +27,10 @@ namespace gempba::telemetry {
     inline constexpr std::size_t MAX_RUN_ANNOTATION_KEY_BYTES = 32;
     /** @brief Longest annotation value, in bytes. */
     inline constexpr std::size_t MAX_RUN_ANNOTATION_VALUE_BYTES = 64;
+    /** @brief Most markers one run keeps; see @ref telemetry_hub::mark_run. */
+    inline constexpr std::size_t MAX_RUN_MARKERS = 32;
+    /** @brief Longest marker label, in bytes. */
+    inline constexpr std::size_t MAX_RUN_MARKER_LABEL_BYTES = 64;
 
     class process_probe;
     class node_probe;
@@ -175,6 +179,21 @@ namespace gempba::telemetry {
         /// @return this run's annotations, in the order their keys were first set.
         [[nodiscard]] std::vector<std::pair<std::string, std::string>> run_annotations() const;
 
+        /**
+         * @brief Record that @p p_label happened now, e.g. "phase 2 started", stamped in milliseconds since telemetry came up.
+         *
+         * Only the center keeps markers, and it broadcasts them with the run setup; on any other rank, before
+         * @ref on_runtime_ready or after @ref shutdown, the call does nothing.
+         * Keeps up to @ref MAX_RUN_MARKERS markers with labels of 1 to @ref MAX_RUN_MARKER_LABEL_BYTES bytes; a marker over a
+         * limit is dropped with a warning, never truncated.
+         *
+         * @return whether the marker was kept
+         */
+        bool mark_run(std::string_view p_label, marker_source p_source = marker_source::CODE);
+
+        /// @return this run's markers, in the order they were recorded.
+        [[nodiscard]] std::vector<run_marker> run_markers() const;
+
         /// Record the scheduler this run uses, by its scheduler::get_name().
         void describe_scheduler(std::string_view p_name);
 
@@ -236,6 +255,7 @@ namespace gempba::telemetry {
 
         mutable std::mutex m_run_mtx;
         std::vector<std::pair<std::string, std::string>> m_run_annotations;
+        std::vector<run_marker> m_run_markers;
         std::string m_scheduler_name;
         std::string m_load_balancer_name;
     };
@@ -251,6 +271,15 @@ namespace gempba::telemetry {
      * @return whether the pair was kept
      */
     bool annotate_run(std::string_view p_key, std::string_view p_value);
+
+    /**
+     * @brief Record a marker on the installed hub; see @ref telemetry_hub::mark_run.
+     *
+     * With telemetry enabled but no hub installed yet, the marker is dropped with a warning.
+     *
+     * @return whether the marker was kept
+     */
+    bool mark_run(std::string_view p_label);
 
     /// Install @p p_hub as the process-wide singleton; transfers ownership.
     void install(std::unique_ptr<telemetry_hub> p_hub) noexcept;

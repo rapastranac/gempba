@@ -16,6 +16,7 @@
 #include <spdlog/spdlog.h>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <thread>
 #include <vector>
 
@@ -118,57 +119,148 @@ namespace gempba::telemetry {
             return p_s;
         }
 
-        bool parse_control_line(std::string_view p_line, control_kind& p_out_kind, std::uint32_t& p_out_value) noexcept {
-            const auto v_find_string_field = [&](std::string_view p_name) -> std::optional<std::string_view> {
-                std::string v_pat;
-                v_pat.reserve(p_name.size() + 4);
-                v_pat += '"';
-                v_pat.append(p_name);
-                v_pat += "\":";
-                const auto v_pos = p_line.find(v_pat);
-                if (v_pos == std::string_view::npos)
-                    return std::nullopt;
-                std::size_t v_i = v_pos + v_pat.size();
-                while (v_i < p_line.size() && std::isspace(static_cast<unsigned char>(p_line[v_i])))
-                    ++v_i;
-                if (v_i >= p_line.size() || p_line[v_i] != '"')
-                    return std::nullopt;
+        std::optional<std::size_t> find_field_value(const std::string_view p_line, const std::string_view p_name) {
+            std::string v_pat;
+            v_pat.reserve(p_name.size() + 4);
+            v_pat += '"';
+            v_pat.append(p_name);
+            v_pat += "\":";
+            const auto v_pos = p_line.find(v_pat);
+            if (v_pos == std::string_view::npos) {
+                return std::nullopt;
+            }
+            std::size_t v_i = v_pos + v_pat.size();
+            while (v_i < p_line.size() && std::isspace(static_cast<unsigned char>(p_line[v_i]))) {
                 ++v_i;
-                const std::size_t v_start = v_i;
-                while (v_i < p_line.size() && p_line[v_i] != '"')
-                    ++v_i;
-                if (v_i >= p_line.size())
-                    return std::nullopt;
-                return p_line.substr(v_start, v_i - v_start);
-            };
+            }
+            return v_i;
+        }
 
-            const auto v_find_uint_field = [&](std::string_view p_name) -> std::optional<std::uint32_t> {
-                std::string v_pat;
-                v_pat.reserve(p_name.size() + 4);
-                v_pat += '"';
-                v_pat.append(p_name);
-                v_pat += "\":";
-                const auto v_pos = p_line.find(v_pat);
-                if (v_pos == std::string_view::npos)
-                    return std::nullopt;
-                std::size_t v_i = v_pos + v_pat.size();
-                while (v_i < p_line.size() && std::isspace(static_cast<unsigned char>(p_line[v_i])))
-                    ++v_i;
-                std::uint64_t v_acc = 0;
-                bool v_any = false;
-                while (v_i < p_line.size() && std::isdigit(static_cast<unsigned char>(p_line[v_i]))) {
-                    v_acc = v_acc * 10 + static_cast<std::uint64_t>(p_line[v_i] - '0');
-                    if (v_acc > std::numeric_limits<std::uint32_t>::max())
-                        return std::nullopt;
-                    ++v_i;
-                    v_any = true;
+        std::optional<std::uint32_t> parse_hex4(const std::string_view p_line, const std::size_t p_at) {
+            if (p_at + 4 > p_line.size()) {
+                return std::nullopt;
+            }
+            std::uint32_t v_value = 0;
+            const char* v_end = p_line.data() + p_at + 4;
+            const auto [v_ptr, v_ec] = std::from_chars(p_line.data() + p_at, v_end, v_value, 16);
+            if (v_ec != std::errc{} || v_ptr != v_end) {
+                return std::nullopt;
+            }
+            return v_value;
+        }
+
+        void append_utf8(std::string& p_out, const std::uint32_t p_code_point) {
+            if (p_code_point < 0x80) {
+                p_out += static_cast<char>(p_code_point);
+            } else if (p_code_point < 0x800) {
+                p_out += static_cast<char>(0xC0 | (p_code_point >> 6));
+                p_out += static_cast<char>(0x80 | (p_code_point & 0x3F));
+            } else if (p_code_point < 0x10000) {
+                p_out += static_cast<char>(0xE0 | (p_code_point >> 12));
+                p_out += static_cast<char>(0x80 | ((p_code_point >> 6) & 0x3F));
+                p_out += static_cast<char>(0x80 | (p_code_point & 0x3F));
+            } else {
+                p_out += static_cast<char>(0xF0 | (p_code_point >> 18));
+                p_out += static_cast<char>(0x80 | ((p_code_point >> 12) & 0x3F));
+                p_out += static_cast<char>(0x80 | ((p_code_point >> 6) & 0x3F));
+                p_out += static_cast<char>(0x80 | (p_code_point & 0x3F));
+            }
+        }
+
+        std::optional<std::string> find_string_field(const std::string_view p_line, const std::string_view p_name) {
+            const auto v_at = find_field_value(p_line, p_name);
+            if (!v_at || *v_at >= p_line.size() || p_line[*v_at] != '"') {
+                return std::nullopt;
+            }
+            std::string v_out;
+            for (std::size_t v_i = *v_at + 1; v_i < p_line.size(); ++v_i) {
+                const char v_c = p_line[v_i];
+                if (v_c == '"') {
+                    return v_out;
                 }
-                if (!v_any)
+                if (v_c != '\\') {
+                    v_out += v_c;
+                    continue;
+                }
+                if (++v_i >= p_line.size()) {
                     return std::nullopt;
-                return static_cast<std::uint32_t>(v_acc);
-            };
+                }
+                switch (p_line[v_i]) {
+                    case '"':
+                    case '\\':
+                    case '/':
+                        v_out += p_line[v_i];
+                        break;
+                    case 'b':
+                        v_out += '\b';
+                        break;
+                    case 'f':
+                        v_out += '\f';
+                        break;
+                    case 'n':
+                        v_out += '\n';
+                        break;
+                    case 'r':
+                        v_out += '\r';
+                        break;
+                    case 't':
+                        v_out += '\t';
+                        break;
+                    case 'u': {
+                        const auto v_unit = parse_hex4(p_line, v_i + 1);
+                        if (!v_unit || (*v_unit >= 0xDC00 && *v_unit <= 0xDFFF)) {
+                            return std::nullopt;
+                        }
+                        v_i += 4;
+                        std::uint32_t v_code_point = *v_unit;
+                        if (*v_unit >= 0xD800 && *v_unit <= 0xDBFF) {
+                            const auto v_low = v_i + 2 < p_line.size() && p_line[v_i + 1] == '\\' && p_line[v_i + 2] == 'u' ? parse_hex4(p_line, v_i + 3) : std::nullopt;
+                            if (!v_low || *v_low < 0xDC00 || *v_low > 0xDFFF) {
+                                return std::nullopt;
+                            }
+                            v_i += 6;
+                            v_code_point = 0x10000 + ((*v_unit - 0xD800) << 10) + (*v_low - 0xDC00);
+                        }
+                        append_utf8(v_out, v_code_point);
+                        break;
+                    }
+                    default:
+                        return std::nullopt;
+                }
+            }
+            return std::nullopt;
+        }
 
-            const auto v_kind_str = v_find_string_field("kind");
+        std::optional<std::uint32_t> find_uint_field(const std::string_view p_line, const std::string_view p_name) {
+            const auto v_at = find_field_value(p_line, p_name);
+            if (!v_at) {
+                return std::nullopt;
+            }
+            std::uint64_t v_acc = 0;
+            bool v_any = false;
+            for (std::size_t v_i = *v_at; v_i < p_line.size() && std::isdigit(static_cast<unsigned char>(p_line[v_i])); ++v_i) {
+                v_acc = v_acc * 10 + static_cast<std::uint64_t>(p_line[v_i] - '0');
+                if (v_acc > std::numeric_limits<std::uint32_t>::max()) {
+                    return std::nullopt;
+                }
+                v_any = true;
+            }
+            if (!v_any) {
+                return std::nullopt;
+            }
+            return static_cast<std::uint32_t>(v_acc);
+        }
+
+        std::optional<std::string> parse_marker_line(const std::string_view p_line) {
+            const auto v_kind = find_string_field(p_line, "kind");
+            if (!v_kind || trim(*v_kind) != "mark") {
+                return std::nullopt;
+            }
+            return find_string_field(p_line, "label");
+        }
+
+        bool parse_control_line(std::string_view p_line, control_kind& p_out_kind, std::uint32_t& p_out_value) {
+            const auto v_kind_str = find_string_field(p_line, "kind");
             if (!v_kind_str) {
                 return false;
             }
@@ -178,7 +270,7 @@ namespace gempba::telemetry {
                 p_out_value = 0;
                 return true;
             }
-            const auto v_value = v_find_uint_field("value");
+            const auto v_value = find_uint_field(p_line, "value");
             if (!v_value) {
                 return false;
             }
@@ -361,7 +453,11 @@ namespace gempba::telemetry {
                     const std::string_view v_line(p_cs.m_inbox.data(), v_nl);
                     control_kind v_kind{};
                     std::uint32_t v_value = 0;
-                    if (parse_control_line(v_line, v_kind, v_value)) {
+                    if (const auto v_label = parse_marker_line(v_line)) {
+                        if (v_impl_ptr->m_hub != nullptr) {
+                            (void) v_impl_ptr->m_hub->mark_run(*v_label, marker_source::DASHBOARD);
+                        }
+                    } else if (parse_control_line(v_line, v_kind, v_value)) {
                         if (v_impl_ptr->m_hub != nullptr)
                             v_impl_ptr->m_hub->apply_control_from_client(v_kind, v_value);
                     } else {

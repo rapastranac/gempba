@@ -452,6 +452,29 @@ namespace gempba::telemetry {
         return m_run_annotations;
     }
 
+    bool telemetry_hub::mark_run(const std::string_view p_label, const marker_source p_source) {
+        if (!m_running.load(std::memory_order_acquire) || m_worker_id != 0) {
+            return false;
+        }
+        const std::string_view v_shown_label = p_label.substr(0, MAX_RUN_MARKER_LABEL_BYTES);
+        if (p_label.empty() || p_label.size() > MAX_RUN_MARKER_LABEL_BYTES) {
+            spdlog::warn("telemetry: dropped run marker '{}': labels take 1 to {} bytes", v_shown_label, MAX_RUN_MARKER_LABEL_BYTES);
+            return false;
+        }
+        const std::scoped_lock v_lock(m_run_mtx);
+        if (m_run_markers.size() >= MAX_RUN_MARKERS) {
+            spdlog::warn("telemetry: dropped run marker '{}': a run keeps at most {} markers", v_shown_label, MAX_RUN_MARKERS);
+            return false;
+        }
+        m_run_markers.push_back(run_marker{monotonic_ms() - m_start_ms.load(std::memory_order_acquire), std::string(p_label), p_source});
+        return true;
+    }
+
+    std::vector<run_marker> telemetry_hub::run_markers() const {
+        const std::scoped_lock v_lock(m_run_mtx);
+        return m_run_markers;
+    }
+
     void telemetry_hub::describe_scheduler(const std::string_view p_name) {
         const std::scoped_lock v_lock(m_run_mtx);
         m_scheduler_name = p_name;
@@ -479,6 +502,7 @@ namespace gempba::telemetry {
             v_run.m_scheduler = m_scheduler_name;
             v_run.m_load_balancer = m_load_balancer_name;
             v_run.m_annotations = m_run_annotations;
+            v_run.m_markers = m_run_markers;
         }
         if (m_aggregator) {
             const std::scoped_lock v_lock(m_aggregator->m_mtx);
@@ -541,6 +565,16 @@ namespace gempba::telemetry {
         }
         if (g_enabled) {
             spdlog::warn("telemetry: dropped run annotation '{}': no telemetry hub is installed yet", p_key.substr(0, MAX_RUN_ANNOTATION_KEY_BYTES));
+        }
+        return false;
+    }
+
+    bool mark_run(const std::string_view p_label) {
+        if (auto* v_hub = get()) {
+            return v_hub->mark_run(p_label);
+        }
+        if (g_enabled) {
+            spdlog::warn("telemetry: dropped run marker '{}': no telemetry hub is installed yet", p_label.substr(0, MAX_RUN_MARKER_LABEL_BYTES));
         }
         return false;
     }

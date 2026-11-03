@@ -305,7 +305,19 @@ namespace gempba::telemetry {
                 p_out += ':';
                 escape_quoted(p_out, p_run->m_annotations[v_i].second);
             }
-            p_out += "}}";
+            p_out += R"(},"markers":[)";
+            for (std::size_t v_i = 0; v_i < p_run->m_markers.size(); ++v_i) {
+                if (v_i > 0) {
+                    p_out += ',';
+                }
+                const run_marker& v_marker = p_run->m_markers[v_i];
+                p_out += "{\"elapsed_ms\":";
+                emit_u64(p_out, v_marker.m_elapsed_ms);
+                p_out += ",\"label\":";
+                escape_quoted(p_out, v_marker.m_label);
+                p_out += v_marker.m_source == marker_source::DASHBOARD ? R"(,"source":"dashboard"})" : R"(,"source":"code"})";
+            }
+            p_out += "]}";
         }
         p_out += '}';
     }

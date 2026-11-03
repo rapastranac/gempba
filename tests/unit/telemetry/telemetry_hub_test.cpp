@@ -461,6 +461,74 @@ namespace {
         EXPECT_EQ(v_expected, gempba::telemetry::get()->run_annotations());
     }
 
+    TEST_F(telemetry_hub_test, run_markers_keep_their_order_source_and_time_since_telemetry_came_up) {
+        using clock = std::chrono::steady_clock;
+        const auto v_before = clock::now();
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+
+        EXPECT_TRUE(v_hub.mark_run("setup done"));
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        EXPECT_TRUE(v_hub.mark_run("phase 2", gempba::telemetry::marker_source::DASHBOARD));
+        const auto v_took_ms = std::chrono::duration_cast<std::chrono::milliseconds>(clock::now() - v_before).count();
+
+        const auto v_markers = v_hub.run_markers();
+        ASSERT_EQ(2u, v_markers.size());
+        EXPECT_EQ("setup done", v_markers[0].m_label);
+        EXPECT_EQ(gempba::telemetry::marker_source::CODE, v_markers[0].m_source);
+        EXPECT_EQ("phase 2", v_markers[1].m_label);
+        EXPECT_EQ(gempba::telemetry::marker_source::DASHBOARD, v_markers[1].m_source);
+        EXPECT_GE(v_markers[1].m_elapsed_ms - v_markers[0].m_elapsed_ms, 20u);
+        EXPECT_LE(v_markers[1].m_elapsed_ms, static_cast<std::uint64_t>(v_took_ms) + 1);
+        EXPECT_EQ(2u, v_hub.describe_run().m_markers.size());
+    }
+
+    TEST_F(telemetry_hub_test, run_markers_beyond_the_cap_or_over_the_label_limit_are_dropped) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+
+        EXPECT_FALSE(v_hub.mark_run(""));
+        EXPECT_FALSE(v_hub.mark_run(std::string(gempba::telemetry::MAX_RUN_MARKER_LABEL_BYTES + 1, 'x')));
+        EXPECT_TRUE(v_hub.mark_run(std::string(gempba::telemetry::MAX_RUN_MARKER_LABEL_BYTES, 'x')));
+        for (std::size_t v_i = 1; v_i < gempba::telemetry::MAX_RUN_MARKERS; ++v_i) {
+            EXPECT_TRUE(v_hub.mark_run("marker " + std::to_string(v_i)));
+        }
+        EXPECT_FALSE(v_hub.mark_run("one too many"));
+
+        const auto v_markers = v_hub.run_markers();
+        ASSERT_EQ(gempba::telemetry::MAX_RUN_MARKERS, v_markers.size());
+        EXPECT_EQ(std::string(gempba::telemetry::MAX_RUN_MARKER_LABEL_BYTES, 'x'), v_markers.front().m_label);
+        EXPECT_EQ("marker " + std::to_string(gempba::telemetry::MAX_RUN_MARKERS - 1), v_markers.back().m_label);
+    }
+
+    TEST_F(telemetry_hub_test, only_a_ready_center_keeps_run_markers) {
+        gempba::telemetry::telemetry_hub v_not_ready;
+        EXPECT_FALSE(v_not_ready.mark_run("too early"));
+
+        gempba::telemetry::telemetry_hub v_worker;
+        v_worker.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 1, 2, /*p_start_pump_thread=*/false);
+        EXPECT_FALSE(v_worker.mark_run("on a worker"));
+        EXPECT_TRUE(v_worker.run_markers().empty());
+
+        gempba::telemetry::telemetry_hub v_center;
+        v_center.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+        v_center.shutdown();
+        EXPECT_FALSE(v_center.mark_run("too late"));
+    }
+
+    TEST_F(telemetry_hub_test, mark_run_reaches_the_installed_hub_and_is_dropped_without_one) {
+        EXPECT_FALSE(gempba::telemetry::mark_run("before_install"));
+
+        gempba::telemetry::install(std::make_unique<gempba::telemetry::telemetry_hub>());
+        gempba::telemetry::get()->on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+        EXPECT_TRUE(gempba::telemetry::mark_run("baseline"));
+
+        const auto v_markers = gempba::telemetry::get()->run_markers();
+        ASSERT_EQ(1u, v_markers.size());
+        EXPECT_EQ("baseline", v_markers[0].m_label);
+        EXPECT_EQ(gempba::telemetry::marker_source::CODE, v_markers[0].m_source);
+    }
+
     TEST_F(telemetry_hub_test, describe_run_reports_the_mode_size_version_and_annotations) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MP_MPI, 3, 8, /*p_start_pump_thread=*/false);
