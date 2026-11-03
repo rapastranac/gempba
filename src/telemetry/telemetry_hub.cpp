@@ -71,8 +71,11 @@ namespace gempba::telemetry {
         std::atomic<std::uint64_t> m_score_proposals_sent{0};
         std::atomic<std::uint64_t> m_telemetry_microseconds_total{0};
 
-        std::atomic<std::uint64_t> m_edges_out_bytes[MAX_WORKERS]{};
-        std::atomic<std::uint64_t> m_edges_out_count[MAX_WORKERS]{};
+        struct edge_slot {
+            std::atomic<std::uint64_t> m_bytes{0};
+            std::atomic<std::uint64_t> m_count{0};
+        };
+        std::vector<edge_slot> m_edges_out;
 
         std::mutex m_scheduler_mtx;
         scheduler_clock m_scheduler_clock;
@@ -95,6 +98,7 @@ namespace gempba::telemetry {
         m_mode = p_mode;
         m_worker_id = p_worker_id;
         m_world_size = p_world_size;
+        m_counters->m_edges_out = std::vector<counters::edge_slot>(p_world_size);
         m_start_ms.store(monotonic_ms(), std::memory_order_release);
 
         switch (p_mode) {
@@ -180,9 +184,10 @@ namespace gempba::telemetry {
     }
 
     void telemetry_hub::record_send(const std::uint32_t p_dst_worker_id, const std::uint64_t p_bytes, const std::chrono::nanoseconds p_elapsed) noexcept {
-        if (p_dst_worker_id < MAX_WORKERS) {
-            m_counters->m_edges_out_bytes[p_dst_worker_id].fetch_add(p_bytes, std::memory_order_relaxed);
-            m_counters->m_edges_out_count[p_dst_worker_id].fetch_add(1, std::memory_order_relaxed);
+        if (p_dst_worker_id < m_counters->m_edges_out.size()) {
+            auto& v_edge = m_counters->m_edges_out[p_dst_worker_id];
+            v_edge.m_bytes.fetch_add(p_bytes, std::memory_order_relaxed);
+            v_edge.m_count.fetch_add(1, std::memory_order_relaxed);
         }
         m_counters->m_tasks_sent_total.fetch_add(1, std::memory_order_relaxed);
         m_counters->m_bytes_sent_total.fetch_add(p_bytes, std::memory_order_relaxed);
@@ -332,7 +337,7 @@ namespace gempba::telemetry {
     }
 
     void telemetry_hub::snapshot_worker_frame(worker_frame& p_out) noexcept {
-        std::memset(&p_out, 0, sizeof(worker_frame));
+        p_out = worker_frame{};
         p_out.m_version = TELEMETRY_SCHEMA_VERSION;
         p_out.m_worker_id = m_worker_id;
         p_out.m_seq_no = m_seq_no.load(std::memory_order_relaxed);
@@ -351,9 +356,12 @@ namespace gempba::telemetry {
         p_out.m_score_proposals_sent = m_counters->m_score_proposals_sent.load(std::memory_order_relaxed);
         p_out.m_telemetry_microseconds_total = m_counters->m_telemetry_microseconds_total.load(std::memory_order_relaxed);
 
-        for (unsigned v_i = 0; v_i < MAX_WORKERS; ++v_i) {
-            p_out.m_edges_out[v_i].m_bytes = m_counters->m_edges_out_bytes[v_i].load(std::memory_order_relaxed);
-            p_out.m_edges_out[v_i].m_count = m_counters->m_edges_out_count[v_i].load(std::memory_order_relaxed);
+        for (std::uint32_t v_i = 0; v_i < m_counters->m_edges_out.size(); ++v_i) {
+            const auto& v_edge = m_counters->m_edges_out[v_i];
+            const std::uint64_t v_count = v_edge.m_count.load(std::memory_order_relaxed);
+            if (v_count != 0) {
+                p_out.m_edges_out.push_back(edge_counter{v_i, v_edge.m_bytes.load(std::memory_order_relaxed), v_count});
+            }
         }
 
         {

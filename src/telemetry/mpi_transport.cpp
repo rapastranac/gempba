@@ -1,4 +1,5 @@
 #include <impl/telemetry/mpi_transport.hpp>
+#include <impl/telemetry/worker_frame_codec.hpp>
 
 #include <cstring>
 #include <deque>
@@ -51,12 +52,15 @@ namespace gempba::telemetry {
                 if (!v_flag) {
                     break;
                 }
-                worker_frame v_frame{};
-                MPI_Recv(&v_frame, sizeof(worker_frame), MPI_BYTE, v_status.MPI_SOURCE, p_tag, m_comm, MPI_STATUS_IGNORE);
+                int v_count = 0;
+                MPI_Get_count(&v_status, MPI_BYTE, &v_count);
+                std::vector<std::byte> v_buffer(static_cast<std::size_t>(v_count));
+                MPI_Recv(v_buffer.data(), v_count, MPI_BYTE, v_status.MPI_SOURCE, p_tag, m_comm, MPI_STATUS_IGNORE);
                 if (p_tag == k_tag_final_worker_frame) {
                     ++m_final_frames_received;
                 }
-                if (p_sink) {
+                worker_frame v_frame;
+                if (p_sink && detail::decode_worker_frame(v_buffer.data(), v_buffer.size(), v_frame)) {
                     p_sink(static_cast<std::uint32_t>(v_status.MPI_SOURCE), v_frame);
                 }
             }
@@ -141,10 +145,7 @@ namespace gempba::telemetry {
             return;
 
         m_impl->reap_completed_sends();
-
-        std::vector<std::byte> v_buffer(sizeof(worker_frame));
-        std::memcpy(v_buffer.data(), &p_frame, sizeof(worker_frame));
-        m_impl->post_isend(std::move(v_buffer), k_center_rank, k_tag_worker_frame);
+        m_impl->post_isend(detail::encode_worker_frame(p_frame), k_center_rank, k_tag_worker_frame);
     }
 
     void mpi_transport::publish_final_worker(const worker_frame& p_frame) {
@@ -152,10 +153,7 @@ namespace gempba::telemetry {
             return;
 
         m_impl->reap_completed_sends();
-
-        std::vector<std::byte> v_buffer(sizeof(worker_frame));
-        std::memcpy(v_buffer.data(), &p_frame, sizeof(worker_frame));
-        m_impl->post_isend(std::move(v_buffer), k_center_rank, k_tag_final_worker_frame);
+        m_impl->post_isend(detail::encode_worker_frame(p_frame), k_center_rank, k_tag_final_worker_frame);
     }
 
     std::uint32_t mpi_transport::final_frames_received() const { return m_impl->m_final_frames_received; }
