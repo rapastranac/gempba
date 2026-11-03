@@ -19,7 +19,10 @@ namespace gempba::telemetry {
     inline constexpr unsigned MAX_LOGICAL_CPUS = 1024;
     inline constexpr unsigned CPU_MASK_WORDS = MAX_LOGICAL_CPUS / 64;
 
-    /** @brief Wire-format version stamped into every frame. Bump on any layout change. */
+    /**
+     * @brief Schema version of the telemetry broadcast, stamped into every frame and every line. Added keys keep it; bump it
+     * when a key is renamed or removed or changes meaning. docs/telemetry/wire-format.md describes every version.
+     */
     inline constexpr std::uint16_t TELEMETRY_SCHEMA_VERSION = 2;
 
     /**
