@@ -201,6 +201,10 @@ namespace gempba::telemetry {
         BE_NODE_SENTINEL = 1,
         /** @brief Reset the telemetry interval, for worker and node frames alike, to @c m_value milliseconds. */
         SET_WORKER_INTERVAL_MS = 2,
+        /** @brief Stop publishing and ingesting worker and node frames until @ref RESUME; per-event counters keep counting, and shutdown still sends the final frames. */
+        PAUSE = 3,
+        /** @brief Publish and ingest frames again at the current interval. */
+        RESUME = 4,
     };
 
     /** @brief Control message body. The semantics of @ref m_value depend on @ref m_kind. */

@@ -169,10 +169,19 @@ namespace gempba::telemetry {
             };
 
             const auto v_kind_str = v_find_string_field("kind");
-            const auto v_value = v_find_uint_field("value");
-            if (!v_kind_str || !v_value)
+            if (!v_kind_str) {
                 return false;
+            }
             const auto v_kind_trimmed = trim(*v_kind_str);
+            if (v_kind_trimmed == "pause" || v_kind_trimmed == "resume") {
+                p_out_kind = v_kind_trimmed == "pause" ? control_kind::PAUSE : control_kind::RESUME;
+                p_out_value = 0;
+                return true;
+            }
+            const auto v_value = v_find_uint_field("value");
+            if (!v_value) {
+                return false;
+            }
             if (v_kind_trimmed == "set_worker_interval_ms") {
                 p_out_kind = control_kind::SET_WORKER_INTERVAL_MS;
             } else if (v_kind_trimmed == "set_node_interval_ms") {
@@ -185,7 +194,22 @@ namespace gempba::telemetry {
             return true;
         }
 
-        std::string build_broadcast_line(telemetry_hub& p_hub) {
+        std::string build_broadcast_line(telemetry_hub& p_hub, const bool p_with_frames) {
+            const auto v_now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+
+            broadcast_payload v_payload{};
+            v_payload.m_run_id = p_hub.run_id();
+            v_payload.m_now_ms = static_cast<std::uint64_t>(v_now);
+            v_payload.m_elapsed_seconds = p_hub.program_elapsed_seconds();
+            v_payload.m_paused = p_hub.paused();
+
+            std::string v_line;
+            if (!p_with_frames) {
+                serialize_paused_broadcast(v_line, v_payload);
+                v_line += '\n';
+                return v_line;
+            }
+
             const auto& v_topology = p_hub.current_topology();
             std::vector<worker_frame> v_workers;
             std::vector<node_frame> v_nodes;
@@ -200,20 +224,12 @@ namespace gempba::telemetry {
                 }
             }
 
-            const auto v_now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-
             const run_description v_run = p_hub.describe_run();
-
-            broadcast_payload v_payload{};
-            v_payload.m_run_id = p_hub.run_id();
-            v_payload.m_now_ms = static_cast<std::uint64_t>(v_now);
-            v_payload.m_elapsed_seconds = p_hub.program_elapsed_seconds();
             v_payload.m_topology = &v_topology;
             v_payload.m_run = &v_run;
             v_payload.m_workers = &v_workers;
             v_payload.m_nodes = &v_nodes;
 
-            std::string v_line;
             v_line.reserve(2048);
             serialize_broadcast(v_line, v_payload);
             v_line += '\n';
@@ -380,7 +396,7 @@ namespace gempba::telemetry {
 
                 if (std::chrono::steady_clock::now() >= v_last_broadcast + broadcast_interval(*v_impl_ptr->m_hub)) {
                     v_last_broadcast = std::chrono::steady_clock::now();
-                    const std::string v_line = build_broadcast_line(*v_impl_ptr->m_hub);
+                    const std::string v_line = build_broadcast_line(*v_impl_ptr->m_hub, !v_impl_ptr->m_hub->paused());
                     const std::scoped_lock v_lock(v_impl_ptr->m_clients_mtx);
                     for (const auto& v_cs: v_impl_ptr->m_clients) {
                         const bool v_already_dead = std::find(v_dead.begin(), v_dead.end(), v_cs.m_sock) != v_dead.end();
@@ -438,7 +454,7 @@ namespace gempba::telemetry {
 
         const std::scoped_lock v_lock(m_impl->m_clients_mtx);
         if (!m_impl->m_clients.empty()) {
-            const std::string v_line = build_broadcast_line(*m_impl->m_hub);
+            const std::string v_line = build_broadcast_line(*m_impl->m_hub, true);
             for (const auto& v_cs: m_impl->m_clients) {
                 (void) send_all(v_cs.m_sock, v_line.data(), v_line.size());
             }

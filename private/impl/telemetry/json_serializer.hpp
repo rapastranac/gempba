@@ -26,10 +26,14 @@ namespace gempba::telemetry {
         const run_description* m_run;
         const std::vector<worker_frame>* m_workers;
         const std::vector<node_frame>* m_nodes;
+        bool m_paused;
     };
 
     /// Serialize one @ref broadcast_payload to a single JSON line.
     void serialize_broadcast(std::string& p_out, const broadcast_payload& p_payload);
+
+    /// Serialize the line a paused center broadcasts: the header of @ref serialize_broadcast with @c "paused":true and no topology or frames.
+    void serialize_paused_broadcast(std::string& p_out, const broadcast_payload& p_payload);
 
 } // namespace gempba::telemetry
 

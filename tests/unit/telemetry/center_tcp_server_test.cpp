@@ -208,6 +208,27 @@ namespace {
         v_server.stop();
     }
 
+    TEST_F(tcp_server_test, client_pause_and_resume_are_applied_with_or_without_a_value) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+        v_hub.set_worker_interval_ms(500);
+
+        gempba::telemetry::center_tcp_server v_server(0, v_hub);
+        ASSERT_TRUE(v_server.start());
+
+        const socket_t v_client = connect_loopback(v_server.bound_port());
+        ASSERT_NE(k_invalid, v_client);
+
+        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"pause\"}\n"));
+        EXPECT_TRUE(wait_for([&] { return v_hub.paused(); }, std::chrono::milliseconds(2000)));
+        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"resume\",\"value\":0}\n"));
+        EXPECT_TRUE(wait_for([&] { return !v_hub.paused(); }, std::chrono::milliseconds(2000)));
+        EXPECT_EQ(500u, v_hub.worker_interval_ms());
+
+        close_sock(v_client);
+        v_server.stop();
+    }
+
     std::uint16_t free_loopback_port() {
         const socket_t v_s = ::socket(AF_INET, SOCK_STREAM, 0);
         sockaddr_in v_addr{};
@@ -307,6 +328,65 @@ namespace {
         EXPECT_FALSE(v_hub.run_id().empty());
         EXPECT_NE(std::string::npos, v_first.find(v_run_id_key)) << v_first;
         EXPECT_NE(std::string::npos, v_last.find(v_run_id_key)) << v_last;
+    }
+
+    TEST_F(tcp_server_test, a_paused_center_broadcasts_only_the_envelope_until_resumed) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+        v_hub.set_worker_interval_ms(50);
+        v_hub.tick_if_due();
+        ASSERT_TRUE(v_hub.latest_worker_frame(0).has_value());
+        v_hub.apply_control_from_client(gempba::telemetry::control_kind::PAUSE, 0);
+
+        gempba::telemetry::center_tcp_server v_server(0, v_hub);
+        ASSERT_TRUE(v_server.start());
+        const socket_t v_client = connect_loopback(v_server.bound_port());
+        ASSERT_NE(k_invalid, v_client);
+        set_recv_timeout(v_client, 100);
+
+        const std::string v_paused = read_one_line(v_client, std::chrono::milliseconds(2000));
+        v_hub.apply_control_from_client(gempba::telemetry::control_kind::RESUME, 0);
+        std::string v_resumed;
+        const auto v_deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(2000);
+        while (v_resumed.find("\"paused\":false") == std::string::npos && std::chrono::steady_clock::now() < v_deadline) {
+            v_resumed = read_one_line(v_client, std::chrono::milliseconds(500));
+        }
+        close_sock(v_client);
+        v_server.stop();
+
+        EXPECT_TRUE(v_paused.starts_with(R"({"version":2,"run_id":")" + v_hub.run_id() + R"(","ts":)")) << v_paused;
+        EXPECT_TRUE(v_paused.ends_with(R"("paused":true})")) << v_paused;
+        EXPECT_EQ(std::string::npos, v_paused.find("\"workers\"")) << v_paused;
+        EXPECT_NE(std::string::npos, v_resumed.find("\"paused\":false")) << v_resumed;
+        EXPECT_NE(std::string::npos, v_resumed.find("\"workers\":[{\"worker_id\":0")) << v_resumed;
+    }
+
+    TEST_F(tcp_server_test, shutdown_while_paused_still_broadcasts_the_final_frame) {
+        const std::uint16_t v_port = free_loopback_port();
+        gempba::telemetry::configure_port(v_port);
+
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.set_worker_interval_ms(0);
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/true);
+        v_hub.apply_control_from_client(gempba::telemetry::control_kind::PAUSE, 0);
+
+        const socket_t v_client = connect_loopback(v_port);
+        ASSERT_NE(k_invalid, v_client);
+        set_recv_timeout(v_client, 200);
+        ASSERT_TRUE(read_one_line(v_client, std::chrono::milliseconds(2000)).ends_with(R"("paused":true})"));
+
+        for (int v_i = 0; v_i < 5; ++v_i) {
+            v_hub.record_task_local();
+        }
+        v_hub.shutdown();
+
+        const std::string v_rest = read_until_closed(v_client, std::chrono::milliseconds(3000));
+        close_sock(v_client);
+        gempba::telemetry::configure_port(9000);
+
+        const std::string v_last = last_complete_line(v_rest);
+        EXPECT_NE(std::string::npos, v_last.find("\"paused\":true")) << v_last;
+        EXPECT_NE(std::string::npos, v_last.find("\"tasks_started_total\":5")) << v_last;
     }
 
     std::vector<std::chrono::steady_clock::time_point> line_arrivals(socket_t p_s, const std::size_t p_count, std::chrono::milliseconds p_timeout) {

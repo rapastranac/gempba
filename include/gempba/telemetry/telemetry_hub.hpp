@@ -193,6 +193,9 @@ namespace gempba::telemetry {
         /// @return The current worker-frame emission interval, in milliseconds.
         [[nodiscard]] std::uint32_t worker_interval_ms() const noexcept;
 
+        /// @return whether a @ref control_kind::PAUSE holds; frames are neither published nor ingested until a @ref control_kind::RESUME.
+        [[nodiscard]] bool paused() const noexcept;
+
         /**
          * @brief Apply one control message received from the dashboard.
          *
@@ -212,6 +215,7 @@ namespace gempba::telemetry {
         std::uint32_t m_world_size = 1;
         std::atomic<bool> m_is_sentinel{false};
         std::atomic<std::uint32_t> m_worker_interval_ms{500};
+        std::atomic<bool> m_paused{false};
         std::atomic<std::uint64_t> m_last_worker_emit_ms{0};
         std::atomic<std::uint32_t> m_seq_no{0};
         std::atomic<std::uint64_t> m_start_ms{0};
