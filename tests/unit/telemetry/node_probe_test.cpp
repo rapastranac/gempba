@@ -45,8 +45,7 @@ namespace {
     TEST_F(node_emit_test, sentinel_publishes_node_frame_via_pump) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1);
-        v_hub.set_worker_interval_ms(500);
-        v_hub.set_node_interval_ms(50);
+        v_hub.set_worker_interval_ms(50);
 
         std::this_thread::sleep_for(std::chrono::milliseconds(250));
 

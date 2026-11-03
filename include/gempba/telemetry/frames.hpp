@@ -159,7 +159,7 @@ namespace gempba::telemetry {
     /**
      * @brief Periodic per-host telemetry sample.
      *
-     * Emitted by the host's sentinel worker on the node-interval cadence.
+     * Emitted by the host's sentinel worker with each of its worker frames.
      * Aggregates host-wide signals (CPU, memory) that are not meaningful
      * per-worker.
      */
@@ -191,10 +191,8 @@ namespace gempba::telemetry {
         UNSPECIFIED = 0,
         /** @brief Promote this worker to its host's sentinel (emits node frames). */
         BE_NODE_SENTINEL = 1,
-        /** @brief Reset the worker-frame emission interval to @c m_value milliseconds. */
+        /** @brief Reset the telemetry interval, for worker and node frames alike, to @c m_value milliseconds. */
         SET_WORKER_INTERVAL_MS = 2,
-        /** @brief Reset the node-frame emission interval to @c m_value milliseconds. */
-        SET_NODE_INTERVAL_MS = 3,
     };
 
     /** @brief Control message body. The semantics of @ref m_value depend on @ref m_kind. */

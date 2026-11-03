@@ -184,20 +184,14 @@ namespace gempba::telemetry {
         /// @return how this run is set up; the thread count comes from the latest worker frames, so only the center fills it.
         [[nodiscard]] run_description describe_run() const;
 
-        /// Set the cadence at which worker frames are emitted. Fans out to other workers.
+        /// Set the cadence at which worker frames, and each host sentinel's node frame, are emitted. Fans out to other workers.
         void set_worker_interval_ms(std::uint32_t p_interval_ms) noexcept;
-
-        /// Set the cadence at which node frames are emitted (sentinel only). Fans out.
-        void set_node_interval_ms(std::uint32_t p_interval_ms) noexcept;
 
         /// Promote this worker to its host's sentinel; it will start emitting node frames.
         void mark_as_node_sentinel() noexcept;
 
         /// @return The current worker-frame emission interval, in milliseconds.
         [[nodiscard]] std::uint32_t worker_interval_ms() const noexcept;
-
-        /// @return The current node-frame emission interval, in milliseconds.
-        [[nodiscard]] std::uint32_t node_interval_ms() const noexcept;
 
         /**
          * @brief Apply one control message received from the dashboard.
@@ -218,9 +212,7 @@ namespace gempba::telemetry {
         std::uint32_t m_world_size = 1;
         std::atomic<bool> m_is_sentinel{false};
         std::atomic<std::uint32_t> m_worker_interval_ms{500};
-        std::atomic<std::uint32_t> m_node_interval_ms{1000};
         std::atomic<std::uint64_t> m_last_worker_emit_ms{0};
-        std::atomic<std::uint64_t> m_last_node_emit_ms{0};
         std::atomic<std::uint32_t> m_seq_no{0};
         std::atomic<std::uint64_t> m_start_ms{0};
         std::string m_run_id;
