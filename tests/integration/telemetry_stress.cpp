@@ -269,20 +269,20 @@ int main(const int p_argc, char* p_argv[]) {
         v_checks.expect(v_totals[5] == (1ULL << v_max_depth), "the leaf count is wrong");
         v_checks.expect(v_totals[0] == v_totals[1], "tasks sent differ from tasks received across ranks");
         v_checks.expect(v_totals[2] == v_totals[3], "bytes sent differ from bytes received across ranks");
-        v_checks.expect(v_worker_proposals == v_frame.m_center_score_proposals_total, "workers' score proposals differ from those the center received");
+        v_checks.expect(v_worker_proposals == v_frame.m_coordinator_score_proposals_total, "workers' score proposals differ from those the center received");
 
         gempba::default_mpi_stats_visitor v_stats;
         v_scheduler->get_stats()->visit(&v_stats);
-        const std::uint64_t v_kinds = v_frame.m_center_state_msgs_total + v_frame.m_tasks_recv_total + v_frame.m_tasks_sent_total + v_frame.m_center_score_proposals_total +
-                                      v_frame.m_center_score_broadcasts_total;
-        v_checks.expect(v_stats.m_center_messages_handled == v_kinds, "center_messages_handled differs from the center's per-kind counters");
+        const std::uint64_t v_kinds = v_frame.m_coordinator_state_msgs_total + v_frame.m_tasks_recv_total + v_frame.m_tasks_sent_total + v_frame.m_coordinator_score_proposals_total +
+                                      v_frame.m_coordinator_score_broadcasts_total;
+        v_checks.expect(v_stats.m_coordinator_messages_handled == v_kinds, "coordinator_messages_handled differs from the coordinator's per-kind counters");
 
         std::cout << v_topology_name << " ranks=" << v_world_size << " tasks=" << v_totals[0] << " bytes=" << v_totals[2] << " proposals=" << v_worker_proposals
-                  << " center_messages=" << v_stats.m_center_messages_handled << '\n';
+                  << " coordinator_messages=" << v_stats.m_coordinator_messages_handled << '\n';
     }
 
     gempba::telemetry::telemetry_hub& v_hub = *gempba::telemetry::get();
-    const std::uint32_t v_interval_ms = v_hub.worker_interval_ms();
+    const std::uint32_t v_interval_ms = v_hub.interval_ms();
     if (v_rank == 0) {
         v_hub.apply_control_from_client(gempba::telemetry::control_kind::PAUSE, 0);
         v_hub.tick_if_due();
@@ -296,7 +296,7 @@ int main(const int p_argc, char* p_argv[]) {
     std::vector<std::uint32_t> v_ingested_seq_nos(static_cast<std::size_t>(v_world_size));
     if (v_rank == 0) {
         for (int v_r = 1; v_r < v_world_size; ++v_r) {
-            const auto v_latest = v_hub.latest_worker_frame(static_cast<std::uint32_t>(v_r));
+            const auto v_latest = v_hub.latest_rank_frame(static_cast<std::uint32_t>(v_r));
             v_ingested_seq_nos[static_cast<std::size_t>(v_r)] = v_latest ? v_latest->m_seq_no : 0;
         }
     } else {
@@ -316,7 +316,7 @@ int main(const int p_argc, char* p_argv[]) {
     if (v_rank == 0) {
         v_checks.expect(v_paused_window_done, "the dashboard received no paused broadcast");
         for (int v_r = 1; v_r < v_world_size; ++v_r) {
-            const auto v_latest = v_hub.latest_worker_frame(static_cast<std::uint32_t>(v_r));
+            const auto v_latest = v_hub.latest_rank_frame(static_cast<std::uint32_t>(v_r));
             v_checks.expect((v_latest ? v_latest->m_seq_no : 0) == v_ingested_seq_nos[static_cast<std::size_t>(v_r)],
                             "the paused aggregator ingested a frame from rank " + std::to_string(v_r));
         }
@@ -329,7 +329,7 @@ int main(const int p_argc, char* p_argv[]) {
         const std::uint32_t v_snapshot_id = v_hub.snapshot_requested();
         const bool v_answered = tick_until(v_hub, [&] {
             for (std::size_t v_r = 0; std::cmp_less(v_r, v_world_size); ++v_r) {
-                const auto v_latest = v_hub.latest_worker_frame(static_cast<std::uint32_t>(v_r));
+                const auto v_latest = v_hub.latest_rank_frame(static_cast<std::uint32_t>(v_r));
                 if (!v_latest || v_latest->m_snapshot_id != v_snapshot_id || (v_r != 0 && v_latest->m_tasks_started_total != v_all[v_r * k_fields + 6] + k_paused_tasks)) {
                     return false;
                 }
@@ -363,7 +363,7 @@ int main(const int p_argc, char* p_argv[]) {
     if (v_rank == 0) {
         const bool v_caught_up = tick_until(v_hub, [&] {
             for (std::size_t v_r = 1; std::cmp_less(v_r, v_world_size); ++v_r) {
-                const auto v_latest = v_hub.latest_worker_frame(static_cast<std::uint32_t>(v_r));
+                const auto v_latest = v_hub.latest_rank_frame(static_cast<std::uint32_t>(v_r));
                 if (!v_latest || v_latest->m_tasks_started_total != v_all[v_r * k_fields + 6] + k_paused_tasks + k_tasks_after_snapshot) {
                     return false;
                 }
@@ -372,7 +372,7 @@ int main(const int p_argc, char* p_argv[]) {
         });
         v_checks.expect(v_caught_up, "after the resume the aggregator lacks the tasks the workers counted while paused");
     }
-    v_checks.expect(v_hub.worker_interval_ms() == v_interval_ms, "pausing and resuming changed the interval");
+    v_checks.expect(v_hub.interval_ms() == v_interval_ms, "pausing and resuming changed the interval");
 
     v_scheduler->barrier();
     const int v_shutdown_code = gempba::shutdown();
@@ -387,13 +387,13 @@ int main(const int p_argc, char* p_argv[]) {
         v_checks.expect(v_line.find(R"("load_balancer":"quasi_horizontal")") != std::string::npos, "the final broadcast names another load balancer");
         v_checks.expect(v_line.find(R"("annotations":{"test":"telemetry_stress"})") != std::string::npos, "the final broadcast lost the run annotation");
         v_checks.expect(v_line.find(R"("paused":false,"final":true,)") != std::string::npos, "the final broadcast is still paused or not marked final");
-        v_checks.expect(count_of(v_line, R"("role":"center")") == 1, "the final broadcast does not mark exactly one center");
+        v_checks.expect(count_of(v_line, R"("role":"coordinator")") == 1, "the final broadcast does not mark exactly one coordinator");
         v_checks.expect(count_of(v_line, R"("role":"worker")") == static_cast<std::size_t>(v_world_size - 1), "the final broadcast does not mark every other rank a worker");
         for (int v_r = 0; v_r < v_world_size; ++v_r) {
-            v_checks.expect(v_line.find("{\"worker_id\":" + std::to_string(v_r) + ",\"seq_no\":") != std::string::npos, "the final broadcast lacks rank " + std::to_string(v_r) + "'s frame");
+            v_checks.expect(v_line.find("{\"rank\":" + std::to_string(v_r) + ",\"seq_no\":") != std::string::npos, "the final broadcast lacks rank " + std::to_string(v_r) + "'s frame");
         }
         const std::size_t v_hosts = count_of(v_line, R"({"hostname":)");
-        v_checks.expect(v_hosts > 0 && count_of(v_line, R"({"sentinel_worker_id":)") == v_hosts, "the final broadcast does not carry one node frame per host");
+        v_checks.expect(v_hosts > 0 && count_of(v_line, R"({"sentinel_rank":)") == v_hosts, "the final broadcast does not carry one node frame per host");
         const std::uint64_t v_edges_bytes = sum_of(v_line, "bytes");
         v_checks.expect(v_edges_bytes > 0 && v_edges_bytes == sum_of(v_line, "bytes_sent_total"), "the final broadcast's edges do not add up to the bytes sent");
     }

@@ -13,7 +13,7 @@ namespace gempba::telemetry {
      * @brief Turns a rank's scheduler events, stamped in microseconds, into the scheduler times of a @ref worker_frame.
      *
      * Times accrue only between @ref on_run_start and @ref on_run_end. Available-rank time accrues only while the
-     * center queue is empty: the centralized center hands a task to every available rank while its queue holds any.
+     * coordinator queue is empty: the centralized coordinator hands a task to every available rank while its queue holds any.
      * Not thread-safe.
      */
     class scheduler_clock {
@@ -58,24 +58,24 @@ namespace gempba::telemetry {
             m_phase = phase::RUNNING;
         }
 
-        void on_assignment(const std::uint32_t p_worker_id, const std::uint64_t p_now) {
-            if (p_worker_id < MAX_WORKERS) {
-                m_assigned_at[p_worker_id] = p_now;
+        void on_assignment(const std::uint32_t p_rank, const std::uint64_t p_now) {
+            if (p_rank < MAX_WORKERS) {
+                m_assigned_at[p_rank] = p_now;
             }
         }
 
-        void on_assignment_accepted(const std::uint32_t p_worker_id, const std::uint64_t p_now) {
-            if (p_worker_id >= MAX_WORKERS || m_assigned_at[p_worker_id] == k_unassigned) {
+        void on_assignment_accepted(const std::uint32_t p_rank, const std::uint64_t p_now) {
+            if (p_rank >= MAX_WORKERS || m_assigned_at[p_rank] == k_unassigned) {
                 return;
             }
-            const std::uint64_t v_latency = p_now - m_assigned_at[p_worker_id];
-            m_assigned_at[p_worker_id] = k_unassigned;
+            const std::uint64_t v_latency = p_now - m_assigned_at[p_rank];
+            m_assigned_at[p_rank] = k_unassigned;
             m_assign_latency_total += v_latency;
             m_assign_latency_max = std::max(m_assign_latency_max, v_latency);
             ++m_assign_count;
         }
 
-        void on_center_queue(const std::uint32_t p_available_ranks, const bool p_queue_empty, const std::uint64_t p_now) {
+        void on_coordinator_queue(const std::uint32_t p_available_ranks, const bool p_queue_empty, const std::uint64_t p_now) {
             if (!m_in_run) {
                 return;
             }
@@ -84,12 +84,12 @@ namespace gempba::telemetry {
             m_queue_empty = p_queue_empty;
         }
 
-        void on_center_full(const std::uint64_t p_now) {
-            if (!m_in_run || m_center_full) {
+        void on_coordinator_full(const std::uint64_t p_now) {
+            if (!m_in_run || m_coordinator_full) {
                 return;
             }
             accrue(p_now);
-            m_center_full = true;
+            m_coordinator_full = true;
         }
 
         void on_global_score_improved(const std::uint64_t p_now) {
@@ -98,12 +98,12 @@ namespace gempba::telemetry {
             }
         }
 
-        void on_center_free(const std::uint64_t p_now) {
-            if (!m_in_run || !m_center_full) {
+        void on_coordinator_free(const std::uint64_t p_now) {
+            if (!m_in_run || !m_coordinator_full) {
                 return;
             }
             accrue(p_now);
-            m_center_full = false;
+            m_coordinator_full = false;
         }
 
         void fill(worker_frame& p_out, const std::uint64_t p_now) const {
@@ -117,7 +117,7 @@ namespace gempba::telemetry {
             p_out.m_assign_count = m_assign_count;
             p_out.m_assign_latency_microseconds_max = m_assign_latency_max;
             p_out.m_available_microseconds_queue_empty = m_available_queue_empty + (m_queue_empty ? m_available_ranks * v_open : 0);
-            p_out.m_center_full_microseconds = m_center_full_time + (m_center_full ? v_open : 0);
+            p_out.m_coordinator_full_microseconds = m_coordinator_full_time + (m_coordinator_full ? v_open : 0);
             p_out.m_last_score_improvement_ms = m_last_score_improvement_ms;
         }
 
@@ -136,8 +136,8 @@ namespace gempba::telemetry {
             if (m_queue_empty) {
                 m_available_queue_empty += m_available_ranks * v_elapsed;
             }
-            if (m_center_full) {
-                m_center_full_time += v_elapsed;
+            if (m_coordinator_full) {
+                m_coordinator_full_time += v_elapsed;
             }
             m_since = p_now;
         }
@@ -162,8 +162,8 @@ namespace gempba::telemetry {
         bool m_queue_empty = true;
         std::uint64_t m_available_queue_empty = 0;
 
-        bool m_center_full = false;
-        std::uint64_t m_center_full_time = 0;
+        bool m_coordinator_full = false;
+        std::uint64_t m_coordinator_full_time = 0;
 
         std::uint64_t m_last_score_improvement_ms = 0;
     };

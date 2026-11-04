@@ -17,7 +17,7 @@ namespace gempba::telemetry {
      * synthesizes a single-node snapshot; the multi-process path gathers each
      * host's layout from its sentinel and merges them into one snapshot.
      */
-    topology_snapshot build_topology_snapshot(runtime_mode p_mode, std::uint32_t p_worker_id, std::uint32_t p_world_size);
+    topology_snapshot build_topology_snapshot(runtime_mode p_mode, std::uint32_t p_rank, std::uint32_t p_world_size);
 
     namespace detail {
 

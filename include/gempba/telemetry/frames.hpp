@@ -6,7 +6,7 @@
 
 namespace gempba::telemetry {
 
-    /** @brief Hard upper bound on worker_id values in the local transport and the center's assignment table; edges are not capped. */
+    /** @brief Hard upper bound on worker_id values in the local transport and the coordinator's assignment table; edges are not capped. */
     inline constexpr unsigned MAX_WORKERS = 1024;
     /** @brief Hard upper bound on per-host socket count; sizes node_frame::m_sockets. */
     inline constexpr unsigned MAX_SOCKETS = 8;
@@ -26,10 +26,11 @@ namespace gempba::telemetry {
     inline constexpr std::uint16_t TELEMETRY_SCHEMA_VERSION = 2;
 
     /**
-     * @brief Static, one-shot description of a worker.
+     * @brief Static, one-shot description of a rank.
      *
-     * Published once per worker at startup. Joins a worker_id to a host / pid
+     * Published once per rank at startup. Joins a rank (its worker_id) to a host / pid
      * plus its CPU-affinity mask so the dashboard can place it in the topology.
+     * The worker_* names predate the rank vocabulary and change in v5.0.0 (#373).
      */
     struct worker_identity {
         std::uint16_t m_version;
@@ -56,7 +57,7 @@ namespace gempba::telemetry {
     /**
      * @brief The fixed-size part of a @ref worker_frame; it travels over MPI as one block ahead of the edges.
      *
-     * Counters are cumulative since worker startup; consumers compute deltas if they want rate-of-change.
+     * Counters are cumulative since the rank started telemetry; consumers compute deltas if they want rate-of-change.
      */
     struct worker_frame_header {
         std::uint16_t m_version;
@@ -90,7 +91,7 @@ namespace gempba::telemetry {
         /** @brief Local submissions the load balancer refused because every pool thread was busy; those nodes ran inline. */
         std::uint64_t m_spawn_rejected_pool_full;
         /**
-         * @brief Remote submissions refused because the scheduler opened no transmission channel (one already in use, the center
+         * @brief Remote submissions refused because the scheduler opened no transmission channel (one already in use, the coordinator
          * full, or no target rank); those nodes were then tried locally.
          */
         std::uint64_t m_spawn_remote_rejected;
@@ -117,29 +118,29 @@ namespace gempba::telemetry {
         /** @brief Worker: milliseconds from run start to the end of its latest task. */
         std::uint64_t m_last_task_ms;
         /**
-         * @brief Center: microseconds from assigning a rank to that rank reporting running, summed over assignments.
-         * The centralized center assigns by sending a task; the semi-centralized one by naming the rank a push target.
+         * @brief Coordinator: microseconds from assigning a rank to that rank reporting running, summed over assignments.
+         * The centralized coordinator assigns by sending a task; the semi-centralized one by naming the rank a push target.
          */
         std::uint64_t m_assign_latency_microseconds_total;
-        /** @brief Center: assignments counted in @ref m_assign_latency_microseconds_total. */
+        /** @brief Coordinator: assignments counted in @ref m_assign_latency_microseconds_total. */
         std::uint64_t m_assign_count;
-        /** @brief Center: longest single assignment latency, in microseconds. */
+        /** @brief Coordinator: longest single assignment latency, in microseconds. */
         std::uint64_t m_assign_latency_microseconds_max;
-        /** @brief Centralized center: microseconds ranks spent available while its queue was empty, summed over ranks. */
+        /** @brief Centralized coordinator: microseconds ranks spent available while its queue was empty, summed over ranks. */
         std::uint64_t m_available_microseconds_queue_empty;
 
-        /** @brief Center: running and available reports handled. Tasks in and out are @ref m_tasks_recv_total and @ref m_tasks_sent_total. */
-        std::uint64_t m_center_state_msgs_total;
-        /** @brief Center: score proposals received, whether or not they improved the global score. */
-        std::uint64_t m_center_score_proposals_total;
-        /** @brief Center: global score broadcasts, each a message to every worker. */
-        std::uint64_t m_center_score_broadcasts_total;
-        /** @brief Worker: score proposals sent to the center. */
+        /** @brief Coordinator: running and available reports handled. Tasks in and out are @ref m_tasks_recv_total and @ref m_tasks_sent_total. */
+        std::uint64_t m_coordinator_state_msgs_total;
+        /** @brief Coordinator: score proposals received, whether or not they improved the global score. */
+        std::uint64_t m_coordinator_score_proposals_total;
+        /** @brief Coordinator: global score broadcasts, each a message to every worker. */
+        std::uint64_t m_coordinator_score_broadcasts_total;
+        /** @brief Worker: score proposals sent to the coordinator. */
         std::uint64_t m_score_proposals_sent;
-        /** @brief Center: milliseconds from run start to the latest global score improvement; 0 until @ref m_center_score_broadcasts_total is non-zero. */
+        /** @brief Coordinator: milliseconds from run start to the latest global score improvement; 0 until @ref m_coordinator_score_broadcasts_total is non-zero. */
         std::uint64_t m_last_score_improvement_ms;
-        /** @brief Centralized center: microseconds its workers were told the center is full and must not send tasks. */
-        std::uint64_t m_center_full_microseconds;
+        /** @brief Centralized coordinator: microseconds its workers were told the coordinator is full and must not send tasks. */
+        std::uint64_t m_coordinator_full_microseconds;
         /**
          * @brief Microseconds this rank spent in telemetry_hub::tick_if_due calls that sent or read a frame; under MPI, time taken
          * from its scheduler thread. Calls with nothing due are part of the scheduler's polling loop and are not counted.
@@ -152,9 +153,9 @@ namespace gempba::telemetry {
     };
 
     /**
-     * @brief Periodic per-worker telemetry sample, emitted on the worker-interval cadence.
+     * @brief Periodic per-rank telemetry sample, sent every telemetry interval whatever the rank's scheduler role; the stream calls it a rank frame.
      *
-     * Its size follows the destinations the worker actually sent tasks to, not the size of the run.
+     * Its size follows the destinations the rank actually sent tasks to, not the size of the run.
      */
     struct worker_frame : worker_frame_header {
         /** @brief One entry per destination this worker sent tasks to, in ascending @c m_dst_worker_id; others are absent. */
@@ -202,11 +203,13 @@ namespace gempba::telemetry {
     /** @brief Tag for client-pushed control messages over the dashboard channel. */
     enum class control_kind : std::uint16_t {
         UNSPECIFIED = 0,
-        /** @brief Promote this worker to its host's sentinel (emits node frames). */
+        /** @brief Promote this rank to its host's sentinel (emits node frames). */
         BE_NODE_SENTINEL = 1,
-        /** @brief Reset the telemetry interval, for worker and node frames alike, to @c m_value milliseconds. */
-        SET_WORKER_INTERVAL_MS = 2,
-        /** @brief Stop publishing and ingesting worker and node frames until @ref RESUME; per-event counters keep counting, and shutdown still sends the final frames. */
+        /** @brief Reset the telemetry interval, for rank and node frames alike, to @c m_value milliseconds; sent as the set_interval_ms control, or set_worker_interval_ms until v5.0.0. */
+        SET_INTERVAL_MS = 2,
+        /** @deprecated Use @ref SET_INTERVAL_MS. Removed in v5.0.0 (#373). */
+        SET_WORKER_INTERVAL_MS [[deprecated("use SET_INTERVAL_MS")]] = SET_INTERVAL_MS,
+        /** @brief Stop publishing and ingesting rank and node frames until @ref RESUME; per-event counters keep counting, and shutdown still sends the final frames. */
         PAUSE = 3,
         /** @brief Publish and ingest frames again at the current interval. */
         RESUME = 4,

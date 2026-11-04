@@ -155,7 +155,7 @@ namespace gempba {
 
         [[nodiscard]] std::string_view get_name() const override { return "centralized"; }
 
-        [[nodiscard]] rank_role role_of(const int p_rank) const override { return p_rank == CENTER_NODE ? rank_role::CENTER : rank_role::WORKER; }
+        [[nodiscard]] rank_role role_of(const int p_rank) const override { return p_rank == CENTER_NODE ? rank_role::COORDINATOR : rank_role::WORKER; }
 
         [[nodiscard]] int world_size() const override { return m_world_size; }
 
@@ -543,7 +543,7 @@ namespace gempba {
                 m_total_requests_number++;
                 m_stats.m_sent_task_count++;
                 m_stats.m_total_requested_tasks++;
-                m_stats.m_center_messages_handled++;
+                m_stats.m_coordinator_messages_handled++;
 
                 if (auto* v_telemetry = telemetry::get()) {
                     v_telemetry->record_send(static_cast<std::uint32_t>(p_rank), static_cast<std::uint64_t>(v_bytes.size()), v_send_elapsed);
@@ -552,9 +552,9 @@ namespace gempba {
             });
         }
 
-        void record_center_queue() const {
+        void record_coordinator_queue() const {
             if (auto* v_telemetry = telemetry::get()) {
-                v_telemetry->record_center_queue(static_cast<std::uint32_t>(m_nodes_available), m_center_bundle_queue.empty());
+                v_telemetry->record_coordinator_queue(static_cast<std::uint32_t>(m_nodes_available), m_center_bundle_queue.empty());
             }
         }
 
@@ -566,7 +566,7 @@ namespace gempba {
             }
 
             send_seed(p_seed, p_runnable_id);
-            record_center_queue();
+            record_coordinator_queue();
 
             while (true) {
                 MPI_Status v_status = probe_communicators_at_center();
@@ -603,7 +603,7 @@ namespace gempba {
 
                 clear_buffer();
                 monitor_and_notify_center_status();
-                record_center_queue();
+                record_coordinator_queue();
 
                 if (auto* v_telemetry = telemetry::get())
                     v_telemetry->tick_if_due();
@@ -686,9 +686,9 @@ namespace gempba {
             m_nodes_running++;
             m_total_requests_number++;
             m_stats.m_total_requested_tasks++;
-            m_stats.m_center_messages_handled++;
+            m_stats.m_coordinator_messages_handled++;
             if (auto* v_telemetry = telemetry::get()) {
-                v_telemetry->record_center_state_msg();
+                v_telemetry->record_coordinator_state_msg();
                 v_telemetry->record_assignment_accepted(static_cast<std::uint32_t>(p_status.MPI_SOURCE));
             }
         }
@@ -700,9 +700,9 @@ namespace gempba {
             m_nodes_running--;
             m_total_requests_number++;
             m_stats.m_total_requested_tasks++;
-            m_stats.m_center_messages_handled++;
+            m_stats.m_coordinator_messages_handled++;
             if (auto* v_telemetry = telemetry::get()) {
-                v_telemetry->record_center_state_msg();
+                v_telemetry->record_coordinator_state_msg();
             }
         }
 
@@ -713,9 +713,9 @@ namespace gempba {
         void maybe_broadcast_global_score(const score& p_new_global_score, MPI_Status p_status) {
             utils::print_ipc_debug_comments("center received global score {} from rank {}\n", p_new_global_score.to_string(), p_status.MPI_SOURCE);
             auto* v_telemetry = telemetry::get();
-            m_stats.m_center_messages_handled++;
+            m_stats.m_coordinator_messages_handled++;
             if (v_telemetry) {
-                v_telemetry->record_center_score_proposal();
+                v_telemetry->record_coordinator_score_proposal();
             }
 
             const bool v_should_broadcast = should_broadcast_global(m_goal, m_global_score, p_new_global_score);
@@ -731,9 +731,9 @@ namespace gempba {
                 MPI_Send(&m_global_score, sizeof(score), MPI_BYTE, v_rank, SCORE_UPDATE, m_global_score_communicator);
             }
             ++m_score_updates_sent;
-            m_stats.m_center_messages_handled++;
+            m_stats.m_coordinator_messages_handled++;
             if (v_telemetry) {
-                v_telemetry->record_center_score_broadcast();
+                v_telemetry->record_coordinator_score_broadcast();
                 v_telemetry->record_global_score_improved();
             }
 
@@ -774,7 +774,7 @@ namespace gempba {
             m_received_tasks++;
             m_stats.m_total_requested_tasks++;
             m_stats.m_received_task_count++;
-            m_stats.m_center_messages_handled++;
+            m_stats.m_coordinator_messages_handled++;
 
             if (auto* v_telemetry = telemetry::get()) {
                 v_telemetry->record_recv(static_cast<std::uint32_t>(p_status.MPI_SOURCE), static_cast<std::uint64_t>(v_buffer_char_count), v_recv_elapsed);
@@ -812,7 +812,7 @@ namespace gempba {
                 m_center_last_full_status = true;
                 m_time_centerfull_sent = MPI_Wtime();
                 if (auto* v_telemetry = telemetry::get()) {
-                    v_telemetry->record_center_full();
+                    v_telemetry->record_coordinator_full();
                 }
 
                 // cout << "CENTER IS FULL" << endl;
@@ -829,7 +829,7 @@ namespace gempba {
                 ++m_fullness_notices_sent;
                 m_center_last_full_status = false;
                 if (auto* v_telemetry = telemetry::get()) {
-                    v_telemetry->record_center_free();
+                    v_telemetry->record_coordinator_free();
                 }
 
                 // cout << "CENTER IS NOT FULL ANYMORE" << endl;
@@ -874,9 +874,9 @@ namespace gempba {
                         consume_int_flag(v_status, m_world_communicator);
                         m_total_requests_number++;
                         m_stats.m_total_requested_tasks++;
-                        m_stats.m_center_messages_handled++;
+                        m_stats.m_coordinator_messages_handled++;
                         if (auto* v_telemetry = telemetry::get()) {
-                            v_telemetry->record_center_state_msg();
+                            v_telemetry->record_coordinator_state_msg();
                         }
                         break;
                     }
@@ -946,7 +946,7 @@ namespace gempba {
             m_total_requests_number++;
             m_stats.m_sent_task_count++;
             m_stats.m_total_requested_tasks++;
-            m_stats.m_center_messages_handled++;
+            m_stats.m_coordinator_messages_handled++;
 
             if (auto* v_telemetry = telemetry::get()) {
                 v_telemetry->record_send(static_cast<std::uint32_t>(DEST), p_packet.size(), v_send_elapsed);

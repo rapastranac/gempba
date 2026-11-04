@@ -169,15 +169,15 @@ namespace gempba::telemetry {
         m_impl->post_isend(std::move(v_buffer), k_aggregator_rank, k_tag_node_frame);
     }
 
-    void mpi_transport::poll(const worker_frame_sink& p_worker_sink, const node_frame_sink& p_node_sink) {
+    void mpi_transport::poll(const worker_frame_sink& p_rank_sink, const node_frame_sink& p_node_sink) {
         if (m_impl->m_comm == MPI_COMM_NULL)
             return;
         if (m_impl->m_rank != k_aggregator_rank)
             return;
 
         // Regular frames first, so a rank's final frame lands in the sink after its earlier ones.
-        m_impl->drain_worker_frames(k_tag_worker_frame, p_worker_sink);
-        m_impl->drain_worker_frames(k_tag_final_worker_frame, p_worker_sink);
+        m_impl->drain_worker_frames(k_tag_worker_frame, p_rank_sink);
+        m_impl->drain_worker_frames(k_tag_final_worker_frame, p_rank_sink);
 
         // Drain node frames from sentinels.
         while (true) {
@@ -196,17 +196,17 @@ namespace gempba::telemetry {
         m_impl->reap_completed_sends();
     }
 
-    void mpi_transport::send_control(const std::uint32_t p_dst_worker_id, const control_msg& p_msg) {
+    void mpi_transport::send_control(const std::uint32_t p_dst_rank, const control_msg& p_msg) {
         if (m_impl->m_comm == MPI_COMM_NULL)
             return;
-        if (std::cmp_greater_equal(p_dst_worker_id, m_impl->m_world_size))
+        if (std::cmp_greater_equal(p_dst_rank, m_impl->m_world_size))
             return;
 
         m_impl->reap_completed_sends();
 
         std::vector<std::byte> v_buffer(sizeof(control_msg));
         std::memcpy(v_buffer.data(), &p_msg, sizeof(control_msg));
-        m_impl->post_isend(std::move(v_buffer), static_cast<int>(p_dst_worker_id), k_tag_control);
+        m_impl->post_isend(std::move(v_buffer), static_cast<int>(p_dst_rank), k_tag_control);
     }
 
     std::optional<control_msg> mpi_transport::try_recv_control() {

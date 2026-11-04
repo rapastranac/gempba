@@ -188,10 +188,10 @@ namespace gempba::telemetry {
 #endif
         }
 
-        worker_identity build_self_identity(std::uint32_t p_worker_id) noexcept {
+        worker_identity build_self_identity(std::uint32_t p_rank) noexcept {
             worker_identity v_self{};
             v_self.m_version = TELEMETRY_SCHEMA_VERSION;
-            v_self.m_worker_id = p_worker_id;
+            v_self.m_worker_id = p_rank;
             fill_hostname(v_self.m_hostname, sizeof(v_self.m_hostname));
             v_self.m_pid = current_pid();
             query_allowed_cpu_mask(v_self.m_allowed_cpu_mask);
@@ -229,24 +229,24 @@ namespace gempba::telemetry {
             p_node.m_sockets.push_back(std::move(v_socket));
         }
 
-        topology_snapshot build_mt_only_snapshot(std::uint32_t p_worker_id) {
+        topology_snapshot build_mt_only_snapshot(std::uint32_t p_rank) {
             topology_snapshot v_snapshot;
-            const worker_identity v_self = build_self_identity(p_worker_id);
+            const worker_identity v_self = build_self_identity(p_rank);
             v_snapshot.m_identities.push_back(v_self);
 
             topology_node v_node;
             v_node.m_hostname = v_self.m_hostname;
-            v_node.m_worker_ids.push_back(p_worker_id);
-            v_node.m_sentinel_worker_id = p_worker_id;
+            v_node.m_worker_ids.push_back(p_rank);
+            v_node.m_sentinel_worker_id = p_rank;
             fill_local_host_fields(v_node);
             v_snapshot.m_nodes.push_back(std::move(v_node));
             return v_snapshot;
         }
 
 #if GEMPBA_MULTIPROCESSING
-        topology_snapshot build_mpi_snapshot(std::uint32_t p_worker_id, std::uint32_t p_world_size) {
+        topology_snapshot build_mpi_snapshot(std::uint32_t p_rank, std::uint32_t p_world_size) {
             topology_snapshot v_snapshot;
-            const worker_identity v_self = build_self_identity(p_worker_id);
+            const worker_identity v_self = build_self_identity(p_rank);
 
             int v_initialized = 0;
             MPI_Initialized(&v_initialized);
@@ -254,8 +254,8 @@ namespace gempba::telemetry {
                 v_snapshot.m_identities.push_back(v_self);
                 topology_node v_node;
                 v_node.m_hostname = v_self.m_hostname;
-                v_node.m_worker_ids.push_back(p_worker_id);
-                v_node.m_sentinel_worker_id = p_worker_id;
+                v_node.m_worker_ids.push_back(p_rank);
+                v_node.m_sentinel_worker_id = p_rank;
                 fill_local_host_fields(v_node);
                 v_snapshot.m_nodes.push_back(std::move(v_node));
                 return v_snapshot;
@@ -292,7 +292,7 @@ namespace gempba::telemetry {
             std::vector<std::uint8_t> v_self_blob;
             {
                 const auto v_self_it = v_node_index_by_hostname.find(std::string(v_self.m_hostname));
-                const bool v_is_sentinel = v_self_it != v_node_index_by_hostname.end() && v_snapshot.m_nodes[v_self_it->second].m_sentinel_worker_id == p_worker_id;
+                const bool v_is_sentinel = v_self_it != v_node_index_by_hostname.end() && v_snapshot.m_nodes[v_self_it->second].m_sentinel_worker_id == p_rank;
                 if (v_is_sentinel) {
                     topology_node v_self_node;
                     v_self_node.m_hostname = v_self.m_hostname;
@@ -478,19 +478,19 @@ namespace gempba::telemetry {
 
     } // namespace detail
 
-    topology_snapshot build_topology_snapshot(const runtime_mode p_mode, const std::uint32_t p_worker_id, const std::uint32_t p_world_size) {
+    topology_snapshot build_topology_snapshot(const runtime_mode p_mode, const std::uint32_t p_rank, const std::uint32_t p_world_size) {
         switch (p_mode) {
             case runtime_mode::MT_ONLY:
-                return build_mt_only_snapshot(p_worker_id);
+                return build_mt_only_snapshot(p_rank);
 #if GEMPBA_MULTIPROCESSING
             case runtime_mode::MP_MPI:
-                return build_mpi_snapshot(p_worker_id, p_world_size);
+                return build_mpi_snapshot(p_rank, p_world_size);
 #else
             case runtime_mode::MP_MPI:
-                return build_mt_only_snapshot(p_worker_id);
+                return build_mt_only_snapshot(p_rank);
 #endif
         }
-        return build_mt_only_snapshot(p_worker_id);
+        return build_mt_only_snapshot(p_rank);
     }
 
 } // namespace gempba::telemetry

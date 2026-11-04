@@ -18,7 +18,7 @@ namespace {
         std::string v_out;
         gempba::telemetry::serialize_worker_frame(v_out, v_f);
 
-        EXPECT_NE(std::string::npos, v_out.find("\"worker_id\":3"));
+        EXPECT_NE(std::string::npos, v_out.find("\"rank\":3"));
         EXPECT_NE(std::string::npos, v_out.find("\"seq_no\":7"));
         EXPECT_NE(std::string::npos, v_out.find("\"tasks_started_total\":42"));
         EXPECT_NE(std::string::npos, v_out.find("\"tasks_sent_total\":8"));
@@ -65,7 +65,7 @@ namespace {
         std::string v_out;
         gempba::telemetry::serialize_worker_frame(v_out, v_f);
 
-        EXPECT_NE(std::string::npos, v_out.find("\"idle_microseconds_per_worker\":900"));
+        EXPECT_NE(std::string::npos, v_out.find("\"idle_microseconds_per_thread\":900"));
         EXPECT_NE(std::string::npos, v_out.find("\"idle_microseconds_starved\":600"));
         EXPECT_NE(std::string::npos, v_out.find("\"idle_microseconds_imbalanced\":300"));
     }
@@ -94,21 +94,21 @@ namespace {
         EXPECT_NE(std::string::npos, v_out.find("\"available_microseconds_queue_empty\":18"));
     }
 
-    TEST(json_serializer_test, worker_frame_includes_the_center_counters_and_telemetry_time) {
+    TEST(json_serializer_test, worker_frame_includes_the_coordinator_counters_and_telemetry_time) {
         gempba::telemetry::worker_frame v_f{};
-        v_f.m_center_state_msgs_total = 21;
-        v_f.m_center_score_proposals_total = 22;
-        v_f.m_center_score_broadcasts_total = 23;
-        v_f.m_center_full_microseconds = 24;
+        v_f.m_coordinator_state_msgs_total = 21;
+        v_f.m_coordinator_score_proposals_total = 22;
+        v_f.m_coordinator_score_broadcasts_total = 23;
+        v_f.m_coordinator_full_microseconds = 24;
         v_f.m_telemetry_microseconds_total = 25;
 
         std::string v_out;
         gempba::telemetry::serialize_worker_frame(v_out, v_f);
 
-        EXPECT_NE(std::string::npos, v_out.find("\"center_state_msgs_total\":21"));
-        EXPECT_NE(std::string::npos, v_out.find("\"center_score_proposals_total\":22"));
-        EXPECT_NE(std::string::npos, v_out.find("\"center_score_broadcasts_total\":23"));
-        EXPECT_NE(std::string::npos, v_out.find("\"center_full_microseconds\":24"));
+        EXPECT_NE(std::string::npos, v_out.find("\"coordinator_state_msgs_total\":21"));
+        EXPECT_NE(std::string::npos, v_out.find("\"coordinator_score_proposals_total\":22"));
+        EXPECT_NE(std::string::npos, v_out.find("\"coordinator_score_broadcasts_total\":23"));
+        EXPECT_NE(std::string::npos, v_out.find("\"coordinator_full_microseconds\":24"));
         EXPECT_NE(std::string::npos, v_out.find("\"telemetry_microseconds_total\":25"));
     }
 
@@ -139,7 +139,7 @@ namespace {
         std::string v_out;
         gempba::telemetry::serialize_node_frame(v_out, v_n);
 
-        EXPECT_NE(std::string::npos, v_out.find("\"sentinel_worker_id\":1"));
+        EXPECT_NE(std::string::npos, v_out.find("\"sentinel_rank\":1"));
         EXPECT_NE(std::string::npos, v_out.find("\"hostname\":\"host-a\""));
         EXPECT_NE(std::string::npos, v_out.find("\"logical_cores\":16"));
         EXPECT_NE(std::string::npos, v_out.find("\"mem_total_bytes\":4096"));
@@ -194,8 +194,8 @@ namespace {
         gempba::telemetry::serialize_topology(v_out, v_t);
 
         EXPECT_NE(std::string::npos, v_out.find("\"hostname\":\"host-a\""));
-        EXPECT_NE(std::string::npos, v_out.find("\"worker_ids\":[0,1,2]"));
-        EXPECT_NE(std::string::npos, v_out.find("\"sentinel_worker_id\":0"));
+        EXPECT_NE(std::string::npos, v_out.find("\"ranks\":[0,1,2]"));
+        EXPECT_NE(std::string::npos, v_out.find("\"sentinel_rank\":0"));
         EXPECT_NE(std::string::npos, v_out.find("\"total_physical_cores\":8"));
         EXPECT_NE(std::string::npos, v_out.find("\"total_logical_cores\":16"));
         EXPECT_NE(std::string::npos, v_out.find("\"mem_total_bytes\":17179869184"));
@@ -244,33 +244,33 @@ namespace {
         }
     }
 
-    TEST(json_serializer_test, topology_run_marks_the_ranks_the_scheduler_declares_centers) {
+    TEST(json_serializer_test, topology_run_marks_the_ranks_the_scheduler_declares_coordinators) {
         gempba::telemetry::run_description v_run;
         v_run.m_mode = gempba::telemetry::runtime_mode::MP_MPI;
-        v_run.m_roles = {gempba::rank_role::CENTER, gempba::rank_role::WORKER};
+        v_run.m_roles = {gempba::rank_role::COORDINATOR, gempba::rank_role::WORKER};
 
         std::string v_mpi;
         gempba::telemetry::serialize_topology(v_mpi, two_rank_topology(), &v_run);
-        EXPECT_NE(std::string::npos, v_mpi.find(R"({"worker_id":0,"hostname":"","pid":0,"primary_socket":0,"role":"center")")) << v_mpi;
-        EXPECT_NE(std::string::npos, v_mpi.find(R"({"worker_id":1,"hostname":"","pid":0,"primary_socket":0,"role":"worker")")) << v_mpi;
+        EXPECT_NE(std::string::npos, v_mpi.find(R"({"rank":0,"hostname":"","pid":0,"primary_socket":0,"role":"coordinator")")) << v_mpi;
+        EXPECT_NE(std::string::npos, v_mpi.find(R"({"rank":1,"hostname":"","pid":0,"primary_socket":0,"role":"worker")")) << v_mpi;
 
         v_run.m_mode = gempba::telemetry::runtime_mode::MT_ONLY;
         v_run.m_roles.clear();
         std::string v_mt;
         gempba::telemetry::serialize_topology(v_mt, two_rank_topology(), &v_run);
-        EXPECT_EQ(std::string::npos, v_mt.find(R"("role":"center")")) << v_mt;
+        EXPECT_EQ(std::string::npos, v_mt.find(R"("role":"coordinator")")) << v_mt;
         EXPECT_NE(std::string::npos, v_mt.find(R"("runtime_mode":"multithreading")")) << v_mt;
     }
 
-    TEST(json_serializer_test, topology_run_marks_every_rank_a_worker_when_the_scheduler_declares_no_center) {
+    TEST(json_serializer_test, topology_run_marks_every_rank_a_worker_when_the_scheduler_declares_no_coordinator) {
         gempba::telemetry::run_description v_run;
         v_run.m_mode = gempba::telemetry::runtime_mode::MP_MPI;
 
         std::string v_out;
         gempba::telemetry::serialize_topology(v_out, two_rank_topology(), &v_run);
-        EXPECT_EQ(std::string::npos, v_out.find(R"("role":"center")")) << v_out;
-        EXPECT_NE(std::string::npos, v_out.find(R"({"worker_id":0,"hostname":"","pid":0,"primary_socket":0,"role":"worker")")) << v_out;
-        EXPECT_NE(std::string::npos, v_out.find(R"({"worker_id":1,"hostname":"","pid":0,"primary_socket":0,"role":"worker")")) << v_out;
+        EXPECT_EQ(std::string::npos, v_out.find(R"("role":"coordinator")")) << v_out;
+        EXPECT_NE(std::string::npos, v_out.find(R"({"rank":0,"hostname":"","pid":0,"primary_socket":0,"role":"worker")")) << v_out;
+        EXPECT_NE(std::string::npos, v_out.find(R"({"rank":1,"hostname":"","pid":0,"primary_socket":0,"role":"worker")")) << v_out;
     }
 
     TEST(json_serializer_test, topology_run_writes_null_for_missing_components_and_escapes_annotations) {
@@ -324,7 +324,7 @@ namespace {
         EXPECT_TRUE(v_out.ends_with("}"));
         EXPECT_NE(std::string::npos, v_out.find("\"elapsed_seconds\":12345"));
         EXPECT_NE(std::string::npos, v_out.find("\"topology\":"));
-        EXPECT_NE(std::string::npos, v_out.find("\"workers\":[]"));
+        EXPECT_NE(std::string::npos, v_out.find("\"ranks\":[]"));
         EXPECT_NE(std::string::npos, v_out.find("\"nodes\":[]"));
     }
 
@@ -347,7 +347,7 @@ namespace {
 
         EXPECT_NE(std::string::npos, v_running.find(R"("elapsed_seconds":12,"paused":false,"final":false,"topology":)")) << v_running;
         EXPECT_NE(std::string::npos, v_paused.find(R"("elapsed_seconds":12,"paused":true,"final":false,"topology":)")) << v_paused;
-        EXPECT_NE(std::string::npos, v_paused.find(R"("workers":[{"worker_id":0,)")) << v_paused;
+        EXPECT_NE(std::string::npos, v_paused.find(R"("ranks":[{"rank":0,)")) << v_paused;
     }
 
     TEST(json_serializer_test, paused_broadcast_is_the_header_alone) {

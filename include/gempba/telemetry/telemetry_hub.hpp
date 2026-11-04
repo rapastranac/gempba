@@ -58,32 +58,32 @@ namespace gempba::telemetry {
         /**
          * @brief Bind the hub to a runtime mode and start the transport.
          *
-         * Call once after the runtime is up and the worker_id / world_size
+         * Call once after the runtime is up and the rank / world_size
          * are known. Sets up the transport, populates the topology snapshot,
          * and (on the aggregator) starts the dashboard server.
          *
          * @param p_mode              Runtime mode driving transport choice.
-         * @param p_worker_id         This worker's id (0..world_size-1).
-         * @param p_world_size        Total worker count in this run.
+         * @param p_rank              This rank (0..world_size-1).
+         * @param p_world_size        Total rank count in this run.
          * @param p_start_pump_thread When @c false, the periodic pump thread
          *                            (and the aggregator's dashboard server, when
          *                            wired) is skipped; @ref tick_if_due must
          *                            then be called manually. Used by tests.
          */
-        void on_runtime_ready(runtime_mode p_mode, std::uint32_t p_worker_id, std::uint32_t p_world_size, bool p_start_pump_thread = true);
+        void on_runtime_ready(runtime_mode p_mode, std::uint32_t p_rank, std::uint32_t p_world_size, bool p_start_pump_thread = true);
 
         /// Stop the pump, drain a final frame, and release transport resources.
         void shutdown();
 
         /**
-         * @brief Record an outbound task to a remote worker (bytes + count), and how long its MPI sends took.
+         * @brief Record an outbound task to another rank (bytes + count), and how long its MPI sends took.
          *
          * Atomic, lock-free, allocation-free. Safe to call from any thread.
          */
-        void record_send(std::uint32_t p_dst_worker_id, std::uint64_t p_bytes, std::chrono::nanoseconds p_elapsed = {}) noexcept;
+        void record_send(std::uint32_t p_dst_rank, std::uint64_t p_bytes, std::chrono::nanoseconds p_elapsed = {}) noexcept;
 
-        /// Record an inbound task from a remote worker, and how long its MPI receives took. Hot-path; same guarantees as @ref record_send.
-        void record_recv(std::uint32_t p_src_worker_id, std::uint64_t p_bytes, std::chrono::nanoseconds p_elapsed = {}) noexcept;
+        /// Record an inbound task from another rank, and how long its MPI receives took. Hot-path; same guarantees as @ref record_send.
+        void record_recv(std::uint32_t p_src_rank, std::uint64_t p_bytes, std::chrono::nanoseconds p_elapsed = {}) noexcept;
 
         /// Record a task dispatched to the local thread pool. Hot-path; same guarantees as @ref record_send.
         void record_task_local() noexcept;
@@ -100,34 +100,34 @@ namespace gempba::telemetry {
         /// Record that this worker received a task and runs it.
         void record_worker_running() noexcept;
 
-        /// Record that the center assigned @p p_worker_id, which then waits for its task.
-        void record_assignment(std::uint32_t p_worker_id) noexcept;
+        /// Record that the coordinator assigned rank @p p_rank, which then waits for its task.
+        void record_assignment(std::uint32_t p_rank) noexcept;
 
-        /// Record that @p p_worker_id reported running, which ends its pending assignment.
-        void record_assignment_accepted(std::uint32_t p_worker_id) noexcept;
+        /// Record that rank @p p_rank reported running, which ends its pending assignment.
+        void record_assignment_accepted(std::uint32_t p_rank) noexcept;
 
-        /// Record the center's available-rank count and queue state after it handled an event.
-        void record_center_queue(std::uint32_t p_available_ranks, bool p_queue_empty) noexcept;
+        /// Record the coordinator's available-rank count and queue state after it handled an event.
+        void record_coordinator_queue(std::uint32_t p_available_ranks, bool p_queue_empty) noexcept;
 
-        /// Record that the center handled a running or available report. Hot-path; same guarantees as @ref record_send.
-        void record_center_state_msg() noexcept;
+        /// Record that the coordinator handled a running or available report. Hot-path; same guarantees as @ref record_send.
+        void record_coordinator_state_msg() noexcept;
 
-        /// Record that the center received a score proposal. Hot-path; same guarantees as @ref record_send.
-        void record_center_score_proposal() noexcept;
+        /// Record that the coordinator received a score proposal. Hot-path; same guarantees as @ref record_send.
+        void record_coordinator_score_proposal() noexcept;
 
-        /// Record that the center broadcast a new global score to every worker. Hot-path; same guarantees as @ref record_send.
-        void record_center_score_broadcast() noexcept;
+        /// Record that the coordinator broadcast a new global score to every worker. Hot-path; same guarantees as @ref record_send.
+        void record_coordinator_score_broadcast() noexcept;
 
-        /// Record that the center told its workers it is full; repeated notices extend the same full period.
-        void record_center_full() noexcept;
+        /// Record that the coordinator told its workers it is full; repeated notices extend the same full period.
+        void record_coordinator_full() noexcept;
 
-        /// Record that the center told its workers it has room again.
-        void record_center_free() noexcept;
+        /// Record that the coordinator told its workers it has room again.
+        void record_coordinator_free() noexcept;
 
-        /// Record that this worker proposed its local best score to the center. Hot-path; same guarantees as @ref record_send.
+        /// Record that this worker proposed its local best score to the coordinator. Hot-path; same guarantees as @ref record_send.
         void record_score_proposal_sent() noexcept;
 
-        /// Record that the center's global score improved; its time since run start becomes the latest improvement.
+        /// Record that the coordinator's global score improved; its time since run start becomes the latest improvement.
         void record_global_score_improved() noexcept;
 
         /**
@@ -140,21 +140,24 @@ namespace gempba::telemetry {
         void tick_if_due() noexcept;
 
         /**
-         * @brief Fill @p p_out with the current worker counter snapshot.
+         * @brief Fill @p p_out with this rank's current counter snapshot.
          *
          * Safe alongside concurrent @c record_* calls (relaxed atomics).
          * Not @c const — the process probe maintains delta state for CPU%.
          */
         void snapshot_worker_frame(worker_frame& p_out) noexcept;
 
-        /// Fill @p p_out with the current host-level snapshot. Sentinel workers only.
+        /// Fill @p p_out with the current host-level snapshot. Sentinel ranks only.
         void snapshot_node_frame(node_frame& p_out) noexcept;
 
-        /// @return The latest worker_frame for @p p_worker_id, if one has been received.
-        [[nodiscard]] std::optional<worker_frame> latest_worker_frame(std::uint32_t p_worker_id) const;
+        /// @return The latest frame of rank @p p_rank, if one has been received.
+        [[nodiscard]] std::optional<worker_frame> latest_rank_frame(std::uint32_t p_rank) const;
 
-        /// @return The latest node_frame for @p p_sentinel_worker_id, if one has been received.
-        [[nodiscard]] std::optional<node_frame> latest_node_frame(std::uint32_t p_sentinel_worker_id) const;
+        /// @deprecated Use @ref latest_rank_frame. Removed in v5.0.0 (#373).
+        [[deprecated("use latest_rank_frame")]] [[nodiscard]] std::optional<worker_frame> latest_worker_frame(std::uint32_t p_rank) const;
+
+        /// @return The latest node_frame of the host whose sentinel is rank @p p_sentinel_rank, if one has been received.
+        [[nodiscard]] std::optional<node_frame> latest_node_frame(std::uint32_t p_sentinel_rank) const;
 
         /// Static topology captured at @ref on_runtime_ready time.
         [[nodiscard]] const topology_snapshot& current_topology() const noexcept;
@@ -162,7 +165,7 @@ namespace gempba::telemetry {
         /// Wall-clock seconds since @ref on_runtime_ready was called; 0 before that.
         [[nodiscard]] std::uint64_t program_elapsed_seconds() const noexcept;
 
-        /// The UUID v4 the aggregator generated for this run at @ref on_runtime_ready; empty on other workers.
+        /// The UUID v4 the aggregator generated for this run at @ref on_runtime_ready; empty on other ranks.
         [[nodiscard]] const std::string& run_id() const noexcept;
 
         /**
@@ -194,29 +197,35 @@ namespace gempba::telemetry {
         /// @return this run's markers, in the order they were recorded.
         [[nodiscard]] std::vector<run_marker> run_markers() const;
 
-        /// Record the scheduler this run uses, by its scheduler::get_name(), and each rank's scheduler::role_of(), indexed by worker id.
+        /// Record the scheduler this run uses, by its scheduler::get_name(), and each rank's scheduler::role_of(), indexed by rank.
         void describe_scheduler(std::string_view p_name, std::vector<rank_role> p_roles = {});
 
         /// Record the load balancer this run uses.
         void describe_load_balancer(balancing_policy p_policy);
 
-        /// @return how this run is set up; the thread count comes from the latest worker frames, so only the aggregator fills it.
+        /// @return how this run is set up; the thread count comes from the latest rank frames, so only the aggregator fills it.
         [[nodiscard]] run_description describe_run() const;
 
-        /// Set the cadence at which worker frames, and each host sentinel's node frame, are emitted. Fans out to other workers.
-        void set_worker_interval_ms(std::uint32_t p_interval_ms) noexcept;
+        /// Set the telemetry interval at which rank frames, and each host sentinel's node frame, are emitted. Fans out to other ranks.
+        void set_interval_ms(std::uint32_t p_interval_ms) noexcept;
 
-        /// @deprecated Does nothing: node frames follow @ref set_worker_interval_ms since v4.3.0. Removed in the next breaking release.
-        [[deprecated("node frames follow set_worker_interval_ms")]] void set_node_interval_ms(std::uint32_t p_interval_ms) noexcept;
+        /// @deprecated Use @ref set_interval_ms. Removed in v5.0.0 (#373).
+        [[deprecated("use set_interval_ms")]] void set_worker_interval_ms(std::uint32_t p_interval_ms) noexcept;
 
-        /// Promote this worker to its host's sentinel; it will start emitting node frames.
+        /// @deprecated Does nothing: node frames follow @ref set_interval_ms since v4.3.0. Removed in the next breaking release.
+        [[deprecated("node frames follow set_interval_ms")]] void set_node_interval_ms(std::uint32_t p_interval_ms) noexcept;
+
+        /// Promote this rank to its host's sentinel; it will start emitting node frames.
         void mark_as_node_sentinel() noexcept;
 
-        /// @return The current worker-frame emission interval, in milliseconds.
-        [[nodiscard]] std::uint32_t worker_interval_ms() const noexcept;
+        /// @return The current telemetry interval, in milliseconds.
+        [[nodiscard]] std::uint32_t interval_ms() const noexcept;
 
-        /// @deprecated Node frames follow the worker interval since v4.3.0, so this returns @ref worker_interval_ms. Removed in the next breaking release.
-        [[deprecated("node frames follow worker_interval_ms")]] [[nodiscard]] std::uint32_t node_interval_ms() const noexcept;
+        /// @deprecated Use @ref interval_ms. Removed in v5.0.0 (#373).
+        [[deprecated("use interval_ms")]] [[nodiscard]] std::uint32_t worker_interval_ms() const noexcept;
+
+        /// @deprecated Node frames follow the telemetry interval since v4.3.0, so this returns @ref interval_ms. Removed in the next breaking release.
+        [[deprecated("node frames follow interval_ms")]] [[nodiscard]] std::uint32_t node_interval_ms() const noexcept;
 
         /// @return whether a @ref control_kind::PAUSE holds; frames are neither published nor ingested until a @ref control_kind::RESUME.
         [[nodiscard]] bool paused() const noexcept;
@@ -248,16 +257,16 @@ namespace gempba::telemetry {
         bool drain_inbound_frames();
 
         runtime_mode m_mode = runtime_mode::MT_ONLY;
-        std::uint32_t m_worker_id = 0;
+        std::uint32_t m_rank = 0;
         std::uint32_t m_world_size = 1;
         std::atomic<bool> m_is_sentinel{false};
-        std::atomic<std::uint32_t> m_worker_interval_ms{500};
+        std::atomic<std::uint32_t> m_interval_ms{500};
         std::atomic<bool> m_paused{false};
         std::atomic<std::uint32_t> m_snapshot_requested{0};
         std::atomic<std::uint64_t> m_snapshot_requested_ms{0};
         std::atomic<std::uint32_t> m_snapshot_due{0};
         std::atomic<std::uint32_t> m_snapshot_answered{0};
-        std::atomic<std::uint64_t> m_last_worker_emit_ms{0};
+        std::atomic<std::uint64_t> m_last_rank_emit_ms{0};
         std::atomic<std::uint32_t> m_seq_no{0};
         std::atomic<std::uint64_t> m_start_ms{0};
         std::string m_run_id;

@@ -140,7 +140,7 @@ namespace gempba {
 
         [[nodiscard]] std::string_view get_name() const override { return "semi_centralized"; }
 
-        [[nodiscard]] rank_role role_of(const int p_rank) const override { return p_rank == CENTER_NODE ? rank_role::CENTER : rank_role::WORKER; }
+        [[nodiscard]] rank_role role_of(const int p_rank) const override { return p_rank == CENTER_NODE ? rank_role::COORDINATOR : rank_role::WORKER; }
 
     private:
         [[nodiscard]] int next_process() const { return this->m_next_process; }
@@ -648,9 +648,9 @@ namespace gempba {
             m_process_state[p_status.MPI_SOURCE] = RUNNING_STATE; // node was assigned, now it's running
             ++m_nodes_running;
             utils::print_ipc_debug_comments("rank {} reported running, nRunning :{}\n", p_status.MPI_SOURCE, m_nodes_running);
-            m_stats.m_center_messages_handled++;
+            m_stats.m_coordinator_messages_handled++;
             if (auto* v_telemetry = telemetry::get()) {
-                v_telemetry->record_center_state_msg();
+                v_telemetry->record_coordinator_state_msg();
                 v_telemetry->record_assignment_accepted(static_cast<std::uint32_t>(p_status.MPI_SOURCE));
             }
 
@@ -680,9 +680,9 @@ namespace gempba {
             --m_nodes_running;
             m_total_requests_number++;
             m_stats.m_total_requested_tasks++;
-            m_stats.m_center_messages_handled++;
+            m_stats.m_coordinator_messages_handled++;
             if (auto* v_telemetry = telemetry::get()) {
-                v_telemetry->record_center_state_msg();
+                v_telemetry->record_coordinator_state_msg();
             }
 
             if (m_process_tree[p_status.MPI_SOURCE].is_assigned()) {
@@ -729,9 +729,9 @@ namespace gempba {
         void maybe_broadcast_global_score(const score& p_new_global_score, MPI_Status p_status) {
             utils::print_ipc_debug_comments("center received global score {} from rank {}\n", p_new_global_score.to_string(), p_status.MPI_SOURCE);
             auto* v_telemetry = telemetry::get();
-            m_stats.m_center_messages_handled++;
+            m_stats.m_coordinator_messages_handled++;
             if (v_telemetry) {
-                v_telemetry->record_center_score_proposal();
+                v_telemetry->record_coordinator_score_proposal();
             }
 
             const bool v_should_broadcast = should_broadcast_global(m_goal, m_global_score, p_new_global_score);
@@ -747,9 +747,9 @@ namespace gempba {
                 MPI_Send(&m_global_score, sizeof(score), MPI_BYTE, v_rank, SCORE_UPDATE, m_global_score_communicator);
             }
             ++m_score_updates_sent;
-            m_stats.m_center_messages_handled++;
+            m_stats.m_coordinator_messages_handled++;
             if (v_telemetry) {
-                v_telemetry->record_center_score_broadcast();
+                v_telemetry->record_coordinator_score_broadcast();
                 v_telemetry->record_global_score_improved();
             }
 
@@ -824,9 +824,9 @@ namespace gempba {
                         consume_int_flag(v_status, m_world_communicator);
                         m_total_requests_number++;
                         m_stats.m_total_requested_tasks++;
-                        m_stats.m_center_messages_handled++;
+                        m_stats.m_coordinator_messages_handled++;
                         if (auto* v_telemetry = telemetry::get()) {
-                            v_telemetry->record_center_state_msg();
+                            v_telemetry->record_coordinator_state_msg();
                         }
                         break;
                     }
@@ -879,7 +879,7 @@ namespace gempba {
             m_total_requests_number++;
             m_stats.m_sent_task_count++;
             m_stats.m_total_requested_tasks++;
-            m_stats.m_center_messages_handled++;
+            m_stats.m_coordinator_messages_handled++;
 
             if (auto* v_telemetry = telemetry::get()) {
                 v_telemetry->record_send(static_cast<std::uint32_t>(DEST), p_packet.size(), v_send_elapsed);

@@ -14,7 +14,7 @@ namespace gempba {
         /// Runs tasks.
         WORKER,
         /// Coordinates the run and runs no tasks.
-        CENTER,
+        COORDINATOR,
     };
 
 } // namespace gempba

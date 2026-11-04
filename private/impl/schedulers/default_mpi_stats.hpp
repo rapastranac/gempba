@@ -44,20 +44,20 @@ namespace gempba {
             size_t m_total_thread_requests;
             double m_idle_time;
             double m_elapsed_time;
-            size_t m_center_messages_handled;
+            size_t m_coordinator_messages_handled;
         };
 
     public:
         int m_rank;
         size_t m_received_task_count = 0;
         size_t m_sent_task_count = 0;
-        /** @deprecated Sent plus received tasks on workers but requests handled on the center; use @ref m_center_messages_handled on the center. */
+        /** @deprecated Sent plus received tasks on workers but requests handled on the coordinator; use @ref m_coordinator_messages_handled on the coordinator. */
         size_t m_total_requested_tasks = 0;
         size_t m_total_thread_requests = 0;
         double m_idle_time = 0.0;
         double m_elapsed_time = 0.0;
-        /** @brief Center: running and available reports, tasks in and out, score proposals and score broadcasts it handled; 0 on workers. */
-        size_t m_center_messages_handled = 0;
+        /** @brief Coordinator: running and available reports, tasks in and out, score proposals and score broadcasts it handled; 0 on workers. */
+        size_t m_coordinator_messages_handled = 0;
 
         // Original constructor
         explicit default_mpi_stats(const int p_rank) : m_rank(p_rank) {}
@@ -75,28 +75,29 @@ namespace gempba {
         friend bool operator==(const default_mpi_stats& p_lhs, const default_mpi_stats& p_rhs) {
             return p_lhs.m_rank == p_rhs.m_rank && p_lhs.m_received_task_count == p_rhs.m_received_task_count && p_lhs.m_sent_task_count == p_rhs.m_sent_task_count &&
                    p_lhs.m_total_requested_tasks == p_rhs.m_total_requested_tasks && p_lhs.m_total_thread_requests == p_rhs.m_total_thread_requests &&
-                   p_lhs.m_idle_time == p_rhs.m_idle_time && p_lhs.m_elapsed_time == p_rhs.m_elapsed_time && p_lhs.m_center_messages_handled == p_rhs.m_center_messages_handled;
+                   p_lhs.m_idle_time == p_rhs.m_idle_time && p_lhs.m_elapsed_time == p_rhs.m_elapsed_time && p_lhs.m_coordinator_messages_handled == p_rhs.m_coordinator_messages_handled;
         }
 
         friend bool operator!=(const default_mpi_stats& p_lhs, const default_mpi_stats& p_rhs) { return !(p_lhs == p_rhs); }
 
         auto operator<=>(const default_mpi_stats& p_other) const {
-            auto v_lhs = std::tie(m_rank, m_received_task_count, m_sent_task_count, m_total_requested_tasks, m_total_thread_requests, m_idle_time, m_elapsed_time, m_center_messages_handled);
+            auto v_lhs =
+                    std::tie(m_rank, m_received_task_count, m_sent_task_count, m_total_requested_tasks, m_total_thread_requests, m_idle_time, m_elapsed_time, m_coordinator_messages_handled);
             auto v_rhs = std::tie(p_other.m_rank, p_other.m_received_task_count, p_other.m_sent_task_count, p_other.m_total_requested_tasks, p_other.m_total_thread_requests,
-                                  p_other.m_idle_time, p_other.m_elapsed_time, p_other.m_center_messages_handled);
+                                  p_other.m_idle_time, p_other.m_elapsed_time, p_other.m_coordinator_messages_handled);
             return v_lhs <=> v_rhs;
         }
 
 
         [[nodiscard]] task_packet serialize() const override {
-            const internal_data v_data{m_rank,      m_received_task_count, m_sent_task_count,        m_total_requested_tasks, m_total_thread_requests,
-                                       m_idle_time, m_elapsed_time,        m_center_messages_handled};
+            const internal_data v_data{m_rank,         m_received_task_count,         m_sent_task_count, m_total_requested_tasks, m_total_thread_requests, m_idle_time,
+                                       m_elapsed_time, m_coordinator_messages_handled};
 
             return task_packet{reinterpret_cast<const char*>(&v_data), sizeof(internal_data)};
         }
 
         [[nodiscard]] std::vector<std::string> labels() const override {
-            return {"rank", "received_task_count", "sent_task_count", "total_requested_tasks", "total_thread_requests", "idle_time", "elapsed_time", "center_messages_handled"};
+            return {"rank", "received_task_count", "sent_task_count", "total_requested_tasks", "total_thread_requests", "idle_time", "elapsed_time", "coordinator_messages_handled"};
         }
 
         static default_mpi_stats from_packet(const task_packet& p_packet) {
@@ -113,7 +114,7 @@ namespace gempba {
             v_result.m_total_thread_requests = v_data->m_total_thread_requests;
             v_result.m_idle_time = v_data->m_idle_time;
             v_result.m_elapsed_time = v_data->m_elapsed_time;
-            v_result.m_center_messages_handled = v_data->m_center_messages_handled;
+            v_result.m_coordinator_messages_handled = v_data->m_coordinator_messages_handled;
 
             return v_result;
         }
@@ -126,7 +127,7 @@ namespace gempba {
             p_visitor("total_thread_requests", std::make_any<std::size_t>(m_total_thread_requests));
             p_visitor("idle_time", std::make_any<double>(m_idle_time));
             p_visitor("elapsed_time", std::make_any<double>(m_elapsed_time));
-            p_visitor("center_messages_handled", std::make_any<std::size_t>(m_center_messages_handled));
+            p_visitor("coordinator_messages_handled", std::make_any<std::size_t>(m_coordinator_messages_handled));
         }
 
         void visit(stats_visitor* const p_visitor) const override { p_visitor->visit(*this); }

@@ -58,7 +58,7 @@ TEST(default_mpi_stats_test, visitor_returns_all_fields_correctly) {
     v_stats_impl.m_total_thread_requests = 40;
     v_stats_impl.m_idle_time = 1.5;
     v_stats_impl.m_elapsed_time = 2.5;
-    v_stats_impl.m_center_messages_handled = 50;
+    v_stats_impl.m_coordinator_messages_handled = 50;
 
     std::unordered_map<std::string, std::any> v_collected;
 
@@ -72,7 +72,7 @@ TEST(default_mpi_stats_test, visitor_returns_all_fields_correctly) {
     EXPECT_EQ(40u, std::any_cast<std::size_t>(v_collected["total_thread_requests"]));
     EXPECT_DOUBLE_EQ(1.5, std::any_cast<double>(v_collected["idle_time"]));
     EXPECT_DOUBLE_EQ(2.5, std::any_cast<double>(v_collected["elapsed_time"]));
-    EXPECT_EQ(50u, std::any_cast<std::size_t>(v_collected["center_messages_handled"]));
+    EXPECT_EQ(50u, std::any_cast<std::size_t>(v_collected["coordinator_messages_handled"]));
 }
 
 TEST(default_mpi_stats_test, serialize_and_from_packet_round_trip) {
@@ -83,7 +83,7 @@ TEST(default_mpi_stats_test, serialize_and_from_packet_round_trip) {
     v_stats_impl.m_total_thread_requests = 44;
     v_stats_impl.m_idle_time = 3.3;
     v_stats_impl.m_elapsed_time = 4.4;
-    v_stats_impl.m_center_messages_handled = 55;
+    v_stats_impl.m_coordinator_messages_handled = 55;
 
     const gempba::task_packet v_pkt = v_stats_impl.serialize();
     const gempba::default_mpi_stats v_deserialized = gempba::default_mpi_stats::from_packet(v_pkt);
@@ -95,7 +95,7 @@ TEST(default_mpi_stats_test, serialize_and_from_packet_round_trip) {
     EXPECT_EQ(44u, v_deserialized.m_total_thread_requests);
     EXPECT_DOUBLE_EQ(3.3, v_deserialized.m_idle_time);
     EXPECT_DOUBLE_EQ(4.4, v_deserialized.m_elapsed_time);
-    EXPECT_EQ(55u, v_deserialized.m_center_messages_handled);
+    EXPECT_EQ(55u, v_deserialized.m_coordinator_messages_handled);
 }
 
 TEST(default_mpi_stats_test, from_packet_invalid_size_throws) {
@@ -317,7 +317,7 @@ TEST(default_mpi_stats_test, labels_returns_expected_column_names) {
     EXPECT_EQ("total_thread_requests", v_labels[4]);
     EXPECT_EQ("idle_time", v_labels[5]);
     EXPECT_EQ("elapsed_time", v_labels[6]);
-    EXPECT_EQ("center_messages_handled", v_labels[7]);
+    EXPECT_EQ("coordinator_messages_handled", v_labels[7]);
 }
 
 TEST(default_mpi_stats_test, equality_operator_equal_objects) {

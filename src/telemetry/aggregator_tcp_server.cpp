@@ -101,7 +101,7 @@ namespace gempba::telemetry {
         constexpr std::chrono::milliseconds k_control_poll_interval{500};
         constexpr std::chrono::milliseconds k_snapshot_poll_interval{10};
 
-        std::chrono::milliseconds broadcast_interval(const telemetry_hub& p_hub) { return std::max(std::chrono::milliseconds(p_hub.worker_interval_ms()), k_min_broadcast_interval); }
+        std::chrono::milliseconds broadcast_interval(const telemetry_hub& p_hub) { return std::max(std::chrono::milliseconds(p_hub.interval_ms()), k_min_broadcast_interval); }
 
         constexpr std::size_t k_inbox_cap = 4096;
 
@@ -278,8 +278,8 @@ namespace gempba::telemetry {
             if (!v_value) {
                 return false;
             }
-            if (v_kind_trimmed == "set_worker_interval_ms") {
-                p_out_kind = control_kind::SET_WORKER_INTERVAL_MS;
+            if (v_kind_trimmed == "set_interval_ms" || v_kind_trimmed == "set_worker_interval_ms") {
+                p_out_kind = control_kind::SET_INTERVAL_MS;
             } else if (v_kind_trimmed == "set_node_interval_ms") {
                 // Sent by dashboards from before #367 folded the node rate into the worker rate; accepted and ignored for v4.3.0, to be removed in the next breaking release.
                 p_out_kind = control_kind::UNSPECIFIED;
@@ -312,7 +312,7 @@ namespace gempba::telemetry {
             std::vector<node_frame> v_nodes;
             for (const auto& v_node: v_topology.m_nodes) {
                 for (std::uint32_t v_id: v_node.m_worker_ids) {
-                    if (auto v_f = p_hub.latest_worker_frame(v_id)) {
+                    if (auto v_f = p_hub.latest_rank_frame(v_id)) {
                         v_workers.push_back(*v_f);
                     }
                 }
