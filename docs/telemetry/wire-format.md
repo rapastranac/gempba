@@ -4,14 +4,14 @@ This is the reference for what gempba's telemetry stream carries: every key of a
 
 ## The stream
 
-- The center (rank 0, or the only process in a multithreading run) serves the stream, whatever role its scheduler gives it (see `role`). It listens on `127.0.0.1` only, port 9000 unless the program calls `gempba::telemetry::configure_port` before creating the runtime. To watch a run on another machine, use the GemPBA Dashboard, which opens the SSH tunnel itself.
+- The aggregator (rank 0, or the only process in a multithreading run) collects every rank's frames and serves the stream. The aggregator is a telemetry role, not a scheduler one: rank 0 is the aggregator whatever `role` its scheduler gives it, and "center" on this page always means that scheduler role. It listens on `127.0.0.1` only, port 9000 unless the program calls `gempba::telemetry::configure_port` before creating the runtime. To watch a run on another machine, use the GemPBA Dashboard, which opens the SSH tunnel itself.
 - Any number of clients can connect, and each receives the same lines. Each line is one JSON object followed by `\n`.
 - A full line is self-contained. It carries the topology, the run setup and the latest frame from every rank and every host, so a client that connects late misses nothing but history.
-- The center sends:
+- The aggregator sends:
   - a full line every telemetry interval: 500 ms by default, never more often than every 50 ms, and changeable live with `set_worker_interval_ms`;
   - while paused, a [paused line](#paused-line) at the same cadence instead;
   - one full line as soon as a [snapshot](#control-lines) is answered;
-  - a final full line at shutdown, even while paused, carrying the run's totals and marked `"final":true`. The center then closes the connection, so a connection that closes without that line ended some other way, such as a crash.
+  - a final full line at shutdown, even while paused, carrying the run's totals and marked `"final":true`. The aggregator then closes the connection, so a connection that closes without that line ended some other way, such as a crash.
 - Frame counters are cumulative since the process started telemetry. A consumer takes differences between lines to get rates.
 - `first_task_ms`, `last_task_ms` and `last_score_improvement_ms` are milliseconds since the scheduler run started, and stay 0 until the event first happens. `elapsed_seconds` and a marker's `elapsed_ms` count from when telemetry came up. `worker_local_ms` and `sentinel_local_ms` are a rank's own monotonic clock.
 
@@ -200,7 +200,7 @@ A full line from a 2-rank centralized run on one Windows host, pretty-printed (t
 
 ### Paused line
 
-While paused, the center sends only the line's header:
+While paused, the aggregator sends only the line's header:
 
 ```json
 {"version":2,"run_id":"6a5a9990-6f0f-4972-b6be-9d4bae4ead1e","ts":1793730848551,"elapsed_seconds":2,"paused":true,"final":false}
@@ -211,11 +211,11 @@ While paused, the center sends only the line's header:
 | Key | Type | Meaning | Since |
 |---|---|---|---|
 | `version` | integer | The schema version, `2`. See [Schema versions](#schema-versions). | v3.3.0 |
-| `run_id` | string | A UUID v4 the center draws once per run, so a consumer can tell runs apart. | v4.3.0 (#343) |
+| `run_id` | string | A UUID v4 the aggregator draws once per run, so a consumer can tell runs apart. | v4.3.0 (#343) |
 | `ts` | integer | Wall-clock milliseconds since the Unix epoch when the line was built. | v3.3.0 |
-| `elapsed_seconds` | integer | Seconds since telemetry came up on the center. | v3.3.0 |
+| `elapsed_seconds` | integer | Seconds since telemetry came up on the aggregator. | v3.3.0 |
 | `paused` | boolean | Whether telemetry is paused. A paused line carries only the header, the keys up to `final`; a full line sent while paused, such as a snapshot or the final line, says `true` too. | v4.3.0 (#368) |
-| `final` | boolean | `true` only on the line the center sends at shutdown, the last before it closes the connection; `false` on every other line, paused lines included. | v4.3.0 (#389) |
+| `final` | boolean | `true` only on the line the aggregator sends at shutdown, the last before it closes the connection; `false` on every other line, paused lines included. | v4.3.0 (#389) |
 | `topology` | object | Hosts, ranks and the run setup. See [Topology](#topology). Absent from paused lines. | v3.3.0 |
 | `workers` | array | The latest [worker frame](#worker-frame) of each rank that has sent one. Absent from paused lines. | v3.3.0 |
 | `nodes` | array | The latest [node frame](#node-frame) of each host. Absent from paused lines. | v3.3.0 |
@@ -256,7 +256,7 @@ While paused, the center sends only the line's header:
 | `runtime_mode` | string | `"multiprocessing"` or `"multithreading"`. | v4.3.0 (#344) |
 | `world_size` | integer | The number of ranks. | v4.3.0 (#344) |
 | `threads_per_process` | integer | The largest thread pool a worker reports; 0 until a frame arrives. | v4.3.0 (#344) |
-| `gempba_version` | string | The gempba version the center was built from. | v4.3.0 (#344) |
+| `gempba_version` | string | The gempba version the aggregator was built from. | v4.3.0 (#344) |
 | `annotations` | object | Up to 8 key/value strings the program set with `telemetry::annotate_run`, keys of 1 to 32 bytes and values up to 64, in the order their keys were first set. | v4.3.0 (#344) |
 | `markers` | array | Labelled moments, in the order they were recorded. Each has `elapsed_ms` (milliseconds since telemetry came up), `label`, and `source`: `"code"` for `telemetry::mark_run`, `"dashboard"` for a `mark` control line. At most 32, labels of 1 to 64 bytes. | v4.3.0 (#370) |
 
@@ -322,16 +322,16 @@ Each entry of `nodes` is one host's latest frame, sent by its sentinel rank with
 
 ## Control lines
 
-A client can write lines back on the same socket, one JSON object per line. The center applies each one and passes on to every rank what the ranks need. A malformed line, or one with an unknown `kind`, is dropped with a warning, and the lines after it still apply. String values accept JSON escapes. The center reads at most 4096 bytes from a client between polls and disconnects a client that sends more.
+A client can write lines back on the same socket, one JSON object per line. The aggregator applies each one and passes on to every rank what the ranks need. A malformed line, or one with an unknown `kind`, is dropped with a warning, and the lines after it still apply. String values accept JSON escapes. The aggregator reads at most 4096 bytes from a client between polls and disconnects a client that sends more.
 
 | Line | Effect | Since |
 |---|---|---|
 | `{"kind":"set_worker_interval_ms","value":N}` | Sets the telemetry interval to `N` ms, clamped to 50–600000, for worker frames, node frames and the broadcast alike. | v3.3.0 |
 | `{"kind":"set_node_interval_ms","value":N}` | Accepted and ignored since v4.3.0, when node frames started following the worker interval (#367); to be removed in v5.0.0 (#373). | v3.3.0 |
-| `{"kind":"pause"}` | Stops all ranks sending frames and the center reading them. Counters keep counting, so totals after the resume include the paused stretch. | v4.3.0 (#368) |
+| `{"kind":"pause"}` | Stops all ranks sending frames and the aggregator reading them. Counters keep counting, so totals after the resume include the paused stretch. | v4.3.0 (#368) |
 | `{"kind":"resume"}` | Ends a pause; frames resume at the current interval. | v4.3.0 (#368) |
-| `{"kind":"snapshot"}` | Every rank sends one frame on its next tick, whatever the interval and even while paused, and the center sends one full line once all have arrived, or one second after the request. A request within 50 ms of the last accepted one is merged into it. | v4.3.0 (#369) |
-| `{"kind":"mark","label":"..."}` | Records a marker with `source` `"dashboard"`, stamped by the center. Labels take 1 to 64 bytes; at most 32 markers per run, and any over a limit are dropped with a warning. | v4.3.0 (#370) |
+| `{"kind":"snapshot"}` | Every rank sends one frame on its next tick, whatever the interval and even while paused, and the aggregator sends one full line once all have arrived, or one second after the request. A request within 50 ms of the last accepted one is merged into it. | v4.3.0 (#369) |
+| `{"kind":"mark","label":"..."}` | Records a marker with `source` `"dashboard"`, stamped by the aggregator. Labels take 1 to 64 bytes; at most 32 markers per run, and any over a limit are dropped with a warning. | v4.3.0 (#370) |
 
 `pause`, `resume` and `snapshot` also accept a `value`, which they ignore.
 
@@ -340,7 +340,7 @@ A client can write lines back on the same socket, one JSON object per line. The 
 - `version` is the schema number. Adding keys keeps it. Renaming or removing a key, or changing what a key means, bumps it.
 - A consumer should ignore keys it doesn't know and treat a missing object or array as absent, so it keeps working when a release adds keys.
 - The **Since** column gives the release that added each key. Within a schema, a key added by a later release is absent when an earlier one of the same schema sends the line.
-- The center and every rank must run the same build. The frames between ranks are binary and carry no compatibility guarantee; only this JSON stream does.
+- Every rank, the aggregator included, must run the same build. The frames between ranks are binary and carry no compatibility guarantee; only this JSON stream does.
 
 ## Schema versions
 
@@ -361,7 +361,7 @@ Time accounting to explain falling speedup (#333). Changes from schema 1:
   - `sched_running_microseconds`, `sched_waiting_microseconds`, `first_task_ms`, `last_task_ms`, `assign_latency_microseconds_total`, `assign_count`, `assign_latency_microseconds_max` and `available_microseconds_queue_empty` (#338);
   - `center_state_msgs_total`, `center_score_proposals_total`, `center_score_broadcasts_total`, `center_full_microseconds` and `telemetry_microseconds_total` (#339).
 - **Changed meaning:** `idle_microseconds_per_worker` now includes the idle time of pool threads still asleep when the frame is built (#335).
-- **Cadence:** the center broadcasts at the telemetry interval instead of every 500 ms (#345), and node frames follow the worker interval instead of their own 1000 ms one (#367).
+- **Cadence:** the aggregator broadcasts at the telemetry interval instead of every 500 ms (#345), and node frames follow the worker interval instead of their own 1000 ms one (#367).
 - **Controls:** added `pause`, `resume` (#368), `snapshot` (#369) and `mark` (#370); `set_node_interval_ms` is accepted and ignored (#367).
 
 ### Schema 1: gempba v3.3.0 to v4.2.0
@@ -374,4 +374,4 @@ Sent by v3.3.0, v4.0.0, v4.1.0, v4.1.1, v4.1.2, v4.1.3 and v4.2.0. Its keys are 
 
 v4.2.0 added `cgroup_mem_used_bytes` and `cgroup_mem_limit_bytes` to the node frame; earlier schema-1 releases don't send them. Schema 1 has no `run_id`, `paused`, `final`, `role` or `run`.
 
-The center broadcast every 500 ms, whatever the interval. Worker frames defaulted to 500 ms and node frames to 1000 ms. The controls were `set_worker_interval_ms` and `set_node_interval_ms`, each clamped to 50–600000 ms.
+The aggregator broadcast every 500 ms, whatever the interval. Worker frames defaulted to 500 ms and node frames to 1000 ms. The controls were `set_worker_interval_ms` and `set_node_interval_ms`, each clamped to 50–600000 ms.

@@ -70,7 +70,7 @@ namespace gempba::telemetry {
     };
 
     /**
-     * @brief How a run is set up, as the center describes it in each broadcast.
+     * @brief How a run is set up, as the aggregator describes it in each broadcast.
      *
      * Each rank's role is the one its scheduler gives it; a multithreading run's only rank is a worker.
      */
@@ -87,7 +87,7 @@ namespace gempba::telemetry {
         std::uint32_t m_threads_per_process = 0;
         std::string m_gempba_version;
         std::vector<std::pair<std::string, std::string>> m_annotations;
-        /// The center's markers, in the order they were recorded.
+        /// The aggregator's markers, in the order they were recorded.
         std::vector<run_marker> m_markers;
     };
 
