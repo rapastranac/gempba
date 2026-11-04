@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <functional>
+#include <gempba/core/rank_role.hpp>
 #include <gempba/core/scheduler_traits.hpp>
 #include <gempba/core/serial_runnable.hpp>
 #include <gempba/utils/gempba_utils.hpp>
@@ -36,6 +37,14 @@ namespace gempba {
          * @return the name telemetry reports for this scheduler; "custom" for schedulers that do not name themselves
          */
         [[nodiscard]] virtual std::string_view get_name() const { return "custom"; }
+
+        /**
+         * @param p_rank a rank in [0, world_size())
+         * @return the role @p p_rank plays in this scheduler; @ref rank_role::WORKER for every rank of schedulers that do not say otherwise
+         * @note Telemetry's aggregator, rank 0, asks its own scheduler for every rank's role once, at startup, and reports those answers.
+         * The answer must therefore depend on @p p_rank alone: the same on every rank, and fixed for the whole run.
+         */
+        [[nodiscard]] virtual rank_role role_of([[maybe_unused]] int p_rank) const { return rank_role::WORKER; }
 
         virtual void set_goal(goal p_goal, score_type p_type) = 0;
 

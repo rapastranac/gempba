@@ -188,6 +188,12 @@ TEST_F(gempba_test, mp_unnamed_scheduler_is_described_to_telemetry_as_custom) {
     EXPECT_EQ("custom", gempba::telemetry::get()->describe_run().m_scheduler);
 }
 
+TEST_F(gempba_test, a_scheduler_that_names_no_center_reports_every_rank_a_worker) {
+    const scheduler_stub v_stub;
+    EXPECT_EQ(gempba::rank_role::WORKER, v_stub.role_of(0));
+    EXPECT_EQ(gempba::rank_role::WORKER, v_stub.role_of(3));
+}
+
 TEST_F(gempba_test, mp_load_balancer_created_after_the_hub_is_described_to_telemetry) {
     gempba::multiprocessing::create_scheduler(std::make_unique<scheduler_stub>());
     ASSERT_NE(nullptr, gempba::telemetry::get());
