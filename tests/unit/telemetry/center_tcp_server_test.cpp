@@ -328,6 +328,8 @@ namespace {
         EXPECT_FALSE(v_hub.run_id().empty());
         EXPECT_NE(std::string::npos, v_first.find(v_run_id_key)) << v_first;
         EXPECT_NE(std::string::npos, v_last.find(v_run_id_key)) << v_last;
+        EXPECT_NE(std::string::npos, v_first.find(R"("final":false)")) << v_first;
+        EXPECT_NE(std::string::npos, v_last.find(R"("final":true)")) << v_last;
     }
 
     TEST_F(tcp_server_test, a_paused_center_broadcasts_only_the_envelope_until_resumed) {
@@ -355,7 +357,7 @@ namespace {
         v_server.stop();
 
         EXPECT_TRUE(v_paused.starts_with(R"({"version":2,"run_id":")" + v_hub.run_id() + R"(","ts":)")) << v_paused;
-        EXPECT_TRUE(v_paused.ends_with(R"("paused":true})")) << v_paused;
+        EXPECT_TRUE(v_paused.ends_with(R"("paused":true,"final":false})")) << v_paused;
         EXPECT_EQ(std::string::npos, v_paused.find("\"workers\"")) << v_paused;
         EXPECT_NE(std::string::npos, v_resumed.find("\"paused\":false")) << v_resumed;
         EXPECT_NE(std::string::npos, v_resumed.find("\"workers\":[{\"worker_id\":0")) << v_resumed;
@@ -373,7 +375,7 @@ namespace {
         const socket_t v_client = connect_loopback(v_port);
         ASSERT_NE(k_invalid, v_client);
         set_recv_timeout(v_client, 200);
-        ASSERT_TRUE(read_one_line(v_client, std::chrono::milliseconds(2000)).ends_with(R"("paused":true})"));
+        ASSERT_TRUE(read_one_line(v_client, std::chrono::milliseconds(2000)).ends_with(R"("paused":true,"final":false})"));
 
         for (int v_i = 0; v_i < 5; ++v_i) {
             v_hub.record_task_local();
@@ -385,7 +387,7 @@ namespace {
         gempba::telemetry::configure_port(9000);
 
         const std::string v_last = last_complete_line(v_rest);
-        EXPECT_NE(std::string::npos, v_last.find("\"paused\":true")) << v_last;
+        EXPECT_NE(std::string::npos, v_last.find(R"("paused":true,"final":true,)")) << v_last;
         EXPECT_NE(std::string::npos, v_last.find("\"tasks_started_total\":5")) << v_last;
     }
 
@@ -412,7 +414,7 @@ namespace {
         gempba::telemetry::configure_port(9000);
 
         EXPECT_EQ(1u, v_hub.snapshot_requested());
-        EXPECT_NE(std::string::npos, v_line.find(R"("paused":true,"topology":)")) << v_line;
+        EXPECT_NE(std::string::npos, v_line.find(R"("paused":true,"final":false,"topology":)")) << v_line;
         EXPECT_NE(std::string::npos, v_line.find(R"("workers":[{"worker_id":0,)")) << v_line;
         EXPECT_NE(std::string::npos, v_line.find(R"("tasks_started_total":4,)")) << v_line;
     }

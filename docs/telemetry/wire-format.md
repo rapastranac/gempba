@@ -11,7 +11,7 @@ This is the reference for what gempba's telemetry stream carries: every key of a
   - a full line every telemetry interval: 500 ms by default, never more often than every 50 ms, and changeable live with `set_worker_interval_ms`;
   - while paused, a [paused line](#paused-line) at the same cadence instead;
   - one full line as soon as a [snapshot](#control-lines) is answered;
-  - a final full line at shutdown, even while paused, carrying the run's totals.
+  - a final full line at shutdown, even while paused, carrying the run's totals and marked `"final":true`. The center then closes the connection, so a connection that closes without that line ended some other way, such as a crash.
 - Frame counters are cumulative since the process started telemetry. A consumer takes differences between lines to get rates.
 - `first_task_ms`, `last_task_ms` and `last_score_improvement_ms` are milliseconds since the scheduler run started, and stay 0 until the event first happens. `elapsed_seconds` and a marker's `elapsed_ms` count from when telemetry came up. `worker_local_ms` and `sentinel_local_ms` are a rank's own monotonic clock.
 
@@ -26,6 +26,7 @@ A full line from a 2-rank centralized run on one Windows host, pretty-printed (t
   "ts": 1793730847508,
   "elapsed_seconds": 1,
   "paused": false,
+  "final": false,
   "topology": {
     "nodes": [
       {
@@ -202,7 +203,7 @@ A full line from a 2-rank centralized run on one Windows host, pretty-printed (t
 While paused, the center sends only the line's header:
 
 ```json
-{"version":2,"run_id":"6a5a9990-6f0f-4972-b6be-9d4bae4ead1e","ts":1793730848551,"elapsed_seconds":2,"paused":true}
+{"version":2,"run_id":"6a5a9990-6f0f-4972-b6be-9d4bae4ead1e","ts":1793730848551,"elapsed_seconds":2,"paused":true,"final":false}
 ```
 
 ## Envelope
@@ -213,7 +214,8 @@ While paused, the center sends only the line's header:
 | `run_id` | string | A UUID v4 the center draws once per run, so a consumer can tell runs apart. | v4.3.0 (#343) |
 | `ts` | integer | Wall-clock milliseconds since the Unix epoch when the line was built. | v3.3.0 |
 | `elapsed_seconds` | integer | Seconds since telemetry came up on the center. | v3.3.0 |
-| `paused` | boolean | Whether telemetry is paused. A paused line carries nothing else; a full line sent while paused, such as a snapshot or the final line, says `true` too. | v4.3.0 (#368) |
+| `paused` | boolean | Whether telemetry is paused. A paused line carries only the header, the keys up to `final`; a full line sent while paused, such as a snapshot or the final line, says `true` too. | v4.3.0 (#368) |
+| `final` | boolean | `true` only on the line the center sends at shutdown, the last before it closes the connection; `false` on every other line, paused lines included. | v4.3.0 (#389) |
 | `topology` | object | Hosts, ranks and the run setup. See [Topology](#topology). Absent from paused lines. | v3.3.0 |
 | `workers` | array | The latest [worker frame](#worker-frame) of each rank that has sent one. Absent from paused lines. | v3.3.0 |
 | `nodes` | array | The latest [node frame](#node-frame) of each host. Absent from paused lines. | v3.3.0 |
@@ -350,7 +352,7 @@ Time accounting to explain falling speedup (#333). Changes from schema 1:
 
 - **Renamed:** `tasks_local_total` to `tasks_started_total` (#342), which now counts subtrees handed to a pool thread, received ones included, at hand-off.
 - **Removed:** the node frame's `net_aggregate` and `disk_aggregate` (#342), which were always zero.
-- **Added to the envelope:** `run_id` (#343) and `paused` (#368). Paused lines (#368) carry only the envelope's header.
+- **Added to the envelope:** `run_id` (#343), `paused` (#368) and `final` (#389). Paused lines (#368) carry only the envelope's header.
 - **Added to the topology:** each identity's `role`, and the `run` object (#344), with `markers` (#370).
 - **Added to the worker frame:**
   - `bytes_sent_total`, `bytes_recv_total`, `send_microseconds_total` and `recv_microseconds_total` (#340);
@@ -370,6 +372,6 @@ Sent by v3.3.0, v4.0.0, v4.1.0, v4.1.1, v4.1.2, v4.1.3 and v4.2.0. Its keys are 
 - in the node frame, `net_aggregate` (`bytes_in`, `bytes_out`, `packets_in`, `packets_out`) and `disk_aggregate` (`read_bytes`, `write_bytes`);
 - `idle_microseconds_per_worker` leaving out the idle time of threads still asleep when the frame was built.
 
-v4.2.0 added `cgroup_mem_used_bytes` and `cgroup_mem_limit_bytes` to the node frame; earlier schema-1 releases don't send them. Schema 1 has no `run_id`, `paused`, `role` or `run`.
+v4.2.0 added `cgroup_mem_used_bytes` and `cgroup_mem_limit_bytes` to the node frame; earlier schema-1 releases don't send them. Schema 1 has no `run_id`, `paused`, `final`, `role` or `run`.
 
 The center broadcast every 500 ms, whatever the interval. Worker frames defaulted to 500 ms and node frames to 1000 ms. The controls were `set_worker_interval_ms` and `set_node_interval_ms`, each clamped to 50–600000 ms.

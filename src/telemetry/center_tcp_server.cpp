@@ -290,7 +290,7 @@ namespace gempba::telemetry {
             return true;
         }
 
-        std::string build_broadcast_line(telemetry_hub& p_hub, const bool p_with_frames) {
+        std::string build_broadcast_line(telemetry_hub& p_hub, const bool p_with_frames, const bool p_final) {
             const auto v_now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 
             broadcast_payload v_payload{};
@@ -298,6 +298,7 @@ namespace gempba::telemetry {
             v_payload.m_now_ms = static_cast<std::uint64_t>(v_now);
             v_payload.m_elapsed_seconds = p_hub.program_elapsed_seconds();
             v_payload.m_paused = p_hub.paused();
+            v_payload.m_final = p_final;
 
             std::string v_line;
             if (!p_with_frames) {
@@ -503,7 +504,7 @@ namespace gempba::telemetry {
                     if (v_snapshot_ready) {
                         v_broadcast_snapshot = v_snapshot;
                     }
-                    const std::string v_line = build_broadcast_line(*v_impl_ptr->m_hub, v_snapshot_ready || !v_impl_ptr->m_hub->paused());
+                    const std::string v_line = build_broadcast_line(*v_impl_ptr->m_hub, v_snapshot_ready || !v_impl_ptr->m_hub->paused(), false);
                     const std::scoped_lock v_lock(v_impl_ptr->m_clients_mtx);
                     for (const auto& v_cs: v_impl_ptr->m_clients) {
                         const bool v_already_dead = std::find(v_dead.begin(), v_dead.end(), v_cs.m_sock) != v_dead.end();
@@ -561,7 +562,7 @@ namespace gempba::telemetry {
 
         const std::scoped_lock v_lock(m_impl->m_clients_mtx);
         if (!m_impl->m_clients.empty()) {
-            const std::string v_line = build_broadcast_line(*m_impl->m_hub, true);
+            const std::string v_line = build_broadcast_line(*m_impl->m_hub, true, true);
             for (const auto& v_cs: m_impl->m_clients) {
                 (void) send_all(v_cs.m_sock, v_line.data(), v_line.size());
             }

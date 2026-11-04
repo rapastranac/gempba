@@ -27,6 +27,8 @@ namespace gempba::telemetry {
         const std::vector<worker_frame>* m_workers;
         const std::vector<node_frame>* m_nodes;
         bool m_paused;
+        /// Whether this is the line the center sends at shutdown, the last before it closes the connection.
+        bool m_final;
     };
 
     /// Serialize one @ref broadcast_payload to a single JSON line.
