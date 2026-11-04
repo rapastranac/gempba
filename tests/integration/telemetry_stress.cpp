@@ -275,10 +275,10 @@ int main(const int p_argc, char* p_argv[]) {
         v_scheduler->get_stats()->visit(&v_stats);
         const std::uint64_t v_kinds = v_frame.m_coordinator_state_msgs_total + v_frame.m_tasks_recv_total + v_frame.m_tasks_sent_total + v_frame.m_coordinator_score_proposals_total +
                                       v_frame.m_coordinator_score_broadcasts_total;
-        v_checks.expect(v_stats.m_center_messages_handled == v_kinds, "center_messages_handled differs from the center's per-kind counters");
+        v_checks.expect(v_stats.m_coordinator_messages_handled == v_kinds, "coordinator_messages_handled differs from the coordinator's per-kind counters");
 
         std::cout << v_topology_name << " ranks=" << v_world_size << " tasks=" << v_totals[0] << " bytes=" << v_totals[2] << " proposals=" << v_worker_proposals
-                  << " center_messages=" << v_stats.m_center_messages_handled << '\n';
+                  << " coordinator_messages=" << v_stats.m_coordinator_messages_handled << '\n';
     }
 
     gempba::telemetry::telemetry_hub& v_hub = *gempba::telemetry::get();
