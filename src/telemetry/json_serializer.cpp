@@ -71,6 +71,7 @@ namespace gempba::telemetry {
             p_out += ",\"elapsed_seconds\":";
             emit_u64(p_out, p_payload.m_elapsed_seconds);
             p_out += p_paused ? R"(,"paused":true)" : R"(,"paused":false)";
+            p_out += p_payload.m_final ? R"(,"final":true)" : R"(,"final":false)";
         }
 
     } // namespace

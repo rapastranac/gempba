@@ -310,7 +310,7 @@ int main(const int p_argc, char* p_argv[]) {
             return false;
         }
         const std::scoped_lock v_lock(v_dashboard_mtx);
-        return v_rank != 0 || v_dashboard_stream.find(R"("paused":true})") != std::string::npos;
+        return v_rank != 0 || v_dashboard_stream.find(R"("paused":true,"final":false})") != std::string::npos;
     });
     v_checks.expect(own_frame(v_hub).m_seq_no == v_paused_seq_no, "a paused rank published a frame");
     if (v_rank == 0) {
@@ -338,7 +338,7 @@ int main(const int p_argc, char* p_argv[]) {
         v_checks.expect(v_snapshot_id == 1 && v_answered, "the paused center lacks a rank's snapshot frame");
         const bool v_broadcast = tick_until(v_hub, [&] {
             const std::scoped_lock v_lock(v_dashboard_mtx);
-            return v_dashboard_stream.find(R"("paused":true,"topology":)") != std::string::npos;
+            return v_dashboard_stream.find(R"("paused":true,"final":false,"topology":)") != std::string::npos;
         });
         v_checks.expect(v_broadcast, "the dashboard received no snapshot while paused");
         v_checks.expect(v_hub.paused(), "the snapshot ended the pause");
@@ -385,7 +385,7 @@ int main(const int p_argc, char* p_argv[]) {
         v_checks.expect(v_line.find(R"("scheduler":")" + std::string(v_topology_name) + '"') != std::string::npos, "the final broadcast names another scheduler");
         v_checks.expect(v_line.find(R"("load_balancer":"quasi_horizontal")") != std::string::npos, "the final broadcast names another load balancer");
         v_checks.expect(v_line.find(R"("annotations":{"test":"telemetry_stress"})") != std::string::npos, "the final broadcast lost the run annotation");
-        v_checks.expect(v_line.find(R"("paused":false)") != std::string::npos, "the final broadcast is still paused");
+        v_checks.expect(v_line.find(R"("paused":false,"final":true,)") != std::string::npos, "the final broadcast is still paused or not marked final");
         v_checks.expect(count_of(v_line, R"("role":"center")") == 1, "the final broadcast does not mark exactly one center");
         v_checks.expect(count_of(v_line, R"("role":"worker")") == static_cast<std::size_t>(v_world_size - 1), "the final broadcast does not mark every other rank a worker");
         for (int v_r = 0; v_r < v_world_size; ++v_r) {

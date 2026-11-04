@@ -332,8 +332,8 @@ namespace {
         std::string v_paused;
         gempba::telemetry::serialize_broadcast(v_paused, v_p);
 
-        EXPECT_NE(std::string::npos, v_running.find(R"("elapsed_seconds":12,"paused":false,"topology":)")) << v_running;
-        EXPECT_NE(std::string::npos, v_paused.find(R"("elapsed_seconds":12,"paused":true,"topology":)")) << v_paused;
+        EXPECT_NE(std::string::npos, v_running.find(R"("elapsed_seconds":12,"paused":false,"final":false,"topology":)")) << v_running;
+        EXPECT_NE(std::string::npos, v_paused.find(R"("elapsed_seconds":12,"paused":true,"final":false,"topology":)")) << v_paused;
         EXPECT_NE(std::string::npos, v_paused.find(R"("workers":[{"worker_id":0,)")) << v_paused;
     }
 
@@ -353,7 +353,29 @@ namespace {
         std::string v_out;
         gempba::telemetry::serialize_paused_broadcast(v_out, v_p);
 
-        EXPECT_EQ(R"({"version":2,"run_id":"123e4567-e89b-42d3-a456-426614174000","ts":1700000000000,"elapsed_seconds":12345,"paused":true})", v_out);
+        EXPECT_EQ(R"({"version":2,"run_id":"123e4567-e89b-42d3-a456-426614174000","ts":1700000000000,"elapsed_seconds":12345,"paused":true,"final":false})", v_out);
+    }
+
+    TEST(json_serializer_test, only_the_shutdown_line_is_marked_final) {
+        gempba::telemetry::topology_snapshot v_topo;
+        std::vector<gempba::telemetry::worker_frame> v_workers;
+        std::vector<gempba::telemetry::node_frame> v_nodes;
+
+        gempba::telemetry::broadcast_payload v_p{};
+        v_p.m_elapsed_seconds = 12;
+        v_p.m_topology = &v_topo;
+        v_p.m_workers = &v_workers;
+        v_p.m_nodes = &v_nodes;
+        v_p.m_final = true;
+
+        std::string v_final;
+        gempba::telemetry::serialize_broadcast(v_final, v_p);
+        v_p.m_paused = true;
+        std::string v_paused_final;
+        gempba::telemetry::serialize_broadcast(v_paused_final, v_p);
+
+        EXPECT_NE(std::string::npos, v_final.find(R"("elapsed_seconds":12,"paused":false,"final":true,"topology":)")) << v_final;
+        EXPECT_NE(std::string::npos, v_paused_final.find(R"("paused":true,"final":true,"topology":)")) << v_paused_final;
     }
 
     TEST(json_serializer_test, special_characters_in_hostname_are_escaped) {
