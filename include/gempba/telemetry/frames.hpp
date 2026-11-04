@@ -204,7 +204,7 @@ namespace gempba::telemetry {
         UNSPECIFIED = 0,
         /** @brief Promote this worker to its host's sentinel (emits node frames). */
         BE_NODE_SENTINEL = 1,
-        /** @brief Reset the telemetry interval, for worker and node frames alike, to @c m_value milliseconds. */
+        /** @brief Reset the telemetry interval, for rank and node frames alike, to @c m_value milliseconds; sent as the set_interval_ms control, or set_worker_interval_ms until v5.0.0. */
         SET_WORKER_INTERVAL_MS = 2,
         /** @brief Stop publishing and ingesting worker and node frames until @ref RESUME; per-event counters keep counting, and shutdown still sends the final frames. */
         PAUSE = 3,

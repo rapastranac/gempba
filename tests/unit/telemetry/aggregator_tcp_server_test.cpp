@@ -149,7 +149,25 @@ namespace {
         return p_predicate();
     }
 
-    TEST_F(tcp_server_test, client_set_worker_interval_is_applied) {
+    TEST_F(tcp_server_test, client_set_interval_is_applied) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+        v_hub.set_worker_interval_ms(500);
+
+        gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
+        ASSERT_TRUE(v_server.start());
+
+        const socket_t v_client = connect_loopback(v_server.bound_port());
+        ASSERT_NE(k_invalid, v_client);
+
+        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"set_interval_ms\",\"value\":2500}\n"));
+        EXPECT_TRUE(wait_for([&] { return v_hub.worker_interval_ms() == 2500u; }, std::chrono::milliseconds(2000)));
+
+        close_sock(v_client);
+        v_server.stop();
+    }
+
+    TEST_F(tcp_server_test, client_set_worker_interval_is_still_applied) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
         v_hub.set_worker_interval_ms(500);
@@ -178,7 +196,7 @@ namespace {
         const socket_t v_client = connect_loopback(v_server.bound_port());
         ASSERT_NE(k_invalid, v_client);
 
-        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"set_worker_interval_ms\",\"value\":2500}\n{\"value\":7500,\"kind\":\"set_node_interval_ms\"}\n"));
+        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"set_interval_ms\",\"value\":2500}\n{\"value\":7500,\"kind\":\"set_node_interval_ms\"}\n"));
         EXPECT_TRUE(wait_for([&] { return v_hub.worker_interval_ms() == 2500u; }, std::chrono::milliseconds(2000)));
         std::this_thread::sleep_for(std::chrono::milliseconds(700));
         EXPECT_EQ(2500u, v_hub.worker_interval_ms());
@@ -198,10 +216,10 @@ namespace {
         const socket_t v_client = connect_loopback(v_server.bound_port());
         ASSERT_NE(k_invalid, v_client);
 
-        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"set_worker_interval_ms\",\"value\":0}\n"));
+        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"set_interval_ms\",\"value\":0}\n"));
         EXPECT_TRUE(wait_for([&] { return v_hub.worker_interval_ms() == 50u; }, std::chrono::milliseconds(2000)));
 
-        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"set_worker_interval_ms\",\"value\":99999999}\n"));
+        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"set_interval_ms\",\"value\":99999999}\n"));
         EXPECT_TRUE(wait_for([&] { return v_hub.worker_interval_ms() == 600000u; }, std::chrono::milliseconds(2000)));
 
         close_sock(v_client);
@@ -479,8 +497,8 @@ namespace {
         const socket_t v_client = connect_loopback(v_server.bound_port());
         ASSERT_NE(k_invalid, v_client);
 
-        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"set_worker_interval_ms\",\"value\":99999999999}\n"));
-        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"set_worker_interval_ms\",\"value\":\"fast\"}\n"));
+        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"set_interval_ms\",\"value\":99999999999}\n"));
+        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"set_interval_ms\",\"value\":\"fast\"}\n"));
         ASSERT_TRUE(send_all(v_client, "{\"kind\":\"mark\"}\n"));
         ASSERT_TRUE(send_all(v_client, "{\"kind\":\"mark\",\"label\":\"bad \\x escape\"}\n"));
         ASSERT_TRUE(send_all(v_client, "{\"kind\":\"mark\",\"label\":\"lone \\ud83d surrogate\"}\n"));
@@ -566,7 +584,7 @@ namespace {
         ASSERT_NE(k_invalid, v_client);
         set_recv_timeout(v_client, 100);
 
-        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"set_worker_interval_ms\",\"value\":100}\n"));
+        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"set_interval_ms\",\"value\":100}\n"));
         const auto v_arrivals = line_arrivals(v_client, 3, std::chrono::milliseconds(1400));
         close_sock(v_client);
         v_server.stop();
@@ -613,7 +631,7 @@ namespace {
 
         ASSERT_TRUE(send_all(v_client, "this is not json\n"));
         ASSERT_TRUE(send_all(v_client, "{\"kind\":\"unknown_kind\",\"value\":1000}\n"));
-        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"set_worker_interval_ms\",\"value\":1234}\n"));
+        ASSERT_TRUE(send_all(v_client, "{\"kind\":\"set_interval_ms\",\"value\":1234}\n"));
 
         EXPECT_TRUE(wait_for([&] { return v_hub.worker_interval_ms() == 1234u; }, std::chrono::milliseconds(2000)));
 

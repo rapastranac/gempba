@@ -8,7 +8,7 @@ This is the reference for what gempba's telemetry stream carries: every key of a
 - Any number of clients can connect, and each receives the same lines. Each line is one JSON object followed by `\n`.
 - A full line is self-contained. It carries the topology, the run setup and the latest frame from every rank and every host, so a client that connects late misses nothing but history.
 - The aggregator sends:
-  - a full line every telemetry interval: 500 ms by default, never more often than every 50 ms, and changeable live with `set_worker_interval_ms`;
+  - a full line every telemetry interval: 500 ms by default, never more often than every 50 ms, and changeable live with `set_interval_ms`;
   - while paused, a [paused line](#paused-line) at the same cadence instead;
   - one full line as soon as a [snapshot](#control-lines) is answered;
   - a final full line at shutdown, even while paused, carrying the run's totals and marked `"final":true`. The aggregator then closes the connection, so a connection that closes without that line ended some other way, such as a crash.
@@ -326,8 +326,9 @@ A client can write lines back on the same socket, one JSON object per line. The 
 
 | Line | Effect | Since |
 |---|---|---|
-| `{"kind":"set_worker_interval_ms","value":N}` | Sets the telemetry interval to `N` ms, clamped to 50–600000, for worker frames, node frames and the broadcast alike. | v3.3.0 |
-| `{"kind":"set_node_interval_ms","value":N}` | Accepted and ignored since v4.3.0, when node frames started following the worker interval (#367); to be removed in v5.0.0 (#373). | v3.3.0 |
+| `{"kind":"set_interval_ms","value":N}` | Sets the telemetry interval to `N` ms, clamped to 50–600000, for rank frames, node frames and the broadcast alike. | v4.3.0 (#396) |
+| `{"kind":"set_worker_interval_ms","value":N}` | The same as `set_interval_ms`, under its schema-1 name; accepted until v5.0.0 (#373). | v3.3.0 |
+| `{"kind":"set_node_interval_ms","value":N}` | Accepted and ignored since v4.3.0, when node frames started following the telemetry interval (#367); to be removed in v5.0.0 (#373). | v3.3.0 |
 | `{"kind":"pause"}` | Stops all ranks sending frames and the aggregator reading them. Counters keep counting, so totals after the resume include the paused stretch. | v4.3.0 (#368) |
 | `{"kind":"resume"}` | Ends a pause; frames resume at the current interval. | v4.3.0 (#368) |
 | `{"kind":"snapshot"}` | Every rank sends one frame on its next tick, whatever the interval and even while paused, and the aggregator sends one full line once all have arrived, or one second after the request. A request within 50 ms of the last accepted one is merged into it. | v4.3.0 (#369) |
@@ -363,7 +364,7 @@ Time accounting to explain falling speedup (#333). Changes from schema 1:
   - `coordinator_state_msgs_total`, `coordinator_score_proposals_total`, `coordinator_score_broadcasts_total`, `coordinator_full_microseconds` and `telemetry_microseconds_total` (#339).
 - **Changed meaning:** `idle_microseconds_per_thread` now includes the idle time of pool threads still asleep when the frame is built (#335).
 - **Cadence:** the aggregator broadcasts at the telemetry interval instead of every 500 ms (#345), and node frames follow the worker interval instead of their own 1000 ms one (#367).
-- **Controls:** added `pause`, `resume` (#368), `snapshot` (#369) and `mark` (#370); `set_node_interval_ms` is accepted and ignored (#367).
+- **Controls:** added `pause`, `resume` (#368), `snapshot` (#369) and `mark` (#370); `set_worker_interval_ms` becomes `set_interval_ms`, and the old name is still accepted (#396); `set_node_interval_ms` is accepted and ignored (#367).
 
 ### Schema 1: gempba v3.3.0 to v4.2.0
 
