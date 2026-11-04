@@ -28,6 +28,7 @@
 #include <memory>
 #include <optional>
 #include <thread>
+#include <vector>
 
 #include <gempba/gempba.hpp>
 #include <gempba/node_manager.hpp>
@@ -188,6 +189,19 @@ TEST_F(gempba_test, mp_unnamed_scheduler_is_described_to_telemetry_as_custom) {
     EXPECT_EQ("custom", gempba::telemetry::get()->describe_run().m_scheduler);
 }
 
+TEST_F(gempba_test, mp_scheduler_roles_are_described_to_telemetry) {
+    gempba::multiprocessing::create_scheduler(std::make_unique<scheduler_stub>());
+    ASSERT_NE(nullptr, gempba::telemetry::get());
+    const std::vector<gempba::rank_role> v_expected{gempba::rank_role::WORKER};
+    EXPECT_EQ(v_expected, gempba::telemetry::get()->describe_run().m_roles);
+}
+
+TEST_F(gempba_test, a_scheduler_that_names_no_center_reports_every_rank_a_worker) {
+    const scheduler_stub v_stub;
+    EXPECT_EQ(gempba::rank_role::WORKER, v_stub.role_of(0));
+    EXPECT_EQ(gempba::rank_role::WORKER, v_stub.role_of(3));
+}
+
 TEST_F(gempba_test, mp_load_balancer_created_after_the_hub_is_described_to_telemetry) {
     gempba::multiprocessing::create_scheduler(std::make_unique<scheduler_stub>());
     ASSERT_NE(nullptr, gempba::telemetry::get());
@@ -221,6 +235,24 @@ TEST_F(gempba_test, mt_threads_per_process_is_the_pool_size_the_worker_frames_re
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     EXPECT_EQ(3u, v_hub->describe_run().m_threads_per_process);
+}
+
+TEST_F(gempba_test, threads_per_process_leaves_out_a_rank_its_scheduler_declares_a_center) {
+    gempba::load_balancer* v_lb = gempba::multithreading::create_load_balancer(gempba::QUASI_HORIZONTAL);
+    v_lb->set_thread_pool_size(3);
+    gempba::multithreading::create_node_manager(v_lb);
+    auto* v_hub = gempba::telemetry::get();
+    ASSERT_NE(nullptr, v_hub);
+    v_hub->set_worker_interval_ms(0);
+
+    const auto v_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    while (v_hub->describe_run().m_threads_per_process == 0 && std::chrono::steady_clock::now() < v_deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    ASSERT_EQ(3u, v_hub->describe_run().m_threads_per_process);
+
+    v_hub->describe_scheduler("custom", {gempba::rank_role::CENTER});
+    EXPECT_EQ(0u, v_hub->describe_run().m_threads_per_process);
 }
 
 TEST_F(gempba_test, mp_create_scheduler_throws_if_already_exists) {

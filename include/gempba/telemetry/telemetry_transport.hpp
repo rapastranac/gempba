@@ -8,15 +8,15 @@
 
 namespace gempba::telemetry {
 
-    /// Callback for one worker_frame delivered to the center role.
+    /// Callback for one worker_frame delivered to the aggregator.
     using worker_frame_sink = std::function<void(std::uint32_t p_src_worker_id, const worker_frame&)>;
-    /// Callback for one node_frame delivered to the center role.
+    /// Callback for one node_frame delivered to the aggregator.
     using node_frame_sink = std::function<void(std::uint32_t p_src_worker_id, const node_frame&)>;
 
     /**
-     * @brief Abstract transport for telemetry frames between workers and the center.
+     * @brief Abstract transport for telemetry frames between ranks and the aggregator.
      *
-     * The hub owns one transport. Workers publish frames; the center role polls
+     * The hub owns one transport. Every rank publishes frames; the aggregator polls
      * inbound frames and drains them to the local aggregator. Backends are free
      * to drop, coalesce, or batch — the contract only requires non-blocking
      * publish and at-most-once delivery per @ref poll cycle.
@@ -43,13 +43,13 @@ namespace gempba::telemetry {
         virtual void publish_node(const node_frame& p_frame) = 0;
 
         /**
-         * @brief Publish the local worker's last frame before shutdown, so the center can tell it apart.
+         * @brief Publish the local worker's last frame before shutdown, so the aggregator can tell it apart.
          *
-         * Defaults to @ref publish_worker for backends where every frame reaches the center before shutdown.
+         * Defaults to @ref publish_worker for backends where every frame reaches the aggregator before shutdown.
          */
         virtual void publish_final_worker(const worker_frame& p_frame) { publish_worker(p_frame); }
 
-        /// @return How many final worker frames @ref poll has delivered to the center so far.
+        /// @return How many final worker frames @ref poll has delivered to the aggregator so far.
         [[nodiscard]] virtual std::uint32_t final_frames_received() const { return 0; }
 
         /**
@@ -61,7 +61,7 @@ namespace gempba::telemetry {
         virtual void poll(const worker_frame_sink& p_worker_sink, const node_frame_sink& p_node_sink) = 0;
 
         /**
-         * @brief Send a control message from the center to one worker.
+         * @brief Send a control message from the aggregator to one rank.
          *
          * Used for client-pushed knobs (interval changes, sentinel promotion).
          */

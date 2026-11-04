@@ -3,7 +3,7 @@
 #include <gempba/core/scheduler.hpp>
 #include <gempba/gempba.hpp>
 #include <gempba/telemetry/telemetry_hub.hpp>
-#include <impl/telemetry/center_tcp_server.hpp>
+#include <impl/telemetry/aggregator_tcp_server.hpp>
 #include <impl/telemetry/local_transport.hpp>
 #include <impl/telemetry/node_probe.hpp>
 #include <impl/telemetry/process_probe.hpp>
@@ -83,7 +83,7 @@ namespace gempba::telemetry {
         scheduler_clock m_scheduler_clock;
     };
 
-    // Center-side latest-frame state. Lives only on the center role; sparse
+    // Latest-frame state. Lives only on the aggregator; sparse
     // maps avoid the 16 KB-per-slot cost up front.
     struct telemetry_hub::aggregator {
         mutable std::mutex m_mtx;
@@ -120,7 +120,7 @@ namespace gempba::telemetry {
             m_run_id = detail::generate_run_id();
             m_aggregator = std::make_unique<aggregator>();
             if (p_start_pump_thread) {
-                m_tcp_server = std::make_unique<center_tcp_server>(g_configured_port.load(std::memory_order_acquire), *this);
+                m_tcp_server = std::make_unique<aggregator_tcp_server>(g_configured_port.load(std::memory_order_acquire), *this);
                 (void) m_tcp_server->start();
             }
         }
@@ -485,9 +485,10 @@ namespace gempba::telemetry {
         return m_run_markers;
     }
 
-    void telemetry_hub::describe_scheduler(const std::string_view p_name) {
+    void telemetry_hub::describe_scheduler(const std::string_view p_name, std::vector<rank_role> p_roles) {
         const std::scoped_lock v_lock(m_run_mtx);
         m_scheduler_name = p_name;
+        m_scheduler_roles = std::move(p_roles);
     }
 
     void telemetry_hub::describe_load_balancer(const balancing_policy p_policy) {
@@ -510,6 +511,7 @@ namespace gempba::telemetry {
         {
             const std::scoped_lock v_lock(m_run_mtx);
             v_run.m_scheduler = m_scheduler_name;
+            v_run.m_roles = m_scheduler_roles;
             v_run.m_load_balancer = m_load_balancer_name;
             v_run.m_annotations = m_run_annotations;
             v_run.m_markers = m_run_markers;
@@ -517,7 +519,7 @@ namespace gempba::telemetry {
         if (m_aggregator) {
             const std::scoped_lock v_lock(m_aggregator->m_mtx);
             for (const auto& [v_id, v_frame]: m_aggregator->m_latest_worker) {
-                const bool v_is_center = m_mode == runtime_mode::MP_MPI && v_id == 0;
+                const bool v_is_center = v_id < v_run.m_roles.size() && v_run.m_roles[v_id] == rank_role::CENTER;
                 if (!v_is_center && v_frame.m_process_threads > 0) {
                     v_run.m_threads_per_process = std::max(v_run.m_threads_per_process, v_frame.m_process_threads - 1);
                 }

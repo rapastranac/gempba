@@ -10,7 +10,7 @@ namespace gempba::telemetry {
     // telemetry tag space is fully isolated from task-message traffic and
     // cannot accidentally match a task receive. All ranks Isend their frames
     // to rank 0; rank 0 Iprobe + Recv drains them in poll(). Control messages
-    // travel center → workers on the same dup'd communicator.
+    // travel aggregator → other ranks on the same dup'd communicator.
     //
     // Single-threaded: every MPI call originates from the scheduler's polling
     // loop on the rank that owns it. MPI_THREAD_SERIALIZED is sufficient.

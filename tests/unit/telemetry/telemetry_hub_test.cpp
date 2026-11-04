@@ -86,7 +86,7 @@ namespace {
         EXPECT_NO_THROW(v_hub.shutdown());
     }
 
-    TEST_F(telemetry_hub_test, center_shutdown_waits_at_most_a_second_for_missing_final_frames) {
+    TEST_F(telemetry_hub_test, aggregator_shutdown_waits_at_most_a_second_for_missing_final_frames) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MP_MPI, 0, 3, /*p_start_pump_thread=*/false);
 
@@ -475,19 +475,19 @@ namespace {
         EXPECT_EQ(v_frame.m_assign_latency_microseconds_total, v_frame.m_assign_latency_microseconds_max);
     }
 
-    TEST_F(telemetry_hub_test, center_generates_a_run_id_per_run_and_workers_have_none) {
+    TEST_F(telemetry_hub_test, aggregator_generates_a_run_id_per_run_and_other_ranks_have_none) {
         const std::regex v_uuid_v4{"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"};
 
         gempba::telemetry::telemetry_hub v_first_run;
         v_first_run.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
         gempba::telemetry::telemetry_hub v_second_run;
         v_second_run.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
-        gempba::telemetry::telemetry_hub v_worker;
-        v_worker.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 1, 2, /*p_start_pump_thread=*/false);
+        gempba::telemetry::telemetry_hub v_other_rank;
+        v_other_rank.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 1, 2, /*p_start_pump_thread=*/false);
 
         EXPECT_TRUE(std::regex_match(v_first_run.run_id(), v_uuid_v4)) << v_first_run.run_id();
         EXPECT_NE(v_first_run.run_id(), v_second_run.run_id());
-        EXPECT_TRUE(v_worker.run_id().empty());
+        EXPECT_TRUE(v_other_rank.run_id().empty());
     }
 
     TEST_F(telemetry_hub_test, run_annotations_keep_their_order_and_a_repeated_key_replaces_its_value) {
@@ -578,19 +578,19 @@ namespace {
         EXPECT_EQ("marker " + std::to_string(gempba::telemetry::MAX_RUN_MARKERS - 1), v_markers.back().m_label);
     }
 
-    TEST_F(telemetry_hub_test, only_a_ready_center_keeps_run_markers) {
+    TEST_F(telemetry_hub_test, only_a_ready_aggregator_keeps_run_markers) {
         gempba::telemetry::telemetry_hub v_not_ready;
         EXPECT_FALSE(v_not_ready.mark_run("too early"));
 
-        gempba::telemetry::telemetry_hub v_worker;
-        v_worker.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 1, 2, /*p_start_pump_thread=*/false);
-        EXPECT_FALSE(v_worker.mark_run("on a worker"));
-        EXPECT_TRUE(v_worker.run_markers().empty());
+        gempba::telemetry::telemetry_hub v_other_rank;
+        v_other_rank.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 1, 2, /*p_start_pump_thread=*/false);
+        EXPECT_FALSE(v_other_rank.mark_run("off the aggregator"));
+        EXPECT_TRUE(v_other_rank.run_markers().empty());
 
-        gempba::telemetry::telemetry_hub v_center;
-        v_center.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
-        v_center.shutdown();
-        EXPECT_FALSE(v_center.mark_run("too late"));
+        gempba::telemetry::telemetry_hub v_aggregator;
+        v_aggregator.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+        v_aggregator.shutdown();
+        EXPECT_FALSE(v_aggregator.mark_run("too late"));
     }
 
     TEST_F(telemetry_hub_test, mark_run_reaches_the_installed_hub_and_is_dropped_without_one) {
@@ -631,6 +631,15 @@ namespace {
         v_hub.describe_load_balancer(gempba::WORK_STEALING);
         EXPECT_EQ("work_stealing", v_hub.describe_run().m_load_balancer);
         EXPECT_EQ("semi_centralized", v_hub.describe_run().m_scheduler);
+    }
+
+    TEST_F(telemetry_hub_test, describe_run_reports_the_roles_the_scheduler_declares) {
+        gempba::telemetry::telemetry_hub v_hub;
+        EXPECT_TRUE(v_hub.describe_run().m_roles.empty());
+
+        const std::vector<gempba::rank_role> v_roles{gempba::rank_role::CENTER, gempba::rank_role::WORKER, gempba::rank_role::WORKER};
+        v_hub.describe_scheduler("centralized", v_roles);
+        EXPECT_EQ(v_roles, v_hub.describe_run().m_roles);
     }
 
     void expect_edge(const gempba::telemetry::edge_counter& p_edge, const std::uint32_t p_dst, const std::uint64_t p_bytes, const std::uint64_t p_count) {
@@ -760,7 +769,7 @@ namespace {
         EXPECT_EQ(7u, v_frame.m_worker_id);
     }
 
-    TEST_F(telemetry_hub_test, latest_worker_frame_returns_nullopt_for_non_center_role) {
+    TEST_F(telemetry_hub_test, latest_worker_frame_returns_nullopt_off_the_aggregator) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 5, 8, /*p_start_pump_thread=*/false);
         EXPECT_FALSE(v_hub.latest_worker_frame(0).has_value());

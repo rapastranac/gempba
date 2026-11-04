@@ -55,12 +55,12 @@
 
 /**
  * Runs the leaf count and checks what telemetry reports about it across ranks: each rank's own frame, totals
- * gathered to rank 0, and the center's final broadcast as a dashboard connected to its TCP port receives it.
- * Then the center pauses telemetry and resumes it, each step between barriers: the pause must reach every worker
- * and stop all frames, a snapshot requested while paused must bring every rank's frame to the center and the
- * dashboard, and after the resume the center must receive the tasks the workers counted while paused.
+ * gathered to rank 0, and the aggregator's final broadcast as a dashboard connected to its TCP port receives it.
+ * Then the aggregator pauses telemetry and resumes it, each step between barriers: the pause must reach every worker
+ * and stop all frames, a snapshot requested while paused must bring every rank's frame to the aggregator and the
+ * dashboard, and after the resume the aggregator must receive the tasks the workers counted while paused.
  * Every check compares totals or waits for a state with a generous deadline; only the snapshot needs every worker,
- * ticking every few milliseconds, to answer within the center's one-second wait.
+ * ticking every few milliseconds, to answer within the aggregator's one-second wait.
  *
  * Usage: telemetry_stress <depth> <semi_centralized|centralized>
  */
@@ -228,7 +228,7 @@ int main(const int p_argc, char* p_argv[]) {
     std::thread v_dashboard_reader;
     if (v_rank == 0) {
         v_dashboard = connect_loopback(v_port);
-        v_checks.expect(v_dashboard != k_invalid_socket, "could not connect to the center's telemetry port");
+        v_checks.expect(v_dashboard != k_invalid_socket, "could not connect to the aggregator's telemetry port");
         v_checks.expect(gempba::telemetry::annotate_run("test", "telemetry_stress"), "the run annotation was refused");
         if (v_dashboard != k_invalid_socket) {
             v_dashboard_reader = std::thread([&] { read_until_closed(v_dashboard, std::chrono::seconds(60), v_dashboard_stream, v_dashboard_mtx); });
@@ -317,7 +317,8 @@ int main(const int p_argc, char* p_argv[]) {
         v_checks.expect(v_paused_window_done, "the dashboard received no paused broadcast");
         for (int v_r = 1; v_r < v_world_size; ++v_r) {
             const auto v_latest = v_hub.latest_worker_frame(static_cast<std::uint32_t>(v_r));
-            v_checks.expect((v_latest ? v_latest->m_seq_no : 0) == v_ingested_seq_nos[static_cast<std::size_t>(v_r)], "the paused center ingested a frame from rank " + std::to_string(v_r));
+            v_checks.expect((v_latest ? v_latest->m_seq_no : 0) == v_ingested_seq_nos[static_cast<std::size_t>(v_r)],
+                            "the paused aggregator ingested a frame from rank " + std::to_string(v_r));
         }
     }
     v_scheduler->barrier();
@@ -335,7 +336,7 @@ int main(const int p_argc, char* p_argv[]) {
             }
             return true;
         });
-        v_checks.expect(v_snapshot_id == 1 && v_answered, "the paused center lacks a rank's snapshot frame");
+        v_checks.expect(v_snapshot_id == 1 && v_answered, "the paused aggregator lacks a rank's snapshot frame");
         const bool v_broadcast = tick_until(v_hub, [&] {
             const std::scoped_lock v_lock(v_dashboard_mtx);
             return v_dashboard_stream.find(R"("paused":true,"final":false,"topology":)") != std::string::npos;
@@ -369,7 +370,7 @@ int main(const int p_argc, char* p_argv[]) {
             }
             return true;
         });
-        v_checks.expect(v_caught_up, "after the resume the center lacks the tasks the workers counted while paused");
+        v_checks.expect(v_caught_up, "after the resume the aggregator lacks the tasks the workers counted while paused");
     }
     v_checks.expect(v_hub.worker_interval_ms() == v_interval_ms, "pausing and resuming changed the interval");
 

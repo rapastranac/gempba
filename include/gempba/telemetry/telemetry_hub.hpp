@@ -34,12 +34,12 @@ namespace gempba::telemetry {
 
     class process_probe;
     class node_probe;
-    class center_tcp_server;
+    class aggregator_tcp_server;
 
     /**
      * @brief Process-wide runtime-telemetry hub.
      *
-     * Owns the transport, counters, probes, and (on the center role) the
+     * Owns the transport, counters, probes, and (on the aggregator) the
      * dashboard server. Workers feed it via the @c record_* hot-path hooks;
      * the pump thread periodically snapshots the counters into frames and
      * pushes them through the transport.
@@ -60,13 +60,13 @@ namespace gempba::telemetry {
          *
          * Call once after the runtime is up and the worker_id / world_size
          * are known. Sets up the transport, populates the topology snapshot,
-         * and (on the center role) starts the dashboard server.
+         * and (on the aggregator) starts the dashboard server.
          *
          * @param p_mode              Runtime mode driving transport choice.
          * @param p_worker_id         This worker's id (0..world_size-1).
          * @param p_world_size        Total worker count in this run.
          * @param p_start_pump_thread When @c false, the periodic pump thread
-         *                            (and the center dashboard server, when
+         *                            (and the aggregator's dashboard server, when
          *                            wired) is skipped; @ref tick_if_due must
          *                            then be called manually. Used by tests.
          */
@@ -162,13 +162,13 @@ namespace gempba::telemetry {
         /// Wall-clock seconds since @ref on_runtime_ready was called; 0 before that.
         [[nodiscard]] std::uint64_t program_elapsed_seconds() const noexcept;
 
-        /// The UUID v4 the center generated for this run at @ref on_runtime_ready; empty on other workers.
+        /// The UUID v4 the aggregator generated for this run at @ref on_runtime_ready; empty on other workers.
         [[nodiscard]] const std::string& run_id() const noexcept;
 
         /**
          * @brief Attach @p p_value to this run under @p p_key, e.g. a run label, problem name or seed.
          *
-         * The center broadcasts its annotations with the run setup. Keeps up to @ref MAX_RUN_ANNOTATIONS pairs, keys of 1 to
+         * The aggregator broadcasts its annotations with the run setup. Keeps up to @ref MAX_RUN_ANNOTATIONS pairs, keys of 1 to
          * @ref MAX_RUN_ANNOTATION_KEY_BYTES bytes and values up to @ref MAX_RUN_ANNOTATION_VALUE_BYTES bytes; a pair over a limit
          * is dropped with a warning, never truncated. Annotating a key again replaces its value.
          *
@@ -182,7 +182,7 @@ namespace gempba::telemetry {
         /**
          * @brief Record that @p p_label happened now, e.g. "phase 2 started", stamped in milliseconds since telemetry came up.
          *
-         * Only the center keeps markers, and it broadcasts them with the run setup; on any other rank, before
+         * Only the aggregator keeps markers, and it broadcasts them with the run setup; on any other rank, before
          * @ref on_runtime_ready or after @ref shutdown, the call does nothing.
          * Keeps up to @ref MAX_RUN_MARKERS markers with labels of 1 to @ref MAX_RUN_MARKER_LABEL_BYTES bytes; a marker over a
          * limit is dropped with a warning, never truncated.
@@ -194,13 +194,13 @@ namespace gempba::telemetry {
         /// @return this run's markers, in the order they were recorded.
         [[nodiscard]] std::vector<run_marker> run_markers() const;
 
-        /// Record the scheduler this run uses, by its scheduler::get_name().
-        void describe_scheduler(std::string_view p_name);
+        /// Record the scheduler this run uses, by its scheduler::get_name(), and each rank's scheduler::role_of(), indexed by worker id.
+        void describe_scheduler(std::string_view p_name, std::vector<rank_role> p_roles = {});
 
         /// Record the load balancer this run uses.
         void describe_load_balancer(balancing_policy p_policy);
 
-        /// @return how this run is set up; the thread count comes from the latest worker frames, so only the center fills it.
+        /// @return how this run is set up; the thread count comes from the latest worker frames, so only the aggregator fills it.
         [[nodiscard]] run_description describe_run() const;
 
         /// Set the cadence at which worker frames, and each host sentinel's node frame, are emitted. Fans out to other workers.
@@ -228,7 +228,7 @@ namespace gempba::telemetry {
         [[nodiscard]] std::uint32_t snapshot_requested() const noexcept;
 
         /**
-         * @return whether the center still waits for a frame from some rank answering the latest snapshot request. It ingests
+         * @return whether the aggregator still waits for a frame from some rank answering the latest snapshot request. It ingests
          * frames while it waits, even when paused, and gives up one second after the request.
          */
         [[nodiscard]] bool snapshot_outstanding() const;
@@ -236,7 +236,7 @@ namespace gempba::telemetry {
         /**
          * @brief Apply one control message received from the dashboard.
          *
-         * Routed by the center role; workers act on it locally. See
+         * Routed by the aggregator; other ranks act on it locally. See
          * @ref control_kind for the semantics per kind.
          */
         void apply_control_from_client(control_kind p_kind, std::uint32_t p_value) noexcept;
@@ -266,8 +266,8 @@ namespace gempba::telemetry {
         std::unique_ptr<process_probe> m_process_probe;
         std::unique_ptr<node_probe> m_node_probe;
         std::unique_ptr<telemetry_transport> m_transport;
-        std::unique_ptr<aggregator> m_aggregator; // center role only
-        std::unique_ptr<center_tcp_server> m_tcp_server; // center role only
+        std::unique_ptr<aggregator> m_aggregator; // aggregator only
+        std::unique_ptr<aggregator_tcp_server> m_tcp_server; // aggregator only
         topology_snapshot m_topology;
         std::optional<std::thread> m_timer_thread;
         std::atomic<bool> m_running{false};
@@ -279,6 +279,7 @@ namespace gempba::telemetry {
         std::vector<std::pair<std::string, std::string>> m_run_annotations;
         std::vector<run_marker> m_run_markers;
         std::string m_scheduler_name;
+        std::vector<rank_role> m_scheduler_roles;
         std::string m_load_balancer_name;
     };
 
@@ -327,7 +328,7 @@ namespace gempba::telemetry {
     [[nodiscard]] bool is_enabled() noexcept;
 
     /**
-     * @brief Set the TCP port the center role will bind for the dashboard.
+     * @brief Set the TCP port the aggregator will bind for the dashboard.
      *
      * Must be called before the hub is installed (i.e., before the first
      * node_manager / scheduler is created). Default is 9000 if never called.

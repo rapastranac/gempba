@@ -9,7 +9,7 @@ namespace gempba::telemetry {
     /**
      * @brief In-process @ref telemetry_transport for single-process runs.
      *
-     * Both worker and center roles live in the same address space, so frames
+     * The sending side and the aggregator live in the same address space, so frames
      * are handed off through shared queues — no socket, no serialization.
      */
     class local_transport final : public telemetry_transport {
