@@ -111,12 +111,12 @@ A full line from a 2-rank centralized run on one Windows host, pretty-printed (t
       "assign_count": 4312,
       "assign_latency_microseconds_max": 162,
       "available_microseconds_queue_empty": 0,
-      "center_state_msgs_total": 8623,
-      "center_score_proposals_total": 35676,
-      "center_score_broadcasts_total": 27329,
+      "coordinator_state_msgs_total": 8623,
+      "coordinator_score_proposals_total": 35676,
+      "coordinator_score_broadcasts_total": 27329,
       "score_proposals_sent": 0,
       "last_score_improvement_ms": 1499,
-      "center_full_microseconds": 0,
+      "coordinator_full_microseconds": 0,
       "telemetry_microseconds_total": 10238,
       "process_cpu_pct": 59.375,
       "process_rss_bytes": 10788864,
@@ -155,12 +155,12 @@ A full line from a 2-rank centralized run on one Windows host, pretty-printed (t
       "assign_count": 0,
       "assign_latency_microseconds_max": 0,
       "available_microseconds_queue_empty": 0,
-      "center_state_msgs_total": 0,
-      "center_score_proposals_total": 0,
-      "center_score_broadcasts_total": 0,
+      "coordinator_state_msgs_total": 0,
+      "coordinator_score_proposals_total": 0,
+      "coordinator_score_broadcasts_total": 0,
       "score_proposals_sent": 35744,
       "last_score_improvement_ms": 0,
-      "center_full_microseconds": 0,
+      "coordinator_full_microseconds": 0,
       "telemetry_microseconds_total": 45,
       "process_cpu_pct": 156.467,
       "process_rss_bytes": 10899456,
@@ -262,7 +262,7 @@ While paused, the aggregator sends only the line's header:
 
 ## Worker frame
 
-Each entry of `workers` is one rank's latest frame. Every rank sends one per interval. A key that doesn't apply to a rank, for example a center-only counter on a worker, reads 0.
+Each entry of `workers` is one rank's latest frame. Every rank sends one per interval. A key that doesn't apply to a rank, for example a coordinator-only counter on a worker, reads 0.
 
 | Key | Unit | Ranks | Meaning | Since |
 |---|---|---|---|---|
@@ -283,20 +283,20 @@ Each entry of `workers` is one rank's latest frame. Every rank sends one per int
 | `idle_microseconds_per_worker` | µs per pool thread | with a load balancer | Pool idle time divided by pool size, including the idle time of threads still asleep when the frame is built (#335). | v3.3.0 |
 | `idle_microseconds_starved` | µs per pool thread | with a load balancer | The part of the idle time while no task ran in the pool. | v4.3.0 (#337) |
 | `idle_microseconds_imbalanced` | µs per pool thread | with a load balancer | The part of the idle time while other pool threads ran tasks. With `idle_microseconds_starved` it adds up to `idle_microseconds_per_worker`, give or take 1 µs of rounding. | v4.3.0 (#337) |
-| `sched_running_microseconds` | µs | workers | Time from receiving a task to reporting available, summed over its tasks. | v4.3.0 (#338) |
-| `sched_waiting_microseconds` | µs | workers | Time waiting for a task since run start; with `sched_running_microseconds` it adds up to the run time. | v4.3.0 (#338) |
-| `first_task_ms` | ms since run start | workers | When its first task arrived; 0 until `tasks_recv_total` is non-zero. | v4.3.0 (#338) |
-| `last_task_ms` | ms since run start | workers | When its latest task ended. | v4.3.0 (#338) |
-| `assign_latency_microseconds_total` | µs | center | Time from assigning a rank to that rank reporting running, summed over assignments. The centralized center assigns by sending a task, the semi-centralized one by naming the rank a push target. | v4.3.0 (#338) |
-| `assign_count` | count | center | Assignments counted in `assign_latency_microseconds_total`. | v4.3.0 (#338) |
-| `assign_latency_microseconds_max` | µs | center | The longest single assignment latency. | v4.3.0 (#338) |
-| `available_microseconds_queue_empty` | µs, summed over ranks | centralized center | Time ranks spent available while the center's queue was empty. | v4.3.0 (#338) |
-| `center_state_msgs_total` | count | center | Running and available reports handled. | v4.3.0 (#339) |
-| `center_score_proposals_total` | count | center | Score proposals received, improving or not. | v4.3.0 (#339) |
-| `center_score_broadcasts_total` | count | center | Global score broadcasts, each a message to every worker. | v4.3.0 (#339) |
-| `score_proposals_sent` | count | workers | Score proposals sent to the center. | v4.3.0 (#341) |
-| `last_score_improvement_ms` | ms since run start | center | When the global score last improved; 0 until `center_score_broadcasts_total` is non-zero. | v4.3.0 (#341) |
-| `center_full_microseconds` | µs | centralized center | Time its workers were told the center is full and must not send tasks. | v4.3.0 (#339) |
+| `sched_running_microseconds` | µs | worker | Time from receiving a task to reporting available, summed over its tasks. | v4.3.0 (#338) |
+| `sched_waiting_microseconds` | µs | worker | Time waiting for a task since run start; with `sched_running_microseconds` it adds up to the run time. | v4.3.0 (#338) |
+| `first_task_ms` | ms since run start | worker | When its first task arrived; 0 until `tasks_recv_total` is non-zero. | v4.3.0 (#338) |
+| `last_task_ms` | ms since run start | worker | When its latest task ended. | v4.3.0 (#338) |
+| `assign_latency_microseconds_total` | µs | coordinator | Time from assigning a rank to that rank reporting running, summed over assignments. The centralized coordinator assigns by sending a task, the semi-centralized one by naming the rank a push target. | v4.3.0 (#338) |
+| `assign_count` | count | coordinator | Assignments counted in `assign_latency_microseconds_total`. | v4.3.0 (#338) |
+| `assign_latency_microseconds_max` | µs | coordinator | The longest single assignment latency. | v4.3.0 (#338) |
+| `available_microseconds_queue_empty` | µs, summed over ranks | centralized coordinator | Time ranks spent available while the coordinator's queue was empty. | v4.3.0 (#338) |
+| `coordinator_state_msgs_total` | count | coordinator | Running and available reports handled. | v4.3.0 (#339) |
+| `coordinator_score_proposals_total` | count | coordinator | Score proposals received, improving or not. | v4.3.0 (#339) |
+| `coordinator_score_broadcasts_total` | count | coordinator | Global score broadcasts, each a message to every worker. | v4.3.0 (#339) |
+| `score_proposals_sent` | count | worker | Score proposals sent to the coordinator. | v4.3.0 (#341) |
+| `last_score_improvement_ms` | ms since run start | coordinator | When the global score last improved; 0 until `coordinator_score_broadcasts_total` is non-zero. | v4.3.0 (#341) |
+| `coordinator_full_microseconds` | µs | centralized coordinator | Time its workers were told the coordinator is full and must not send tasks. | v4.3.0 (#339) |
 | `telemetry_microseconds_total` | µs | all | Time in telemetry ticks that sent or read a frame; under MPI, taken from the rank's scheduler thread. | v4.3.0 (#339) |
 | `process_cpu_pct` | % of one CPU | all | Process CPU time over wall time since the previous frame; above 100 when several threads are busy. | v3.3.0 |
 | `process_rss_bytes` | bytes | all | The process's resident memory. | v3.3.0 |
@@ -359,7 +359,7 @@ Time accounting to explain falling speedup (#333). Changes from schema 1:
   - `spawn_rejected_pool_full`, `spawn_remote_rejected`, `score_proposals_sent` and `last_score_improvement_ms` (#341);
   - `idle_microseconds_starved` and `idle_microseconds_imbalanced` (#337);
   - `sched_running_microseconds`, `sched_waiting_microseconds`, `first_task_ms`, `last_task_ms`, `assign_latency_microseconds_total`, `assign_count`, `assign_latency_microseconds_max` and `available_microseconds_queue_empty` (#338);
-  - `center_state_msgs_total`, `center_score_proposals_total`, `center_score_broadcasts_total`, `center_full_microseconds` and `telemetry_microseconds_total` (#339).
+  - `coordinator_state_msgs_total`, `coordinator_score_proposals_total`, `coordinator_score_broadcasts_total`, `coordinator_full_microseconds` and `telemetry_microseconds_total` (#339).
 - **Changed meaning:** `idle_microseconds_per_worker` now includes the idle time of pool threads still asleep when the frame is built (#335).
 - **Cadence:** the aggregator broadcasts at the telemetry interval instead of every 500 ms (#345), and node frames follow the worker interval instead of their own 1000 ms one (#367).
 - **Controls:** added `pause`, `resume` (#368), `snapshot` (#369) and `mark` (#370); `set_node_interval_ms` is accepted and ignored (#367).

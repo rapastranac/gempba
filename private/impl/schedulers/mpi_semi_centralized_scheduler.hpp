@@ -650,7 +650,7 @@ namespace gempba {
             utils::print_ipc_debug_comments("rank {} reported running, nRunning :{}\n", p_status.MPI_SOURCE, m_nodes_running);
             m_stats.m_center_messages_handled++;
             if (auto* v_telemetry = telemetry::get()) {
-                v_telemetry->record_center_state_msg();
+                v_telemetry->record_coordinator_state_msg();
                 v_telemetry->record_assignment_accepted(static_cast<std::uint32_t>(p_status.MPI_SOURCE));
             }
 
@@ -682,7 +682,7 @@ namespace gempba {
             m_stats.m_total_requested_tasks++;
             m_stats.m_center_messages_handled++;
             if (auto* v_telemetry = telemetry::get()) {
-                v_telemetry->record_center_state_msg();
+                v_telemetry->record_coordinator_state_msg();
             }
 
             if (m_process_tree[p_status.MPI_SOURCE].is_assigned()) {
@@ -731,7 +731,7 @@ namespace gempba {
             auto* v_telemetry = telemetry::get();
             m_stats.m_center_messages_handled++;
             if (v_telemetry) {
-                v_telemetry->record_center_score_proposal();
+                v_telemetry->record_coordinator_score_proposal();
             }
 
             const bool v_should_broadcast = should_broadcast_global(m_goal, m_global_score, p_new_global_score);
@@ -749,7 +749,7 @@ namespace gempba {
             ++m_score_updates_sent;
             m_stats.m_center_messages_handled++;
             if (v_telemetry) {
-                v_telemetry->record_center_score_broadcast();
+                v_telemetry->record_coordinator_score_broadcast();
                 v_telemetry->record_global_score_improved();
             }
 
@@ -826,7 +826,7 @@ namespace gempba {
                         m_stats.m_total_requested_tasks++;
                         m_stats.m_center_messages_handled++;
                         if (auto* v_telemetry = telemetry::get()) {
-                            v_telemetry->record_center_state_msg();
+                            v_telemetry->record_coordinator_state_msg();
                         }
                         break;
                     }

@@ -100,34 +100,34 @@ namespace gempba::telemetry {
         /// Record that this worker received a task and runs it.
         void record_worker_running() noexcept;
 
-        /// Record that the center assigned @p p_worker_id, which then waits for its task.
+        /// Record that the coordinator assigned @p p_worker_id, which then waits for its task.
         void record_assignment(std::uint32_t p_worker_id) noexcept;
 
         /// Record that @p p_worker_id reported running, which ends its pending assignment.
         void record_assignment_accepted(std::uint32_t p_worker_id) noexcept;
 
-        /// Record the center's available-rank count and queue state after it handled an event.
-        void record_center_queue(std::uint32_t p_available_ranks, bool p_queue_empty) noexcept;
+        /// Record the coordinator's available-rank count and queue state after it handled an event.
+        void record_coordinator_queue(std::uint32_t p_available_ranks, bool p_queue_empty) noexcept;
 
-        /// Record that the center handled a running or available report. Hot-path; same guarantees as @ref record_send.
-        void record_center_state_msg() noexcept;
+        /// Record that the coordinator handled a running or available report. Hot-path; same guarantees as @ref record_send.
+        void record_coordinator_state_msg() noexcept;
 
-        /// Record that the center received a score proposal. Hot-path; same guarantees as @ref record_send.
-        void record_center_score_proposal() noexcept;
+        /// Record that the coordinator received a score proposal. Hot-path; same guarantees as @ref record_send.
+        void record_coordinator_score_proposal() noexcept;
 
-        /// Record that the center broadcast a new global score to every worker. Hot-path; same guarantees as @ref record_send.
-        void record_center_score_broadcast() noexcept;
+        /// Record that the coordinator broadcast a new global score to every worker. Hot-path; same guarantees as @ref record_send.
+        void record_coordinator_score_broadcast() noexcept;
 
-        /// Record that the center told its workers it is full; repeated notices extend the same full period.
-        void record_center_full() noexcept;
+        /// Record that the coordinator told its workers it is full; repeated notices extend the same full period.
+        void record_coordinator_full() noexcept;
 
-        /// Record that the center told its workers it has room again.
-        void record_center_free() noexcept;
+        /// Record that the coordinator told its workers it has room again.
+        void record_coordinator_free() noexcept;
 
-        /// Record that this worker proposed its local best score to the center. Hot-path; same guarantees as @ref record_send.
+        /// Record that this worker proposed its local best score to the coordinator. Hot-path; same guarantees as @ref record_send.
         void record_score_proposal_sent() noexcept;
 
-        /// Record that the center's global score improved; its time since run start becomes the latest improvement.
+        /// Record that the coordinator's global score improved; its time since run start becomes the latest improvement.
         void record_global_score_improved() noexcept;
 
         /**

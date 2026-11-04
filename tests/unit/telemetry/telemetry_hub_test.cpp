@@ -147,10 +147,10 @@ namespace {
         EXPECT_EQ(0u, v_frame.m_sched_waiting_microseconds);
         EXPECT_EQ(0u, v_frame.m_assign_count);
         EXPECT_EQ(0u, v_frame.m_available_microseconds_queue_empty);
-        EXPECT_EQ(0u, v_frame.m_center_state_msgs_total);
-        EXPECT_EQ(0u, v_frame.m_center_score_proposals_total);
-        EXPECT_EQ(0u, v_frame.m_center_score_broadcasts_total);
-        EXPECT_EQ(0u, v_frame.m_center_full_microseconds);
+        EXPECT_EQ(0u, v_frame.m_coordinator_state_msgs_total);
+        EXPECT_EQ(0u, v_frame.m_coordinator_score_proposals_total);
+        EXPECT_EQ(0u, v_frame.m_coordinator_score_broadcasts_total);
+        EXPECT_EQ(0u, v_frame.m_coordinator_full_microseconds);
         EXPECT_EQ(0u, v_frame.m_telemetry_microseconds_total);
         EXPECT_EQ(0u, v_frame.m_spawn_rejected_pool_full);
         EXPECT_EQ(0u, v_frame.m_spawn_remote_rejected);
@@ -159,40 +159,40 @@ namespace {
         EXPECT_GT(v_frame.m_worker_local_ms, 0u);
     }
 
-    TEST_F(telemetry_hub_test, center_state_msg_counter_accumulates) {
+    TEST_F(telemetry_hub_test, coordinator_state_msg_counter_accumulates) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
 
-        v_hub.record_center_state_msg();
-        v_hub.record_center_state_msg();
-        v_hub.record_center_state_msg();
+        v_hub.record_coordinator_state_msg();
+        v_hub.record_coordinator_state_msg();
+        v_hub.record_coordinator_state_msg();
 
         gempba::telemetry::worker_frame v_frame{};
         v_hub.snapshot_worker_frame(v_frame);
-        EXPECT_EQ(3u, v_frame.m_center_state_msgs_total);
+        EXPECT_EQ(3u, v_frame.m_coordinator_state_msgs_total);
     }
 
-    TEST_F(telemetry_hub_test, center_score_proposal_counter_accumulates) {
+    TEST_F(telemetry_hub_test, coordinator_score_proposal_counter_accumulates) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
 
-        v_hub.record_center_score_proposal();
-        v_hub.record_center_score_proposal();
+        v_hub.record_coordinator_score_proposal();
+        v_hub.record_coordinator_score_proposal();
 
         gempba::telemetry::worker_frame v_frame{};
         v_hub.snapshot_worker_frame(v_frame);
-        EXPECT_EQ(2u, v_frame.m_center_score_proposals_total);
+        EXPECT_EQ(2u, v_frame.m_coordinator_score_proposals_total);
     }
 
-    TEST_F(telemetry_hub_test, center_score_broadcast_counter_accumulates) {
+    TEST_F(telemetry_hub_test, coordinator_score_broadcast_counter_accumulates) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
 
-        v_hub.record_center_score_broadcast();
+        v_hub.record_coordinator_score_broadcast();
 
         gempba::telemetry::worker_frame v_frame{};
         v_hub.snapshot_worker_frame(v_frame);
-        EXPECT_EQ(1u, v_frame.m_center_score_broadcasts_total);
+        EXPECT_EQ(1u, v_frame.m_coordinator_score_broadcasts_total);
     }
 
     TEST_F(telemetry_hub_test, score_proposal_counter_accumulates) {
@@ -222,15 +222,15 @@ namespace {
         EXPECT_LE(v_frame.m_last_score_improvement_ms, static_cast<std::uint64_t>(v_after - v_before));
     }
 
-    TEST_F(telemetry_hub_test, center_full_time_fits_in_the_full_period_and_stops_when_free) {
+    TEST_F(telemetry_hub_test, coordinator_full_time_fits_in_the_full_period_and_stops_when_free) {
         using clock = std::chrono::steady_clock;
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
         v_hub.record_run_start();
 
         const auto v_before = std::chrono::duration_cast<std::chrono::microseconds>(clock::now().time_since_epoch()).count();
-        v_hub.record_center_full();
-        v_hub.record_center_free();
+        v_hub.record_coordinator_full();
+        v_hub.record_coordinator_free();
         const auto v_after = std::chrono::duration_cast<std::chrono::microseconds>(clock::now().time_since_epoch()).count();
 
         gempba::telemetry::worker_frame v_first{};
@@ -238,8 +238,8 @@ namespace {
         gempba::telemetry::worker_frame v_second{};
         v_hub.snapshot_worker_frame(v_second);
 
-        EXPECT_LE(v_first.m_center_full_microseconds, static_cast<std::uint64_t>(v_after - v_before));
-        EXPECT_EQ(v_first.m_center_full_microseconds, v_second.m_center_full_microseconds);
+        EXPECT_LE(v_first.m_coordinator_full_microseconds, static_cast<std::uint64_t>(v_after - v_before));
+        EXPECT_EQ(v_first.m_coordinator_full_microseconds, v_second.m_coordinator_full_microseconds);
     }
 
     TEST_F(telemetry_hub_test, tick_if_due_accumulates_its_own_time) {
@@ -461,7 +461,7 @@ namespace {
         EXPECT_EQ(v_first.m_sched_waiting_microseconds, v_second.m_sched_waiting_microseconds);
     }
 
-    TEST_F(telemetry_hub_test, center_assignment_reaches_the_frame) {
+    TEST_F(telemetry_hub_test, coordinator_assignment_reaches_the_frame) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
 

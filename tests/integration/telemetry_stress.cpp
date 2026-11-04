@@ -269,12 +269,12 @@ int main(const int p_argc, char* p_argv[]) {
         v_checks.expect(v_totals[5] == (1ULL << v_max_depth), "the leaf count is wrong");
         v_checks.expect(v_totals[0] == v_totals[1], "tasks sent differ from tasks received across ranks");
         v_checks.expect(v_totals[2] == v_totals[3], "bytes sent differ from bytes received across ranks");
-        v_checks.expect(v_worker_proposals == v_frame.m_center_score_proposals_total, "workers' score proposals differ from those the center received");
+        v_checks.expect(v_worker_proposals == v_frame.m_coordinator_score_proposals_total, "workers' score proposals differ from those the center received");
 
         gempba::default_mpi_stats_visitor v_stats;
         v_scheduler->get_stats()->visit(&v_stats);
-        const std::uint64_t v_kinds = v_frame.m_center_state_msgs_total + v_frame.m_tasks_recv_total + v_frame.m_tasks_sent_total + v_frame.m_center_score_proposals_total +
-                                      v_frame.m_center_score_broadcasts_total;
+        const std::uint64_t v_kinds = v_frame.m_coordinator_state_msgs_total + v_frame.m_tasks_recv_total + v_frame.m_tasks_sent_total + v_frame.m_coordinator_score_proposals_total +
+                                      v_frame.m_coordinator_score_broadcasts_total;
         v_checks.expect(v_stats.m_center_messages_handled == v_kinds, "center_messages_handled differs from the center's per-kind counters");
 
         std::cout << v_topology_name << " ranks=" << v_world_size << " tasks=" << v_totals[0] << " bytes=" << v_totals[2] << " proposals=" << v_worker_proposals

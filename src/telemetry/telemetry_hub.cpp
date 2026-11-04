@@ -67,9 +67,9 @@ namespace gempba::telemetry {
         std::atomic<std::uint64_t> m_send_nanoseconds_total{0};
         std::atomic<std::uint64_t> m_recv_nanoseconds_total{0};
 
-        std::atomic<std::uint64_t> m_center_state_msgs_total{0};
-        std::atomic<std::uint64_t> m_center_score_proposals_total{0};
-        std::atomic<std::uint64_t> m_center_score_broadcasts_total{0};
+        std::atomic<std::uint64_t> m_coordinator_state_msgs_total{0};
+        std::atomic<std::uint64_t> m_coordinator_score_proposals_total{0};
+        std::atomic<std::uint64_t> m_coordinator_score_broadcasts_total{0};
         std::atomic<std::uint64_t> m_score_proposals_sent{0};
         std::atomic<std::uint64_t> m_telemetry_microseconds_total{0};
 
@@ -234,25 +234,25 @@ namespace gempba::telemetry {
         m_counters->m_scheduler_clock.on_assignment_accepted(p_worker_id, monotonic_us());
     }
 
-    void telemetry_hub::record_center_queue(const std::uint32_t p_available_ranks, const bool p_queue_empty) noexcept {
+    void telemetry_hub::record_coordinator_queue(const std::uint32_t p_available_ranks, const bool p_queue_empty) noexcept {
         const std::scoped_lock v_lock(m_counters->m_scheduler_mtx);
-        m_counters->m_scheduler_clock.on_center_queue(p_available_ranks, p_queue_empty, monotonic_us());
+        m_counters->m_scheduler_clock.on_coordinator_queue(p_available_ranks, p_queue_empty, monotonic_us());
     }
 
-    void telemetry_hub::record_center_state_msg() noexcept { m_counters->m_center_state_msgs_total.fetch_add(1, std::memory_order_relaxed); }
+    void telemetry_hub::record_coordinator_state_msg() noexcept { m_counters->m_coordinator_state_msgs_total.fetch_add(1, std::memory_order_relaxed); }
 
-    void telemetry_hub::record_center_score_proposal() noexcept { m_counters->m_center_score_proposals_total.fetch_add(1, std::memory_order_relaxed); }
+    void telemetry_hub::record_coordinator_score_proposal() noexcept { m_counters->m_coordinator_score_proposals_total.fetch_add(1, std::memory_order_relaxed); }
 
-    void telemetry_hub::record_center_score_broadcast() noexcept { m_counters->m_center_score_broadcasts_total.fetch_add(1, std::memory_order_relaxed); }
+    void telemetry_hub::record_coordinator_score_broadcast() noexcept { m_counters->m_coordinator_score_broadcasts_total.fetch_add(1, std::memory_order_relaxed); }
 
-    void telemetry_hub::record_center_full() noexcept {
+    void telemetry_hub::record_coordinator_full() noexcept {
         const std::scoped_lock v_lock(m_counters->m_scheduler_mtx);
-        m_counters->m_scheduler_clock.on_center_full(monotonic_us());
+        m_counters->m_scheduler_clock.on_coordinator_full(monotonic_us());
     }
 
-    void telemetry_hub::record_center_free() noexcept {
+    void telemetry_hub::record_coordinator_free() noexcept {
         const std::scoped_lock v_lock(m_counters->m_scheduler_mtx);
-        m_counters->m_scheduler_clock.on_center_free(monotonic_us());
+        m_counters->m_scheduler_clock.on_coordinator_free(monotonic_us());
     }
 
     void telemetry_hub::record_score_proposal_sent() noexcept { m_counters->m_score_proposals_sent.fetch_add(1, std::memory_order_relaxed); }
@@ -366,9 +366,9 @@ namespace gempba::telemetry {
         p_out.m_bytes_recv_total = m_counters->m_bytes_recv_total.load(std::memory_order_relaxed);
         p_out.m_send_microseconds_total = m_counters->m_send_nanoseconds_total.load(std::memory_order_relaxed) / 1000;
         p_out.m_recv_microseconds_total = m_counters->m_recv_nanoseconds_total.load(std::memory_order_relaxed) / 1000;
-        p_out.m_center_state_msgs_total = m_counters->m_center_state_msgs_total.load(std::memory_order_relaxed);
-        p_out.m_center_score_proposals_total = m_counters->m_center_score_proposals_total.load(std::memory_order_relaxed);
-        p_out.m_center_score_broadcasts_total = m_counters->m_center_score_broadcasts_total.load(std::memory_order_relaxed);
+        p_out.m_coordinator_state_msgs_total = m_counters->m_coordinator_state_msgs_total.load(std::memory_order_relaxed);
+        p_out.m_coordinator_score_proposals_total = m_counters->m_coordinator_score_proposals_total.load(std::memory_order_relaxed);
+        p_out.m_coordinator_score_broadcasts_total = m_counters->m_coordinator_score_broadcasts_total.load(std::memory_order_relaxed);
         p_out.m_score_proposals_sent = m_counters->m_score_proposals_sent.load(std::memory_order_relaxed);
         p_out.m_telemetry_microseconds_total = m_counters->m_telemetry_microseconds_total.load(std::memory_order_relaxed);
 

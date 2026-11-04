@@ -552,9 +552,9 @@ namespace gempba {
             });
         }
 
-        void record_center_queue() const {
+        void record_coordinator_queue() const {
             if (auto* v_telemetry = telemetry::get()) {
-                v_telemetry->record_center_queue(static_cast<std::uint32_t>(m_nodes_available), m_center_bundle_queue.empty());
+                v_telemetry->record_coordinator_queue(static_cast<std::uint32_t>(m_nodes_available), m_center_bundle_queue.empty());
             }
         }
 
@@ -566,7 +566,7 @@ namespace gempba {
             }
 
             send_seed(p_seed, p_runnable_id);
-            record_center_queue();
+            record_coordinator_queue();
 
             while (true) {
                 MPI_Status v_status = probe_communicators_at_center();
@@ -603,7 +603,7 @@ namespace gempba {
 
                 clear_buffer();
                 monitor_and_notify_center_status();
-                record_center_queue();
+                record_coordinator_queue();
 
                 if (auto* v_telemetry = telemetry::get())
                     v_telemetry->tick_if_due();
@@ -688,7 +688,7 @@ namespace gempba {
             m_stats.m_total_requested_tasks++;
             m_stats.m_center_messages_handled++;
             if (auto* v_telemetry = telemetry::get()) {
-                v_telemetry->record_center_state_msg();
+                v_telemetry->record_coordinator_state_msg();
                 v_telemetry->record_assignment_accepted(static_cast<std::uint32_t>(p_status.MPI_SOURCE));
             }
         }
@@ -702,7 +702,7 @@ namespace gempba {
             m_stats.m_total_requested_tasks++;
             m_stats.m_center_messages_handled++;
             if (auto* v_telemetry = telemetry::get()) {
-                v_telemetry->record_center_state_msg();
+                v_telemetry->record_coordinator_state_msg();
             }
         }
 
@@ -715,7 +715,7 @@ namespace gempba {
             auto* v_telemetry = telemetry::get();
             m_stats.m_center_messages_handled++;
             if (v_telemetry) {
-                v_telemetry->record_center_score_proposal();
+                v_telemetry->record_coordinator_score_proposal();
             }
 
             const bool v_should_broadcast = should_broadcast_global(m_goal, m_global_score, p_new_global_score);
@@ -733,7 +733,7 @@ namespace gempba {
             ++m_score_updates_sent;
             m_stats.m_center_messages_handled++;
             if (v_telemetry) {
-                v_telemetry->record_center_score_broadcast();
+                v_telemetry->record_coordinator_score_broadcast();
                 v_telemetry->record_global_score_improved();
             }
 
@@ -812,7 +812,7 @@ namespace gempba {
                 m_center_last_full_status = true;
                 m_time_centerfull_sent = MPI_Wtime();
                 if (auto* v_telemetry = telemetry::get()) {
-                    v_telemetry->record_center_full();
+                    v_telemetry->record_coordinator_full();
                 }
 
                 // cout << "CENTER IS FULL" << endl;
@@ -829,7 +829,7 @@ namespace gempba {
                 ++m_fullness_notices_sent;
                 m_center_last_full_status = false;
                 if (auto* v_telemetry = telemetry::get()) {
-                    v_telemetry->record_center_free();
+                    v_telemetry->record_coordinator_free();
                 }
 
                 // cout << "CENTER IS NOT FULL ANYMORE" << endl;
@@ -876,7 +876,7 @@ namespace gempba {
                         m_stats.m_total_requested_tasks++;
                         m_stats.m_center_messages_handled++;
                         if (auto* v_telemetry = telemetry::get()) {
-                            v_telemetry->record_center_state_msg();
+                            v_telemetry->record_coordinator_state_msg();
                         }
                         break;
                     }

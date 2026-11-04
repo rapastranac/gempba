@@ -94,21 +94,21 @@ namespace {
         EXPECT_NE(std::string::npos, v_out.find("\"available_microseconds_queue_empty\":18"));
     }
 
-    TEST(json_serializer_test, worker_frame_includes_the_center_counters_and_telemetry_time) {
+    TEST(json_serializer_test, worker_frame_includes_the_coordinator_counters_and_telemetry_time) {
         gempba::telemetry::worker_frame v_f{};
-        v_f.m_center_state_msgs_total = 21;
-        v_f.m_center_score_proposals_total = 22;
-        v_f.m_center_score_broadcasts_total = 23;
-        v_f.m_center_full_microseconds = 24;
+        v_f.m_coordinator_state_msgs_total = 21;
+        v_f.m_coordinator_score_proposals_total = 22;
+        v_f.m_coordinator_score_broadcasts_total = 23;
+        v_f.m_coordinator_full_microseconds = 24;
         v_f.m_telemetry_microseconds_total = 25;
 
         std::string v_out;
         gempba::telemetry::serialize_worker_frame(v_out, v_f);
 
-        EXPECT_NE(std::string::npos, v_out.find("\"center_state_msgs_total\":21"));
-        EXPECT_NE(std::string::npos, v_out.find("\"center_score_proposals_total\":22"));
-        EXPECT_NE(std::string::npos, v_out.find("\"center_score_broadcasts_total\":23"));
-        EXPECT_NE(std::string::npos, v_out.find("\"center_full_microseconds\":24"));
+        EXPECT_NE(std::string::npos, v_out.find("\"coordinator_state_msgs_total\":21"));
+        EXPECT_NE(std::string::npos, v_out.find("\"coordinator_score_proposals_total\":22"));
+        EXPECT_NE(std::string::npos, v_out.find("\"coordinator_score_broadcasts_total\":23"));
+        EXPECT_NE(std::string::npos, v_out.find("\"coordinator_full_microseconds\":24"));
         EXPECT_NE(std::string::npos, v_out.find("\"telemetry_microseconds_total\":25"));
     }
 

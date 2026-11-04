@@ -62,7 +62,7 @@ namespace {
     TEST(scheduler_clock_test, nothing_accrues_outside_the_run) {
         scheduler_clock v_clock;
         v_clock.on_worker_running(1'000);
-        v_clock.on_center_queue(4, true, 1'000);
+        v_clock.on_coordinator_queue(4, true, 1'000);
         EXPECT_EQ(0u, fill_at(v_clock, 5'000).m_sched_running_microseconds);
         EXPECT_EQ(0u, fill_at(v_clock, 5'000).m_available_microseconds_queue_empty);
 
@@ -104,12 +104,12 @@ namespace {
         EXPECT_EQ(1u, v_frame.m_assign_count);
     }
 
-    TEST(scheduler_clock_test, available_time_accrues_only_while_the_center_queue_is_empty) {
+    TEST(scheduler_clock_test, available_time_accrues_only_while_the_coordinator_queue_is_empty) {
         scheduler_clock v_clock;
         v_clock.on_run_start(0);
-        v_clock.on_center_queue(2, true, 0);
-        v_clock.on_center_queue(3, false, 1'000);
-        v_clock.on_center_queue(1, true, 3'000);
+        v_clock.on_coordinator_queue(2, true, 0);
+        v_clock.on_coordinator_queue(3, false, 1'000);
+        v_clock.on_coordinator_queue(1, true, 3'000);
 
         const worker_frame v_live = fill_at(v_clock, 3'500);
         EXPECT_EQ(2'500u, v_live.m_available_microseconds_queue_empty);
@@ -119,28 +119,28 @@ namespace {
         EXPECT_EQ(3'000u, v_final.m_available_microseconds_queue_empty);
     }
 
-    TEST(scheduler_clock_test, center_full_time_spans_full_to_free_and_ignores_repeated_notices) {
+    TEST(scheduler_clock_test, coordinator_full_time_spans_full_to_free_and_ignores_repeated_notices) {
         scheduler_clock v_clock;
         v_clock.on_run_start(0);
-        v_clock.on_center_free(500);
-        v_clock.on_center_full(1'000);
-        v_clock.on_center_full(2'000);
-        v_clock.on_center_free(4'000);
-        v_clock.on_center_free(5'000);
-        EXPECT_EQ(3'000u, fill_at(v_clock, 5'500).m_center_full_microseconds);
+        v_clock.on_coordinator_free(500);
+        v_clock.on_coordinator_full(1'000);
+        v_clock.on_coordinator_full(2'000);
+        v_clock.on_coordinator_free(4'000);
+        v_clock.on_coordinator_free(5'000);
+        EXPECT_EQ(3'000u, fill_at(v_clock, 5'500).m_coordinator_full_microseconds);
 
-        v_clock.on_center_full(6'000);
-        EXPECT_EQ(4'500u, fill_at(v_clock, 7'500).m_center_full_microseconds);
+        v_clock.on_coordinator_full(6'000);
+        EXPECT_EQ(4'500u, fill_at(v_clock, 7'500).m_coordinator_full_microseconds);
 
         v_clock.on_run_end(8'000);
-        EXPECT_EQ(5'000u, fill_at(v_clock, 9'000).m_center_full_microseconds);
+        EXPECT_EQ(5'000u, fill_at(v_clock, 9'000).m_coordinator_full_microseconds);
     }
 
-    TEST(scheduler_clock_test, center_full_time_does_not_accrue_outside_the_run) {
+    TEST(scheduler_clock_test, coordinator_full_time_does_not_accrue_outside_the_run) {
         scheduler_clock v_clock;
-        v_clock.on_center_full(0);
+        v_clock.on_coordinator_full(0);
         v_clock.on_run_start(1'000);
-        EXPECT_EQ(0u, fill_at(v_clock, 3'000).m_center_full_microseconds);
+        EXPECT_EQ(0u, fill_at(v_clock, 3'000).m_coordinator_full_microseconds);
     }
 
     TEST(scheduler_clock_test, last_score_improvement_is_the_latest_relative_to_run_start) {
@@ -158,10 +158,10 @@ namespace {
         EXPECT_EQ(8u, fill_at(v_clock, 16'000).m_last_score_improvement_ms);
     }
 
-    TEST(scheduler_clock_test, center_events_leave_worker_times_at_zero) {
+    TEST(scheduler_clock_test, coordinator_events_leave_worker_times_at_zero) {
         scheduler_clock v_clock;
         v_clock.on_run_start(0);
-        v_clock.on_center_queue(2, true, 0);
+        v_clock.on_coordinator_queue(2, true, 0);
         v_clock.on_run_end(5'000);
 
         const worker_frame v_frame = fill_at(v_clock, 5'000);
