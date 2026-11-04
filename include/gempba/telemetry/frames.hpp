@@ -203,11 +203,13 @@ namespace gempba::telemetry {
     /** @brief Tag for client-pushed control messages over the dashboard channel. */
     enum class control_kind : std::uint16_t {
         UNSPECIFIED = 0,
-        /** @brief Promote this worker to its host's sentinel (emits node frames). */
+        /** @brief Promote this rank to its host's sentinel (emits node frames). */
         BE_NODE_SENTINEL = 1,
         /** @brief Reset the telemetry interval, for rank and node frames alike, to @c m_value milliseconds; sent as the set_interval_ms control, or set_worker_interval_ms until v5.0.0. */
-        SET_WORKER_INTERVAL_MS = 2,
-        /** @brief Stop publishing and ingesting worker and node frames until @ref RESUME; per-event counters keep counting, and shutdown still sends the final frames. */
+        SET_INTERVAL_MS = 2,
+        /** @deprecated Use @ref SET_INTERVAL_MS. Removed in v5.0.0 (#373). */
+        SET_WORKER_INTERVAL_MS [[deprecated("use SET_INTERVAL_MS")]] = SET_INTERVAL_MS,
+        /** @brief Stop publishing and ingesting rank and node frames until @ref RESUME; per-event counters keep counting, and shutdown still sends the final frames. */
         PAUSE = 3,
         /** @brief Publish and ingest frames again at the current interval. */
         RESUME = 4,

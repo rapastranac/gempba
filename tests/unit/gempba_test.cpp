@@ -228,7 +228,7 @@ TEST_F(gempba_test, mt_threads_per_process_is_the_pool_size_the_worker_frames_re
     gempba::multithreading::create_node_manager(v_lb);
     auto* v_hub = gempba::telemetry::get();
     ASSERT_NE(nullptr, v_hub);
-    v_hub->set_worker_interval_ms(0);
+    v_hub->set_interval_ms(0);
 
     const auto v_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
     while (v_hub->describe_run().m_threads_per_process == 0 && std::chrono::steady_clock::now() < v_deadline) {
@@ -243,7 +243,7 @@ TEST_F(gempba_test, threads_per_process_leaves_out_a_rank_its_scheduler_declares
     gempba::multithreading::create_node_manager(v_lb);
     auto* v_hub = gempba::telemetry::get();
     ASSERT_NE(nullptr, v_hub);
-    v_hub->set_worker_interval_ms(0);
+    v_hub->set_interval_ms(0);
 
     const auto v_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
     while (v_hub->describe_run().m_threads_per_process == 0 && std::chrono::steady_clock::now() < v_deadline) {

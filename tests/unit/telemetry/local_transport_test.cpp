@@ -60,14 +60,14 @@ namespace {
 
         gempba::telemetry::control_msg v_msg{};
         v_msg.m_version = gempba::telemetry::TELEMETRY_SCHEMA_VERSION;
-        v_msg.m_kind = gempba::telemetry::control_kind::SET_WORKER_INTERVAL_MS;
+        v_msg.m_kind = gempba::telemetry::control_kind::SET_INTERVAL_MS;
         v_msg.m_value = 250;
 
         v_transport.send_control(0, v_msg);
 
         const auto v_received = v_transport.try_recv_control();
         ASSERT_TRUE(v_received.has_value());
-        EXPECT_EQ(gempba::telemetry::control_kind::SET_WORKER_INTERVAL_MS, v_received->m_kind);
+        EXPECT_EQ(gempba::telemetry::control_kind::SET_INTERVAL_MS, v_received->m_kind);
         EXPECT_EQ(250u, v_received->m_value);
 
         EXPECT_FALSE(v_transport.try_recv_control().has_value());

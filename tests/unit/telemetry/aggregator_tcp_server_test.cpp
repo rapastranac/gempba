@@ -65,7 +65,7 @@ namespace {
         // Don't auto-spawn the timer thread or the default-port TCP server —
         // the test stands up its own server on an ephemeral port.
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
-        v_hub.set_worker_interval_ms(0);
+        v_hub.set_interval_ms(0);
 
         gempba::telemetry::aggregator_tcp_server v_server(0, v_hub); // 0 → OS picks port
         ASSERT_TRUE(v_server.start());
@@ -152,7 +152,7 @@ namespace {
     TEST_F(tcp_server_test, client_set_interval_is_applied) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
-        v_hub.set_worker_interval_ms(500);
+        v_hub.set_interval_ms(500);
 
         gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
         ASSERT_TRUE(v_server.start());
@@ -161,7 +161,7 @@ namespace {
         ASSERT_NE(k_invalid, v_client);
 
         ASSERT_TRUE(send_all(v_client, "{\"kind\":\"set_interval_ms\",\"value\":2500}\n"));
-        EXPECT_TRUE(wait_for([&] { return v_hub.worker_interval_ms() == 2500u; }, std::chrono::milliseconds(2000)));
+        EXPECT_TRUE(wait_for([&] { return v_hub.interval_ms() == 2500u; }, std::chrono::milliseconds(2000)));
 
         close_sock(v_client);
         v_server.stop();
@@ -170,7 +170,7 @@ namespace {
     TEST_F(tcp_server_test, client_set_worker_interval_is_still_applied) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
-        v_hub.set_worker_interval_ms(500);
+        v_hub.set_interval_ms(500);
 
         gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
         ASSERT_TRUE(v_server.start());
@@ -179,7 +179,7 @@ namespace {
         ASSERT_NE(k_invalid, v_client);
 
         ASSERT_TRUE(send_all(v_client, "{\"kind\":\"set_worker_interval_ms\",\"value\":2500}\n"));
-        EXPECT_TRUE(wait_for([&] { return v_hub.worker_interval_ms() == 2500u; }, std::chrono::milliseconds(2000)));
+        EXPECT_TRUE(wait_for([&] { return v_hub.interval_ms() == 2500u; }, std::chrono::milliseconds(2000)));
 
         close_sock(v_client);
         v_server.stop();
@@ -188,7 +188,7 @@ namespace {
     TEST_F(tcp_server_test, client_set_node_interval_is_accepted_and_ignored) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
-        v_hub.set_worker_interval_ms(500);
+        v_hub.set_interval_ms(500);
 
         gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
         ASSERT_TRUE(v_server.start());
@@ -197,9 +197,9 @@ namespace {
         ASSERT_NE(k_invalid, v_client);
 
         ASSERT_TRUE(send_all(v_client, "{\"kind\":\"set_interval_ms\",\"value\":2500}\n{\"value\":7500,\"kind\":\"set_node_interval_ms\"}\n"));
-        EXPECT_TRUE(wait_for([&] { return v_hub.worker_interval_ms() == 2500u; }, std::chrono::milliseconds(2000)));
+        EXPECT_TRUE(wait_for([&] { return v_hub.interval_ms() == 2500u; }, std::chrono::milliseconds(2000)));
         std::this_thread::sleep_for(std::chrono::milliseconds(700));
-        EXPECT_EQ(2500u, v_hub.worker_interval_ms());
+        EXPECT_EQ(2500u, v_hub.interval_ms());
 
         close_sock(v_client);
         v_server.stop();
@@ -208,7 +208,7 @@ namespace {
     TEST_F(tcp_server_test, client_value_is_clamped_to_safe_range) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
-        v_hub.set_worker_interval_ms(500);
+        v_hub.set_interval_ms(500);
 
         gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
         ASSERT_TRUE(v_server.start());
@@ -217,10 +217,10 @@ namespace {
         ASSERT_NE(k_invalid, v_client);
 
         ASSERT_TRUE(send_all(v_client, "{\"kind\":\"set_interval_ms\",\"value\":0}\n"));
-        EXPECT_TRUE(wait_for([&] { return v_hub.worker_interval_ms() == 50u; }, std::chrono::milliseconds(2000)));
+        EXPECT_TRUE(wait_for([&] { return v_hub.interval_ms() == 50u; }, std::chrono::milliseconds(2000)));
 
         ASSERT_TRUE(send_all(v_client, "{\"kind\":\"set_interval_ms\",\"value\":99999999}\n"));
-        EXPECT_TRUE(wait_for([&] { return v_hub.worker_interval_ms() == 600000u; }, std::chrono::milliseconds(2000)));
+        EXPECT_TRUE(wait_for([&] { return v_hub.interval_ms() == 600000u; }, std::chrono::milliseconds(2000)));
 
         close_sock(v_client);
         v_server.stop();
@@ -229,7 +229,7 @@ namespace {
     TEST_F(tcp_server_test, client_pause_and_resume_are_applied_with_or_without_a_value) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
-        v_hub.set_worker_interval_ms(500);
+        v_hub.set_interval_ms(500);
 
         gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
         ASSERT_TRUE(v_server.start());
@@ -241,7 +241,7 @@ namespace {
         EXPECT_TRUE(wait_for([&] { return v_hub.paused(); }, std::chrono::milliseconds(2000)));
         ASSERT_TRUE(send_all(v_client, "{\"kind\":\"resume\",\"value\":0}\n"));
         EXPECT_TRUE(wait_for([&] { return !v_hub.paused(); }, std::chrono::milliseconds(2000)));
-        EXPECT_EQ(500u, v_hub.worker_interval_ms());
+        EXPECT_EQ(500u, v_hub.interval_ms());
 
         close_sock(v_client);
         v_server.stop();
@@ -314,7 +314,7 @@ namespace {
         gempba::telemetry::configure_port(v_port);
 
         gempba::telemetry::telemetry_hub v_hub;
-        v_hub.set_worker_interval_ms(0);
+        v_hub.set_interval_ms(0);
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/true);
 
         const socket_t v_client = connect_loopback(v_port);
@@ -328,7 +328,7 @@ namespace {
         }
         ASSERT_NE(std::string::npos, v_first.find("\"tasks_started_total\":0"));
 
-        v_hub.set_worker_interval_ms(600'000);
+        v_hub.set_interval_ms(600'000);
         // A tick that read the old interval must finish before the counters change, or it could publish them early.
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         for (int v_i = 0; v_i < 5; ++v_i) {
@@ -353,9 +353,9 @@ namespace {
     TEST_F(tcp_server_test, a_paused_aggregator_broadcasts_only_the_envelope_until_resumed) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
-        v_hub.set_worker_interval_ms(50);
+        v_hub.set_interval_ms(50);
         v_hub.tick_if_due();
-        ASSERT_TRUE(v_hub.latest_worker_frame(0).has_value());
+        ASSERT_TRUE(v_hub.latest_rank_frame(0).has_value());
         v_hub.apply_control_from_client(gempba::telemetry::control_kind::PAUSE, 0);
 
         gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
@@ -386,7 +386,7 @@ namespace {
         gempba::telemetry::configure_port(v_port);
 
         gempba::telemetry::telemetry_hub v_hub;
-        v_hub.set_worker_interval_ms(0);
+        v_hub.set_interval_ms(0);
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/true);
         v_hub.apply_control_from_client(gempba::telemetry::control_kind::PAUSE, 0);
 
@@ -414,7 +414,7 @@ namespace {
         gempba::telemetry::configure_port(v_port);
 
         gempba::telemetry::telemetry_hub v_hub;
-        v_hub.set_worker_interval_ms(600'000);
+        v_hub.set_interval_ms(600'000);
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/true);
         v_hub.apply_control_from_client(gempba::telemetry::control_kind::PAUSE, 0);
 
@@ -440,7 +440,7 @@ namespace {
     TEST_F(tcp_server_test, client_markers_are_unescaped_recorded_from_the_dashboard_and_broadcast) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
-        v_hub.set_worker_interval_ms(50);
+        v_hub.set_interval_ms(50);
 
         gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
         ASSERT_TRUE(v_server.start());
@@ -490,7 +490,7 @@ namespace {
     TEST_F(tcp_server_test, malformed_or_over_limit_markers_are_dropped) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
-        v_hub.set_worker_interval_ms(500);
+        v_hub.set_interval_ms(500);
 
         gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
         ASSERT_TRUE(v_server.start());
@@ -515,7 +515,7 @@ namespace {
         const auto v_markers = v_hub.run_markers();
         ASSERT_EQ(1u, v_markers.size());
         EXPECT_EQ("ok", v_markers[0].m_label);
-        EXPECT_EQ(500u, v_hub.worker_interval_ms());
+        EXPECT_EQ(500u, v_hub.interval_ms());
     }
 
     std::vector<std::chrono::steady_clock::time_point> line_arrivals(socket_t p_s, const std::size_t p_count, std::chrono::milliseconds p_timeout) {
@@ -541,7 +541,7 @@ namespace {
     TEST_F(tcp_server_test, broadcast_follows_a_short_worker_interval) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
-        v_hub.set_worker_interval_ms(100);
+        v_hub.set_interval_ms(100);
         gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
         ASSERT_TRUE(v_server.start());
         const socket_t v_client = connect_loopback(v_server.bound_port());
@@ -559,7 +559,7 @@ namespace {
     TEST_F(tcp_server_test, broadcast_waits_for_a_long_worker_interval) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
-        v_hub.set_worker_interval_ms(1000);
+        v_hub.set_interval_ms(1000);
         gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
         ASSERT_TRUE(v_server.start());
         const socket_t v_client = connect_loopback(v_server.bound_port());
@@ -577,7 +577,7 @@ namespace {
     TEST_F(tcp_server_test, client_rate_change_applies_to_the_broadcast_without_a_restart) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
-        v_hub.set_worker_interval_ms(5000);
+        v_hub.set_interval_ms(5000);
         gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
         ASSERT_TRUE(v_server.start());
         const socket_t v_client = connect_loopback(v_server.bound_port());
@@ -589,21 +589,21 @@ namespace {
         close_sock(v_client);
         v_server.stop();
 
-        EXPECT_EQ(100u, v_hub.worker_interval_ms());
+        EXPECT_EQ(100u, v_hub.interval_ms());
         EXPECT_EQ(3u, v_arrivals.size());
     }
 
     TEST_F(tcp_server_test, stop_is_prompt_and_sends_the_final_line_with_a_long_worker_interval) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
-        v_hub.set_worker_interval_ms(50);
+        v_hub.set_interval_ms(50);
         gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
         ASSERT_TRUE(v_server.start());
         const socket_t v_client = connect_loopback(v_server.bound_port());
         ASSERT_NE(k_invalid, v_client);
         set_recv_timeout(v_client, 100);
         ASSERT_EQ(1u, line_arrivals(v_client, 1, std::chrono::milliseconds(2000)).size());
-        v_hub.set_worker_interval_ms(600'000);
+        v_hub.set_interval_ms(600'000);
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
         const auto v_start = std::chrono::steady_clock::now();
@@ -621,7 +621,7 @@ namespace {
     TEST_F(tcp_server_test, malformed_lines_are_ignored_and_do_not_break_subsequent_input) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
-        v_hub.set_worker_interval_ms(500);
+        v_hub.set_interval_ms(500);
 
         gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
         ASSERT_TRUE(v_server.start());
@@ -633,7 +633,7 @@ namespace {
         ASSERT_TRUE(send_all(v_client, "{\"kind\":\"unknown_kind\",\"value\":1000}\n"));
         ASSERT_TRUE(send_all(v_client, "{\"kind\":\"set_interval_ms\",\"value\":1234}\n"));
 
-        EXPECT_TRUE(wait_for([&] { return v_hub.worker_interval_ms() == 1234u; }, std::chrono::milliseconds(2000)));
+        EXPECT_TRUE(wait_for([&] { return v_hub.interval_ms() == 1234u; }, std::chrono::milliseconds(2000)));
 
         close_sock(v_client);
         v_server.stop();

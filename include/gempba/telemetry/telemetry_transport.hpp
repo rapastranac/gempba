@@ -9,9 +9,9 @@
 namespace gempba::telemetry {
 
     /// Callback for one worker_frame delivered to the aggregator.
-    using worker_frame_sink = std::function<void(std::uint32_t p_src_worker_id, const worker_frame&)>;
+    using worker_frame_sink = std::function<void(std::uint32_t p_src_rank, const worker_frame&)>;
     /// Callback for one node_frame delivered to the aggregator.
-    using node_frame_sink = std::function<void(std::uint32_t p_src_worker_id, const node_frame&)>;
+    using node_frame_sink = std::function<void(std::uint32_t p_src_rank, const node_frame&)>;
 
     /**
      * @brief Abstract transport for telemetry frames between ranks and the aggregator.
@@ -58,14 +58,14 @@ namespace gempba::telemetry {
          * Each callback fires once per frame; sinks must be re-entrant against
          * other hub state but the hub serializes @ref poll calls.
          */
-        virtual void poll(const worker_frame_sink& p_worker_sink, const node_frame_sink& p_node_sink) = 0;
+        virtual void poll(const worker_frame_sink& p_rank_sink, const node_frame_sink& p_node_sink) = 0;
 
         /**
          * @brief Send a control message from the aggregator to one rank.
          *
          * Used for client-pushed knobs (interval changes, sentinel promotion).
          */
-        virtual void send_control(std::uint32_t p_dst_worker_id, const control_msg& p_msg) = 0;
+        virtual void send_control(std::uint32_t p_dst_rank, const control_msg& p_msg) = 0;
 
         /**
          * @brief Pull the next inbound control message addressed to this worker.

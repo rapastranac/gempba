@@ -282,7 +282,7 @@ int main(const int p_argc, char* p_argv[]) {
     }
 
     gempba::telemetry::telemetry_hub& v_hub = *gempba::telemetry::get();
-    const std::uint32_t v_interval_ms = v_hub.worker_interval_ms();
+    const std::uint32_t v_interval_ms = v_hub.interval_ms();
     if (v_rank == 0) {
         v_hub.apply_control_from_client(gempba::telemetry::control_kind::PAUSE, 0);
         v_hub.tick_if_due();
@@ -296,7 +296,7 @@ int main(const int p_argc, char* p_argv[]) {
     std::vector<std::uint32_t> v_ingested_seq_nos(static_cast<std::size_t>(v_world_size));
     if (v_rank == 0) {
         for (int v_r = 1; v_r < v_world_size; ++v_r) {
-            const auto v_latest = v_hub.latest_worker_frame(static_cast<std::uint32_t>(v_r));
+            const auto v_latest = v_hub.latest_rank_frame(static_cast<std::uint32_t>(v_r));
             v_ingested_seq_nos[static_cast<std::size_t>(v_r)] = v_latest ? v_latest->m_seq_no : 0;
         }
     } else {
@@ -316,7 +316,7 @@ int main(const int p_argc, char* p_argv[]) {
     if (v_rank == 0) {
         v_checks.expect(v_paused_window_done, "the dashboard received no paused broadcast");
         for (int v_r = 1; v_r < v_world_size; ++v_r) {
-            const auto v_latest = v_hub.latest_worker_frame(static_cast<std::uint32_t>(v_r));
+            const auto v_latest = v_hub.latest_rank_frame(static_cast<std::uint32_t>(v_r));
             v_checks.expect((v_latest ? v_latest->m_seq_no : 0) == v_ingested_seq_nos[static_cast<std::size_t>(v_r)],
                             "the paused aggregator ingested a frame from rank " + std::to_string(v_r));
         }
@@ -329,7 +329,7 @@ int main(const int p_argc, char* p_argv[]) {
         const std::uint32_t v_snapshot_id = v_hub.snapshot_requested();
         const bool v_answered = tick_until(v_hub, [&] {
             for (std::size_t v_r = 0; std::cmp_less(v_r, v_world_size); ++v_r) {
-                const auto v_latest = v_hub.latest_worker_frame(static_cast<std::uint32_t>(v_r));
+                const auto v_latest = v_hub.latest_rank_frame(static_cast<std::uint32_t>(v_r));
                 if (!v_latest || v_latest->m_snapshot_id != v_snapshot_id || (v_r != 0 && v_latest->m_tasks_started_total != v_all[v_r * k_fields + 6] + k_paused_tasks)) {
                     return false;
                 }
@@ -363,7 +363,7 @@ int main(const int p_argc, char* p_argv[]) {
     if (v_rank == 0) {
         const bool v_caught_up = tick_until(v_hub, [&] {
             for (std::size_t v_r = 1; std::cmp_less(v_r, v_world_size); ++v_r) {
-                const auto v_latest = v_hub.latest_worker_frame(static_cast<std::uint32_t>(v_r));
+                const auto v_latest = v_hub.latest_rank_frame(static_cast<std::uint32_t>(v_r));
                 if (!v_latest || v_latest->m_tasks_started_total != v_all[v_r * k_fields + 6] + k_paused_tasks + k_tasks_after_snapshot) {
                     return false;
                 }
@@ -372,7 +372,7 @@ int main(const int p_argc, char* p_argv[]) {
         });
         v_checks.expect(v_caught_up, "after the resume the aggregator lacks the tasks the workers counted while paused");
     }
-    v_checks.expect(v_hub.worker_interval_ms() == v_interval_ms, "pausing and resuming changed the interval");
+    v_checks.expect(v_hub.interval_ms() == v_interval_ms, "pausing and resuming changed the interval");
 
     v_scheduler->barrier();
     const int v_shutdown_code = gempba::shutdown();

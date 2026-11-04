@@ -49,7 +49,7 @@ namespace gempba::telemetry {
         v_slot.m_dirty = true;
     }
 
-    void local_transport::poll(const worker_frame_sink& p_worker_sink, const node_frame_sink& p_node_sink) {
+    void local_transport::poll(const worker_frame_sink& p_rank_sink, const node_frame_sink& p_node_sink) {
         for (std::uint32_t v_i = 0; v_i < MAX_WORKERS; ++v_i) {
             auto& v_slot = m_impl->m_worker_slots[v_i];
             worker_frame v_local{};
@@ -62,8 +62,8 @@ namespace gempba::telemetry {
                     v_was_dirty = true;
                 }
             }
-            if (v_was_dirty && p_worker_sink) {
-                p_worker_sink(v_i, v_local);
+            if (v_was_dirty && p_rank_sink) {
+                p_rank_sink(v_i, v_local);
             }
         }
         for (std::uint32_t v_i = 0; v_i < MAX_WORKERS; ++v_i) {
@@ -84,9 +84,9 @@ namespace gempba::telemetry {
         }
     }
 
-    void local_transport::send_control(const std::uint32_t p_dst_worker_id, const control_msg& p_msg) {
+    void local_transport::send_control(const std::uint32_t p_dst_rank, const control_msg& p_msg) {
         const std::scoped_lock v_lock(m_impl->m_control_mtx);
-        m_impl->m_control_queue.emplace_back(p_dst_worker_id, p_msg);
+        m_impl->m_control_queue.emplace_back(p_dst_rank, p_msg);
     }
 
     std::optional<control_msg> local_transport::try_recv_control() {

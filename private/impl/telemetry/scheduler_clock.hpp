@@ -58,18 +58,18 @@ namespace gempba::telemetry {
             m_phase = phase::RUNNING;
         }
 
-        void on_assignment(const std::uint32_t p_worker_id, const std::uint64_t p_now) {
-            if (p_worker_id < MAX_WORKERS) {
-                m_assigned_at[p_worker_id] = p_now;
+        void on_assignment(const std::uint32_t p_rank, const std::uint64_t p_now) {
+            if (p_rank < MAX_WORKERS) {
+                m_assigned_at[p_rank] = p_now;
             }
         }
 
-        void on_assignment_accepted(const std::uint32_t p_worker_id, const std::uint64_t p_now) {
-            if (p_worker_id >= MAX_WORKERS || m_assigned_at[p_worker_id] == k_unassigned) {
+        void on_assignment_accepted(const std::uint32_t p_rank, const std::uint64_t p_now) {
+            if (p_rank >= MAX_WORKERS || m_assigned_at[p_rank] == k_unassigned) {
                 return;
             }
-            const std::uint64_t v_latency = p_now - m_assigned_at[p_worker_id];
-            m_assigned_at[p_worker_id] = k_unassigned;
+            const std::uint64_t v_latency = p_now - m_assigned_at[p_rank];
+            m_assigned_at[p_rank] = k_unassigned;
             m_assign_latency_total += v_latency;
             m_assign_latency_max = std::max(m_assign_latency_max, v_latency);
             ++m_assign_count;

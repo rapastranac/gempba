@@ -20,9 +20,9 @@ namespace gempba::telemetry {
         void publish_worker(const worker_frame& p_frame) override;
         void publish_node(const node_frame& p_frame) override;
 
-        void poll(const worker_frame_sink& p_worker_sink, const node_frame_sink& p_node_sink) override;
+        void poll(const worker_frame_sink& p_rank_sink, const node_frame_sink& p_node_sink) override;
 
-        void send_control(std::uint32_t p_dst_worker_id, const control_msg& p_msg) override;
+        void send_control(std::uint32_t p_dst_rank, const control_msg& p_msg) override;
         std::optional<control_msg> try_recv_control() override;
 
     private:
