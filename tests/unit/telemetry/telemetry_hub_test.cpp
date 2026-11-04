@@ -637,7 +637,7 @@ namespace {
         gempba::telemetry::telemetry_hub v_hub;
         EXPECT_TRUE(v_hub.describe_run().m_roles.empty());
 
-        const std::vector<gempba::rank_role> v_roles{gempba::rank_role::CENTER, gempba::rank_role::WORKER, gempba::rank_role::WORKER};
+        const std::vector<gempba::rank_role> v_roles{gempba::rank_role::COORDINATOR, gempba::rank_role::WORKER, gempba::rank_role::WORKER};
         v_hub.describe_scheduler("centralized", v_roles);
         EXPECT_EQ(v_roles, v_hub.describe_run().m_roles);
     }

@@ -4,7 +4,7 @@ This is the reference for what gempba's telemetry stream carries: every key of a
 
 ## The stream
 
-- The aggregator (rank 0, or the only process in a multithreading run) collects every rank's frames and serves the stream. The aggregator is a telemetry role, not a scheduler one: rank 0 is the aggregator whatever `role` its scheduler gives it, and "center" on this page always means that scheduler role. It listens on `127.0.0.1` only, port 9000 unless the program calls `gempba::telemetry::configure_port` before creating the runtime. To watch a run on another machine, use the GemPBA Dashboard, which opens the SSH tunnel itself.
+- The aggregator (rank 0, or the only process in a multithreading run) collects every rank's frames and serves the stream. The aggregator is a telemetry role, not a scheduler one: rank 0 is the aggregator whatever `role` its scheduler gives it. It listens on `127.0.0.1` only, port 9000 unless the program calls `gempba::telemetry::configure_port` before creating the runtime. To watch a run on another machine, use the GemPBA Dashboard, which opens the SSH tunnel itself.
 - Any number of clients can connect, and each receives the same lines. Each line is one JSON object followed by `\n`.
 - A full line is self-contained. It carries the topology, the run setup and the latest frame from every rank and every host, so a client that connects late misses nothing but history.
 - The aggregator sends:
@@ -53,7 +53,7 @@ A full line from a 2-rank centralized run on one Windows host, pretty-printed (t
         "hostname": "DESKTOP",
         "pid": 59172,
         "primary_socket": 0,
-        "role": "center",
+        "role": "coordinator",
         "allowed_cpu_ids": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
       },
       {
@@ -244,7 +244,7 @@ While paused, the aggregator sends only the line's header:
 | `hostname` | string | The host it runs on. | v3.3.0 |
 | `pid` | integer | Its process id. | v3.3.0 |
 | `primary_socket` | integer | The socket its CPU affinity places it on; 0 when unknown. | v3.3.0 |
-| `role` | string | `"center"` for a rank its scheduler declares a center, which coordinates and runs no tasks: rank 0 under the built-in multiprocessing schedulers. `"worker"` otherwise, including every rank of a scheduler that declares no center and the only rank of a multithreading run. | v4.3.0 (#344, #391) |
+| `role` | string | `"coordinator"` for a rank its scheduler declares the coordinator, which hands out work and runs no tasks: rank 0 under the built-in multiprocessing schedulers. `"worker"` otherwise, including every rank of a scheduler that declares no coordinator and the only rank of a multithreading run. | v4.3.0 (#344, #391, #396) |
 | `allowed_cpu_ids` | array of integers | The logical CPUs it may run on. | v3.3.0 |
 
 `topology.run` describes the run setup:

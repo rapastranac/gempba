@@ -267,8 +267,8 @@ namespace gempba::telemetry {
             p_out += ",\"primary_socket\":";
             emit_u32(p_out, v_id.m_primary_socket);
             if (p_run) {
-                const bool v_is_center = v_id.m_worker_id < p_run->m_roles.size() && p_run->m_roles[v_id.m_worker_id] == rank_role::CENTER;
-                p_out += v_is_center ? R"(,"role":"center")" : R"(,"role":"worker")";
+                const bool v_is_coordinator = v_id.m_worker_id < p_run->m_roles.size() && p_run->m_roles[v_id.m_worker_id] == rank_role::COORDINATOR;
+                p_out += v_is_coordinator ? R"(,"role":"coordinator")" : R"(,"role":"worker")";
             }
             p_out += ",\"allowed_cpu_ids\":[";
             bool v_first_cpu = true;

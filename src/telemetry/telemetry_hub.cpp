@@ -519,8 +519,8 @@ namespace gempba::telemetry {
         if (m_aggregator) {
             const std::scoped_lock v_lock(m_aggregator->m_mtx);
             for (const auto& [v_id, v_frame]: m_aggregator->m_latest_worker) {
-                const bool v_is_center = v_id < v_run.m_roles.size() && v_run.m_roles[v_id] == rank_role::CENTER;
-                if (!v_is_center && v_frame.m_process_threads > 0) {
+                const bool v_is_coordinator = v_id < v_run.m_roles.size() && v_run.m_roles[v_id] == rank_role::COORDINATOR;
+                if (!v_is_coordinator && v_frame.m_process_threads > 0) {
                     v_run.m_threads_per_process = std::max(v_run.m_threads_per_process, v_frame.m_process_threads - 1);
                 }
             }

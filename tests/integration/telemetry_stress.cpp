@@ -387,7 +387,7 @@ int main(const int p_argc, char* p_argv[]) {
         v_checks.expect(v_line.find(R"("load_balancer":"quasi_horizontal")") != std::string::npos, "the final broadcast names another load balancer");
         v_checks.expect(v_line.find(R"("annotations":{"test":"telemetry_stress"})") != std::string::npos, "the final broadcast lost the run annotation");
         v_checks.expect(v_line.find(R"("paused":false,"final":true,)") != std::string::npos, "the final broadcast is still paused or not marked final");
-        v_checks.expect(count_of(v_line, R"("role":"center")") == 1, "the final broadcast does not mark exactly one center");
+        v_checks.expect(count_of(v_line, R"("role":"coordinator")") == 1, "the final broadcast does not mark exactly one coordinator");
         v_checks.expect(count_of(v_line, R"("role":"worker")") == static_cast<std::size_t>(v_world_size - 1), "the final broadcast does not mark every other rank a worker");
         for (int v_r = 0; v_r < v_world_size; ++v_r) {
             v_checks.expect(v_line.find("{\"worker_id\":" + std::to_string(v_r) + ",\"seq_no\":") != std::string::npos, "the final broadcast lacks rank " + std::to_string(v_r) + "'s frame");

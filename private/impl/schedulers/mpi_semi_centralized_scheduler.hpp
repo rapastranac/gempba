@@ -140,7 +140,7 @@ namespace gempba {
 
         [[nodiscard]] std::string_view get_name() const override { return "semi_centralized"; }
 
-        [[nodiscard]] rank_role role_of(const int p_rank) const override { return p_rank == CENTER_NODE ? rank_role::CENTER : rank_role::WORKER; }
+        [[nodiscard]] rank_role role_of(const int p_rank) const override { return p_rank == CENTER_NODE ? rank_role::COORDINATOR : rank_role::WORKER; }
 
     private:
         [[nodiscard]] int next_process() const { return this->m_next_process; }
