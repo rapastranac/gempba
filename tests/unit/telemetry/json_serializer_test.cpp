@@ -210,11 +210,11 @@ namespace {
 
     gempba::telemetry::topology_snapshot two_rank_topology() {
         gempba::telemetry::topology_snapshot v_topology;
-        gempba::telemetry::worker_identity v_center{};
-        v_center.m_worker_id = 0;
-        gempba::telemetry::worker_identity v_worker{};
-        v_worker.m_worker_id = 1;
-        v_topology.m_identities = {v_center, v_worker};
+        gempba::telemetry::worker_identity v_rank_0{};
+        v_rank_0.m_worker_id = 0;
+        gempba::telemetry::worker_identity v_rank_1{};
+        v_rank_1.m_worker_id = 1;
+        v_topology.m_identities = {v_rank_0, v_rank_1};
         return v_topology;
     }
 

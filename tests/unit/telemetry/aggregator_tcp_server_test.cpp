@@ -3,7 +3,7 @@
 #include <functional>
 #include <gempba/telemetry/telemetry_hub.hpp>
 #include <gtest/gtest.h>
-#include <impl/telemetry/center_tcp_server.hpp>
+#include <impl/telemetry/aggregator_tcp_server.hpp>
 #include <string>
 #include <thread>
 #include <vector>
@@ -67,7 +67,7 @@ namespace {
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
         v_hub.set_worker_interval_ms(0);
 
-        gempba::telemetry::center_tcp_server v_server(0, v_hub); // 0 → OS picks port
+        gempba::telemetry::aggregator_tcp_server v_server(0, v_hub); // 0 → OS picks port
         ASSERT_TRUE(v_server.start());
         const std::uint16_t v_port = v_server.bound_port();
         ASSERT_GT(v_port, 0u);
@@ -112,7 +112,7 @@ namespace {
     TEST_F(tcp_server_test, stop_is_safe_when_start_was_not_called) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
-        gempba::telemetry::center_tcp_server v_server(0, v_hub);
+        gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
         EXPECT_NO_THROW(v_server.stop());
     }
 
@@ -154,7 +154,7 @@ namespace {
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
         v_hub.set_worker_interval_ms(500);
 
-        gempba::telemetry::center_tcp_server v_server(0, v_hub);
+        gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
         ASSERT_TRUE(v_server.start());
 
         const socket_t v_client = connect_loopback(v_server.bound_port());
@@ -172,7 +172,7 @@ namespace {
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
         v_hub.set_worker_interval_ms(500);
 
-        gempba::telemetry::center_tcp_server v_server(0, v_hub);
+        gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
         ASSERT_TRUE(v_server.start());
 
         const socket_t v_client = connect_loopback(v_server.bound_port());
@@ -192,7 +192,7 @@ namespace {
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
         v_hub.set_worker_interval_ms(500);
 
-        gempba::telemetry::center_tcp_server v_server(0, v_hub);
+        gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
         ASSERT_TRUE(v_server.start());
 
         const socket_t v_client = connect_loopback(v_server.bound_port());
@@ -213,7 +213,7 @@ namespace {
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
         v_hub.set_worker_interval_ms(500);
 
-        gempba::telemetry::center_tcp_server v_server(0, v_hub);
+        gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
         ASSERT_TRUE(v_server.start());
 
         const socket_t v_client = connect_loopback(v_server.bound_port());
@@ -332,7 +332,7 @@ namespace {
         EXPECT_NE(std::string::npos, v_last.find(R"("final":true)")) << v_last;
     }
 
-    TEST_F(tcp_server_test, a_paused_center_broadcasts_only_the_envelope_until_resumed) {
+    TEST_F(tcp_server_test, a_paused_aggregator_broadcasts_only_the_envelope_until_resumed) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
         v_hub.set_worker_interval_ms(50);
@@ -340,7 +340,7 @@ namespace {
         ASSERT_TRUE(v_hub.latest_worker_frame(0).has_value());
         v_hub.apply_control_from_client(gempba::telemetry::control_kind::PAUSE, 0);
 
-        gempba::telemetry::center_tcp_server v_server(0, v_hub);
+        gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
         ASSERT_TRUE(v_server.start());
         const socket_t v_client = connect_loopback(v_server.bound_port());
         ASSERT_NE(k_invalid, v_client);
@@ -424,7 +424,7 @@ namespace {
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
         v_hub.set_worker_interval_ms(50);
 
-        gempba::telemetry::center_tcp_server v_server(0, v_hub);
+        gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
         ASSERT_TRUE(v_server.start());
         const socket_t v_client = connect_loopback(v_server.bound_port());
         ASSERT_NE(k_invalid, v_client);
@@ -454,7 +454,7 @@ namespace {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
 
-        gempba::telemetry::center_tcp_server v_server(0, v_hub);
+        gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
         ASSERT_TRUE(v_server.start());
         const socket_t v_client = connect_loopback(v_server.bound_port());
         ASSERT_NE(k_invalid, v_client);
@@ -474,7 +474,7 @@ namespace {
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
         v_hub.set_worker_interval_ms(500);
 
-        gempba::telemetry::center_tcp_server v_server(0, v_hub);
+        gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
         ASSERT_TRUE(v_server.start());
         const socket_t v_client = connect_loopback(v_server.bound_port());
         ASSERT_NE(k_invalid, v_client);
@@ -524,7 +524,7 @@ namespace {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
         v_hub.set_worker_interval_ms(100);
-        gempba::telemetry::center_tcp_server v_server(0, v_hub);
+        gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
         ASSERT_TRUE(v_server.start());
         const socket_t v_client = connect_loopback(v_server.bound_port());
         ASSERT_NE(k_invalid, v_client);
@@ -542,7 +542,7 @@ namespace {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
         v_hub.set_worker_interval_ms(1000);
-        gempba::telemetry::center_tcp_server v_server(0, v_hub);
+        gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
         ASSERT_TRUE(v_server.start());
         const socket_t v_client = connect_loopback(v_server.bound_port());
         ASSERT_NE(k_invalid, v_client);
@@ -560,7 +560,7 @@ namespace {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
         v_hub.set_worker_interval_ms(5000);
-        gempba::telemetry::center_tcp_server v_server(0, v_hub);
+        gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
         ASSERT_TRUE(v_server.start());
         const socket_t v_client = connect_loopback(v_server.bound_port());
         ASSERT_NE(k_invalid, v_client);
@@ -579,7 +579,7 @@ namespace {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
         v_hub.set_worker_interval_ms(50);
-        gempba::telemetry::center_tcp_server v_server(0, v_hub);
+        gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
         ASSERT_TRUE(v_server.start());
         const socket_t v_client = connect_loopback(v_server.bound_port());
         ASSERT_NE(k_invalid, v_client);
@@ -605,7 +605,7 @@ namespace {
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
         v_hub.set_worker_interval_ms(500);
 
-        gempba::telemetry::center_tcp_server v_server(0, v_hub);
+        gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
         ASSERT_TRUE(v_server.start());
 
         const socket_t v_client = connect_loopback(v_server.bound_port());

@@ -1,4 +1,4 @@
-#include <impl/telemetry/center_tcp_server.hpp>
+#include <impl/telemetry/aggregator_tcp_server.hpp>
 
 #include <gempba/telemetry/telemetry_hub.hpp>
 #include <impl/telemetry/json_serializer.hpp>
@@ -340,7 +340,7 @@ namespace gempba::telemetry {
         std::string m_inbox;
     };
 
-    struct center_tcp_server::impl {
+    struct aggregator_tcp_server::impl {
         std::uint16_t m_requested_port = 0;
         std::uint16_t m_bound_port = 0;
         telemetry_hub* m_hub = nullptr;
@@ -356,14 +356,14 @@ namespace gempba::telemetry {
         std::vector<client_state> m_clients;
     };
 
-    center_tcp_server::center_tcp_server(const std::uint16_t p_port, telemetry_hub& p_hub) noexcept : m_impl(std::make_unique<impl>()) {
+    aggregator_tcp_server::aggregator_tcp_server(const std::uint16_t p_port, telemetry_hub& p_hub) noexcept : m_impl(std::make_unique<impl>()) {
         m_impl->m_requested_port = p_port;
         m_impl->m_hub = &p_hub;
     }
 
-    center_tcp_server::~center_tcp_server() { stop(); }
+    aggregator_tcp_server::~aggregator_tcp_server() { stop(); }
 
-    bool center_tcp_server::start() {
+    bool aggregator_tcp_server::start() {
         (void) winsock_keep_alive();
 
         m_impl->m_listen_sock = ::socket(AF_INET, SOCK_STREAM, 0);
@@ -530,7 +530,7 @@ namespace gempba::telemetry {
         return true;
     }
 
-    void center_tcp_server::stop() {
+    void aggregator_tcp_server::stop() {
         if (!m_impl)
             return;
         if (!m_impl->m_running.exchange(false, std::memory_order_acq_rel)) {
@@ -572,6 +572,6 @@ namespace gempba::telemetry {
         m_impl->m_clients.clear();
     }
 
-    std::uint16_t center_tcp_server::bound_port() const noexcept { return m_impl ? m_impl->m_bound_port : 0; }
+    std::uint16_t aggregator_tcp_server::bound_port() const noexcept { return m_impl ? m_impl->m_bound_port : 0; }
 
 } // namespace gempba::telemetry

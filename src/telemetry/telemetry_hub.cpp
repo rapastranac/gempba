@@ -3,7 +3,7 @@
 #include <gempba/core/scheduler.hpp>
 #include <gempba/gempba.hpp>
 #include <gempba/telemetry/telemetry_hub.hpp>
-#include <impl/telemetry/center_tcp_server.hpp>
+#include <impl/telemetry/aggregator_tcp_server.hpp>
 #include <impl/telemetry/local_transport.hpp>
 #include <impl/telemetry/node_probe.hpp>
 #include <impl/telemetry/process_probe.hpp>
@@ -83,7 +83,7 @@ namespace gempba::telemetry {
         scheduler_clock m_scheduler_clock;
     };
 
-    // Center-side latest-frame state. Lives only on the center role; sparse
+    // Latest-frame state. Lives only on the aggregator; sparse
     // maps avoid the 16 KB-per-slot cost up front.
     struct telemetry_hub::aggregator {
         mutable std::mutex m_mtx;
@@ -120,7 +120,7 @@ namespace gempba::telemetry {
             m_run_id = detail::generate_run_id();
             m_aggregator = std::make_unique<aggregator>();
             if (p_start_pump_thread) {
-                m_tcp_server = std::make_unique<center_tcp_server>(g_configured_port.load(std::memory_order_acquire), *this);
+                m_tcp_server = std::make_unique<aggregator_tcp_server>(g_configured_port.load(std::memory_order_acquire), *this);
                 (void) m_tcp_server->start();
             }
         }

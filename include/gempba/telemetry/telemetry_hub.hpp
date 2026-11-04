@@ -34,7 +34,7 @@ namespace gempba::telemetry {
 
     class process_probe;
     class node_probe;
-    class center_tcp_server;
+    class aggregator_tcp_server;
 
     /**
      * @brief Process-wide runtime-telemetry hub.
@@ -267,7 +267,7 @@ namespace gempba::telemetry {
         std::unique_ptr<node_probe> m_node_probe;
         std::unique_ptr<telemetry_transport> m_transport;
         std::unique_ptr<aggregator> m_aggregator; // aggregator only
-        std::unique_ptr<center_tcp_server> m_tcp_server; // aggregator only
+        std::unique_ptr<aggregator_tcp_server> m_tcp_server; // aggregator only
         topology_snapshot m_topology;
         std::optional<std::thread> m_timer_thread;
         std::atomic<bool> m_running{false};

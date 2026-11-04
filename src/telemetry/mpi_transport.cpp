@@ -19,7 +19,7 @@ namespace gempba::telemetry {
         constexpr int k_tag_node_frame = 9002;
         constexpr int k_tag_control = 9003;
         constexpr int k_tag_final_worker_frame = 9004;
-        constexpr int k_center_rank = 0;
+        constexpr int k_aggregator_rank = 0;
 
     } // namespace
 
@@ -79,7 +79,7 @@ namespace gempba::telemetry {
             }
         }
 
-        // dst_rank == k_center_rank for worker frames, an explicit rank for
+        // dst_rank == k_aggregator_rank for worker frames, an explicit rank for
         // controls. Buffer is moved in so it stays alive until reaped.
         void post_isend(std::vector<std::byte>&& p_buffer, int p_dst_rank, int p_tag) {
             const std::scoped_lock v_lock(m_sends_mtx);
@@ -145,7 +145,7 @@ namespace gempba::telemetry {
             return;
 
         m_impl->reap_completed_sends();
-        m_impl->post_isend(detail::encode_worker_frame(p_frame), k_center_rank, k_tag_worker_frame);
+        m_impl->post_isend(detail::encode_worker_frame(p_frame), k_aggregator_rank, k_tag_worker_frame);
     }
 
     void mpi_transport::publish_final_worker(const worker_frame& p_frame) {
@@ -153,7 +153,7 @@ namespace gempba::telemetry {
             return;
 
         m_impl->reap_completed_sends();
-        m_impl->post_isend(detail::encode_worker_frame(p_frame), k_center_rank, k_tag_final_worker_frame);
+        m_impl->post_isend(detail::encode_worker_frame(p_frame), k_aggregator_rank, k_tag_final_worker_frame);
     }
 
     std::uint32_t mpi_transport::final_frames_received() const { return m_impl->m_final_frames_received; }
@@ -166,13 +166,13 @@ namespace gempba::telemetry {
 
         std::vector<std::byte> v_buffer(sizeof(node_frame));
         std::memcpy(v_buffer.data(), &p_frame, sizeof(node_frame));
-        m_impl->post_isend(std::move(v_buffer), k_center_rank, k_tag_node_frame);
+        m_impl->post_isend(std::move(v_buffer), k_aggregator_rank, k_tag_node_frame);
     }
 
     void mpi_transport::poll(const worker_frame_sink& p_worker_sink, const node_frame_sink& p_node_sink) {
         if (m_impl->m_comm == MPI_COMM_NULL)
             return;
-        if (m_impl->m_rank != k_center_rank)
+        if (m_impl->m_rank != k_aggregator_rank)
             return;
 
         // Regular frames first, so a rank's final frame lands in the sink after its earlier ones.
