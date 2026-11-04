@@ -77,11 +77,11 @@ namespace gempba::telemetry {
     } // namespace
 
     void serialize_worker_frame(std::string& p_out, const worker_frame& p_frame) {
-        p_out += "{\"worker_id\":";
+        p_out += "{\"rank\":";
         emit_u32(p_out, p_frame.m_worker_id);
         p_out += ",\"seq_no\":";
         emit_u32(p_out, p_frame.m_seq_no);
-        p_out += ",\"worker_local_ms\":";
+        p_out += ",\"rank_local_ms\":";
         emit_u64(p_out, p_frame.m_worker_local_ms);
         p_out += ",\"tasks_started_total\":";
         emit_u64(p_out, p_frame.m_tasks_started_total);
@@ -105,7 +105,7 @@ namespace gempba::telemetry {
         emit_u32(p_out, p_frame.m_tasks_running);
         p_out += ",\"scheduler_pending_count\":";
         emit_u32(p_out, p_frame.m_scheduler_pending_count);
-        p_out += ",\"idle_microseconds_per_worker\":";
+        p_out += ",\"idle_microseconds_per_thread\":";
         emit_u64(p_out, p_frame.m_idle_microseconds_per_worker);
         p_out += ",\"idle_microseconds_starved\":";
         emit_u64(p_out, p_frame.m_idle_microseconds_starved);
@@ -171,7 +171,7 @@ namespace gempba::telemetry {
     }
 
     void serialize_node_frame(std::string& p_out, const node_frame& p_frame) {
-        p_out += "{\"sentinel_worker_id\":";
+        p_out += "{\"sentinel_rank\":";
         emit_u32(p_out, p_frame.m_sentinel_worker_id);
         p_out += ",\"sentinel_local_ms\":";
         emit_u64(p_out, p_frame.m_sentinel_local_ms);
@@ -215,7 +215,7 @@ namespace gempba::telemetry {
             const auto& v_n = p_topology.m_nodes[v_i];
             p_out += "{\"hostname\":";
             escape_quoted(p_out, v_n.m_hostname);
-            p_out += ",\"sentinel_worker_id\":";
+            p_out += ",\"sentinel_rank\":";
             emit_u32(p_out, v_n.m_sentinel_worker_id);
             p_out += ",\"total_physical_cores\":";
             emit_u32(p_out, v_n.m_total_physical_cores);
@@ -224,7 +224,7 @@ namespace gempba::telemetry {
             p_out += ",\"mem_total_bytes\":";
             emit_u64(p_out, v_n.m_mem_total_bytes);
 
-            p_out += ",\"worker_ids\":[";
+            p_out += ",\"ranks\":[";
             for (std::size_t v_j = 0; v_j < v_n.m_worker_ids.size(); ++v_j) {
                 if (v_j > 0)
                     p_out += ',';
@@ -258,7 +258,7 @@ namespace gempba::telemetry {
             if (v_i > 0)
                 p_out += ',';
             const auto& v_id = p_topology.m_identities[v_i];
-            p_out += "{\"worker_id\":";
+            p_out += "{\"rank\":";
             emit_u32(p_out, v_id.m_worker_id);
             p_out += ",\"hostname\":";
             escape_quoted(p_out, v_id.m_hostname);
@@ -333,7 +333,7 @@ namespace gempba::telemetry {
             p_out += "null";
         }
 
-        p_out += ",\"workers\":[";
+        p_out += ",\"ranks\":[";
         if (p_payload.m_workers) {
             for (std::size_t v_i = 0; v_i < p_payload.m_workers->size(); ++v_i) {
                 if (v_i > 0)

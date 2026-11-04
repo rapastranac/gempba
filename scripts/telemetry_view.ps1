@@ -4,13 +4,13 @@
     Live-tails the GemPBA telemetry stream of a run on this machine.
 
 .DESCRIPTION
-    Connects to the center's TCP socket on 127.0.0.1 and prints, for each
+    Connects to the aggregator's TCP socket on 127.0.0.1 and prints, for each
     broadcast, one row per rank: its role, tasks started, sent and received,
     thread count, CPU% and RSS (KB). A paused stream prints a "paused" row per
     broadcast, and each run marker is printed once, when it first appears.
     Press Ctrl+C to stop.
 
-    The gempba center binds loopback only, so the viewer connects to
+    The gempba aggregator binds loopback only, so the viewer connects to
     127.0.0.1. To watch a run on another machine, use the GemPBA Dashboard,
     which opens the SSH tunnel itself.
 
@@ -40,7 +40,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 # 127.0.0.1 (not "localhost"): Windows may resolve localhost to ::1 (IPv6)
-# first while the gempba center binds INADDR_LOOPBACK (IPv4 only).
+# first while the gempba aggregator binds INADDR_LOOPBACK (IPv4 only).
 $Ip = '127.0.0.1'
 
 try {
@@ -99,7 +99,7 @@ try {
         $time = $epoch.AddMilliseconds([double]$j.ts).ToLocalTime().ToString('HH:mm:ss')
         $elapsed = Format-Elapsed ([TimeSpan]::FromSeconds([double]$j.elapsed_seconds)) $false
 
-        if ($j.paused -eq $true -and $null -eq $j.workers) {
+        if ($j.paused -eq $true -and $null -eq $j.ranks) {
             '{0,8}  {1,12}  paused' -f $time, $elapsed
             continue
         }
@@ -109,7 +109,7 @@ try {
         if ($null -ne $j.topology) {
             foreach ($identity in @($j.topology.identities)) {
                 if ($null -ne $identity) {
-                    $roles[[string]$identity.worker_id] = if ($identity.role) { $identity.role } else { '-' }
+                    $roles[[string]$identity.rank] = if ($identity.role) { $identity.role } else { '-' }
                 }
             }
             if ($null -ne $j.topology.run -and $null -ne $j.topology.run.markers) {
@@ -126,12 +126,12 @@ try {
         $seen = $markers.Count
 
         $first = $true
-        foreach ($w in @($j.workers | Sort-Object { [int]$_.worker_id })) {
-            $role = $roles[[string]$w.worker_id]
+        foreach ($w in @($j.ranks | Sort-Object { [int]$_.rank })) {
+            $role = $roles[[string]$w.rank]
             if (-not $role) { $role = '-' }
             $cpu = ([double]$w.process_cpu_pct).ToString('0.0', $invariant) + '%'
             $rss = [math]::Floor([double]$w.process_rss_bytes / 1KB)
-            $rowFormat -f ($(if ($first) { $time } else { '' })), ($(if ($first) { $elapsed } else { '' })), $w.worker_id, $role, $w.tasks_started_total, $w.tasks_sent_total, $w.tasks_recv_total, $w.process_threads, $cpu, $rss
+            $rowFormat -f ($(if ($first) { $time } else { '' })), ($(if ($first) { $elapsed } else { '' })), $w.rank, $role, $w.tasks_started_total, $w.tasks_sent_total, $w.tasks_recv_total, $w.process_threads, $cpu, $rss
             $first = $false
         }
     }

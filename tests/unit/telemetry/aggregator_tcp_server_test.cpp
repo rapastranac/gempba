@@ -105,7 +105,7 @@ namespace {
         ASSERT_FALSE(v_line.empty());
         EXPECT_NE(std::string::npos, v_line.find("\"version\":2"));
         EXPECT_NE(std::string::npos, v_line.find("\"topology\":"));
-        EXPECT_NE(std::string::npos, v_line.find("\"workers\":["));
+        EXPECT_NE(std::string::npos, v_line.find("\"ranks\":["));
         EXPECT_NE(std::string::npos, v_line.find("\"nodes\":["));
     }
 
@@ -358,9 +358,9 @@ namespace {
 
         EXPECT_TRUE(v_paused.starts_with(R"({"version":2,"run_id":")" + v_hub.run_id() + R"(","ts":)")) << v_paused;
         EXPECT_TRUE(v_paused.ends_with(R"("paused":true,"final":false})")) << v_paused;
-        EXPECT_EQ(std::string::npos, v_paused.find("\"workers\"")) << v_paused;
+        EXPECT_EQ(std::string::npos, v_paused.find("\"ranks\"")) << v_paused;
         EXPECT_NE(std::string::npos, v_resumed.find("\"paused\":false")) << v_resumed;
-        EXPECT_NE(std::string::npos, v_resumed.find("\"workers\":[{\"worker_id\":0")) << v_resumed;
+        EXPECT_NE(std::string::npos, v_resumed.find("\"ranks\":[{\"rank\":0")) << v_resumed;
     }
 
     TEST_F(tcp_server_test, shutdown_while_paused_still_broadcasts_the_final_frame) {
@@ -415,7 +415,7 @@ namespace {
 
         EXPECT_EQ(1u, v_hub.snapshot_requested());
         EXPECT_NE(std::string::npos, v_line.find(R"("paused":true,"final":false,"topology":)")) << v_line;
-        EXPECT_NE(std::string::npos, v_line.find(R"("workers":[{"worker_id":0,)")) << v_line;
+        EXPECT_NE(std::string::npos, v_line.find(R"("ranks":[{"rank":0,)")) << v_line;
         EXPECT_NE(std::string::npos, v_line.find(R"("tasks_started_total":4,)")) << v_line;
     }
 

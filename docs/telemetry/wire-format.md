@@ -13,7 +13,7 @@ This is the reference for what gempba's telemetry stream carries: every key of a
   - one full line as soon as a [snapshot](#control-lines) is answered;
   - a final full line at shutdown, even while paused, carrying the run's totals and marked `"final":true`. The aggregator then closes the connection, so a connection that closes without that line ended some other way, such as a crash.
 - Frame counters are cumulative since the process started telemetry. A consumer takes differences between lines to get rates.
-- `first_task_ms`, `last_task_ms` and `last_score_improvement_ms` are milliseconds since the scheduler run started, and stay 0 until the event first happens. `elapsed_seconds` and a marker's `elapsed_ms` count from when telemetry came up. `worker_local_ms` and `sentinel_local_ms` are a rank's own monotonic clock.
+- `first_task_ms`, `last_task_ms` and `last_score_improvement_ms` are milliseconds since the scheduler run started, and stay 0 until the event first happens. `elapsed_seconds` and a marker's `elapsed_ms` count from when telemetry came up. `rank_local_ms` and `sentinel_local_ms` are a rank's own monotonic clock.
 
 ## Example
 
@@ -31,11 +31,11 @@ A full line from a 2-rank centralized run on one Windows host, pretty-printed (t
     "nodes": [
       {
         "hostname": "DESKTOP",
-        "sentinel_worker_id": 0,
+        "sentinel_rank": 0,
         "total_physical_cores": 24,
         "total_logical_cores": 24,
         "mem_total_bytes": 68051103744,
-        "worker_ids": [0, 1],
+        "ranks": [0, 1],
         "sockets": [
           {
             "socket_id": 0,
@@ -49,7 +49,7 @@ A full line from a 2-rank centralized run on one Windows host, pretty-printed (t
     ],
     "identities": [
       {
-        "worker_id": 0,
+        "rank": 0,
         "hostname": "DESKTOP",
         "pid": 59172,
         "primary_socket": 0,
@@ -57,7 +57,7 @@ A full line from a 2-rank centralized run on one Windows host, pretty-printed (t
         "allowed_cpu_ids": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
       },
       {
-        "worker_id": 1,
+        "rank": 1,
         "hostname": "DESKTOP",
         "pid": 14244,
         "primary_socket": 0,
@@ -84,11 +84,11 @@ A full line from a 2-rank centralized run on one Windows host, pretty-printed (t
       ]
     }
   },
-  "workers": [
+  "ranks": [
     {
-      "worker_id": 0,
+      "rank": 0,
       "seq_no": 4,
-      "worker_local_ms": 106003119,
+      "rank_local_ms": 106003119,
       "tasks_started_total": 0,
       "tasks_sent_total": 4312,
       "tasks_recv_total": 4690,
@@ -100,7 +100,7 @@ A full line from a 2-rank centralized run on one Windows host, pretty-printed (t
       "spawn_remote_rejected": 0,
       "tasks_running": 0,
       "scheduler_pending_count": 379,
-      "idle_microseconds_per_worker": 1499714,
+      "idle_microseconds_per_thread": 1499714,
       "idle_microseconds_starved": 1499715,
       "idle_microseconds_imbalanced": 0,
       "sched_running_microseconds": 0,
@@ -130,9 +130,9 @@ A full line from a 2-rank centralized run on one Windows host, pretty-printed (t
       ]
     },
     {
-      "worker_id": 1,
+      "rank": 1,
       "seq_no": 4,
-      "worker_local_ms": 106003126,
+      "rank_local_ms": 106003126,
       "tasks_started_total": 10732,
       "tasks_sent_total": 4704,
       "tasks_recv_total": 4325,
@@ -144,7 +144,7 @@ A full line from a 2-rank centralized run on one Windows host, pretty-printed (t
       "spawn_remote_rejected": 44293,
       "tasks_running": 0,
       "scheduler_pending_count": 0,
-      "idle_microseconds_per_worker": 530366,
+      "idle_microseconds_per_thread": 530366,
       "idle_microseconds_starved": 420743,
       "idle_microseconds_imbalanced": 109623,
       "sched_running_microseconds": 1228781,
@@ -176,7 +176,7 @@ A full line from a 2-rank centralized run on one Windows host, pretty-printed (t
   ],
   "nodes": [
     {
-      "sentinel_worker_id": 0,
+      "sentinel_rank": 0,
       "sentinel_local_ms": 106003119,
       "hostname": "DESKTOP",
       "socket_count": 1,
@@ -217,7 +217,7 @@ While paused, the aggregator sends only the line's header:
 | `paused` | boolean | Whether telemetry is paused. A paused line carries only the header, the keys up to `final`; a full line sent while paused, such as a snapshot or the final line, says `true` too. | v4.3.0 (#368) |
 | `final` | boolean | `true` only on the line the aggregator sends at shutdown, the last before it closes the connection; `false` on every other line, paused lines included. | v4.3.0 (#389) |
 | `topology` | object | Hosts, ranks and the run setup. See [Topology](#topology). Absent from paused lines. | v3.3.0 |
-| `workers` | array | The latest [worker frame](#worker-frame) of each rank that has sent one. Absent from paused lines. | v3.3.0 |
+| `ranks` | array | The latest [rank frame](#rank-frame) of each rank that has sent one, whatever its role. A topology node's `ranks` holds rank numbers instead. Absent from paused lines. | v3.3.0, as `workers` |
 | `nodes` | array | The latest [node frame](#node-frame) of each host. Absent from paused lines. | v3.3.0 |
 
 ## Topology
@@ -229,18 +229,18 @@ While paused, the aggregator sends only the line's header:
 | Key | Type | Meaning | Since |
 |---|---|---|---|
 | `hostname` | string | The host's name. | v3.3.0 |
-| `sentinel_worker_id` | integer | The rank that sends this host's node frames. | v3.3.0 |
+| `sentinel_rank` | integer | The rank that sends this host's node frames. | v3.3.0, as `sentinel_worker_id` |
 | `total_physical_cores` | integer | Physical cores on the host; 0 without hwloc. | v3.3.0 |
 | `total_logical_cores` | integer | Logical CPUs on the host; without hwloc, the count the OS reports. | v3.3.0 |
 | `mem_total_bytes` | integer | The host's memory. | v3.3.0 |
-| `worker_ids` | array of integers | The ranks on this host. | v3.3.0 |
+| `ranks` | array of integers | The ranks on this host, by number; the envelope's `ranks` holds their frames. | v3.3.0, as `worker_ids` |
 | `sockets` | array | One entry per socket: `socket_id`, `name` (the CPU model), `physical_cores`, `logical_cores` and `cpu_ids` (its logical CPUs). Without hwloc, one entry for the whole host, with 0 physical cores. | v3.3.0 |
 
 `topology.identities` has one entry per rank:
 
 | Key | Type | Meaning | Since |
 |---|---|---|---|
-| `worker_id` | integer | The rank. | v3.3.0 |
+| `rank` | integer | The rank. | v3.3.0, as `worker_id` |
 | `hostname` | string | The host it runs on. | v3.3.0 |
 | `pid` | integer | Its process id. | v3.3.0 |
 | `primary_socket` | integer | The socket its CPU affinity places it on; 0 when unknown. | v3.3.0 |
@@ -260,15 +260,15 @@ While paused, the aggregator sends only the line's header:
 | `annotations` | object | Up to 8 key/value strings the program set with `telemetry::annotate_run`, keys of 1 to 32 bytes and values up to 64, in the order their keys were first set. | v4.3.0 (#344) |
 | `markers` | array | Labelled moments, in the order they were recorded. Each has `elapsed_ms` (milliseconds since telemetry came up), `label`, and `source`: `"code"` for `telemetry::mark_run`, `"dashboard"` for a `mark` control line. At most 32, labels of 1 to 64 bytes. | v4.3.0 (#370) |
 
-## Worker frame
+## Rank frame
 
-Each entry of `workers` is one rank's latest frame. Every rank sends one per interval. A key that doesn't apply to a rank, for example a coordinator-only counter on a worker, reads 0.
+Each entry of `ranks` is one rank's latest frame, whatever its role. Every rank sends one per interval. A key that doesn't apply to a rank, for example a coordinator-only counter on a worker, reads 0.
 
 | Key | Unit | Ranks | Meaning | Since |
 |---|---|---|---|---|
-| `worker_id` | | all | The rank. | v3.3.0 |
+| `rank` | | all | The rank. | v3.3.0, as `worker_id` |
 | `seq_no` | count | all | Frames this rank has sent, the final one included. | v3.3.0 |
-| `worker_local_ms` | ms | all | The rank's monotonic clock when it built the frame; comparable only within one rank. | v3.3.0 |
+| `rank_local_ms` | ms | all | The rank's monotonic clock when it built the frame; comparable only within one rank. | v3.3.0, as `worker_local_ms` |
 | `tasks_started_total` | count | all | Subtrees handed to a pool thread, received ones included, counted at hand-off. Branches explored inline are not counted. | v4.3.0 (#342), was `tasks_local_total` |
 | `tasks_sent_total` | count | all | Tasks sent to another rank. | v3.3.0 |
 | `tasks_recv_total` | count | all | Tasks received from another rank. | v3.3.0 |
@@ -280,9 +280,9 @@ Each entry of `workers` is one rank's latest frame. Every rank sends one per int
 | `spawn_remote_rejected` | count | with a load balancer | Remote submissions refused because the scheduler opened no channel; those nodes were tried locally. | v4.3.0 (#341) |
 | `tasks_running` | count | with a load balancer | Tasks executing on the pool right now. | v3.3.0 |
 | `scheduler_pending_count` | count | all, under MPI | Outstanding requests in the scheduler's queue. | v3.3.0 |
-| `idle_microseconds_per_worker` | µs per pool thread | with a load balancer | Pool idle time divided by pool size, including the idle time of threads still asleep when the frame is built (#335). | v3.3.0 |
+| `idle_microseconds_per_thread` | µs per pool thread | with a load balancer | Pool idle time divided by pool size, including the idle time of threads still asleep when the frame is built (#335). | v3.3.0, as `idle_microseconds_per_worker` |
 | `idle_microseconds_starved` | µs per pool thread | with a load balancer | The part of the idle time while no task ran in the pool. | v4.3.0 (#337) |
-| `idle_microseconds_imbalanced` | µs per pool thread | with a load balancer | The part of the idle time while other pool threads ran tasks. With `idle_microseconds_starved` it adds up to `idle_microseconds_per_worker`, give or take 1 µs of rounding. | v4.3.0 (#337) |
+| `idle_microseconds_imbalanced` | µs per pool thread | with a load balancer | The part of the idle time while other pool threads ran tasks. With `idle_microseconds_starved` it adds up to `idle_microseconds_per_thread`, give or take 1 µs of rounding. | v4.3.0 (#337) |
 | `sched_running_microseconds` | µs | worker | Time from receiving a task to reporting available, summed over its tasks. | v4.3.0 (#338) |
 | `sched_waiting_microseconds` | µs | worker | Time waiting for a task since run start; with `sched_running_microseconds` it adds up to the run time. | v4.3.0 (#338) |
 | `first_task_ms` | ms since run start | worker | When its first task arrived; 0 until `tasks_recv_total` is non-zero. | v4.3.0 (#338) |
@@ -305,11 +305,11 @@ Each entry of `workers` is one rank's latest frame. Every rank sends one per int
 
 ## Node frame
 
-Each entry of `nodes` is one host's latest frame, sent by its sentinel rank with each of its worker frames.
+Each entry of `nodes` is one host's latest frame, sent by its sentinel rank with each of its rank frames.
 
 | Key | Unit | Meaning | Since |
 |---|---|---|---|
-| `sentinel_worker_id` | | The rank that sent it. | v3.3.0 |
+| `sentinel_rank` | | The rank that sent it. | v3.3.0, as `sentinel_worker_id` |
 | `sentinel_local_ms` | ms | The sentinel's monotonic clock when it built the frame. | v3.3.0 |
 | `hostname` | | The host's name. | v3.3.0 |
 | `socket_count` | count | Entries in `sockets`. | v3.3.0 |
@@ -351,16 +351,17 @@ Newest first. Each version lists the releases that send it and what changed from
 Time accounting to explain falling speedup (#333). Changes from schema 1:
 
 - **Renamed:** `tasks_local_total` to `tasks_started_total` (#342), which now counts subtrees handed to a pool thread, received ones included, at hand-off.
+- **Renamed (#396):** `workers` to `ranks`, `worker_id` to `rank`, the topology node's `worker_ids` to `ranks`, `sentinel_worker_id` to `sentinel_rank`, `worker_local_ms` to `rank_local_ms` and `idle_microseconds_per_worker` to `idle_microseconds_per_thread`, so "worker" names only the scheduler role.
 - **Removed:** the node frame's `net_aggregate` and `disk_aggregate` (#342), which were always zero.
 - **Added to the envelope:** `run_id` (#343), `paused` (#368) and `final` (#389). Paused lines (#368) carry only the envelope's header.
 - **Added to the topology:** each identity's `role`, and the `run` object (#344), with `markers` (#370).
-- **Added to the worker frame:**
+- **Added to the rank frame:**
   - `bytes_sent_total`, `bytes_recv_total`, `send_microseconds_total` and `recv_microseconds_total` (#340);
   - `spawn_rejected_pool_full`, `spawn_remote_rejected`, `score_proposals_sent` and `last_score_improvement_ms` (#341);
   - `idle_microseconds_starved` and `idle_microseconds_imbalanced` (#337);
   - `sched_running_microseconds`, `sched_waiting_microseconds`, `first_task_ms`, `last_task_ms`, `assign_latency_microseconds_total`, `assign_count`, `assign_latency_microseconds_max` and `available_microseconds_queue_empty` (#338);
   - `coordinator_state_msgs_total`, `coordinator_score_proposals_total`, `coordinator_score_broadcasts_total`, `coordinator_full_microseconds` and `telemetry_microseconds_total` (#339).
-- **Changed meaning:** `idle_microseconds_per_worker` now includes the idle time of pool threads still asleep when the frame is built (#335).
+- **Changed meaning:** `idle_microseconds_per_thread` now includes the idle time of pool threads still asleep when the frame is built (#335).
 - **Cadence:** the aggregator broadcasts at the telemetry interval instead of every 500 ms (#345), and node frames follow the worker interval instead of their own 1000 ms one (#367).
 - **Controls:** added `pause`, `resume` (#368), `snapshot` (#369) and `mark` (#370); `set_node_interval_ms` is accepted and ignored (#367).
 
@@ -368,6 +369,7 @@ Time accounting to explain falling speedup (#333). Changes from schema 1:
 
 Sent by v3.3.0, v4.0.0, v4.1.0, v4.1.1, v4.1.2, v4.1.3 and v4.2.0. Its keys are schema 2's marked v3.3.0 or v4.2.0 above, plus:
 
+- `workers`, `worker_id`, `worker_ids`, `sentinel_worker_id`, `worker_local_ms` and `idle_microseconds_per_worker` instead of `ranks`, `rank`, `ranks`, `sentinel_rank`, `rank_local_ms` and `idle_microseconds_per_thread`;
 - `tasks_local_total` in the worker frame instead of `tasks_started_total`: tasks dispatched to the rank's local thread pool;
 - in the node frame, `net_aggregate` (`bytes_in`, `bytes_out`, `packets_in`, `packets_out`) and `disk_aggregate` (`read_bytes`, `write_bytes`);
 - `idle_microseconds_per_worker` leaving out the idle time of threads still asleep when the frame was built.

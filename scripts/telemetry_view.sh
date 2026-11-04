@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Live-tails the GemPBA telemetry stream of a run on this machine.
 #
-# Connects to the center's TCP socket on 127.0.0.1 and prints, for each
+# Connects to the aggregator's TCP socket on 127.0.0.1 and prints, for each
 # broadcast, one row per rank: its role, tasks started, sent and received,
 # thread count, CPU% and RSS (KB). A paused stream prints a "paused" row per
 # broadcast, and each run marker is printed once, when it first appears.
 # Press Ctrl+C to stop.
 #
-# The gempba center binds loopback only, so the viewer connects to
+# The gempba aggregator binds loopback only, so the viewer connects to
 # 127.0.0.1. Pass --port to match the port the program set with
 # gempba::telemetry::configure_port (default 9000). To watch a run on another
 # machine, use the GemPBA Dashboard, which opens the SSH tunnel itself.
@@ -56,7 +56,7 @@ while [ $# -gt 0 ]; do
 done
 
 # 127.0.0.1 (not "localhost"): some resolvers prefer ::1 (IPv6) first while
-# the gempba center binds INADDR_LOOPBACK (IPv4 only).
+# the gempba aggregator binds INADDR_LOOPBACK (IPv4 only).
 IP=127.0.0.1
 
 if ! command -v jq >/dev/null 2>&1; then
@@ -94,16 +94,16 @@ def clock: . / 1000 | floor | strflocaltime("%H:%M:%S");
 def hms: floor as $s | "\($s / 3600 | floor):\($s % 3600 / 60 | floor | pad2):\($s % 60 | pad2)";
 (.ts // 0 | clock) as $time
 | (.elapsed_seconds // 0 | hms) as $elapsed
-| if .paused == true and .workers == null then
+| if .paused == true and .ranks == null then
     ["P", $time, $elapsed] | @tsv
   else
-    ((.topology.identities // []) | map({key: (.worker_id | tostring), value: (.role // "-")}) | from_entries) as $roles
+    ((.topology.identities // []) | map({key: (.rank | tostring), value: (.role // "-")}) | from_entries) as $roles
     | (.topology.run.markers // []) as $markers
     | (if (.run_id // "") == $run then $seen else 0 end) as $from
     | (["S", (.run_id // ""), ($markers | length)] | @tsv),
       ($markers[$from:][] | ["M", .elapsed_ms, .label, .source] | @tsv),
-      ((.workers // []) | sort_by(.worker_id)[]
-        | ["R", $time, $elapsed, .worker_id, ($roles[.worker_id | tostring] // "-"), .tasks_started_total, .tasks_sent_total,
+      ((.ranks // []) | sort_by(.rank)[]
+        | ["R", $time, $elapsed, .rank, ($roles[.rank | tostring] // "-"), .tasks_started_total, .tasks_sent_total,
            .tasks_recv_total, .process_threads, .process_cpu_pct, ((.process_rss_bytes // 0) / 1024 | floor)] | @tsv)
   end
 JQ

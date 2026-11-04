@@ -390,10 +390,10 @@ int main(const int p_argc, char* p_argv[]) {
         v_checks.expect(count_of(v_line, R"("role":"coordinator")") == 1, "the final broadcast does not mark exactly one coordinator");
         v_checks.expect(count_of(v_line, R"("role":"worker")") == static_cast<std::size_t>(v_world_size - 1), "the final broadcast does not mark every other rank a worker");
         for (int v_r = 0; v_r < v_world_size; ++v_r) {
-            v_checks.expect(v_line.find("{\"worker_id\":" + std::to_string(v_r) + ",\"seq_no\":") != std::string::npos, "the final broadcast lacks rank " + std::to_string(v_r) + "'s frame");
+            v_checks.expect(v_line.find("{\"rank\":" + std::to_string(v_r) + ",\"seq_no\":") != std::string::npos, "the final broadcast lacks rank " + std::to_string(v_r) + "'s frame");
         }
         const std::size_t v_hosts = count_of(v_line, R"({"hostname":)");
-        v_checks.expect(v_hosts > 0 && count_of(v_line, R"({"sentinel_worker_id":)") == v_hosts, "the final broadcast does not carry one node frame per host");
+        v_checks.expect(v_hosts > 0 && count_of(v_line, R"({"sentinel_rank":)") == v_hosts, "the final broadcast does not carry one node frame per host");
         const std::uint64_t v_edges_bytes = sum_of(v_line, "bytes");
         v_checks.expect(v_edges_bytes > 0 && v_edges_bytes == sum_of(v_line, "bytes_sent_total"), "the final broadcast's edges do not add up to the bytes sent");
     }
