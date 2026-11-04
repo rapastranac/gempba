@@ -67,6 +67,11 @@ namespace gempba {
 
         // ————————— ↓↓↓↓  New development ↓↓↓↓ ——————————
 
+        /**
+         * @brief The coordinator's view of the scheduler, on the rank whose @ref role_of is @ref rank_role::COORDINATOR.
+         *
+         * Keeps the name center until v5.0.0, which replaces these views (#394).
+         */
         class center : public scheduler_traits {
         protected:
             center() = default;
@@ -85,7 +90,7 @@ namespace gempba {
             /**
              * Each index of the returned vector corresponds to the rank of the worker node. If no result was found by a worker node, the corresponding index will contain an empty result.
              *
-             * Also, for rank 0 (the center node), the corresponding index will contain an empty result, as the center node does not perform any computations.
+             * Also, for rank 0 (the coordinator), the corresponding index will contain an empty result, as the coordinator does not perform any computations.
              *
              * @return  all results found across all worker nodes
              */

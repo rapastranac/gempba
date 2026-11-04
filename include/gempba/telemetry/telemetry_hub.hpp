@@ -150,7 +150,7 @@ namespace gempba::telemetry {
         /// Fill @p p_out with the current host-level snapshot. Sentinel workers only.
         void snapshot_node_frame(node_frame& p_out) noexcept;
 
-        /// @return The latest worker_frame for @p p_worker_id, if one has been received.
+        /// @return The latest frame of rank @p p_worker_id, if one has been received.
         [[nodiscard]] std::optional<worker_frame> latest_worker_frame(std::uint32_t p_worker_id) const;
 
         /// @return The latest node_frame for @p p_sentinel_worker_id, if one has been received.

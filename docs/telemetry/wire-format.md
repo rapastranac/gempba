@@ -2,9 +2,19 @@
 
 This is the reference for what gempba's telemetry stream carries: every key of a broadcast line, every control line a client can send, and every schema version, newest first. It describes **schema 2**, which gempba v4.3.0 sends. If you build an older release, find its schema under [Schema versions](#schema-versions); that schema stays valid for that release.
 
+## Vocabulary
+
+| Word | Meaning |
+|---|---|
+| rank | A process of the run, numbered 0 to N−1: the `rank` key. A rank frame is any rank's frame, whatever its role. |
+| coordinator, worker | The scheduler roles, as `role` reports them. The coordinator hands out work and runs no tasks; a worker runs tasks. The scheduler decides which rank plays which. |
+| aggregator | Rank 0, or the only process in a multithreading run. It collects every rank's frames and serves this stream, whatever its scheduler role. |
+| sentinel | The one rank per host that sends that host's node frame: `sentinel_rank`. |
+| thread | One thread of a rank's pool, as in `idle_microseconds_per_thread`. |
+
 ## The stream
 
-- The aggregator (rank 0, or the only process in a multithreading run) collects every rank's frames and serves the stream. The aggregator is a telemetry role, not a scheduler one: rank 0 is the aggregator whatever `role` its scheduler gives it. It listens on `127.0.0.1` only, port 9000 unless the program calls `gempba::telemetry::configure_port` before creating the runtime. To watch a run on another machine, use the GemPBA Dashboard, which opens the SSH tunnel itself.
+- The aggregator serves the stream. It listens on `127.0.0.1` only, port 9000 unless the program calls `gempba::telemetry::configure_port` before creating the runtime. To watch a run on another machine, use the GemPBA Dashboard, which opens the SSH tunnel itself.
 - Any number of clients can connect, and each receives the same lines. Each line is one JSON object followed by `\n`.
 - A full line is self-contained. It carries the topology, the run setup and the latest frame from every rank and every host, so a client that connects late misses nothing but history.
 - The aggregator sends:

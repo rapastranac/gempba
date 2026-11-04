@@ -26,10 +26,11 @@ namespace gempba::telemetry {
     inline constexpr std::uint16_t TELEMETRY_SCHEMA_VERSION = 2;
 
     /**
-     * @brief Static, one-shot description of a worker.
+     * @brief Static, one-shot description of a rank.
      *
-     * Published once per worker at startup. Joins a worker_id to a host / pid
+     * Published once per rank at startup. Joins a rank (its worker_id) to a host / pid
      * plus its CPU-affinity mask so the dashboard can place it in the topology.
+     * The worker_* names predate the rank vocabulary and change in v5.0.0 (#373).
      */
     struct worker_identity {
         std::uint16_t m_version;
@@ -56,7 +57,7 @@ namespace gempba::telemetry {
     /**
      * @brief The fixed-size part of a @ref worker_frame; it travels over MPI as one block ahead of the edges.
      *
-     * Counters are cumulative since worker startup; consumers compute deltas if they want rate-of-change.
+     * Counters are cumulative since the rank started telemetry; consumers compute deltas if they want rate-of-change.
      */
     struct worker_frame_header {
         std::uint16_t m_version;
@@ -152,9 +153,9 @@ namespace gempba::telemetry {
     };
 
     /**
-     * @brief Periodic per-worker telemetry sample, emitted on the worker-interval cadence.
+     * @brief Periodic per-rank telemetry sample, sent every telemetry interval whatever the rank's scheduler role; the stream calls it a rank frame.
      *
-     * Its size follows the destinations the worker actually sent tasks to, not the size of the run.
+     * Its size follows the destinations the rank actually sent tasks to, not the size of the run.
      */
     struct worker_frame : worker_frame_header {
         /** @brief One entry per destination this worker sent tasks to, in ascending @c m_dst_worker_id; others are absent. */
