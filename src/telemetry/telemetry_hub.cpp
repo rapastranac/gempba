@@ -485,9 +485,10 @@ namespace gempba::telemetry {
         return m_run_markers;
     }
 
-    void telemetry_hub::describe_scheduler(const std::string_view p_name) {
+    void telemetry_hub::describe_scheduler(const std::string_view p_name, std::vector<rank_role> p_roles) {
         const std::scoped_lock v_lock(m_run_mtx);
         m_scheduler_name = p_name;
+        m_scheduler_roles = std::move(p_roles);
     }
 
     void telemetry_hub::describe_load_balancer(const balancing_policy p_policy) {
@@ -510,6 +511,7 @@ namespace gempba::telemetry {
         {
             const std::scoped_lock v_lock(m_run_mtx);
             v_run.m_scheduler = m_scheduler_name;
+            v_run.m_roles = m_scheduler_roles;
             v_run.m_load_balancer = m_load_balancer_name;
             v_run.m_annotations = m_run_annotations;
             v_run.m_markers = m_run_markers;
@@ -517,7 +519,7 @@ namespace gempba::telemetry {
         if (m_aggregator) {
             const std::scoped_lock v_lock(m_aggregator->m_mtx);
             for (const auto& [v_id, v_frame]: m_aggregator->m_latest_worker) {
-                const bool v_is_center = m_mode == runtime_mode::MP_MPI && v_id == 0;
+                const bool v_is_center = v_id < v_run.m_roles.size() && v_run.m_roles[v_id] == rank_role::CENTER;
                 if (!v_is_center && v_frame.m_process_threads > 0) {
                     v_run.m_threads_per_process = std::max(v_run.m_threads_per_process, v_frame.m_process_threads - 1);
                 }

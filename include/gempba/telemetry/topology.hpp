@@ -1,6 +1,7 @@
 #ifndef GEMPBA_TELEMETRY_TOPOLOGY_HPP
 #define GEMPBA_TELEMETRY_TOPOLOGY_HPP
 
+#include <gempba/core/rank_role.hpp>
 #include <gempba/telemetry/frames.hpp>
 #include <gempba/telemetry/runtime_mode.hpp>
 
@@ -71,7 +72,7 @@ namespace gempba::telemetry {
     /**
      * @brief How a run is set up, as the center describes it in each broadcast.
      *
-     * In a multiprocessing run rank 0 is the center and every other rank a worker; a multithreading run's only rank is a worker.
+     * Each rank's role is the one its scheduler gives it; a multithreading run's only rank is a worker.
      */
     struct run_description {
         runtime_mode m_mode = runtime_mode::MT_ONLY;
@@ -80,6 +81,8 @@ namespace gempba::telemetry {
         /// Load balancer name, "quasi_horizontal" or "work_stealing"; empty until one is created.
         std::string m_load_balancer;
         std::uint32_t m_world_size = 1;
+        /// Each rank's role, indexed by worker id, as its scheduler reports it; a rank past the end is a worker.
+        std::vector<rank_role> m_roles;
         /// Largest thread pool the workers report in their frames; 0 before any frame arrives.
         std::uint32_t m_threads_per_process = 0;
         std::string m_gempba_version;

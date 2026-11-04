@@ -244,9 +244,10 @@ namespace {
         }
     }
 
-    TEST(json_serializer_test, topology_run_marks_rank_zero_as_the_center_only_under_mpi) {
+    TEST(json_serializer_test, topology_run_marks_the_ranks_the_scheduler_declares_centers) {
         gempba::telemetry::run_description v_run;
         v_run.m_mode = gempba::telemetry::runtime_mode::MP_MPI;
+        v_run.m_roles = {gempba::rank_role::CENTER, gempba::rank_role::WORKER};
 
         std::string v_mpi;
         gempba::telemetry::serialize_topology(v_mpi, two_rank_topology(), &v_run);
@@ -254,10 +255,22 @@ namespace {
         EXPECT_NE(std::string::npos, v_mpi.find(R"({"worker_id":1,"hostname":"","pid":0,"primary_socket":0,"role":"worker")")) << v_mpi;
 
         v_run.m_mode = gempba::telemetry::runtime_mode::MT_ONLY;
+        v_run.m_roles.clear();
         std::string v_mt;
         gempba::telemetry::serialize_topology(v_mt, two_rank_topology(), &v_run);
         EXPECT_EQ(std::string::npos, v_mt.find(R"("role":"center")")) << v_mt;
         EXPECT_NE(std::string::npos, v_mt.find(R"("runtime_mode":"multithreading")")) << v_mt;
+    }
+
+    TEST(json_serializer_test, topology_run_marks_every_rank_a_worker_when_the_scheduler_declares_no_center) {
+        gempba::telemetry::run_description v_run;
+        v_run.m_mode = gempba::telemetry::runtime_mode::MP_MPI;
+
+        std::string v_out;
+        gempba::telemetry::serialize_topology(v_out, two_rank_topology(), &v_run);
+        EXPECT_EQ(std::string::npos, v_out.find(R"("role":"center")")) << v_out;
+        EXPECT_NE(std::string::npos, v_out.find(R"({"worker_id":0,"hostname":"","pid":0,"primary_socket":0,"role":"worker")")) << v_out;
+        EXPECT_NE(std::string::npos, v_out.find(R"({"worker_id":1,"hostname":"","pid":0,"primary_socket":0,"role":"worker")")) << v_out;
     }
 
     TEST(json_serializer_test, topology_run_writes_null_for_missing_components_and_escapes_annotations) {

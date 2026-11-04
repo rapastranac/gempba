@@ -633,6 +633,15 @@ namespace {
         EXPECT_EQ("semi_centralized", v_hub.describe_run().m_scheduler);
     }
 
+    TEST_F(telemetry_hub_test, describe_run_reports_the_roles_the_scheduler_declares) {
+        gempba::telemetry::telemetry_hub v_hub;
+        EXPECT_TRUE(v_hub.describe_run().m_roles.empty());
+
+        const std::vector<gempba::rank_role> v_roles{gempba::rank_role::CENTER, gempba::rank_role::WORKER, gempba::rank_role::WORKER};
+        v_hub.describe_scheduler("centralized", v_roles);
+        EXPECT_EQ(v_roles, v_hub.describe_run().m_roles);
+    }
+
     void expect_edge(const gempba::telemetry::edge_counter& p_edge, const std::uint32_t p_dst, const std::uint64_t p_bytes, const std::uint64_t p_count) {
         EXPECT_EQ(p_dst, p_edge.m_dst_worker_id);
         EXPECT_EQ(p_bytes, p_edge.m_bytes);
