@@ -1,6 +1,6 @@
 # Telemetry wire format
 
-This is the reference for what gempba's telemetry stream carries: every key of a broadcast line, every control line a client can send, and every schema version, newest first. It describes **schema 2**, which gempba v4.3.0 sends. If you build an older release, find its schema under [Schema versions](#schema-versions); that schema stays valid for that release.
+This is the reference for what gempba's telemetry stream carries: every key of a broadcast line, every control line a client can send, and every schema version, newest first. It describes **schema 2**, which gempba v4.3.0 sends. If you build an older release, find its schema under [Schema versions](#schema-versions); that schema stays valid for that release. How a custom scheduler feeds this stream is in [Feeding telemetry from a custom scheduler](custom-schedulers.md).
 
 ## Vocabulary
 
@@ -8,7 +8,7 @@ This is the reference for what gempba's telemetry stream carries: every key of a
 |---|---|
 | rank | A process of the run, numbered 0 to N−1: the `rank` key. A rank frame is any rank's frame, whatever its role. |
 | coordinator, worker | The scheduler roles, as `role` reports them. The coordinator hands out work and runs no tasks; a worker runs tasks. The scheduler decides which rank plays which. |
-| aggregator | Rank 0, or the only process in a multithreading run. It collects every rank's frames and serves this stream, whatever its scheduler role. |
+| aggregator | Rank 0, or the only process in a multithreading run: the entry with `rank` 0, in every run. It collects every rank's frames and serves this stream, whatever its scheduler role. |
 | sentinel | The one rank per host that sends that host's node frame: `sentinel_rank`. |
 | thread | One thread of a rank's pool, as in `idle_microseconds_per_thread`. |
 
@@ -272,7 +272,7 @@ While paused, the aggregator sends only the line's header:
 
 ## Rank frame
 
-Each entry of `ranks` is one rank's latest frame, whatever its role. Every rank sends one per interval. A key that doesn't apply to a rank, for example a coordinator-only counter on a worker, reads 0.
+Each entry of `ranks` is one rank's latest frame, whatever its role. Every rank sends one per interval. A key that doesn't apply to a rank, for example a coordinator-only counter on a worker, reads 0, and so does a scheduler counter that the rank's scheduler never fills. A consumer treats a scheduler counter that stays 0 for the whole run as nothing to show. The Ranks column gives the built-in schedulers' mapping.
 
 | Key | Unit | Ranks | Meaning | Since |
 |---|---|---|---|---|
