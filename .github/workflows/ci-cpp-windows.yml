@@ -3,7 +3,13 @@ name: C/C++ CI (Windows 2025)
 on:
   push:
     branches: [ "main", "release" ]
+  # Docs-only PRs start no CI; wire-format.md still does, because a unit test reads it.
   pull_request:
+    paths:
+      - '**'
+      - '!docs/**'
+      - '!**/*.md'
+      - 'docs/telemetry/wire-format.md'
 
 permissions:
   contents: read
@@ -15,13 +21,9 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  build:
+  test:
     runs-on: ${{ fromJSON(vars.RUNNER_WINDOWS || '["windows-2025"]') }}
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        multiprocessing: ['ON', 'OFF']
 
     steps:
       # 1️⃣ Checkout the repository
@@ -36,8 +38,8 @@ jobs:
       - name: Setup Dependencies
         uses: ./.github/actions/setup-windows-deps
         with:
-          multiprocessing: ${{ matrix.multiprocessing }}
-          tests: ${{ matrix.multiprocessing == 'ON' && 'true' || 'false' }}
+          multiprocessing: 'ON'
+          tests: 'true'
           cache: 'false'
           release: 'false'
 
@@ -50,54 +52,18 @@ jobs:
           echo "make: $(make --version | head -1 | awk '{print $3}')"
           echo "mingw-w64-x86_64-boost: $(pacman -Qi mingw-w64-x86_64-boost | grep Version | awk '{print $3}')"
           echo "mingw-w64-x86_64-hwloc: $(pacman -Qi mingw-w64-x86_64-hwloc | grep Version | awk '{print $3}')"
-          if [ "${{ matrix.multiprocessing }}" = "ON" ]; then
-            echo "mingw-w64-x86_64-msmpi: $(pacman -Qi mingw-w64-x86_64-msmpi | grep Version | awk '{print $3}')"
-            echo "mingw-w64-x86_64-gtest: $(pacman -Qi mingw-w64-x86_64-gtest | grep Version | awk '{print $3}')"
-          fi
+          echo "mingw-w64-x86_64-msmpi: $(pacman -Qi mingw-w64-x86_64-msmpi | grep Version | awk '{print $3}')"
+          echo "mingw-w64-x86_64-gtest: $(pacman -Qi mingw-w64-x86_64-gtest | grep Version | awk '{print $3}')"
 
-      # 4️⃣ Build the project (no artifact upload — the test job rebuilds
-      # locally so every CMake-generated path is resolved on the test runner;
-      # ccache wiring for MSYS2+mingw is a separate follow-up)
-      - name: Build
-        shell: msys2 {0}
-        run: |
-          cmake -G "MSYS Makefiles" -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }} -S . -B build
-          cmake --build build --parallel $(nproc)
-
-  test:
-    needs: build
-    runs-on: ${{ fromJSON(vars.RUNNER_WINDOWS || '["windows-2025"]') }}
-    timeout-minutes: 30
-
-    steps:
-      # 1️⃣ Checkout the repository
-      - name: Checkout repository
-        uses: actions/checkout@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          ref: ${{ github.ref }}
-
-      # 2️⃣ Set up MSYS2 + MS-MPI runtime (same set as build for ABI parity;
-      # cache: false, release: false preserves the preinstalled C:\msys64 — see #159).
-      - name: Setup Dependencies
-        uses: ./.github/actions/setup-windows-deps
-        with:
-          multiprocessing: 'ON'
-          tests: 'true'
-          cache: 'false'
-          release: 'false'
-
-      # 3️⃣ Build locally with MP=ON so cmake-generated paths point at this
-      # runner's workspace. No ccache on Windows yet (mingw+msys2 PATH plumbing
-      # is a separate follow-up), so this is a full compile every time. Tests
-      # reference gempba::mp::* directly so we never exercise MP=OFF here.
+      # 4️⃣ Configure + build with MP=ON. Tests reference gempba::mp::* directly,
+      # so only MP=ON is built here.
       - name: Configure + build
         shell: msys2 {0}
         run: |
           cmake -G "MSYS Makefiles" -DGEMPBA_MULTIPROCESSING=ON -S . -B build
           cmake --build build --parallel $(nproc)
 
-      # 4️⃣ Run tests with JUnit XML output
+      # 5️⃣ Run tests with JUnit XML output
       - name: Run tests with retry for flaky tests
         shell: msys2 {0}
         run: |
@@ -109,7 +75,7 @@ jobs:
           echo "🟡 Flaky tests: up to 3 attempts each"
           ctest --repeat until-pass:3 --output-on-failure --output-junit test_results_flaky.xml -R "FLAKY_" --no-tests=ignore
 
-      # 5️⃣ Upload test results as artifacts
+      # 6️⃣ Upload test results as artifacts
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v7
@@ -118,15 +84,22 @@ jobs:
           path: ${{ github.workspace }}/build/test_results_*.xml
           retention-days: 30
 
+      # 7️⃣ Publish test results as a check
+      - name: Publish Test Report
+        if: ${{ !cancelled() }}
+        uses: mikepenz/action-junit-report@v4
+        with:
+          report_paths: 'build/test_results_*.xml'
+          check_name: 'Windows Test Results'
+          fail_on_failure: true
+          detailed_summary: true
+          include_passed: true
+
   # Build the gempba-examples sister repo against an installed gempba built
   # from THIS branch. See ci-cpp-ubuntu.yml for rationale.
   build-examples-from-install:
     runs-on: ${{ fromJSON(vars.RUNNER_WINDOWS || '["windows-2025"]') }}
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        multiprocessing: ['ON', 'OFF']
     env:
       GEMPBA_EXAMPLES_OWNER: ${{ vars.GEMPBA_EXAMPLES_OWNER || github.repository_owner }}
       GEMPBA_CROSS_REPO_TOKEN: ${{ secrets.GEMPBA_CROSS_REPO_TOKEN || '' }}
@@ -139,21 +112,40 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ github.ref }}
 
-      # 2️⃣ Set up MSYS2 + MS-MPI runtime; `extra: git` so the cross-repo clone
-      # step has git available inside the msys2 shell.
+      # 2️⃣ Set up MSYS2 + MS-MPI runtime, MPI included for the MP=ON examples;
+      # `extra: git` so the cross-repo clone step has git available inside the msys2 shell.
       - name: Setup Dependencies
         uses: ./.github/actions/setup-windows-deps
         with:
-          multiprocessing: ${{ matrix.multiprocessing }}
+          multiprocessing: 'ON'
           tests: 'false'
           extra: 'git'
           cache: 'false'
           release: 'false'
 
-      # 3️⃣ Install gempba mt (the base package) into the prefix. The mpi
+      # 3️⃣ Resolve sister-repo branch (same-name, fall back to main)
+      - name: Resolve gempba-examples ref
+        id: examples_ref
+        uses: ./.github/actions/resolve-examples-ref
+        with:
+          examples-owner: ${{ env.GEMPBA_EXAMPLES_OWNER }}
+          cross-repo-token: ${{ env.GEMPBA_CROSS_REPO_TOKEN }}
+
+      # 4️⃣ Clone gempba-examples
+      - name: Clone gempba-examples
+        shell: msys2 {0}
+        run: |
+          if [ -n "$GEMPBA_CROSS_REPO_TOKEN" ]; then
+            EX_URL="https://x-access-token:${GEMPBA_CROSS_REPO_TOKEN}@github.com/${GEMPBA_EXAMPLES_OWNER}/gempba-examples.git"
+          else
+            EX_URL="https://github.com/${GEMPBA_EXAMPLES_OWNER}/gempba-examples.git"
+          fi
+          git -c http."https://github.com/".extraheader= -c credential.helper= clone --depth 1 --branch "${{ steps.examples_ref.outputs.ref }}" \
+            "$EX_URL" "$RUNNER_TEMP/gempba-examples-src"
+
+      # 5️⃣ Install gempba mt (the base package) into the prefix. The mpi
       #    topping package depends on the mt base for headers and the
-      #    gempbaConfig.cmake dispatcher, so the mt install always happens
-      #    first — even on the MP=ON matrix leg.
+      #    gempbaConfig.cmake dispatcher, so the mt install comes first.
       - name: Install gempba (mt base)
         shell: msys2 {0}
         run: |
@@ -170,11 +162,21 @@ jobs:
           cmake --build "$RUNNER_TEMP/gempba-build-mt" --parallel $(nproc)
           cmake --install "$RUNNER_TEMP/gempba-build-mt"
 
-      # 3️⃣bis Layer the mpi topping on top of the mt base when the matrix
-      #       leg is MP=ON. Adds libgempba_mpi.a + gempba_mpi-targets.cmake
-      #       so find_package(gempba COMPONENTS mpi) resolves.
+      # 6️⃣ Build the examples against the mt base alone
+      - name: Build gempba-examples (MP=OFF)
+        shell: msys2 {0}
+        run: |
+          cmake -G "MSYS Makefiles" \
+            -S "$RUNNER_TEMP/gempba-examples-src" -B "$RUNNER_TEMP/gempba-examples-build-mt" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$GEMPBA_INSTALL_PREFIX" \
+            -DGEMPBA_MULTIPROCESSING=OFF
+          cmake --build "$RUNNER_TEMP/gempba-examples-build-mt" --parallel $(nproc)
+
+      # 7️⃣ Layer the mpi topping on top of the mt base. Adds
+      #    libgempba_mpi.a + gempba_mpi-targets.cmake so
+      #    find_package(gempba COMPONENTS mpi) resolves.
       - name: Install gempba (mpi topping)
-        if: matrix.multiprocessing == 'ON'
         shell: msys2 {0}
         run: |
           cmake -G "MSYS Makefiles" \
@@ -187,54 +189,19 @@ jobs:
           cmake --build "$RUNNER_TEMP/gempba-build-mpi" --parallel $(nproc)
           cmake --install "$RUNNER_TEMP/gempba-build-mpi"
 
-      # 4️⃣ Resolve sister-repo branch (same-name, fall back to main)
-      - name: Resolve gempba-examples ref
-        id: examples_ref
-        uses: ./.github/actions/resolve-examples-ref
-        with:
-          examples-owner: ${{ env.GEMPBA_EXAMPLES_OWNER }}
-          cross-repo-token: ${{ env.GEMPBA_CROSS_REPO_TOKEN }}
-
-      # 5️⃣ Clone gempba-examples and build it against the installed gempba
-      - name: Build gempba-examples
+      # 8️⃣ Build the examples against the mt base plus the mpi topping
+      - name: Build gempba-examples (MP=ON)
         shell: msys2 {0}
         run: |
-          if [ -n "$GEMPBA_CROSS_REPO_TOKEN" ]; then
-            EX_URL="https://x-access-token:${GEMPBA_CROSS_REPO_TOKEN}@github.com/${GEMPBA_EXAMPLES_OWNER}/gempba-examples.git"
-          else
-            EX_URL="https://github.com/${GEMPBA_EXAMPLES_OWNER}/gempba-examples.git"
-          fi
-          git -c http."https://github.com/".extraheader= -c credential.helper= clone --depth 1 --branch "${{ steps.examples_ref.outputs.ref }}" \
-            "$EX_URL" "$RUNNER_TEMP/gempba-examples-src"
           cmake -G "MSYS Makefiles" \
-            -S "$RUNNER_TEMP/gempba-examples-src" -B "$RUNNER_TEMP/gempba-examples-build" \
+            -S "$RUNNER_TEMP/gempba-examples-src" -B "$RUNNER_TEMP/gempba-examples-build-mpi" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH="$GEMPBA_INSTALL_PREFIX" \
-            -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }}
-          cmake --build "$RUNNER_TEMP/gempba-examples-build" --parallel $(nproc)
+            -DGEMPBA_MULTIPROCESSING=ON
+          cmake --build "$RUNNER_TEMP/gempba-examples-build-mpi" --parallel $(nproc)
 
+  # Packaging only on the way into main or release: PRs into them and pushes to them.
   build-msys2:
-    needs: build
-    uses: ./.github/workflows/_build-msys2.yml
-
-  publish-test-results:
     needs: test
-    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
-    if: ${{ !cancelled() }}
-
-    steps:
-      # Download the test results
-      - name: Download test results
-        uses: actions/download-artifact@v8
-        with:
-          name: test-results-windows
-
-      # Publish test results
-      - name: Publish Test Report
-        uses: mikepenz/action-junit-report@v4
-        with:
-          report_paths: 'test_results_*.xml'
-          check_name: 'Windows Test Results'
-          fail_on_failure: true
-          detailed_summary: true
-          include_passed: true
+    if: github.event_name == 'push' || contains(fromJSON('["main","release"]'), github.base_ref)
+    uses: ./.github/workflows/_build-msys2.yml

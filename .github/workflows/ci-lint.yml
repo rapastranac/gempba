@@ -3,8 +3,12 @@ name: Lint
 on:
   push:
     branches: [ "main", "release" ]
-    tags: [ "v*" ]
+  # Docs-only PRs start no CI.
   pull_request:
+    paths:
+      - '**'
+      - '!docs/**'
+      - '!**/*.md'
 
 permissions:
   contents: read
