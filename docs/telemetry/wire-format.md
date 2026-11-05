@@ -16,6 +16,7 @@ This is the reference for what gempba's telemetry stream carries: every key of a
 
 - The aggregator serves the stream. It listens on `127.0.0.1` only, port 9000 unless the program calls `gempba::telemetry::configure_port` before creating the runtime. To watch a run on another machine, use the GemPBA Dashboard, which opens the SSH tunnel itself.
 - Any number of clients can connect, and each receives the same lines. Each line is one JSON object followed by `\n`.
+- Each client has its own queue of up to 16 lines waiting to be sent. A client that reads slower than the stream skips whole lines, oldest first, so it never receives part of a line and never holds up the other clients or the control lines. At shutdown the aggregator waits up to one second for each client to take the final line.
 - A full line is self-contained. It carries the topology, the run setup and the latest frame from every rank and every host, so a client that connects late misses nothing but history.
 - The aggregator sends:
   - a full line every telemetry interval: 500 ms by default, never more often than every 50 ms, and changeable live with `set_interval_ms`;
