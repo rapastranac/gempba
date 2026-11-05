@@ -104,10 +104,6 @@ jobs:
   build-examples-from-install:
     runs-on: ${{ fromJSON(vars.RUNNER_MACOS_INTEL || '["macos-26-intel"]') }}
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        multiprocessing: ['ON', 'OFF']
     env:
       GEMPBA_EXAMPLES_OWNER: ${{ vars.GEMPBA_EXAMPLES_OWNER || github.repository_owner }}
       GEMPBA_INSTALL_PREFIX: ${{ github.workspace }}/.gempba-install
@@ -128,17 +124,35 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ github.ref }}
 
-      # 2️⃣ Install dependencies (mirror build job's set)
+      # 2️⃣ Install dependencies, MPI included for the MP=ON examples
       - name: Setup Dependencies
         uses: ./.github/actions/setup-macos-deps
         with:
-          multiprocessing: ${{ matrix.multiprocessing }}
+          multiprocessing: 'ON'
           tests: 'false'
 
-      # 3️⃣ Install gempba mt (the base package) into the prefix. The mpi
+      # 3️⃣ Resolve sister-repo branch (same-name, fall back to main)
+      - name: Resolve gempba-examples ref
+        id: examples_ref
+        uses: ./.github/actions/resolve-examples-ref
+        with:
+          examples-owner: ${{ env.GEMPBA_EXAMPLES_OWNER }}
+          cross-repo-token: ${{ env.GEMPBA_CROSS_REPO_TOKEN }}
+
+      # 4️⃣ Clone gempba-examples
+      - name: Clone gempba-examples
+        run: |
+          if [ -n "$GEMPBA_CROSS_REPO_TOKEN" ]; then
+            EX_URL="https://x-access-token:${GEMPBA_CROSS_REPO_TOKEN}@github.com/${GEMPBA_EXAMPLES_OWNER}/gempba-examples.git"
+          else
+            EX_URL="https://github.com/${GEMPBA_EXAMPLES_OWNER}/gempba-examples.git"
+          fi
+          git -c http."https://github.com/".extraheader= -c credential.helper= clone --depth 1 --branch "${{ steps.examples_ref.outputs.ref }}" \
+            "$EX_URL" "$RUNNER_TEMP/gempba-examples-src"
+
+      # 5️⃣ Install gempba mt (the base package) into the prefix. The mpi
       #    topping package depends on the mt base for headers and the
-      #    gempbaConfig.cmake dispatcher, so the mt install always happens
-      #    first — even on the MP=ON matrix leg.
+      #    gempbaConfig.cmake dispatcher, so the mt install comes first.
       - name: Install gempba (mt base)
         run: |
           cmake -S . -B "$RUNNER_TEMP/gempba-build-mt" \
@@ -151,11 +165,19 @@ jobs:
           cmake --build "$RUNNER_TEMP/gempba-build-mt" --parallel $(sysctl -n hw.logicalcpu)
           cmake --install "$RUNNER_TEMP/gempba-build-mt"
 
-      # 3️⃣bis Layer the mpi topping on top of the mt base when the matrix
-      #       leg is MP=ON. Adds libgempba_mpi.a + gempba_mpi-targets.cmake
-      #       so find_package(gempba COMPONENTS mpi) resolves.
+      # 6️⃣ Build the examples against the mt base alone
+      - name: Build gempba-examples (MP=OFF)
+        run: |
+          cmake -S "$RUNNER_TEMP/gempba-examples-src" -B "$RUNNER_TEMP/gempba-examples-build-mt" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$GEMPBA_INSTALL_PREFIX;$(brew --prefix boost)" \
+            -DGEMPBA_MULTIPROCESSING=OFF
+          cmake --build "$RUNNER_TEMP/gempba-examples-build-mt" --parallel $(sysctl -n hw.logicalcpu)
+
+      # 7️⃣ Layer the mpi topping on top of the mt base. Adds
+      #    libgempba_mpi.a + gempba_mpi-targets.cmake so
+      #    find_package(gempba COMPONENTS mpi) resolves.
       - name: Install gempba (mpi topping)
-        if: matrix.multiprocessing == 'ON'
         run: |
           cmake -S . -B "$RUNNER_TEMP/gempba-build-mpi" \
             -DCMAKE_BUILD_TYPE=Release \
@@ -167,26 +189,11 @@ jobs:
           cmake --build "$RUNNER_TEMP/gempba-build-mpi" --parallel $(sysctl -n hw.logicalcpu)
           cmake --install "$RUNNER_TEMP/gempba-build-mpi"
 
-      # 4️⃣ Resolve sister-repo branch (same-name, fall back to main)
-      - name: Resolve gempba-examples ref
-        id: examples_ref
-        uses: ./.github/actions/resolve-examples-ref
-        with:
-          examples-owner: ${{ env.GEMPBA_EXAMPLES_OWNER }}
-          cross-repo-token: ${{ env.GEMPBA_CROSS_REPO_TOKEN }}
-
-      # 5️⃣ Clone gempba-examples and build it against the installed gempba
-      - name: Build gempba-examples
+      # 8️⃣ Build the examples against the mt base plus the mpi topping
+      - name: Build gempba-examples (MP=ON)
         run: |
-          if [ -n "$GEMPBA_CROSS_REPO_TOKEN" ]; then
-            EX_URL="https://x-access-token:${GEMPBA_CROSS_REPO_TOKEN}@github.com/${GEMPBA_EXAMPLES_OWNER}/gempba-examples.git"
-          else
-            EX_URL="https://github.com/${GEMPBA_EXAMPLES_OWNER}/gempba-examples.git"
-          fi
-          git -c http."https://github.com/".extraheader= -c credential.helper= clone --depth 1 --branch "${{ steps.examples_ref.outputs.ref }}" \
-            "$EX_URL" "$RUNNER_TEMP/gempba-examples-src"
-          cmake -S "$RUNNER_TEMP/gempba-examples-src" -B "$RUNNER_TEMP/gempba-examples-build" \
+          cmake -S "$RUNNER_TEMP/gempba-examples-src" -B "$RUNNER_TEMP/gempba-examples-build-mpi" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH="$GEMPBA_INSTALL_PREFIX;$(brew --prefix boost)" \
-            -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }}
-          cmake --build "$RUNNER_TEMP/gempba-examples-build" --parallel $(sysctl -n hw.logicalcpu)
+            -DGEMPBA_MULTIPROCESSING=ON
+          cmake --build "$RUNNER_TEMP/gempba-examples-build-mpi" --parallel $(sysctl -n hw.logicalcpu)
