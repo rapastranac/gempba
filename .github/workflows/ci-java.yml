@@ -16,8 +16,11 @@ concurrency:
 
 jobs:
   # Shared with release-java.yml so tag-time publish reuses the same build path.
+  # The fat JARs are assembled only on the way into main or release.
   build:
     uses: ./.github/workflows/_build-java-jars.yml
+    with:
+      assemble: ${{ github.event_name == 'push' || contains(fromJSON('["main","release"]'), github.base_ref) }}
 
   publish-test-results:
     needs: [ build ]

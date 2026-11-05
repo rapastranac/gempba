@@ -202,8 +202,10 @@ jobs:
             -DGEMPBA_MULTIPROCESSING=ON
           cmake --build "$RUNNER_TEMP/gempba-examples-build-mpi" --parallel $(nproc)
 
+  # Packaging only on the way into main or release: PRs into them and pushes to them.
   build-deb:
     needs: test
+    if: github.event_name == 'push' || contains(fromJSON('["main","release"]'), github.base_ref)
     uses: ./.github/workflows/_build-deb.yml
 
   build-apt-index:
