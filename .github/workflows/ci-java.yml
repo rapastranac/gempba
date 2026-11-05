@@ -3,7 +3,12 @@ name: Java JNI binding
 on:
   push:
     branches: [ "main", "release" ]
+  # Docs-only PRs start no CI.
   pull_request:
+    paths:
+      - '**'
+      - '!docs/**'
+      - '!**/*.md'
 
 permissions:
   contents: read

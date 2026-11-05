@@ -3,7 +3,13 @@ name: C/C++ CI (macOS 26)
 on:
   push:
     branches: [ "main", "release" ]
+  # Docs-only PRs start no CI; wire-format.md still does, because a unit test reads it.
   pull_request:
+    paths:
+      - '**'
+      - '!docs/**'
+      - '!**/*.md'
+      - 'docs/telemetry/wire-format.md'
 
 permissions:
   contents: read
