@@ -1,6 +1,7 @@
 #include <impl/telemetry/aggregator_tcp_server.hpp>
 
 #include <gempba/telemetry/telemetry_hub.hpp>
+#include <impl/telemetry/client_outbox.hpp>
 #include <impl/telemetry/json_serializer.hpp>
 
 #include <algorithm>
@@ -11,6 +12,7 @@
 #include <condition_variable>
 #include <cstring>
 #include <limits>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <spdlog/spdlog.h>
@@ -25,6 +27,8 @@
     #include <winsock2.h>
 #else
     #include <arpa/inet.h>
+    #include <cerrno>
+    #include <fcntl.h>
     #include <netinet/in.h>
     #include <sys/select.h>
     #include <sys/socket.h>
@@ -60,15 +64,19 @@ namespace gempba::telemetry {
         void close_socket(socket_t p_s) noexcept { closesocket(p_s); }
         // Forces a blocking accept/recv on this socket to return promptly.
         void shutdown_socket(socket_t p_s) noexcept { ::shutdown(p_s, SD_BOTH); }
-        bool send_all(socket_t p_s, const char* p_buf, std::size_t p_len) noexcept {
-            std::size_t v_written = 0;
-            while (v_written < p_len) {
-                const int v_n = ::send(p_s, p_buf + v_written, static_cast<int>(p_len - v_written), 0);
-                if (v_n == SOCKET_ERROR)
-                    return false;
-                v_written += static_cast<std::size_t>(v_n);
+        bool set_non_blocking(socket_t p_s) noexcept {
+            u_long v_on = 1;
+            return ::ioctlsocket(p_s, FIONBIO, &v_on) == 0;
+        }
+        std::optional<std::size_t> send_some(socket_t p_s, const std::string_view p_bytes) noexcept {
+            const int v_n = ::send(p_s, p_bytes.data(), static_cast<int>(std::min<std::size_t>(p_bytes.size(), std::numeric_limits<int>::max())), 0);
+            if (v_n != SOCKET_ERROR) {
+                return static_cast<std::size_t>(v_n);
             }
-            return true;
+            if (::WSAGetLastError() == WSAEWOULDBLOCK) {
+                return 0;
+            }
+            return std::nullopt;
         }
 #else
         using socket_t = int;
@@ -85,21 +93,29 @@ namespace gempba::telemetry {
         // close() alone does not reliably unblock a sibling thread blocked in
         // accept()/recv() on Linux; shutdown(SHUT_RDWR) does.
         void shutdown_socket(socket_t p_s) noexcept { ::shutdown(p_s, SHUT_RDWR); }
-        bool send_all(socket_t p_s, const char* p_buf, std::size_t p_len) noexcept {
-            std::size_t v_written = 0;
-            while (v_written < p_len) {
-                const ssize_t v_n = ::send(p_s, p_buf + v_written, p_len - v_written, MSG_NOSIGNAL);
-                if (v_n <= 0)
-                    return false;
-                v_written += static_cast<std::size_t>(v_n);
+        bool set_non_blocking(socket_t p_s) noexcept {
+            const int v_flags = ::fcntl(p_s, F_GETFL, 0);
+            return v_flags != -1 && ::fcntl(p_s, F_SETFL, v_flags | O_NONBLOCK) != -1;
+        }
+        std::optional<std::size_t> send_some(socket_t p_s, const std::string_view p_bytes) noexcept {
+            const ssize_t v_n = ::send(p_s, p_bytes.data(), p_bytes.size(), MSG_NOSIGNAL);
+            if (v_n >= 0) {
+                return static_cast<std::size_t>(v_n);
             }
-            return true;
+            if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
+                return 0;
+            }
+            return std::nullopt;
         }
 #endif
 
         constexpr std::chrono::milliseconds k_min_broadcast_interval{50};
         constexpr std::chrono::milliseconds k_control_poll_interval{500};
         constexpr std::chrono::milliseconds k_snapshot_poll_interval{10};
+
+        constexpr std::size_t k_outbox_lines = 16;
+        constexpr std::chrono::milliseconds k_final_flush_timeout{1000};
+        constexpr std::chrono::milliseconds k_final_flush_poll{10};
 
         std::chrono::milliseconds broadcast_interval(const telemetry_hub& p_hub) { return std::max(std::chrono::milliseconds(p_hub.interval_ms()), k_min_broadcast_interval); }
 
@@ -338,7 +354,32 @@ namespace gempba::telemetry {
     struct client_state {
         socket_t m_sock = k_invalid_socket;
         std::string m_inbox;
+        client_outbox m_outbox{k_outbox_lines};
     };
+
+    namespace {
+
+        bool flush_client(client_state& p_cs) {
+            return p_cs.m_outbox.flush([&p_cs](const std::string_view p_bytes) { return send_some(p_cs.m_sock, p_bytes); });
+        }
+
+        void flush_final_lines(std::vector<client_state>& p_clients) {
+            std::vector<client_state*> v_waiting;
+            v_waiting.reserve(p_clients.size());
+            for (auto& v_cs: p_clients) {
+                v_waiting.push_back(&v_cs);
+            }
+            const auto v_deadline = std::chrono::steady_clock::now() + k_final_flush_timeout;
+            while (true) {
+                std::erase_if(v_waiting, [](client_state* p_cs) { return !flush_client(*p_cs) || p_cs->m_outbox.empty(); });
+                if (v_waiting.empty() || std::chrono::steady_clock::now() >= v_deadline) {
+                    return;
+                }
+                std::this_thread::sleep_for(k_final_flush_poll);
+            }
+        }
+
+    } // namespace
 
     struct aggregator_tcp_server::impl {
         std::uint16_t m_requested_port = 0;
@@ -416,9 +457,14 @@ namespace gempba::telemetry {
                     // listen socket likely closed during stop() → exit
                     break;
                 }
+                if (!set_non_blocking(v_client)) {
+                    spdlog::warn("telemetry: closing a client whose socket could not be made non-blocking");
+                    close_socket(v_client);
+                    continue;
+                }
                 {
                     const std::scoped_lock v_lock(v_impl_ptr->m_clients_mtx);
-                    v_impl_ptr->m_clients.push_back(client_state{v_client, {}});
+                    v_impl_ptr->m_clients.push_back(client_state{v_client});
                 }
             }
         });
@@ -476,10 +522,14 @@ namespace gempba::telemetry {
             const auto v_stopped = [v_impl_ptr] { return !v_impl_ptr->m_running.load(std::memory_order_acquire); };
             auto v_last_broadcast = std::chrono::steady_clock::now();
             std::uint32_t v_broadcast_snapshot = 0;
+            bool v_backlog = false;
             while (!v_stopped()) {
                 {
                     const auto v_due = v_last_broadcast + broadcast_interval(*v_impl_ptr->m_hub);
-                    const auto v_poll = v_impl_ptr->m_hub->snapshot_requested() != v_broadcast_snapshot ? k_snapshot_poll_interval : k_control_poll_interval;
+                    auto v_poll = v_impl_ptr->m_hub->snapshot_requested() != v_broadcast_snapshot ? k_snapshot_poll_interval : k_control_poll_interval;
+                    if (v_backlog) {
+                        v_poll = std::min(v_poll, k_min_broadcast_interval);
+                    }
                     std::unique_lock v_wake_lock(v_impl_ptr->m_wake_mtx);
                     v_impl_ptr->m_wake_cv.wait_until(v_wake_lock, std::min(v_due, std::chrono::steady_clock::now() + v_poll), v_stopped);
                 }
@@ -497,6 +547,7 @@ namespace gempba::telemetry {
                     }
                 }
 
+                client_outbox::line v_line;
                 const std::uint32_t v_snapshot = v_impl_ptr->m_hub->snapshot_requested();
                 const bool v_snapshot_ready = v_snapshot != v_broadcast_snapshot && !v_impl_ptr->m_hub->snapshot_outstanding();
                 if (v_snapshot_ready || std::chrono::steady_clock::now() >= v_last_broadcast + broadcast_interval(*v_impl_ptr->m_hub)) {
@@ -504,22 +555,27 @@ namespace gempba::telemetry {
                     if (v_snapshot_ready) {
                         v_broadcast_snapshot = v_snapshot;
                     }
-                    const std::string v_line = build_broadcast_line(*v_impl_ptr->m_hub, v_snapshot_ready || !v_impl_ptr->m_hub->paused(), false);
-                    const std::scoped_lock v_lock(v_impl_ptr->m_clients_mtx);
-                    for (const auto& v_cs: v_impl_ptr->m_clients) {
-                        const bool v_already_dead = std::find(v_dead.begin(), v_dead.end(), v_cs.m_sock) != v_dead.end();
-                        if (!v_already_dead && !send_all(v_cs.m_sock, v_line.data(), v_line.size())) {
-                            v_dead.push_back(v_cs.m_sock);
-                        }
-                    }
+                    v_line = std::make_shared<const std::string>(build_broadcast_line(*v_impl_ptr->m_hub, v_snapshot_ready || !v_impl_ptr->m_hub->paused(), false));
                 }
 
                 {
                     const std::scoped_lock v_lock(v_impl_ptr->m_clients_mtx);
+                    v_backlog = false;
+                    for (auto& v_cs: v_impl_ptr->m_clients) {
+                        if (std::find(v_dead.begin(), v_dead.end(), v_cs.m_sock) != v_dead.end()) {
+                            continue;
+                        }
+                        if (v_line) {
+                            v_cs.m_outbox.push(v_line);
+                        }
+                        if (!flush_client(v_cs)) {
+                            v_dead.push_back(v_cs.m_sock);
+                            continue;
+                        }
+                        v_backlog = v_backlog || !v_cs.m_outbox.empty();
+                    }
                     if (!v_dead.empty()) {
-                        v_impl_ptr->m_clients.erase(std::remove_if(v_impl_ptr->m_clients.begin(), v_impl_ptr->m_clients.end(),
-                                                                   [&](const client_state& p_cs) { return std::find(v_dead.begin(), v_dead.end(), p_cs.m_sock) != v_dead.end(); }),
-                                                    v_impl_ptr->m_clients.end());
+                        std::erase_if(v_impl_ptr->m_clients, [&](const client_state& p_cs) { return std::find(v_dead.begin(), v_dead.end(), p_cs.m_sock) != v_dead.end(); });
                     }
                 }
                 for (socket_t v_c: v_dead)
@@ -562,10 +618,11 @@ namespace gempba::telemetry {
 
         const std::scoped_lock v_lock(m_impl->m_clients_mtx);
         if (!m_impl->m_clients.empty()) {
-            const std::string v_line = build_broadcast_line(*m_impl->m_hub, true, true);
-            for (const auto& v_cs: m_impl->m_clients) {
-                (void) send_all(v_cs.m_sock, v_line.data(), v_line.size());
+            const auto v_final = std::make_shared<const std::string>(build_broadcast_line(*m_impl->m_hub, true, true));
+            for (auto& v_cs: m_impl->m_clients) {
+                v_cs.m_outbox.push(v_final);
             }
+            flush_final_lines(m_impl->m_clients);
         }
         for (const auto& v_cs: m_impl->m_clients)
             close_socket(v_cs.m_sock);

@@ -12,7 +12,9 @@ namespace gempba::telemetry {
      * @brief Loopback-only TCP broadcaster for the aggregator's dashboard channel.
      *
      * Accepts multiple concurrent clients; each receives the same line-delimited
-     * JSON stream. Lifetime is owned by the @ref telemetry_hub.
+     * JSON stream. Each client has its own queue of whole lines: one that reads
+     * slower than the stream skips its oldest lines and never holds up the other
+     * clients or the control lines. Lifetime is owned by the @ref telemetry_hub.
      */
     class aggregator_tcp_server {
     public:
@@ -24,6 +26,8 @@ namespace gempba::telemetry {
 
         // Returns false on bind failure; stop() / destruction stay safe.
         bool start();
+
+        /// Sends every client the final line, waiting at most one second for clients that read slowly, then closes them.
         void stop();
 
         // bound_port lets tests pass port 0 and read back the OS-assigned one.

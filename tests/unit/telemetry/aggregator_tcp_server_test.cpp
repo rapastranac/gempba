@@ -124,10 +124,13 @@ namespace {
 #endif
     }
 
-    socket_t connect_loopback(std::uint16_t p_port) {
+    socket_t connect_loopback(std::uint16_t p_port, const int p_receive_buffer = 0) {
         const socket_t v_s = ::socket(AF_INET, SOCK_STREAM, 0);
         if (v_s == k_invalid)
             return k_invalid;
+        if (p_receive_buffer > 0) {
+            ::setsockopt(v_s, SOL_SOCKET, SO_RCVBUF, reinterpret_cast<const char*>(&p_receive_buffer), sizeof(p_receive_buffer));
+        }
         sockaddr_in v_addr{};
         v_addr.sin_family = AF_INET;
         v_addr.sin_port = htons(p_port);
@@ -616,6 +619,64 @@ namespace {
 
         EXPECT_LT(v_stop_took, std::chrono::milliseconds(1000));
         EXPECT_NE(std::string::npos, v_rest.find("\"version\":2")) << v_rest;
+    }
+
+    std::vector<std::string> complete_lines(const std::string& p_buf) {
+        std::vector<std::string> v_lines;
+        std::size_t v_start = 0;
+        for (std::size_t v_end = p_buf.find('\n'); v_end != std::string::npos; v_end = p_buf.find('\n', v_start)) {
+            v_lines.push_back(p_buf.substr(v_start, v_end - v_start));
+            v_start = v_end + 1;
+        }
+        return v_lines;
+    }
+
+    TEST_F(tcp_server_test, a_client_that_stops_reading_holds_up_neither_the_other_clients_nor_the_controls) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+        v_hub.set_interval_ms(50);
+        // Long markers make every line a few kilobytes, so the stuck client's socket buffers fill early in the test.
+        for (int v_i = 0; v_i < 32; ++v_i) {
+            ASSERT_TRUE(v_hub.mark_run(std::string(64, 'x')));
+        }
+        gempba::telemetry::aggregator_tcp_server v_server(0, v_hub);
+        ASSERT_TRUE(v_server.start());
+
+        const socket_t v_stuck = connect_loopback(v_server.bound_port(), /*p_receive_buffer=*/1024);
+        const socket_t v_reader = connect_loopback(v_server.bound_port());
+        ASSERT_NE(k_invalid, v_stuck);
+        ASSERT_NE(k_invalid, v_reader);
+        set_recv_timeout(v_reader, 100);
+
+        EXPECT_EQ(40u, line_arrivals(v_reader, 40, std::chrono::milliseconds(6000)).size());
+
+        ASSERT_TRUE(send_all(v_reader, "{\"kind\":\"set_interval_ms\",\"value\":70}\n"));
+        EXPECT_TRUE(wait_for([&] { return v_hub.interval_ms() == 70u; }, std::chrono::milliseconds(2000)));
+
+        std::string v_stuck_received;
+        std::thread v_stuck_reader([&] {
+            set_recv_timeout(v_stuck, 200);
+            v_stuck_received = read_until_closed(v_stuck, std::chrono::milliseconds(5000));
+        });
+        const auto v_start = std::chrono::steady_clock::now();
+        v_server.stop();
+        const auto v_stop_took = std::chrono::steady_clock::now() - v_start;
+        v_stuck_reader.join();
+
+        set_recv_timeout(v_reader, 200);
+        const std::string v_reader_rest = read_until_closed(v_reader, std::chrono::milliseconds(3000));
+        close_sock(v_stuck);
+        close_sock(v_reader);
+
+        EXPECT_LT(v_stop_took, std::chrono::milliseconds(2000));
+        EXPECT_NE(std::string::npos, last_complete_line(v_reader_rest).find(R"("final":true)"));
+
+        const std::vector<std::string> v_stuck_lines = complete_lines(v_stuck_received);
+        ASSERT_FALSE(v_stuck_lines.empty());
+        for (const std::string& v_line: v_stuck_lines) {
+            EXPECT_TRUE(v_line.starts_with('{') && v_line.ends_with('}')) << v_line.substr(0, 80);
+        }
+        EXPECT_NE(std::string::npos, v_stuck_lines.back().find(R"("final":true)"));
     }
 
     TEST_F(tcp_server_test, malformed_lines_are_ignored_and_do_not_break_subsequent_input) {
