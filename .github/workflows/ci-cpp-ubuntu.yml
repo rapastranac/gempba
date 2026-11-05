@@ -15,69 +15,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  build:
-    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        multiprocessing: ['ON', 'OFF']
-    env:
-      CC: gcc-14
-      CXX: g++-14
-
-    steps:
-      # 1️⃣ Checkout the repository
-      - name: Checkout repository
-        uses: actions/checkout@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          ref: ${{ github.ref }}
-
-      # 2️⃣ Set up environment and install dependencies
-      - name: Setup Dependencies
-        uses: ./.github/actions/setup-ubuntu-deps
-        with:
-          multiprocessing: ${{ matrix.multiprocessing }}
-          tests: ${{ matrix.multiprocessing == 'ON' && 'true' || 'false' }}
-
-      # 3️⃣ Echo versions of installed dependencies
-      - name: Echo Dependencies Version
-        run: |
-          echo "g++: $($CXX --version | head -1 | awk '{print $4}')"
-          echo "cmake: $(cmake --version | head -1 | awk '{print $3}')"
-          echo "make: $(make --version | head -1 | awk '{print $3}')"
-          echo "libboost-dev: $(dpkg -s libboost-dev | grep 'Version' | awk '{print $2}')"
-          echo "libhwloc-dev: $(dpkg -s libhwloc-dev | grep 'Version' | awk '{print $2}')"
-          if [ "${{ matrix.multiprocessing }}" = "ON" ]; then
-            echo "libopenmpi-dev: $(dpkg -s libopenmpi-dev | grep 'Version' | awk '{print $2}')"
-            echo "libgtest-dev: $(dpkg -s libgtest-dev | grep 'Version' | awk '{print $2}')"
-            echo "libgmock-dev: $(dpkg -s libgmock-dev | grep 'Version' | awk '{print $2}')"
-          fi
-
-      # 4️⃣ Set up ccache (per-matrix-leg key so MP=ON and MP=OFF don't poison
-      # each other; the MP=ON leg's cache is consumed by the test job below)
-      - name: Setup ccache
-        uses: hendrikmuhs/ccache-action@v1
-        with:
-          key: build-ubuntu-mp${{ matrix.multiprocessing }}
-
-      # 5️⃣ Build the project (no artifact upload — the test job re-runs cmake
-      # configure + cmake --build locally with the same ccache key, so every
-      # CMake-generated path is resolved on the test runner)
-      - name: Build the project
-        run: |
-          cmake -S . -B build \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }} \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_FLAGS="--coverage" \
-            -DCMAKE_EXE_LINKER_FLAGS="--coverage"
-          cmake --build build --parallel $(nproc)
-
   test:
-    needs: build
     runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
     timeout-minutes: 30
     env:
@@ -99,20 +37,25 @@ jobs:
           multiprocessing: 'ON'
           tests: 'true'
 
-      # 3️⃣ Restore the MP=ON cache that the build job populated. save: false
-      # because this job doesn't add anything new — the build job is the
-      # canonical writer. Tests reference gempba::mp::* directly so we never
-      # exercise the MP=OFF leg here.
+      # 3️⃣ Echo versions of installed dependencies
+      - name: Echo Dependencies Version
+        run: |
+          echo "g++: $($CXX --version | head -1 | awk '{print $4}')"
+          echo "cmake: $(cmake --version | head -1 | awk '{print $3}')"
+          echo "make: $(make --version | head -1 | awk '{print $3}')"
+          echo "libboost-dev: $(dpkg -s libboost-dev | grep 'Version' | awk '{print $2}')"
+          echo "libhwloc-dev: $(dpkg -s libhwloc-dev | grep 'Version' | awk '{print $2}')"
+          echo "libopenmpi-dev: $(dpkg -s libopenmpi-dev | grep 'Version' | awk '{print $2}')"
+          echo "libgtest-dev: $(dpkg -s libgtest-dev | grep 'Version' | awk '{print $2}')"
+          echo "libgmock-dev: $(dpkg -s libgmock-dev | grep 'Version' | awk '{print $2}')"
+
+      # 4️⃣ Set up ccache. Tests reference gempba::mp::* directly, so only MP=ON is built here.
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1
         with:
           key: build-ubuntu-mpON
-          save: false
 
-      # 4️⃣ Configure + build locally with MP=ON. Same flags as the build job
-      # so ccache hashes match; cache hits make this near-instant. cmake-
-      # generated paths (CTestTestfile.cmake, gtest_discover_tests output)
-      # point at this runner's workspace.
+      # 5️⃣ Configure + build with MP=ON
       - name: Configure + cached build
         run: |
           cmake -S . -B build \
@@ -126,7 +69,7 @@ jobs:
             -DCMAKE_EXE_LINKER_FLAGS="--coverage"
           cmake --build build --parallel $(nproc)
 
-      # 5️⃣ Run tests with JUnit XML output
+      # 6️⃣ Run tests with JUnit XML output
       - name: Run tests with retry for flaky tests
         run: |
           cd ${{ github.workspace }}/build
@@ -137,14 +80,14 @@ jobs:
           echo "🟡 Flaky tests: up to 3 attempts each"
           ctest --repeat until-pass:3 --output-on-failure --output-junit test_results_flaky.xml -R "FLAKY_" --no-tests=ignore
 
-      # 6️⃣ Upload coverage to Codecov
+      # 7️⃣ Upload coverage to Codecov
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
 
-      # 7️⃣ Upload test results as artifacts
+      # 8️⃣ Upload test results as artifacts
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v7
@@ -152,6 +95,17 @@ jobs:
           name: test-results-ubuntu
           path: ${{ github.workspace }}/build/test_results_*.xml
           retention-days: 30
+
+      # 9️⃣ Publish test results as a check
+      - name: Publish Test Report
+        if: ${{ !cancelled() }}
+        uses: mikepenz/action-junit-report@v4
+        with:
+          report_paths: 'build/test_results_*.xml'
+          check_name: 'Ubuntu Test Results'
+          fail_on_failure: true
+          detailed_summary: true
+          include_passed: true
 
   # Build the gempba-examples sister repo against an installed gempba built
   # from THIS branch. Mirror of gempba-examples' own CI job, except it
@@ -242,32 +196,10 @@ jobs:
           cmake --build "$RUNNER_TEMP/gempba-examples-build" --parallel $(nproc)
 
   build-deb:
-    needs: build
+    needs: test
     uses: ./.github/workflows/_build-deb.yml
 
   build-apt-index:
     needs: build-deb
     uses: ./.github/workflows/_build-apt-index.yml
     secrets: inherit
-
-  publish-test-results:
-    needs: test
-    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
-    if: ${{ !cancelled() }}
-
-    steps:
-      # Download the test results
-      - name: Download test results
-        uses: actions/download-artifact@v8
-        with:
-          name: test-results-ubuntu
-
-      # Publish test results
-      - name: Publish Test Report
-        uses: mikepenz/action-junit-report@v4
-        with:
-          report_paths: 'test_results_*.xml'
-          check_name: 'Ubuntu Test Results'
-          fail_on_failure: true
-          detailed_summary: true
-          include_passed: true
