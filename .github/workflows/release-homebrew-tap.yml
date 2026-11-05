@@ -19,6 +19,7 @@ on:
       - 'CMakeLists.txt'
       - 'cmake/**'
       - '.github/workflows/release-homebrew-tap.yml'
+      - 'scripts/homebrew_uninstall_gempba.sh'
   workflow_dispatch:
     inputs:
       tag:
@@ -178,7 +179,7 @@ jobs:
 
           # Persistent runner: hard-reset the tap namespace so a leftover tap
           # dir from an interrupted run cannot collide.
-          brew uninstall --force gempba-mpi gempba 2>/dev/null || true
+          bash scripts/homebrew_uninstall_gempba.sh
           rm -rf "$(brew --repository)/Library/Taps/gempba"
           brew tap-new gempba/citest --no-git
           TAP="$(brew --repository)/Library/Taps/gempba/homebrew-citest/Formula"
@@ -191,7 +192,7 @@ jobs:
       - name: Cleanup tap and kegs
         if: always()
         run: |
-          brew uninstall --force gempba-mpi gempba 2>/dev/null || true
+          bash scripts/homebrew_uninstall_gempba.sh
           rm -rf "$(brew --repository)/Library/Taps/gempba"
 
   publish:
