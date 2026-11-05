@@ -22,6 +22,13 @@ namespace gempba {
 
     class node_manager;
 
+    /**
+     * @brief The base of every multiprocessing scheduler; pass a custom one to @c gempba::multiprocessing::create_scheduler.
+     *
+     * docs/telemetry/custom-schedulers.md says what a custom scheduler must do for its runs to reach the dashboard: be created on every rank,
+     * return the @c MPI_COMM_WORLD rank from @c rank_me(), call @c telemetry_hub::tick_if_due() from its own loops, and report what happens
+     * with the hub's @c record_* calls. Those calls are the only link to telemetry; this interface carries no telemetry bookkeeping.
+     */
     class scheduler : public scheduler_traits {
     protected:
         scheduler() = default;
