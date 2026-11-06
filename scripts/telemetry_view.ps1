@@ -1,43 +1,34 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Live-tails the GemPBA telemetry stream from a running benchmark.
+    Live-tails the GemPBA telemetry stream of a run on this machine.
 
 .DESCRIPTION
-    Connects to the center's TCP socket on 127.0.0.1 and prints one formatted
-    line per broadcast frame: timestamp, tasks_local_total, process CPU,
-    tasks_sent_total, and process RSS. Press Ctrl+C to stop.
+    Connects to the aggregator's TCP socket on 127.0.0.1 and prints, for each
+    broadcast, one row per rank: its role, tasks started, sent and received,
+    thread count, CPU% and RSS (KB). A paused stream prints a "paused" row per
+    broadcast, and each run marker is printed once, when it first appears.
+    Press Ctrl+C to stop.
 
-    The gempba center always binds loopback only — the connection target is
-    therefore always 127.0.0.1, either directly when running on the same host
-    or as the local end of an SSH tunnel for remote dashboards. Pass -Port to
-    match whatever port the gempba binary was launched with (-telemetry_port).
-
-    The gempba binary must be built with -DGEMPBA_TELEMETRY=ON.
+    The gempba aggregator binds loopback only, so the viewer connects to
+    127.0.0.1. To watch a run on another machine, use the GemPBA Dashboard,
+    which opens the SSH tunnel itself.
 
 .PARAMETER Port
     TCP port to connect to on 127.0.0.1. Defaults to 9000, the gempba default.
-    Override when the benchmark was launched with `-telemetry_port <n>` or when
-    your SSH tunnel uses a non-default local port.
+    Pass the port the program set with gempba::telemetry::configure_port.
 
 .PARAMETER Raw
-    Print full pretty-printed JSON for each frame instead of the formatted
-    one-line summary. Useful when you want to inspect topology or node fields.
+    Print full pretty-printed JSON for each broadcast instead of one row per
+    rank. Useful when you want to inspect topology or node fields.
 
 .EXAMPLE
-    scripts\watch_telemetry.ps1
-    # Tails 127.0.0.1:9000 with the formatted summary.
+    scripts\telemetry_view.ps1
+    # Tails 127.0.0.1:9000, one row per rank.
 
 .EXAMPLE
-    scripts\watch_telemetry.ps1 -Port 9100 -Raw
-    # Connects to a non-default port, prints full JSON frames.
-
-.EXAMPLE
-    # In one shell, open the SSH tunnel:
-    #   ssh -J user@login.cluster.edu -L 9000:127.0.0.1:9000 user@compute-12
-    # In a second shell, run the watch script:
-    scripts\watch_telemetry.ps1
-    # SSH carries the traffic to the compute node; nothing else to configure.
+    scripts\telemetry_view.ps1 -Port 9100 -Raw
+    # Connects to a non-default port, prints full JSON broadcasts.
 #>
 
 [CmdletBinding()]
@@ -49,36 +40,55 @@ param(
 $ErrorActionPreference = 'Stop'
 
 # 127.0.0.1 (not "localhost"): Windows may resolve localhost to ::1 (IPv6)
-# first while the gempba center binds INADDR_LOOPBACK (IPv4 only).
+# first while the gempba aggregator binds INADDR_LOOPBACK (IPv4 only).
 $Ip = '127.0.0.1'
 
 try {
     $client = [System.Net.Sockets.TcpClient]::new($Ip, $Port)
 } catch {
     Write-Host ("ERROR: cannot connect to {0}:{1}" -f $Ip, $Port) -ForegroundColor Red
-    Write-Host "  - Is the benchmark running and the SSH tunnel (if any) still up?"
-    Write-Host "  - Was the benchmark built with -DGEMPBA_TELEMETRY=ON ?"
-    Write-Host "  - If the benchmark was launched with -telemetry_port <n>, pass -Port <n> here too."
+    Write-Host "  - Is the gempba program running on this machine?"
+    Write-Host "  - If it set another port with gempba::telemetry::configure_port, pass -Port <n> here too."
     exit 1
 }
 
 $reader = [System.IO.StreamReader]::new($client.GetStream())
 $epoch  = [DateTime]'1970-01-01Z'
+$invariant = [System.Globalization.CultureInfo]::InvariantCulture
+$rowFormat = '{0,8}  {1,12}  {2,4}  {3,-6}  {4,13}  {5,10}  {6,10}  {7,7}  {8,6}  {9,10}'
 
-Write-Host ("Connected to {0}:{1} - streaming frames (Ctrl+C to stop)" -f $Ip, $Port) -ForegroundColor Green
+function Format-Elapsed([TimeSpan]$Span, [bool]$WithMilliseconds) {
+    $text = '{0}:{1:00}:{2:00}' -f [math]::Floor($Span.TotalHours), $Span.Minutes, $Span.Seconds
+    if ($WithMilliseconds) {
+        $text += '.{0:000}' -f $Span.Milliseconds
+    }
+    $text
+}
+
+function Format-Label([string]$Label) {
+    $Label.Replace('\', '\\').Replace("`t", '\t').Replace("`r", '\r').Replace("`n", '\n')
+}
+
+Write-Host ("Connected to {0}:{1} - streaming broadcasts (Ctrl+C to stop)" -f $Ip, $Port) -ForegroundColor Green
 
 if (-not $Raw) {
     Write-Host ""
-    Write-Host ("{0,8}  {1,10}  {2,-14}  {3,-14}  {4,7}  {5,7}  {6,12}" -f "time","elapsed","tasks_local","tasks_remote","threads","cpu%","rss(KB)") -ForegroundColor DarkGray
-    Write-Host ("-" * 95) -ForegroundColor DarkGray
+    Write-Host ($rowFormat -f "time", "elapsed", "rank", "role", "tasks_started", "tasks_sent", "tasks_recv", "threads", "cpu%", "rss(KB)") -ForegroundColor DarkGray
+    Write-Host ("-" * 104) -ForegroundColor DarkGray
 }
 
+$runId = ''
+$seen = 0
 try {
     while (-not $reader.EndOfStream) {
         $line = $reader.ReadLine()
         if ([string]::IsNullOrWhiteSpace($line)) { continue }
 
-        $j = $line | ConvertFrom-Json
+        try {
+            $j = $line | ConvertFrom-Json
+        } catch {
+            continue
+        }
 
         if ($Raw) {
             $j | ConvertTo-Json -Depth 10
@@ -86,21 +96,44 @@ try {
             continue
         }
 
-        $w = $j.workers | Select-Object -First 1
-        if (-not $w) {
-            # No worker frames yet. Center has just started; skip until the
-            # first publish lands in the aggregator.
+        $time = $epoch.AddMilliseconds([double]$j.ts).ToLocalTime().ToString('HH:mm:ss')
+        $elapsed = Format-Elapsed ([TimeSpan]::FromSeconds([double]$j.elapsed_seconds)) $false
+
+        if ($j.paused -eq $true -and $null -eq $j.ranks) {
+            '{0,8}  {1,12}  paused' -f $time, $elapsed
             continue
         }
 
-        $ts      = $epoch.AddMilliseconds($j.ts).ToLocalTime().ToString('HH:mm:ss')
-        $rss     = [math]::Round($w.process_rss_bytes / 1KB, 0)
+        $roles = @{}
+        $markers = @()
+        if ($null -ne $j.topology) {
+            foreach ($identity in @($j.topology.identities)) {
+                if ($null -ne $identity) {
+                    $roles[[string]$identity.rank] = if ($identity.role) { $identity.role } else { '-' }
+                }
+            }
+            if ($null -ne $j.topology.run -and $null -ne $j.topology.run.markers) {
+                $markers = @($j.topology.run.markers)
+            }
+        }
 
-        # Format elapsed_seconds as H:MM:SS so the eye can read it at a glance.
-        $elapsed = [TimeSpan]::FromSeconds([double]$j.elapsed_seconds)
-        $elapsedStr = "{0:0}:{1:00}:{2:00}" -f [int]$elapsed.TotalHours, $elapsed.Minutes, $elapsed.Seconds
+        $from = if ($j.run_id -eq $runId) { $seen } else { 0 }
+        for ($k = $from; $k -lt $markers.Count; $k++) {
+            $marker = $markers[$k]
+            '{0,8}  {1,12}  marker: {2} ({3})' -f '', (Format-Elapsed ([TimeSpan]::FromMilliseconds([double]$marker.elapsed_ms)) $true), (Format-Label $marker.label), $marker.source
+        }
+        $runId = $j.run_id
+        $seen = $markers.Count
 
-        "{0,8}  {1,10}  {2,-14}  {3,-14}  {4,7}  {5,6:N1}%  {6,12:N0}" -f $ts, $elapsedStr, $w.tasks_local_total, $w.tasks_sent_total, $w.process_threads, $w.process_cpu_pct, $rss
+        $first = $true
+        foreach ($w in @($j.ranks | Sort-Object { [int]$_.rank })) {
+            $role = $roles[[string]$w.rank]
+            if (-not $role) { $role = '-' }
+            $cpu = ([double]$w.process_cpu_pct).ToString('0.0', $invariant) + '%'
+            $rss = [math]::Floor([double]$w.process_rss_bytes / 1KB)
+            $rowFormat -f ($(if ($first) { $time } else { '' })), ($(if ($first) { $elapsed } else { '' })), $w.rank, $role, $w.tasks_started_total, $w.tasks_sent_total, $w.tasks_recv_total, $w.process_threads, $cpu, $rss
+            $first = $false
+        }
     }
 } finally {
     $reader.Dispose()

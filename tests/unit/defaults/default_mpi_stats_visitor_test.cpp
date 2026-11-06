@@ -10,6 +10,7 @@ TEST(default_mpi_stats_visitor_test, collects_expected_fields) {
     v_stats.m_total_thread_requests = 40;
     v_stats.m_idle_time = 1.5;
     v_stats.m_elapsed_time = 2.5;
+    v_stats.m_coordinator_messages_handled = 50;
 
     const auto v_visitor = std::make_unique<gempba::default_mpi_stats_visitor>();
     v_stats.visit(v_visitor.get());
@@ -20,6 +21,7 @@ TEST(default_mpi_stats_visitor_test, collects_expected_fields) {
     EXPECT_EQ(40u, v_visitor->m_total_thread_requests);
     EXPECT_DOUBLE_EQ(1.5, v_visitor->m_idle_time);
     EXPECT_DOUBLE_EQ(2.5, v_visitor->m_elapsed_time);
+    EXPECT_EQ(50u, v_visitor->m_coordinator_messages_handled);
 }
 
 TEST(default_mpi_stats_visitor_test, handles_default_constructed_stats) {
@@ -34,6 +36,7 @@ TEST(default_mpi_stats_visitor_test, handles_default_constructed_stats) {
     EXPECT_EQ(0u, v_visitor->m_total_thread_requests);
     EXPECT_DOUBLE_EQ(0.0, v_visitor->m_idle_time);
     EXPECT_DOUBLE_EQ(0.0, v_visitor->m_elapsed_time);
+    EXPECT_EQ(0u, v_visitor->m_coordinator_messages_handled);
 }
 
 TEST(default_mpi_stats_visitor_test, consistent_with_multiple_visits) {

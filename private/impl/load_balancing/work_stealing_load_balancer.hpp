@@ -25,6 +25,7 @@
 #define GEMPBA_WORK_STEALING_LOAD_BALANCER_HPP
 
 #include <BS_thread_pool.hpp>
+#include <atomic>
 #include <gempba/core/load_balancer.hpp>
 #include <gempba/core/node.hpp>
 #include <gempba/telemetry/telemetry_hub.hpp>
@@ -44,6 +45,8 @@ namespace gempba {
         unsigned int m_unique_id_counter = 0;
         std::recursive_mutex m_recursive_mutex;
         std::size_t m_thread_request_count = 0;
+        std::atomic<std::size_t> m_spawn_rejected_pool_full_count{0};
+        std::atomic<std::size_t> m_spawn_remote_rejected_count{0};
 
         scheduler::worker* const m_scheduler_worker;
 
@@ -89,6 +92,10 @@ namespace gempba {
 
         [[nodiscard]] double get_idle_time() const override { return m_thread_pool.get_wall_idle_time(); }
 
+        [[nodiscard]] double get_starved_idle_time() const override { return m_thread_pool.get_wall_starved_idle_time(); }
+
+        [[nodiscard]] double get_imbalanced_idle_time() const override { return m_thread_pool.get_wall_imbalanced_idle_time(); }
+
         std::shared_ptr<std::shared_ptr<node_core>> get_root(std::thread::id) override {
             // No-op for work stealing load balancer
             return {};
@@ -100,7 +107,7 @@ namespace gempba {
 
         void set_thread_pool_size(const unsigned p_size) override {
             m_thread_pool.reset(p_size);
-            m_thread_pool.submit_task([] {}).wait();
+            m_thread_pool.wait();
             spdlog::debug("thread pool size: {}", m_thread_pool.get_thread_count());
         }
 
@@ -113,6 +120,10 @@ namespace gempba {
         bool is_done() const override { return m_thread_pool.get_tasks_total() == 0; }
 
         std::size_t get_thread_request_count() const override { return m_thread_request_count; }
+
+        [[nodiscard]] std::size_t get_spawn_rejected_pool_full_count() const override { return m_spawn_rejected_pool_full_count.load(std::memory_order_relaxed); }
+
+        [[nodiscard]] std::size_t get_spawn_remote_rejected_count() const override { return m_spawn_remote_rejected_count.load(std::memory_order_relaxed); }
 
     private:
         /**
@@ -134,6 +145,7 @@ namespace gempba {
                 return false;
             }
             if (is_thread_pool_full()) {
+                m_spawn_rejected_pool_full_count.fetch_add(1, std::memory_order_relaxed);
                 return false;
             }
             // push current node
@@ -160,6 +172,7 @@ namespace gempba {
 
             const std::optional<transmission_guard> v_guard_optional = m_scheduler_worker->try_open_transmission_channel();
             if (!v_guard_optional.has_value()) {
+                m_spawn_remote_rejected_count.fetch_add(1, std::memory_order_relaxed);
                 return false;
             }
             // push current node

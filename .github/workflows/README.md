@@ -21,11 +21,22 @@ groups workflows by purpose.
 - `_build-msys2.yml` — build the gempba MSYS2 PKGBUILD artefact
 
 ### CI
-- `ci-cpp-ubuntu.yml` — C/C++ build + test on Ubuntu 24.04, MT/MP matrix; MP leg also drives the deb + apt-index reusables and clones gempba-examples
-- `ci-cpp-windows.yml` — C/C++ build + test on Windows Server 2025 via MSYS2 mingw-w64
-- `ci-cpp-macos.yml` — C/C++ build + test on macOS 26 with Homebrew toolchain
+- `ci-cpp-ubuntu.yml` — C/C++ test (MP=ON, coverage, MPI integration tests) on Ubuntu 24.04, gempba-examples built against both installed flavors, and the deb + apt-index reusables
+- `ci-cpp-windows.yml` — C/C++ test and gempba-examples on Windows Server 2025 via MSYS2 mingw-w64, and the MSYS2 package
+- `ci-cpp-macos.yml` — C/C++ test and gempba-examples on macOS 26 with Homebrew toolchain
 - `ci-java.yml` — JNI shared library + Java JAR build + test across Ubuntu / Windows / macOS, MT/MP matrix
 - `ci-lint.yml` — clang-format + clang-tidy
+
+### When CI runs what
+
+| Event | Runs |
+|---|---|
+| PR into any branch | Lint; per OS, the C/C++ test job, the gempba-examples job, and the Java build and test jobs |
+| PR into `main` or `release`, push to them | The above, plus the deb + apt index, the MSYS2 package and the multi-platform JARs |
+| PR that changes only `docs/` or Markdown | Nothing. The C/C++ workflows still run when `docs/telemetry/wire-format.md` changes, because `wire_format_doc_test` reads it |
+| `v*` tag | The `release-*` workflows |
+
+Each test job publishes its own JUnit report. The Java tests keep their own jobs so that a flaky test reruns without rebuilding the native library. Push triggers carry no path filter, so the README badges and the Codecov main graph always get a run.
 
 ### Release
 - `prepare-release.yml` — bumps versions, generates PKGBUILD/deb manifests, opens the release PR

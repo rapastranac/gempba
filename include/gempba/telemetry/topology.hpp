@@ -1,10 +1,13 @@
 #ifndef GEMPBA_TELEMETRY_TOPOLOGY_HPP
 #define GEMPBA_TELEMETRY_TOPOLOGY_HPP
 
+#include <gempba/core/rank_role.hpp>
 #include <gempba/telemetry/frames.hpp>
+#include <gempba/telemetry/runtime_mode.hpp>
 
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace gempba::telemetry {
@@ -50,6 +53,42 @@ namespace gempba::telemetry {
     struct topology_snapshot {
         std::vector<topology_node> m_nodes;
         std::vector<worker_identity> m_identities;
+    };
+
+    /** @brief Who recorded a @ref run_marker. */
+    enum class marker_source : std::uint8_t {
+        CODE,
+        DASHBOARD,
+    };
+
+    /** @brief A labelled moment of the run; see @ref telemetry_hub::mark_run. */
+    struct run_marker {
+        /// Milliseconds since telemetry came up, the clock the broadcast's @c elapsed_seconds counts.
+        std::uint64_t m_elapsed_ms = 0;
+        std::string m_label;
+        marker_source m_source = marker_source::CODE;
+    };
+
+    /**
+     * @brief How a run is set up, as the aggregator describes it in each broadcast.
+     *
+     * Each rank's role is the one its scheduler gives it; a multithreading run's only rank is a worker.
+     */
+    struct run_description {
+        runtime_mode m_mode = runtime_mode::MT_ONLY;
+        /// Scheduler name, e.g. "centralized"; empty when there is no scheduler.
+        std::string m_scheduler;
+        /// Load balancer name, "quasi_horizontal" or "work_stealing"; empty until one is created.
+        std::string m_load_balancer;
+        std::uint32_t m_world_size = 1;
+        /// Each rank's role, indexed by worker id, as its scheduler reports it; a rank past the end is a worker.
+        std::vector<rank_role> m_roles;
+        /// Largest thread pool the workers report in their frames; 0 before any frame arrives.
+        std::uint32_t m_threads_per_process = 0;
+        std::string m_gempba_version;
+        std::vector<std::pair<std::string, std::string>> m_annotations;
+        /// The aggregator's markers, in the order they were recorded.
+        std::vector<run_marker> m_markers;
     };
 
 } // namespace gempba::telemetry

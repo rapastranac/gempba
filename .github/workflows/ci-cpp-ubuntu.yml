@@ -3,8 +3,13 @@ name: C/C++ CI (Ubuntu 24.04)
 on:
   push:
     branches: [ "main", "release" ]
+  # Docs-only PRs start no CI; wire-format.md still does, because a unit test reads it.
   pull_request:
-    branches: [ "main", "release" ]
+    paths:
+      - '**'
+      - '!docs/**'
+      - '!**/*.md'
+      - 'docs/telemetry/wire-format.md'
 
 permissions:
   contents: read
@@ -16,69 +21,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  build:
-    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        multiprocessing: ['ON', 'OFF']
-    env:
-      CC: gcc-14
-      CXX: g++-14
-
-    steps:
-      # 1️⃣ Checkout the repository
-      - name: Checkout repository
-        uses: actions/checkout@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          ref: ${{ github.ref }}
-
-      # 2️⃣ Set up environment and install dependencies
-      - name: Setup Dependencies
-        uses: ./.github/actions/setup-ubuntu-deps
-        with:
-          multiprocessing: ${{ matrix.multiprocessing }}
-          tests: ${{ matrix.multiprocessing == 'ON' && 'true' || 'false' }}
-
-      # 3️⃣ Echo versions of installed dependencies
-      - name: Echo Dependencies Version
-        run: |
-          echo "g++: $($CXX --version | head -1 | awk '{print $4}')"
-          echo "cmake: $(cmake --version | head -1 | awk '{print $3}')"
-          echo "make: $(make --version | head -1 | awk '{print $3}')"
-          echo "libboost-dev: $(dpkg -s libboost-dev | grep 'Version' | awk '{print $2}')"
-          echo "libhwloc-dev: $(dpkg -s libhwloc-dev | grep 'Version' | awk '{print $2}')"
-          if [ "${{ matrix.multiprocessing }}" = "ON" ]; then
-            echo "libopenmpi-dev: $(dpkg -s libopenmpi-dev | grep 'Version' | awk '{print $2}')"
-            echo "libgtest-dev: $(dpkg -s libgtest-dev | grep 'Version' | awk '{print $2}')"
-            echo "libgmock-dev: $(dpkg -s libgmock-dev | grep 'Version' | awk '{print $2}')"
-          fi
-
-      # 4️⃣ Set up ccache (per-matrix-leg key so MP=ON and MP=OFF don't poison
-      # each other; the MP=ON leg's cache is consumed by the test job below)
-      - name: Setup ccache
-        uses: hendrikmuhs/ccache-action@v1
-        with:
-          key: build-ubuntu-mp${{ matrix.multiprocessing }}
-
-      # 5️⃣ Build the project (no artifact upload — the test job re-runs cmake
-      # configure + cmake --build locally with the same ccache key, so every
-      # CMake-generated path is resolved on the test runner)
-      - name: Build the project
-        run: |
-          cmake -S . -B build \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }} \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_FLAGS="--coverage" \
-            -DCMAKE_EXE_LINKER_FLAGS="--coverage"
-          cmake --build build --parallel $(nproc)
-
   test:
-    needs: build
     runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
     timeout-minutes: 30
     env:
@@ -100,32 +43,39 @@ jobs:
           multiprocessing: 'ON'
           tests: 'true'
 
-      # 3️⃣ Restore the MP=ON cache that the build job populated. save: false
-      # because this job doesn't add anything new — the build job is the
-      # canonical writer. Tests reference gempba::mp::* directly so we never
-      # exercise the MP=OFF leg here.
+      # 3️⃣ Echo versions of installed dependencies
+      - name: Echo Dependencies Version
+        run: |
+          echo "g++: $($CXX --version | head -1 | awk '{print $4}')"
+          echo "cmake: $(cmake --version | head -1 | awk '{print $3}')"
+          echo "make: $(make --version | head -1 | awk '{print $3}')"
+          echo "libboost-dev: $(dpkg -s libboost-dev | grep 'Version' | awk '{print $2}')"
+          echo "libhwloc-dev: $(dpkg -s libhwloc-dev | grep 'Version' | awk '{print $2}')"
+          echo "libopenmpi-dev: $(dpkg -s libopenmpi-dev | grep 'Version' | awk '{print $2}')"
+          echo "libgtest-dev: $(dpkg -s libgtest-dev | grep 'Version' | awk '{print $2}')"
+          echo "libgmock-dev: $(dpkg -s libgmock-dev | grep 'Version' | awk '{print $2}')"
+
+      # 4️⃣ Set up ccache. Tests reference gempba::mp::* directly, so only MP=ON is built here.
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1
         with:
           key: build-ubuntu-mpON
-          save: false
 
-      # 4️⃣ Configure + build locally with MP=ON. Same flags as the build job
-      # so ccache hashes match; cache hits make this near-instant. cmake-
-      # generated paths (CTestTestfile.cmake, gtest_discover_tests output)
-      # point at this runner's workspace.
+      # 5️⃣ Configure + build with MP=ON
       - name: Configure + cached build
         run: |
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Debug \
             -DGEMPBA_MULTIPROCESSING=ON \
+            -DGEMPBA_MPI_INTEGRATION_TESTS=ON \
+            -DMPIEXEC_PREFLAGS=--oversubscribe \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_FLAGS="--coverage" \
             -DCMAKE_EXE_LINKER_FLAGS="--coverage"
           cmake --build build --parallel $(nproc)
 
-      # 5️⃣ Run tests with JUnit XML output
+      # 6️⃣ Run tests with JUnit XML output
       - name: Run tests with retry for flaky tests
         run: |
           cd ${{ github.workspace }}/build
@@ -136,14 +86,14 @@ jobs:
           echo "🟡 Flaky tests: up to 3 attempts each"
           ctest --repeat until-pass:3 --output-on-failure --output-junit test_results_flaky.xml -R "FLAKY_" --no-tests=ignore
 
-      # 6️⃣ Upload coverage to Codecov
+      # 7️⃣ Upload coverage to Codecov
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
 
-      # 7️⃣ Upload test results as artifacts
+      # 8️⃣ Upload test results as artifacts
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v7
@@ -152,18 +102,25 @@ jobs:
           path: ${{ github.workspace }}/build/test_results_*.xml
           retention-days: 30
 
+      # 9️⃣ Publish test results as a check
+      - name: Publish Test Report
+        if: ${{ !cancelled() }}
+        uses: mikepenz/action-junit-report@v4
+        with:
+          report_paths: 'build/test_results_*.xml'
+          check_name: 'Ubuntu Test Results'
+          fail_on_failure: true
+          detailed_summary: true
+          include_passed: true
+
   # Build the gempba-examples sister repo against an installed gempba built
   # from THIS branch. Mirror of gempba-examples' own CI job, except it
   # pulls gempba from this PR's commit rather than from a remote sister
-  # branch. Matrix on both flavours so an install-surface regression in
+  # branch. Both flavours build here, so an install-surface regression in
   # either mode fails this PR — not the next gempba-examples PR.
   build-examples-from-install:
     runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        multiprocessing: ['ON', 'OFF']
     env:
       CC: gcc-14
       CXX: g++-14
@@ -179,17 +136,35 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ github.ref }}
 
-      # 2️⃣ Install dependencies (mirror build job's set)
+      # 2️⃣ Install dependencies, MPI included for the MP=ON examples
       - name: Setup Dependencies
         uses: ./.github/actions/setup-ubuntu-deps
         with:
-          multiprocessing: ${{ matrix.multiprocessing }}
+          multiprocessing: 'ON'
           tests: 'false'
 
-      # 3️⃣ Install gempba mt (the base package) into the prefix. The mpi
+      # 3️⃣ Resolve sister-repo branch (same-name, fall back to main)
+      - name: Resolve gempba-examples ref
+        id: examples_ref
+        uses: ./.github/actions/resolve-examples-ref
+        with:
+          examples-owner: ${{ env.GEMPBA_EXAMPLES_OWNER }}
+          cross-repo-token: ${{ env.GEMPBA_CROSS_REPO_TOKEN }}
+
+      # 4️⃣ Clone gempba-examples
+      - name: Clone gempba-examples
+        run: |
+          if [ -n "$GEMPBA_CROSS_REPO_TOKEN" ]; then
+            EX_URL="https://x-access-token:${GEMPBA_CROSS_REPO_TOKEN}@github.com/${GEMPBA_EXAMPLES_OWNER}/gempba-examples.git"
+          else
+            EX_URL="https://github.com/${GEMPBA_EXAMPLES_OWNER}/gempba-examples.git"
+          fi
+          git -c http."https://github.com/".extraheader= -c credential.helper= clone --depth 1 --branch "${{ steps.examples_ref.outputs.ref }}" \
+            "$EX_URL" "$RUNNER_TEMP/gempba-examples-src"
+
+      # 5️⃣ Install gempba mt (the base package) into the prefix. The mpi
       #    topping package depends on the mt base for headers and the
-      #    gempbaConfig.cmake dispatcher, so the mt install always happens
-      #    first — even on the MP=ON matrix leg.
+      #    gempbaConfig.cmake dispatcher, so the mt install comes first.
       - name: Install gempba (mt base)
         run: |
           cmake -S . -B "$RUNNER_TEMP/gempba-build-mt" \
@@ -201,11 +176,19 @@ jobs:
           cmake --build "$RUNNER_TEMP/gempba-build-mt" --parallel $(nproc)
           cmake --install "$RUNNER_TEMP/gempba-build-mt"
 
-      # 3️⃣bis Layer the mpi topping on top of the mt base when the matrix
-      #       leg is MP=ON. Adds libgempba_mpi.a + gempba_mpi-targets.cmake
-      #       so find_package(gempba COMPONENTS mpi) resolves.
+      # 6️⃣ Build the examples against the mt base alone
+      - name: Build gempba-examples (MP=OFF)
+        run: |
+          cmake -S "$RUNNER_TEMP/gempba-examples-src" -B "$RUNNER_TEMP/gempba-examples-build-mt" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$GEMPBA_INSTALL_PREFIX" \
+            -DGEMPBA_MULTIPROCESSING=OFF
+          cmake --build "$RUNNER_TEMP/gempba-examples-build-mt" --parallel $(nproc)
+
+      # 7️⃣ Layer the mpi topping on top of the mt base. Adds
+      #    libgempba_mpi.a + gempba_mpi-targets.cmake so
+      #    find_package(gempba COMPONENTS mpi) resolves.
       - name: Install gempba (mpi topping)
-        if: matrix.multiprocessing == 'ON'
         run: |
           cmake -S . -B "$RUNNER_TEMP/gempba-build-mpi" \
             -DCMAKE_BUILD_TYPE=Release \
@@ -216,57 +199,22 @@ jobs:
           cmake --build "$RUNNER_TEMP/gempba-build-mpi" --parallel $(nproc)
           cmake --install "$RUNNER_TEMP/gempba-build-mpi"
 
-      # 4️⃣ Resolve sister-repo branch (same-name, fall back to main)
-      - name: Resolve gempba-examples ref
-        id: examples_ref
-        uses: ./.github/actions/resolve-examples-ref
-        with:
-          examples-owner: ${{ env.GEMPBA_EXAMPLES_OWNER }}
-          cross-repo-token: ${{ env.GEMPBA_CROSS_REPO_TOKEN }}
-
-      # 5️⃣ Clone gempba-examples and build it against the installed gempba
-      - name: Build gempba-examples
+      # 8️⃣ Build the examples against the mt base plus the mpi topping
+      - name: Build gempba-examples (MP=ON)
         run: |
-          if [ -n "$GEMPBA_CROSS_REPO_TOKEN" ]; then
-            EX_URL="https://x-access-token:${GEMPBA_CROSS_REPO_TOKEN}@github.com/${GEMPBA_EXAMPLES_OWNER}/gempba-examples.git"
-          else
-            EX_URL="https://github.com/${GEMPBA_EXAMPLES_OWNER}/gempba-examples.git"
-          fi
-          git -c http."https://github.com/".extraheader= -c credential.helper= clone --depth 1 --branch "${{ steps.examples_ref.outputs.ref }}" \
-            "$EX_URL" "$RUNNER_TEMP/gempba-examples-src"
-          cmake -S "$RUNNER_TEMP/gempba-examples-src" -B "$RUNNER_TEMP/gempba-examples-build" \
+          cmake -S "$RUNNER_TEMP/gempba-examples-src" -B "$RUNNER_TEMP/gempba-examples-build-mpi" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH="$GEMPBA_INSTALL_PREFIX" \
-            -DGEMPBA_MULTIPROCESSING=${{ matrix.multiprocessing }}
-          cmake --build "$RUNNER_TEMP/gempba-examples-build" --parallel $(nproc)
+            -DGEMPBA_MULTIPROCESSING=ON
+          cmake --build "$RUNNER_TEMP/gempba-examples-build-mpi" --parallel $(nproc)
 
+  # Packaging only on the way into main or release: PRs into them and pushes to them.
   build-deb:
-    needs: build
+    needs: test
+    if: github.event_name == 'push' || contains(fromJSON('["main","release"]'), github.base_ref)
     uses: ./.github/workflows/_build-deb.yml
 
   build-apt-index:
     needs: build-deb
     uses: ./.github/workflows/_build-apt-index.yml
     secrets: inherit
-
-  publish-test-results:
-    needs: test
-    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
-    if: ${{ !cancelled() }}
-
-    steps:
-      # Download the test results
-      - name: Download test results
-        uses: actions/download-artifact@v8
-        with:
-          name: test-results-ubuntu
-
-      # Publish test results
-      - name: Publish Test Report
-        uses: mikepenz/action-junit-report@v4
-        with:
-          report_paths: 'test_results_*.xml'
-          check_name: 'Ubuntu Test Results'
-          fail_on_failure: true
-          detailed_summary: true
-          include_passed: true

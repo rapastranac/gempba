@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <functional>
+#include <gempba/core/rank_role.hpp>
 #include <gempba/core/scheduler_traits.hpp>
 #include <gempba/core/serial_runnable.hpp>
 #include <gempba/utils/gempba_utils.hpp>
@@ -13,6 +14,7 @@
 #include <gempba/utils/tree.hpp>
 #include <map>
 #include <memory>
+#include <string_view>
 
 namespace gempba {
 
@@ -20,6 +22,13 @@ namespace gempba {
 
     class node_manager;
 
+    /**
+     * @brief The base of every multiprocessing scheduler; pass a custom one to @c gempba::multiprocessing::create_scheduler.
+     *
+     * docs/telemetry/custom-schedulers.md says what a custom scheduler must do for its runs to reach the dashboard: be created on every rank,
+     * return the @c MPI_COMM_WORLD rank from @c rank_me(), call @c telemetry_hub::tick_if_due() from its own loops, and report what happens
+     * with the hub's @c record_* calls. Those calls are the only link to telemetry; this interface carries no telemetry bookkeeping.
+     */
     class scheduler : public scheduler_traits {
     protected:
         scheduler() = default;
@@ -30,6 +39,19 @@ namespace gempba {
         [[nodiscard]] virtual double elapsed_time() const = 0;
 
         [[nodiscard]] virtual std::size_t get_pending_request_count() const = 0;
+
+        /**
+         * @return the name telemetry reports for this scheduler; "custom" for schedulers that do not name themselves
+         */
+        [[nodiscard]] virtual std::string_view get_name() const { return "custom"; }
+
+        /**
+         * @param p_rank a rank in [0, world_size())
+         * @return the role @p p_rank plays in this scheduler; @ref rank_role::WORKER for every rank of schedulers that do not say otherwise
+         * @note Telemetry's aggregator, rank 0, asks its own scheduler for every rank's role once, at startup, and reports those answers.
+         * The answer must therefore depend on @p p_rank alone: the same on every rank, and fixed for the whole run.
+         */
+        [[nodiscard]] virtual rank_role role_of([[maybe_unused]] int p_rank) const { return rank_role::WORKER; }
 
         virtual void set_goal(goal p_goal, score_type p_type) = 0;
 
@@ -52,6 +74,11 @@ namespace gempba {
 
         // ————————— ↓↓↓↓  New development ↓↓↓↓ ——————————
 
+        /**
+         * @brief The coordinator's view of the scheduler, on the rank whose @ref role_of is @ref rank_role::COORDINATOR.
+         *
+         * Keeps the name center until v5.0.0, which replaces these views (#394).
+         */
         class center : public scheduler_traits {
         protected:
             center() = default;
@@ -70,7 +97,7 @@ namespace gempba {
             /**
              * Each index of the returned vector corresponds to the rank of the worker node. If no result was found by a worker node, the corresponding index will contain an empty result.
              *
-             * Also, for rank 0 (the center node), the corresponding index will contain an empty result, as the center node does not perform any computations.
+             * Also, for rank 0 (the coordinator), the corresponding index will contain an empty result, as the coordinator does not perform any computations.
              *
              * @return  all results found across all worker nodes
              */

@@ -5,6 +5,8 @@
 #include <impl/load_balancing/quasi_horizontal_load_balancer.hpp>
 #include <impl/load_balancing/work_stealing_load_balancer.hpp>
 #include <memory>
+#include <utility>
+#include <vector>
 
 #if GEMPBA_MULTIPROCESSING
     #include <impl/schedulers/mpi_centralized_scheduler.hpp>
@@ -28,6 +30,18 @@ namespace {
         }
         auto v_hub = std::make_unique<gempba::telemetry::telemetry_hub>();
         if (g_scheduler) {
+            const int v_world_size = g_scheduler->world_size();
+            std::vector<gempba::rank_role> v_roles;
+            v_roles.reserve(static_cast<std::size_t>(v_world_size));
+            for (int v_rank = 0; v_rank < v_world_size; ++v_rank) {
+                v_roles.push_back(g_scheduler->role_of(v_rank));
+            }
+            v_hub->describe_scheduler(g_scheduler->get_name(), std::move(v_roles));
+        }
+        if (g_load_balancer) {
+            v_hub->describe_load_balancer(g_load_balancer->get_balancing_policy());
+        }
+        if (g_scheduler) {
             v_hub->on_runtime_ready(gempba::telemetry::runtime_mode::MP_MPI, static_cast<std::uint32_t>(g_scheduler->rank_me()), static_cast<std::uint32_t>(g_scheduler->world_size()));
         } else {
             v_hub->on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1);
@@ -35,11 +49,18 @@ namespace {
         gempba::telemetry::install(std::move(v_hub));
     }
 
+    void describe_load_balancer_to_telemetry() {
+        if (auto* v_telemetry = gempba::telemetry::get()) {
+            v_telemetry->describe_load_balancer(g_load_balancer->get_balancing_policy());
+        }
+    }
+
     gempba::load_balancer* assign_load_balancer(std::unique_ptr<gempba::load_balancer> p_implementation) {
         if (g_load_balancer != nullptr) {
             throw std::runtime_error("load_balancer already exists!");
         }
         g_load_balancer = std::move(p_implementation);
+        describe_load_balancer_to_telemetry();
         return g_load_balancer.get();
     }
 
@@ -57,6 +78,7 @@ namespace {
                 break;
             }
         }
+        describe_load_balancer_to_telemetry();
         return g_load_balancer.get();
     }
 
@@ -115,17 +137,17 @@ gempba::scheduler* gempba::multiprocessing::create_scheduler(std::unique_ptr<sch
     return g_scheduler.get();
 }
 
-gempba::scheduler* gempba::multiprocessing::create_scheduler(const scheduler_topology& p_topology, const double p_timeout) {
+gempba::scheduler* gempba::multiprocessing::create_scheduler(const scheduler_topology& p_topology, [[maybe_unused]] const double p_timeout) {
     if (g_scheduler != nullptr) {
         throw std::runtime_error("scheduler already exists!");
     }
     switch (p_topology) {
         case SEMI_CENTRALIZED: {
-            g_scheduler = std::unique_ptr<scheduler>(new mpi_semi_centralized_scheduler(p_timeout));
+            g_scheduler = std::unique_ptr<scheduler>(new mpi_semi_centralized_scheduler());
             break;
         }
         case CENTRALIZED: {
-            g_scheduler = std::unique_ptr<scheduler>(new mpi_centralized_scheduler(p_timeout));
+            g_scheduler = std::unique_ptr<scheduler>(new mpi_centralized_scheduler());
             break;
         }
     }

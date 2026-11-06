@@ -88,9 +88,54 @@ TEST_F(work_stealing_load_balancer_test, set_thread_pool_size) {
     EXPECT_NO_THROW(v_load_balancer.set_thread_pool_size(2));
 }
 
-TEST_F(work_stealing_load_balancer_test, get_idle_time) {
-    const gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
-    EXPECT_EQ(v_load_balancer.get_idle_time(), 0);
+TEST_F(work_stealing_load_balancer_test, set_thread_pool_size_returns_with_every_thread_idle) {
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    for (unsigned v_i = 0; v_i < 1000; ++v_i) {
+        v_load_balancer.set_thread_pool_size(1 + v_i % 4);
+        ASSERT_EQ(0u, v_load_balancer.get_tasks_running_count()) << "iteration " << v_i;
+    }
+}
+
+TEST_F(work_stealing_load_balancer_test, get_idle_time_counts_threads_that_are_still_asleep) {
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    v_load_balancer.set_thread_pool_size(2);
+    const double v_before = v_load_balancer.get_idle_time();
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    EXPECT_GE(v_load_balancer.get_idle_time() - v_before, 0.25);
+}
+
+TEST_F(work_stealing_load_balancer_test, get_starved_idle_time_grows_while_no_task_runs) {
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    v_load_balancer.set_thread_pool_size(2);
+    const double v_starved_before = v_load_balancer.get_starved_idle_time();
+    const double v_imbalanced_before = v_load_balancer.get_imbalanced_idle_time();
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    EXPECT_GE(v_load_balancer.get_starved_idle_time() - v_starved_before, 0.25);
+    EXPECT_DOUBLE_EQ(v_imbalanced_before, v_load_balancer.get_imbalanced_idle_time());
+}
+
+TEST_F(work_stealing_load_balancer_test, get_imbalanced_idle_time_grows_while_one_task_runs) {
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    v_load_balancer.set_thread_pool_size(4);
+    std::promise<void> v_started;
+    std::future<void> v_started_future = v_started.get_future();
+    std::promise<void> v_release;
+    std::shared_future<void> v_released = v_release.get_future().share();
+    auto v_task = v_load_balancer.force_local_submit([&v_started, v_released]() -> std::any {
+        v_started.set_value();
+        v_released.wait();
+        return {};
+    });
+    v_started_future.wait();
+    const double v_starved_before = v_load_balancer.get_starved_idle_time();
+    const double v_imbalanced_before = v_load_balancer.get_imbalanced_idle_time();
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    const double v_starved_after = v_load_balancer.get_starved_idle_time();
+    const double v_imbalanced_after = v_load_balancer.get_imbalanced_idle_time();
+    v_release.set_value();
+    v_task.wait();
+    EXPECT_GE(v_imbalanced_after - v_imbalanced_before, 0.2);
+    EXPECT_DOUBLE_EQ(v_starved_before, v_starved_after);
 }
 
 TEST_F(work_stealing_load_balancer_test, wait_and_is_done) {
@@ -267,6 +312,8 @@ TEST_F(work_stealing_load_balancer_test, try_local_submit_when_pool_full_falls_b
     EXPECT_TRUE(v_forward_fn_called); // forward() ran the node synchronously
     EXPECT_EQ(nullptr, v_child->get_parent());
     EXPECT_EQ(nullptr, v_child->get_root());
+    EXPECT_EQ(1u, v_load_balancer.get_spawn_rejected_pool_full_count());
+    EXPECT_EQ(0u, v_load_balancer.get_spawn_remote_rejected_count());
 }
 
 TEST_F(work_stealing_load_balancer_test, try_remote_submit_throws_without_scheduler) {
@@ -302,6 +349,8 @@ TEST_F(work_stealing_load_balancer_test, try_remote_submit_falls_back_to_local_w
     EXPECT_TRUE(v_fn_called);
     EXPECT_EQ(nullptr, v_child->get_parent());
     EXPECT_EQ(nullptr, v_child->get_root());
+    EXPECT_EQ(1u, v_load_balancer.get_spawn_remote_rejected_count());
+    EXPECT_EQ(0u, v_load_balancer.get_spawn_rejected_pool_full_count());
 }
 
 TEST_F(work_stealing_load_balancer_test, try_remote_submit_delegates_remotely_when_channel_open) {
@@ -517,4 +566,6 @@ TEST_F(work_stealing_load_balancer_test, send_remote_returns_false_on_mutex_cont
     EXPECT_TRUE(v_fn_b_called);
     EXPECT_EQ(nullptr, v_child_b->get_parent());
     EXPECT_EQ(nullptr, v_child_b->get_root());
+    EXPECT_EQ(1u, v_load_balancer.get_spawn_remote_rejected_count());
+    EXPECT_EQ(0u, v_load_balancer.get_spawn_rejected_pool_full_count());
 }

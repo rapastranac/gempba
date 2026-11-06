@@ -203,14 +203,14 @@ public final class GemPBA {
     // ─── Multiprocessing factories (mirror gempba::multiprocessing::) ───────
 
     /**
-     * Creates a distributed scheduler with the given topology and per-process
-     * timeout in seconds.
+     * Creates a distributed scheduler with the given topology.
      *
      * <p>Equivalent to {@code gempba::multiprocessing::create_scheduler(topology, timeout)}
      * in C++.  Must be called on every process in the communicator.
      *
      * @param topology distributed coordination pattern
-     * @param timeout  per-process search timeout in seconds
+     * @param timeout  ignored: termination does not wait for a quiet period. Kept for
+     *                 compatibility and removed in the next major version
      * @return a new {@link Scheduler}
      */
     public static Scheduler createScheduler(SchedulerTopology topology, double timeout) {

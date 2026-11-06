@@ -71,7 +71,9 @@
 #include <algorithm>
 #include <cstddef>
 #include <gtest/gtest.h>
+#include <queue>
 #include <string>
+#include <utility>
 #include <vector>
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -388,7 +390,104 @@ TEST_F(task_bundle_comparator_test, transitive_ordering_is_consistent) {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 6. get_peak_rss / get_current_rss — portable smoke tests
+// 6. dispatch_to_available
+// ═════════════════════════════════════════════════════════════════════════════
+
+class dispatch_to_available_test : public ::testing::Test {
+protected:
+    static constexpr int RUNNING = 1;
+    static constexpr int ASSIGNED = 2;
+    static constexpr int AVAILABLE = 3;
+
+    std::priority_queue<int> m_queue;
+    std::vector<std::pair<int, int>> m_sent;
+
+    int dispatch(std::vector<int>& p_states) {
+        return dispatch_to_available(m_queue, p_states, AVAILABLE, ASSIGNED, [this](const int p_rank, const int p_task) { m_sent.emplace_back(p_rank, p_task); });
+    }
+
+    void push(std::initializer_list<int> p_tasks) {
+        for (const int v_task: p_tasks) {
+            m_queue.push(v_task);
+        }
+    }
+};
+
+TEST_F(dispatch_to_available_test, assigns_one_task_to_every_available_rank) {
+    push({10, 20, 30});
+    std::vector<int> v_states{RUNNING, AVAILABLE, AVAILABLE, AVAILABLE};
+
+    EXPECT_EQ(3, dispatch(v_states));
+    EXPECT_TRUE(m_queue.empty());
+    EXPECT_EQ((std::vector<int>{RUNNING, ASSIGNED, ASSIGNED, ASSIGNED}), v_states);
+    ASSERT_EQ(3u, m_sent.size());
+    EXPECT_EQ(1, m_sent[0].first);
+    EXPECT_EQ(2, m_sent[1].first);
+    EXPECT_EQ(3, m_sent[2].first);
+}
+
+TEST_F(dispatch_to_available_test, highest_priority_task_goes_first) {
+    push({1, 5, 3});
+    std::vector<int> v_states{RUNNING, AVAILABLE, AVAILABLE};
+
+    dispatch(v_states);
+
+    ASSERT_EQ(2u, m_sent.size());
+    EXPECT_EQ(5, m_sent[0].second);
+    EXPECT_EQ(3, m_sent[1].second);
+    EXPECT_EQ(1, m_queue.top());
+}
+
+TEST_F(dispatch_to_available_test, stops_when_queue_empties) {
+    push({7});
+    std::vector<int> v_states{RUNNING, AVAILABLE, AVAILABLE, AVAILABLE};
+
+    EXPECT_EQ(1, dispatch(v_states));
+    EXPECT_EQ((std::vector<int>{RUNNING, ASSIGNED, AVAILABLE, AVAILABLE}), v_states);
+}
+
+TEST_F(dispatch_to_available_test, skips_ranks_that_are_not_available) {
+    push({1, 2, 3, 4, 5});
+    std::vector<int> v_states{RUNNING, RUNNING, AVAILABLE, ASSIGNED, AVAILABLE};
+
+    EXPECT_EQ(2, dispatch(v_states));
+    EXPECT_EQ((std::vector<int>{RUNNING, RUNNING, ASSIGNED, ASSIGNED, ASSIGNED}), v_states);
+    EXPECT_EQ(3u, m_queue.size());
+}
+
+TEST_F(dispatch_to_available_test, never_assigns_the_center) {
+    push({1, 2});
+    std::vector<int> v_states{AVAILABLE, AVAILABLE};
+
+    EXPECT_EQ(1, dispatch(v_states));
+    EXPECT_EQ(AVAILABLE, v_states[0]);
+    EXPECT_EQ(1, m_sent[0].first);
+}
+
+TEST_F(dispatch_to_available_test, empty_queue_sends_nothing) {
+    std::vector<int> v_states{RUNNING, AVAILABLE, AVAILABLE};
+
+    EXPECT_EQ(0, dispatch(v_states));
+    EXPECT_TRUE(m_sent.empty());
+    EXPECT_EQ((std::vector<int>{RUNNING, AVAILABLE, AVAILABLE}), v_states);
+}
+
+TEST_F(dispatch_to_available_test, works_with_the_center_bundle_queue) {
+    std::priority_queue<gempba::task_bundle, std::vector<gempba::task_bundle>, task_bundle_comparator> v_queue;
+    v_queue.emplace(make_packet({0x01}), 0);
+    v_queue.emplace(make_packet({0xFF}), 0);
+    std::vector<int> v_states{RUNNING, AVAILABLE, AVAILABLE};
+    std::vector<int> v_bits;
+
+    const int v_dispatched = dispatch_to_available(v_queue, v_states, AVAILABLE, ASSIGNED, [&](int, const gempba::task_bundle& p_bundle) { v_bits.push_back(get_nb_set_bits(p_bundle)); });
+
+    EXPECT_EQ(2, v_dispatched);
+    EXPECT_TRUE(v_queue.empty());
+    EXPECT_EQ((std::vector<int>{8, 1}), v_bits);
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 7. get_peak_rss / get_current_rss — portable smoke tests
 //
 //    Implementations are #if-gated per platform. Tests mirror those guards so
 //    only the branch that actually compiled is exercised. On platforms where

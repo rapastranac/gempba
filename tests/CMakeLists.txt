@@ -29,6 +29,7 @@ set(TEST_DIR "${CMAKE_CURRENT_LIST_DIR}")
 
 # Collect all test source files recursively
 file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS "${TEST_DIR}/*.cpp")
+list(FILTER TEST_SOURCES EXCLUDE REGEX "/integration/")
 
 # Ensure that source files are found
 if (NOT TEST_SOURCES)
@@ -72,3 +73,30 @@ gtest_discover_tests(all_tests
 )
 
 message(STATUS "GTest test discovery enabled for all_tests executable")
+
+option(GEMPBA_MPI_INTEGRATION_TESTS "Register multi-rank MPI tests with CTest (runs mpiexec)" OFF)
+if (GEMPBA_MPI_INTEGRATION_TESTS)
+    add_executable(termination_stress integration/termination_stress.cpp)
+    target_link_libraries(termination_stress PRIVATE gempba)
+    foreach (v_topology semi_centralized centralized)
+        foreach (v_ranks 2 4 8)
+            set(v_test_name mpi_termination_stress_${v_topology}_${v_ranks})
+            add_test(NAME ${v_test_name}
+                    COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${v_ranks} ${MPIEXEC_PREFLAGS} $<TARGET_FILE:termination_stress> ${MPIEXEC_POSTFLAGS} 14 ${v_topology})
+            set_tests_properties(${v_test_name} PROPERTIES TIMEOUT 300)
+        endforeach ()
+    endforeach ()
+
+    add_executable(telemetry_stress integration/telemetry_stress.cpp)
+    target_link_libraries(telemetry_stress PRIVATE gempba)
+    if (WIN32)
+        target_link_libraries(telemetry_stress PRIVATE ws2_32)
+    endif ()
+    foreach (v_topology semi_centralized centralized)
+        set(v_test_name mpi_telemetry_stress_${v_topology}_4)
+        add_test(NAME ${v_test_name}
+                COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4 ${MPIEXEC_PREFLAGS} $<TARGET_FILE:telemetry_stress> ${MPIEXEC_POSTFLAGS} 14 ${v_topology})
+        set_tests_properties(${v_test_name} PROPERTIES TIMEOUT 300)
+    endforeach ()
+    message(STATUS "MPI integration tests registered (mpiexec: ${MPIEXEC_EXECUTABLE})")
+endif ()
