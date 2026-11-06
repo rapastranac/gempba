@@ -2,6 +2,11 @@ name: Build Java JARs (reusable)
 
 on:
   workflow_call:
+    inputs:
+      assemble:
+        description: 'Merge the per-OS JARs into one multi-platform JAR per variant'
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -251,7 +256,7 @@ jobs:
           if-no-files-found: warn
 
   build-macos:
-    runs-on: ${{ fromJSON(vars.RUNNER_MACOS || '["macos-26"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_MACOS_INTEL || '["macos-26-intel"]') }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -320,7 +325,7 @@ jobs:
 
   test-macos:
     needs: build-macos
-    runs-on: ${{ fromJSON(vars.RUNNER_MACOS || '["macos-26"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_MACOS_INTEL || '["macos-26-intel"]') }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -384,6 +389,7 @@ jobs:
   # caller's needs: on this whole workflow.
   assemble-multiplatform-jar:
     needs: [ build-ubuntu, build-windows, build-macos ]
+    if: inputs.assemble
     runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
     timeout-minutes: 10
 

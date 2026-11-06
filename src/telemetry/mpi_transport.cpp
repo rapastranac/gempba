@@ -1,4 +1,5 @@
 #include <impl/telemetry/mpi_transport.hpp>
+#include <impl/telemetry/worker_frame_codec.hpp>
 
 #include <cstring>
 #include <deque>
@@ -17,7 +18,8 @@ namespace gempba::telemetry {
         constexpr int k_tag_worker_frame = 9001;
         constexpr int k_tag_node_frame = 9002;
         constexpr int k_tag_control = 9003;
-        constexpr int k_center_rank = 0;
+        constexpr int k_tag_final_worker_frame = 9004;
+        constexpr int k_aggregator_rank = 0;
 
     } // namespace
 
@@ -40,6 +42,30 @@ namespace gempba::telemetry {
         // buffer in case the caller pulls more than one per tick.
         std::deque<control_msg> m_inbound_controls;
 
+        std::uint32_t m_final_frames_received = 0;
+
+        void drain_worker_frames(const int p_tag, const worker_frame_sink& p_sink) {
+            while (true) {
+                int v_flag = 0;
+                MPI_Status v_status;
+                MPI_Iprobe(MPI_ANY_SOURCE, p_tag, m_comm, &v_flag, &v_status);
+                if (!v_flag) {
+                    break;
+                }
+                int v_count = 0;
+                MPI_Get_count(&v_status, MPI_BYTE, &v_count);
+                std::vector<std::byte> v_buffer(static_cast<std::size_t>(v_count));
+                MPI_Recv(v_buffer.data(), v_count, MPI_BYTE, v_status.MPI_SOURCE, p_tag, m_comm, MPI_STATUS_IGNORE);
+                if (p_tag == k_tag_final_worker_frame) {
+                    ++m_final_frames_received;
+                }
+                worker_frame v_frame;
+                if (p_sink && detail::decode_worker_frame(v_buffer.data(), v_buffer.size(), v_frame)) {
+                    p_sink(static_cast<std::uint32_t>(v_status.MPI_SOURCE), v_frame);
+                }
+            }
+        }
+
         void reap_completed_sends() {
             const std::scoped_lock v_lock(m_sends_mtx);
             for (auto v_it = m_sends.begin(); v_it != m_sends.end();) {
@@ -53,7 +79,7 @@ namespace gempba::telemetry {
             }
         }
 
-        // dst_rank == k_center_rank for worker frames, an explicit rank for
+        // dst_rank == k_aggregator_rank for worker frames, an explicit rank for
         // controls. Buffer is moved in so it stays alive until reaped.
         void post_isend(std::vector<std::byte>&& p_buffer, int p_dst_rank, int p_tag) {
             const std::scoped_lock v_lock(m_sends_mtx);
@@ -119,11 +145,18 @@ namespace gempba::telemetry {
             return;
 
         m_impl->reap_completed_sends();
-
-        std::vector<std::byte> v_buffer(sizeof(worker_frame));
-        std::memcpy(v_buffer.data(), &p_frame, sizeof(worker_frame));
-        m_impl->post_isend(std::move(v_buffer), k_center_rank, k_tag_worker_frame);
+        m_impl->post_isend(detail::encode_worker_frame(p_frame), k_aggregator_rank, k_tag_worker_frame);
     }
+
+    void mpi_transport::publish_final_worker(const worker_frame& p_frame) {
+        if (m_impl->m_comm == MPI_COMM_NULL)
+            return;
+
+        m_impl->reap_completed_sends();
+        m_impl->post_isend(detail::encode_worker_frame(p_frame), k_aggregator_rank, k_tag_final_worker_frame);
+    }
+
+    std::uint32_t mpi_transport::final_frames_received() const { return m_impl->m_final_frames_received; }
 
     void mpi_transport::publish_node(const node_frame& p_frame) {
         if (m_impl->m_comm == MPI_COMM_NULL)
@@ -133,28 +166,18 @@ namespace gempba::telemetry {
 
         std::vector<std::byte> v_buffer(sizeof(node_frame));
         std::memcpy(v_buffer.data(), &p_frame, sizeof(node_frame));
-        m_impl->post_isend(std::move(v_buffer), k_center_rank, k_tag_node_frame);
+        m_impl->post_isend(std::move(v_buffer), k_aggregator_rank, k_tag_node_frame);
     }
 
-    void mpi_transport::poll(const worker_frame_sink& p_worker_sink, const node_frame_sink& p_node_sink) {
+    void mpi_transport::poll(const worker_frame_sink& p_rank_sink, const node_frame_sink& p_node_sink) {
         if (m_impl->m_comm == MPI_COMM_NULL)
             return;
-        if (m_impl->m_rank != k_center_rank)
+        if (m_impl->m_rank != k_aggregator_rank)
             return;
 
-        // Drain worker frames addressed to the center.
-        while (true) {
-            int v_flag = 0;
-            MPI_Status v_status;
-            MPI_Iprobe(MPI_ANY_SOURCE, k_tag_worker_frame, m_impl->m_comm, &v_flag, &v_status);
-            if (!v_flag)
-                break;
-            worker_frame v_frame{};
-            MPI_Recv(&v_frame, sizeof(worker_frame), MPI_BYTE, v_status.MPI_SOURCE, k_tag_worker_frame, m_impl->m_comm, MPI_STATUS_IGNORE);
-            if (p_worker_sink) {
-                p_worker_sink(static_cast<std::uint32_t>(v_status.MPI_SOURCE), v_frame);
-            }
-        }
+        // Regular frames first, so a rank's final frame lands in the sink after its earlier ones.
+        m_impl->drain_worker_frames(k_tag_worker_frame, p_rank_sink);
+        m_impl->drain_worker_frames(k_tag_final_worker_frame, p_rank_sink);
 
         // Drain node frames from sentinels.
         while (true) {
@@ -173,17 +196,17 @@ namespace gempba::telemetry {
         m_impl->reap_completed_sends();
     }
 
-    void mpi_transport::send_control(const std::uint32_t p_dst_worker_id, const control_msg& p_msg) {
+    void mpi_transport::send_control(const std::uint32_t p_dst_rank, const control_msg& p_msg) {
         if (m_impl->m_comm == MPI_COMM_NULL)
             return;
-        if (std::cmp_greater_equal(p_dst_worker_id, m_impl->m_world_size))
+        if (std::cmp_greater_equal(p_dst_rank, m_impl->m_world_size))
             return;
 
         m_impl->reap_completed_sends();
 
         std::vector<std::byte> v_buffer(sizeof(control_msg));
         std::memcpy(v_buffer.data(), &p_msg, sizeof(control_msg));
-        m_impl->post_isend(std::move(v_buffer), static_cast<int>(p_dst_worker_id), k_tag_control);
+        m_impl->post_isend(std::move(v_buffer), static_cast<int>(p_dst_rank), k_tag_control);
     }
 
     std::optional<control_msg> mpi_transport::try_recv_control() {

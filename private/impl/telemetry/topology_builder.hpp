@@ -17,7 +17,7 @@ namespace gempba::telemetry {
      * synthesizes a single-node snapshot; the multi-process path gathers each
      * host's layout from its sentinel and merges them into one snapshot.
      */
-    topology_snapshot build_topology_snapshot(runtime_mode p_mode, std::uint32_t p_worker_id, std::uint32_t p_world_size);
+    topology_snapshot build_topology_snapshot(runtime_mode p_mode, std::uint32_t p_rank, std::uint32_t p_world_size);
 
     namespace detail {
 
@@ -26,7 +26,7 @@ namespace gempba::telemetry {
          * memory, sockets with their full CPU-ID lists) into a portable byte
          * buffer, appended to @p p_out.
          *
-         * Used for the variable-length gather that lets the center carry every
+         * Used for the variable-length gather that lets the aggregator carry every
          * host's layout, not just rank 0's. Unlike a fixed-size record this never
          * truncates a socket's CPU IDs, so wide sockets (e.g. 96-core EPYC) are
          * represented exactly. Encoding is little-endian and self-describing.

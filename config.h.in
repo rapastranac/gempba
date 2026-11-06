@@ -9,3 +9,6 @@
 #ifndef GEMPBA_DEBUG_COMMENTS
 #cmakedefine01 GEMPBA_DEBUG_COMMENTS
 #endif
+
+/* Release version, from the project() call */
+#define GEMPBA_VERSION "@PROJECT_VERSION@"

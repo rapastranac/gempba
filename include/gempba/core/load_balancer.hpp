@@ -69,11 +69,31 @@ namespace gempba {
 
         [[nodiscard]] virtual double get_idle_time() const = 0;
 
+        /**
+         * @return seconds per pool thread spent idle while no task ran in the pool; 0 when the balancer does not split its idle time
+         */
+        [[nodiscard]] virtual double get_starved_idle_time() const { return 0.0; }
+
+        /**
+         * @return seconds per pool thread spent idle while other pool threads ran tasks; 0 when the balancer does not split its idle time
+         */
+        [[nodiscard]] virtual double get_imbalanced_idle_time() const { return 0.0; }
+
         virtual void wait() = 0;
 
         [[nodiscard]] virtual bool is_done() const = 0;
 
         [[nodiscard]] virtual std::size_t get_thread_request_count() const = 0;
+
+        /**
+         * @return local submissions refused because every pool thread was busy; 0 when the balancer does not count them
+         */
+        [[nodiscard]] virtual std::size_t get_spawn_rejected_pool_full_count() const { return 0; }
+
+        /**
+         * @return remote submissions refused because the scheduler opened no transmission channel; 0 when the balancer does not count them
+         */
+        [[nodiscard]] virtual std::size_t get_spawn_remote_rejected_count() const { return 0; }
     };
 } // namespace gempba
 

@@ -49,6 +49,7 @@
 #endif
 
 #include <utility>
+#include <vector>
 
 
 /**
@@ -101,6 +102,29 @@ public:
         return (v_n1 <= v_n2);
     }
 };
+
+/**
+ * @brief Hands one queued task to each rank in @p p_available_state, highest priority first, until the queue empties.
+ *
+ * Rank 0 is the center and is never assigned. Each assigned rank moves to @p p_assigned_state.
+ *
+ * @return Number of tasks handed out.
+ */
+template<typename Queue, typename Send>
+int dispatch_to_available(Queue& p_queue, std::vector<int>& p_states, const int p_available_state, const int p_assigned_state, Send&& p_send) {
+    int v_dispatched = 0;
+    for (int v_rank = 1; std::cmp_less(v_rank, p_states.size()) && !p_queue.empty(); ++v_rank) {
+        if (p_states[v_rank] != p_available_state) {
+            continue;
+        }
+        auto v_task = p_queue.top();
+        p_queue.pop();
+        p_send(v_rank, v_task);
+        p_states[v_rank] = p_assigned_state;
+        ++v_dispatched;
+    }
+    return v_dispatched;
+}
 
 /**
  * Returns the peak (maximum so far) resident set size (physical

@@ -26,6 +26,7 @@
 #define GEMPBA_QUASI_HORIZONTAL_LOAD_BALANCER_HPP
 
 #include <BS_thread_pool.hpp>
+#include <atomic>
 #include <set>
 #include <thread>
 
@@ -50,6 +51,8 @@ namespace gempba {
         std::map<std::thread::id, std::shared_ptr<std::shared_ptr<node_core>>> m_roots; // every thread will be solving a subtree, this point to their roots
         unsigned int m_thread_count = std::thread::hardware_concurrency();
         std::size_t m_thread_request_count = 0;
+        std::atomic<std::size_t> m_spawn_rejected_pool_full_count{0};
+        std::atomic<std::size_t> m_spawn_remote_rejected_count{0};
 
     public:
         explicit quasi_horizontal_load_balancer(scheduler::worker* const p_scheduler_worker = nullptr) : m_scheduler_worker(p_scheduler_worker) {}
@@ -104,6 +107,10 @@ namespace gempba {
 
         [[nodiscard]] double get_idle_time() const override { return m_thread_pool.get_wall_idle_time(); }
 
+        [[nodiscard]] double get_starved_idle_time() const override { return m_thread_pool.get_wall_starved_idle_time(); }
+
+        [[nodiscard]] double get_imbalanced_idle_time() const override { return m_thread_pool.get_wall_imbalanced_idle_time(); }
+
         void set_root(const std::thread::id p_thread_id, std::shared_ptr<node_core>& p_root) override {
             std::scoped_lock v_lock(m_recursive_mutex);
             if (m_roots.contains(p_thread_id)) {
@@ -124,7 +131,7 @@ namespace gempba {
 
         void set_thread_pool_size(const unsigned p_size) override {
             m_thread_pool.reset(p_size);
-            m_thread_pool.submit_task([] {}).wait();
+            m_thread_pool.wait();
             spdlog::debug("thread pool size: {}", m_thread_pool.get_thread_count());
         }
 
@@ -137,6 +144,10 @@ namespace gempba {
         bool is_done() const override { return m_thread_pool.get_tasks_total() == 0; }
 
         std::size_t get_thread_request_count() const override { return m_thread_request_count; }
+
+        [[nodiscard]] std::size_t get_spawn_rejected_pool_full_count() const override { return m_spawn_rejected_pool_full_count.load(std::memory_order_relaxed); }
+
+        [[nodiscard]] std::size_t get_spawn_remote_rejected_count() const override { return m_spawn_remote_rejected_count.load(std::memory_order_relaxed); }
 
 #if GEMPBA_DEV_MODE && GEMPBA_BUILD_TESTS
 
@@ -196,6 +207,7 @@ namespace gempba {
                     return false;
                 }
                 if (is_thread_pool_full()) {
+                    m_spawn_rejected_pool_full_count.fetch_add(1, std::memory_order_relaxed);
                     return false;
                 }
                 const bool v_node_found_and_pushed = try_push_root_level_node_locally(p_node);
@@ -230,6 +242,7 @@ namespace gempba {
 
                 const std::optional<transmission_guard> v_lock_optional = m_scheduler_worker->try_open_transmission_channel();
                 if (!v_lock_optional.has_value()) {
+                    m_spawn_remote_rejected_count.fetch_add(1, std::memory_order_relaxed);
                     return false;
                 }
                 const bool v_node_found_and_pushed = try_push_root_level_node_remotely(p_node, p_runnable_id);

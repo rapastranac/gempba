@@ -82,6 +82,14 @@ TEST_F(quasi_horizontal_load_balancer_test, generate_unique_id) {
     EXPECT_NE(v_id1, v_id2);
 }
 
+TEST_F(quasi_horizontal_load_balancer_test, set_thread_pool_size_returns_with_every_thread_idle) {
+    gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    for (unsigned v_i = 0; v_i < 1000; ++v_i) {
+        v_load_balancer.set_thread_pool_size(1 + v_i % 4);
+        ASSERT_EQ(0u, v_load_balancer.get_tasks_running_count()) << "iteration " << v_i;
+    }
+}
+
 TEST_F(quasi_horizontal_load_balancer_test, set_thread_pool_size_resizes_pool_and_keeps_it_usable) {
     gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_worker_mock);
 
@@ -104,9 +112,46 @@ TEST_F(quasi_horizontal_load_balancer_test, set_thread_pool_size_resizes_pool_an
     EXPECT_EQ(2, v_runs.load());
 }
 
-TEST_F(quasi_horizontal_load_balancer_test, get_idle_time) {
-    const gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_worker_mock);
-    EXPECT_EQ(v_load_balancer.get_idle_time(), 0);
+TEST_F(quasi_horizontal_load_balancer_test, get_idle_time_counts_threads_that_are_still_asleep) {
+    gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    v_load_balancer.set_thread_pool_size(2);
+    const double v_before = v_load_balancer.get_idle_time();
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    EXPECT_GE(v_load_balancer.get_idle_time() - v_before, 0.25);
+}
+
+TEST_F(quasi_horizontal_load_balancer_test, get_starved_idle_time_grows_while_no_task_runs) {
+    gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    v_load_balancer.set_thread_pool_size(2);
+    const double v_starved_before = v_load_balancer.get_starved_idle_time();
+    const double v_imbalanced_before = v_load_balancer.get_imbalanced_idle_time();
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    EXPECT_GE(v_load_balancer.get_starved_idle_time() - v_starved_before, 0.25);
+    EXPECT_DOUBLE_EQ(v_imbalanced_before, v_load_balancer.get_imbalanced_idle_time());
+}
+
+TEST_F(quasi_horizontal_load_balancer_test, get_imbalanced_idle_time_grows_while_one_task_runs) {
+    gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    v_load_balancer.set_thread_pool_size(4);
+    std::promise<void> v_started;
+    std::future<void> v_started_future = v_started.get_future();
+    std::promise<void> v_release;
+    std::shared_future<void> v_released = v_release.get_future().share();
+    auto v_task = v_load_balancer.force_local_submit([&v_started, v_released]() -> std::any {
+        v_started.set_value();
+        v_released.wait();
+        return {};
+    });
+    v_started_future.wait();
+    const double v_starved_before = v_load_balancer.get_starved_idle_time();
+    const double v_imbalanced_before = v_load_balancer.get_imbalanced_idle_time();
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    const double v_starved_after = v_load_balancer.get_starved_idle_time();
+    const double v_imbalanced_after = v_load_balancer.get_imbalanced_idle_time();
+    v_release.set_value();
+    v_task.wait();
+    EXPECT_GE(v_imbalanced_after - v_imbalanced_before, 0.2);
+    EXPECT_DOUBLE_EQ(v_starved_before, v_starved_after);
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, wait_blocks_until_submitted_task_completes) {
@@ -853,6 +898,39 @@ TEST_F(quasi_horizontal_load_balancer_test, try_remote_submit_falls_back_to_loca
 
     EXPECT_FALSE(v_result);
     EXPECT_TRUE(v_fn_called);
+    EXPECT_EQ(1u, v_balancer.get_spawn_remote_rejected_count());
+    EXPECT_EQ(0u, v_balancer.get_spawn_rejected_pool_full_count());
+}
+
+TEST_F(quasi_horizontal_load_balancer_test, try_local_submit_when_pool_full_falls_back_to_forward) {
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    v_balancer.set_thread_pool_size(1);
+
+    std::promise<void> v_started;
+    std::promise<void> v_release;
+    auto v_release_future = v_release.get_future().share();
+    v_balancer.force_local_submit([&v_started, v_release_future]() -> std::any {
+        v_started.set_value();
+        v_release_future.wait();
+        return {};
+    });
+    v_started.get_future().wait();
+
+    bool v_fn_called = false;
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node&) { v_fn_called = true; };
+    auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_balancer);
+    auto v_child = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_parent, v_fn, std::make_tuple(0));
+
+    gempba::node v_node(v_child);
+    const bool v_result = v_balancer.try_local_submit(v_node);
+
+    v_release.set_value();
+    v_balancer.wait();
+
+    EXPECT_FALSE(v_result);
+    EXPECT_TRUE(v_fn_called);
+    EXPECT_EQ(1u, v_balancer.get_spawn_rejected_pool_full_count());
+    EXPECT_EQ(0u, v_balancer.get_spawn_remote_rejected_count());
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, get_root_returns_null_for_unknown_thread) {
@@ -1068,6 +1146,8 @@ TEST_F(quasi_horizontal_load_balancer_test, send_remote_returns_false_on_mutex_c
 
     EXPECT_FALSE(v_result);
     EXPECT_TRUE(v_fn_b_called);
+    EXPECT_EQ(1u, v_balancer.get_spawn_remote_rejected_count());
+    EXPECT_EQ(0u, v_balancer.get_spawn_rejected_pool_full_count());
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, try_push_root_level_node_locally_throws_on_consumed_top) {

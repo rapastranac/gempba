@@ -338,7 +338,7 @@ public final class GemPBANative {
         }
 
         /**
-         * Creates a scheduler with the given topology ordinal and timeout (seconds).
+         * Creates a scheduler with the given topology ordinal. The timeout is ignored.
          */
         public static native long create(int topologyOrdinal, double timeout);
 

@@ -11,7 +11,7 @@ namespace {
         gempba::telemetry::worker_frame v_in{};
         v_in.m_version = gempba::telemetry::TELEMETRY_SCHEMA_VERSION;
         v_in.m_worker_id = 3;
-        v_in.m_tasks_local_total = 42;
+        v_in.m_tasks_started_total = 42;
         v_transport.publish_worker(v_in);
 
         std::vector<gempba::telemetry::worker_frame> v_received;
@@ -19,7 +19,7 @@ namespace {
 
         ASSERT_EQ(1u, v_received.size());
         EXPECT_EQ(3u, v_received.front().m_worker_id);
-        EXPECT_EQ(42u, v_received.front().m_tasks_local_total);
+        EXPECT_EQ(42u, v_received.front().m_tasks_started_total);
     }
 
     TEST(local_transport_test, poll_clears_dirty_so_subsequent_polls_skip) {
@@ -42,16 +42,16 @@ namespace {
 
         gempba::telemetry::worker_frame v_first{};
         v_first.m_worker_id = 0;
-        v_first.m_tasks_local_total = 1;
+        v_first.m_tasks_started_total = 1;
         v_transport.publish_worker(v_first);
 
         gempba::telemetry::worker_frame v_second{};
         v_second.m_worker_id = 0;
-        v_second.m_tasks_local_total = 99;
+        v_second.m_tasks_started_total = 99;
         v_transport.publish_worker(v_second);
 
         std::uint64_t v_seen = 0;
-        v_transport.poll([&](std::uint32_t, const gempba::telemetry::worker_frame& p_f) { v_seen = p_f.m_tasks_local_total; }, [&](std::uint32_t, const gempba::telemetry::node_frame&) {});
+        v_transport.poll([&](std::uint32_t, const gempba::telemetry::worker_frame& p_f) { v_seen = p_f.m_tasks_started_total; }, [&](std::uint32_t, const gempba::telemetry::node_frame&) {});
         EXPECT_EQ(99u, v_seen);
     }
 
@@ -60,14 +60,14 @@ namespace {
 
         gempba::telemetry::control_msg v_msg{};
         v_msg.m_version = gempba::telemetry::TELEMETRY_SCHEMA_VERSION;
-        v_msg.m_kind = gempba::telemetry::control_kind::SET_WORKER_INTERVAL_MS;
+        v_msg.m_kind = gempba::telemetry::control_kind::SET_INTERVAL_MS;
         v_msg.m_value = 250;
 
         v_transport.send_control(0, v_msg);
 
         const auto v_received = v_transport.try_recv_control();
         ASSERT_TRUE(v_received.has_value());
-        EXPECT_EQ(gempba::telemetry::control_kind::SET_WORKER_INTERVAL_MS, v_received->m_kind);
+        EXPECT_EQ(gempba::telemetry::control_kind::SET_INTERVAL_MS, v_received->m_kind);
         EXPECT_EQ(250u, v_received->m_value);
 
         EXPECT_FALSE(v_transport.try_recv_control().has_value());
