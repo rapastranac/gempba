@@ -68,7 +68,6 @@ package_gempba() {
     pkgdesc="GemPBA — multithreading flavor (development files, mingw-w64)"
     depends=(
         "${MINGW_PACKAGE_PREFIX}-gcc-libs"
-        "${MINGW_PACKAGE_PREFIX}-spdlog"
         "${MINGW_PACKAGE_PREFIX}-fmt"
         "${MINGW_PACKAGE_PREFIX}-hwloc"
     )

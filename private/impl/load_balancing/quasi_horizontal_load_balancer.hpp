@@ -28,6 +28,7 @@
 #include <BS_thread_pool.hpp>
 #include <atomic>
 #include <set>
+#include <spdlog/spdlog.h>
 #include <thread>
 
 #include <gempba/core/load_balancer.hpp>

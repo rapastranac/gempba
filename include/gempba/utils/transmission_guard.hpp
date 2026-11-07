@@ -24,6 +24,7 @@
 #ifndef GEMPBA_TRANSMISSION_GUARD_HPP
 #define GEMPBA_TRANSMISSION_GUARD_HPP
 #include <mutex>
+#include <utility>
 
 namespace gempba {
 
