@@ -4,12 +4,12 @@
 #include <any>
 #include <atomic>
 #include <climits>
+#include <format>
 #include <functional>
 #include <gempba/config.h>
 #include <memory>
 #include <mutex>
 #include <optional>
-#include <spdlog/spdlog.h>
 #include <thread>
 #include <tuple>
 #include <utility>
@@ -132,7 +132,7 @@ namespace gempba {
             std::scoped_lock<std::mutex> v_lock(m_mutex);
 
             if (should_update_result(p_new_score)) {
-                spdlog::debug("rank {}, invalidated existing score : {} -> new score: {}", rank_me(), m_score.to_string(), p_new_score.to_string());
+                utils::log_debug("rank {}, invalidated existing score : {} -> new score: {}", rank_me(), m_score.to_string(), p_new_score.to_string());
                 m_score = p_new_score;
                 m_result = task_packet::EMPTY;
                 return true;
@@ -175,7 +175,7 @@ namespace gempba {
         std::optional<T> get_result() {
             std::unique_lock v_lock(m_mutex);
             if (!std::holds_alternative<std::any>(m_result)) {
-                spdlog::error("Attempt to get a result of type {} but the result is not set", typeid(T).name());
+                utils::log_error(std::format("Attempt to get a result of type {} but the result is not set", typeid(T).name()));
                 return std::nullopt;
             }
 
