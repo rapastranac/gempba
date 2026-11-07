@@ -170,19 +170,24 @@ target_compile_options(gempba PRIVATE
 # Its contents (BS_thread_pool headers, spdlog) are wired in via target_include_directories.
 target_link_libraries(gempba PUBLIC
         Threads::Threads
-        fmt::fmt
 )
 
 if (GEMPBA_MULTIPROCESSING)
     target_link_libraries(gempba PUBLIC MPI::MPI_CXX)
 endif ()
 
-# spdlog is used in header-only mode. Deliberately NOT linked as a CMake target
-# so spdlog::spdlog_header_only never appears in the exported targets file and
-# consumers don't need find_package(spdlog) just to use gempba.
+# The public headers use only the standard library (#412). spdlog is internal and header-only, so libgempba.a carries
+# the code it uses and the exported targets don't name it. fmt stays a private link dependency: a static library can't
+# hide one, and a copy compiled into libgempba.a would clash with a consumer's own fmt at link time. spdlog's target is
+# not linked because the export would name it. In-tree targets that include private headers link gempba_logging.
+add_library(gempba_logging INTERFACE)
 get_target_property(_spdlog_includes spdlog::spdlog_header_only INTERFACE_INCLUDE_DIRECTORIES)
-target_include_directories(gempba PRIVATE ${_spdlog_includes})
-target_compile_definitions(gempba PUBLIC SPDLOG_HEADER_ONLY)
+target_include_directories(gempba_logging INTERFACE ${_spdlog_includes})
+target_compile_definitions(gempba_logging INTERFACE SPDLOG_HEADER_ONLY)
+target_link_libraries(gempba_logging INTERFACE fmt::fmt)
+target_include_directories(gempba PRIVATE $<TARGET_PROPERTY:gempba_logging,INTERFACE_INCLUDE_DIRECTORIES>)
+target_compile_definitions(gempba PRIVATE $<TARGET_PROPERTY:gempba_logging,INTERFACE_COMPILE_DEFINITIONS>)
+target_link_libraries(gempba PRIVATE fmt::fmt)
 
 # C++23 stacktrace support (standard library, not external)
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 14)
