@@ -41,6 +41,7 @@
 #include <gempba/utils/task_packet.hpp>
 #include <gempba/utils/transmission_guard.hpp>
 #include <impl/load_balancing/work_stealing_load_balancer.hpp>
+#include <log_capture.hpp>
 #include <map>
 
 /**
@@ -214,6 +215,15 @@ TEST_F(node_manager_test, try_update_score_and_invalidate_result_rejects_worse) 
     const gempba::score v_worse = gempba::score::make(5);
     EXPECT_FALSE(m_node_manager->try_update_score_and_invalidate_result(v_worse));
     EXPECT_EQ(v_first, m_node_manager->get_score());
+}
+
+TEST_F(node_manager_test, try_update_score_and_invalidate_result_logs_the_replaced_score_at_debug_level) {
+    const log_capture v_capture;
+    int v_val = 42;
+    m_node_manager->try_update_result(v_val, gempba::score::make(5));
+
+    EXPECT_TRUE(m_node_manager->try_update_score_and_invalidate_result(gempba::score::make(20)));
+    EXPECT_NE(std::string::npos, v_capture.text().find("[debug] rank -1, invalidated existing score")) << v_capture.text();
 }
 
 TEST_F(node_manager_test, try_update_score_invalidates_any_result) {
