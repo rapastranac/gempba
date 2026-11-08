@@ -8,11 +8,11 @@ class Gempba < Formula
   head "https://github.com/__OWNER_REPO__.git", branch: "main"
 
   depends_on "cmake" => :build
-  depends_on "pkg-config" => :build
   depends_on "spdlog" => :build
   depends_on "boost"
   depends_on "fmt"
   depends_on "hwloc"
+  depends_on "pkgconf"
 
   resource "BS_thread_pool" do
     url "https://github.com/rapastranac/thread-pool/archive/refs/tags/v5.1.0.3.tar.gz"

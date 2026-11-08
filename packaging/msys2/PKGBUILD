@@ -70,6 +70,7 @@ package_gempba() {
         "${MINGW_PACKAGE_PREFIX}-gcc-libs"
         "${MINGW_PACKAGE_PREFIX}-fmt"
         "${MINGW_PACKAGE_PREFIX}-hwloc"
+        "${MINGW_PACKAGE_PREFIX}-pkgconf"
     )
 
     cd "${srcdir}/build-mt-${MSYSTEM}"
