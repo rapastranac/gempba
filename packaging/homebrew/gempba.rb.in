@@ -9,7 +9,6 @@ class Gempba < Formula
 
   depends_on "cmake" => :build
   depends_on "spdlog" => :build
-  depends_on "boost"
   depends_on "fmt"
   depends_on "hwloc"
   depends_on "pkgconf"
@@ -30,7 +29,6 @@ class Gempba < Formula
       "-DGEMPBA_BUILD_TESTS=OFF",
       "-DGEMPBA_DEV_MODE=OFF",
       "-DGEMPBA_MULTIPROCESSING=OFF",
-      "-DCMAKE_PREFIX_PATH=#{Formula["boost"].opt_prefix}",
       "-DFETCHCONTENT_SOURCE_DIR_BS_THREAD_POOL=#{bs_thread_pool}",
     ]
 
@@ -53,6 +51,6 @@ class Gempba < Formula
     CMAKE
 
     system "cmake", "-S", testpath, "-B", testpath/"build",
-           "-DCMAKE_PREFIX_PATH=#{opt_prefix};#{Formula["boost"].opt_prefix}"
+           "-DCMAKE_PREFIX_PATH=#{opt_prefix}"
   end
 end
