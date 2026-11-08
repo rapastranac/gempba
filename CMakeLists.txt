@@ -69,6 +69,7 @@ find_package(spdlog REQUIRED)
 find_package(fmt REQUIRED)
 
 if (GEMPBA_MULTIPROCESSING)
+    set(MPI_CXX_SKIP_MPICXX ON)
     find_package(MPI REQUIRED)
 endif ()
 
