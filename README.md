@@ -82,18 +82,18 @@ sudo apt install libgempba-dev          # multithreading flavor (default)
 sudo apt install libgempba-mpi-dev      # MPI flavor; depends on libgempba-dev
 ```
 
-**MSYS2 / MinGW** — packages are attached to each GitHub Release rather than served from a custom pacman repo. Download the two `.pkg.tar.zst` assets — their names carry the version (e.g. `mingw-w64-x86_64-gempba-4.1.1-1-any.pkg.tar.zst`) — from the [latest release](https://github.com/rapastranac/gempba/releases/latest), then install them locally:
+**MSYS2 (UCRT64)** — packages are attached to each GitHub Release rather than served from a custom pacman repo. Download the two `.pkg.tar.zst` assets — their names carry the version (e.g. `mingw-w64-ucrt-x86_64-gempba-4.4.0-1-any.pkg.tar.zst`) — from the [latest release](https://github.com/rapastranac/gempba/releases/latest), then install them from an MSYS2 UCRT64 shell:
 
 ```bash
-pacman -U mingw-w64-x86_64-gempba-<version>-any.pkg.tar.zst       # multithreading (default)
-pacman -U mingw-w64-x86_64-gempba-mpi-<version>-any.pkg.tar.zst   # MPI; depends on the mt package above
+pacman -U mingw-w64-ucrt-x86_64-gempba-<version>-any.pkg.tar.zst       # multithreading (default)
+pacman -U mingw-w64-ucrt-x86_64-gempba-mpi-<version>-any.pkg.tar.zst   # MPI; depends on the mt package above
 ```
 
-If you'd rather build from `PKGBUILD`:
+If you'd rather build from `PKGBUILD`, in the same shell:
 
 ```bash
 curl -LO https://raw.githubusercontent.com/rapastranac/gempba/main/packaging/msys2/PKGBUILD
-makepkg -si
+MINGW_ARCH=ucrt64 makepkg-mingw -si
 ```
 
 **macOS** — install from the project's Homebrew tap:

@@ -50,10 +50,10 @@ jobs:
           echo "g++: $(g++ --version | head -1 | awk '{print $NF}')"
           echo "cmake: $(cmake --version | head -1 | awk '{print $3}')"
           echo "make: $(make --version | head -1 | awk '{print $3}')"
-          echo "mingw-w64-x86_64-boost: $(pacman -Qi mingw-w64-x86_64-boost | grep Version | awk '{print $3}')"
-          echo "mingw-w64-x86_64-hwloc: $(pacman -Qi mingw-w64-x86_64-hwloc | grep Version | awk '{print $3}')"
-          echo "mingw-w64-x86_64-msmpi: $(pacman -Qi mingw-w64-x86_64-msmpi | grep Version | awk '{print $3}')"
-          echo "mingw-w64-x86_64-gtest: $(pacman -Qi mingw-w64-x86_64-gtest | grep Version | awk '{print $3}')"
+          echo "mingw-w64-ucrt-x86_64-boost: $(pacman -Qi mingw-w64-ucrt-x86_64-boost | grep Version | awk '{print $3}')"
+          echo "mingw-w64-ucrt-x86_64-hwloc: $(pacman -Qi mingw-w64-ucrt-x86_64-hwloc | grep Version | awk '{print $3}')"
+          echo "mingw-w64-ucrt-x86_64-msmpi: $(pacman -Qi mingw-w64-ucrt-x86_64-msmpi | grep Version | awk '{print $3}')"
+          echo "mingw-w64-ucrt-x86_64-gtest: $(pacman -Qi mingw-w64-ucrt-x86_64-gtest | grep Version | awk '{print $3}')"
 
       # 4️⃣ Configure + build with MP=ON. Tests reference gempba::mp::* directly,
       # so only MP=ON is built here.
