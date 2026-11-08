@@ -33,10 +33,12 @@
 #if __has_include(<stacktrace>)
     #include <stacktrace>
 #endif
-#ifdef __cpp_lib_stacktrace
-    #define GEMPBA_HAS_STACKTRACE 1
-#else
-    #define GEMPBA_HAS_STACKTRACE 0
+#ifndef GEMPBA_HAS_STACKTRACE
+    #ifdef __cpp_lib_stacktrace
+        #define GEMPBA_HAS_STACKTRACE 1
+    #else
+        #define GEMPBA_HAS_STACKTRACE 0
+    #endif
 #endif
 
 #include <gempba/core/node_core.hpp>

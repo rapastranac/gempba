@@ -16,8 +16,8 @@ usage() {
 }
 
 case "${1:-}" in
-    MT) variant=multithreading;  mp_flag=OFF ;;
-    MP) variant=multiprocessing; mp_flag=ON  ;;
+    MT) variant=multithreading;  mp_flag=OFF; flavor=mt     ;;
+    MP) variant=multiprocessing; mp_flag=ON;  flavor=mp-mpi ;;
     *)  usage ;;
 esac
 
@@ -100,6 +100,7 @@ cmake -B "$build_dir" -S "$WORKSPACE" \
     -DJAVA_HOME="$JAVA_HOME_UNIX"
 
 cmake --build "$build_dir" --target gempba_jni -j"$(nproc)"
+bash "$WORKSPACE/scripts/check_jni_deps.sh" "$native_lib" "$flavor"
 
 cd "$WORKSPACE/bindings/java"
 # `install` (not `package`) so the produced JAR also lands in

@@ -25,9 +25,6 @@ jobs:
           - variant: MP
             mp_flag: 'ON'
             classifier: mp-mpi
-    env:
-      CC: gcc-14
-      CXX: g++-14
 
     steps:
       - name: Checkout repository
@@ -36,27 +33,21 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ github.ref }}
 
-      # Native toolchain + MPI when MP — same composite the C/C++ jobs use, so the
-      # JNI library links against the exact deps gempba itself was tested with.
-      - name: Setup native deps
-        uses: ./.github/actions/setup-ubuntu-deps
-        with:
-          multiprocessing: ${{ matrix.mp_flag }}
-          tests: 'false'
-
+      # Maven packages the JAR on the runner; the native library builds in
+      # bindings/jni/Dockerfile's container, which holds its own toolchain and deps.
       - name: Setup JDK 25
         uses: ./.github/actions/setup-java-jdk
 
       - name: Echo versions
         run: |
-          echo "g++: $($CXX --version | head -1 | awk '{print $4}')"
-          echo "cmake: $(cmake --version | head -1 | awk '{print $3}')"
+          echo "docker: $(docker version --format '{{.Server.Version}}')"
           echo "java: $(java -version 2>&1 | head -1)"
           echo "mvn: $(mvn -v | head -1)"
 
-      # Builds gempba_jni.so into bindings/java/src/main/resources/natives/<arch>
-      # and mvn install -DskipTests's the variant JAR. Tests run in test-ubuntu
-      # against the native lib uploaded below, so a flaky-test rerun never rebuilds.
+      # Builds gempba_jni.so into bindings/java/src/main/resources/natives/<arch>,
+      # checks that it needs only glibc 2.28 and, for MP, MPI, and mvn install
+      # -DskipTests's the variant JAR. Tests run in test-ubuntu against the native
+      # lib uploaded below, so a flaky-test rerun never rebuilds.
       - name: Build native JNI library + variant JAR
         run: bash scripts/build_jar_linux.sh ${{ matrix.variant }}
 
@@ -85,12 +76,8 @@ jobs:
       matrix:
         include:
           - variant: MT
-            mp_flag: 'OFF'
-            mvn_variant: multithreading
             classifier: mt
           - variant: MP
-            mp_flag: 'ON'
-            mvn_variant: multiprocessing
             classifier: mp-mpi
 
     steps:
@@ -100,26 +87,16 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ github.ref }}
 
-      # Runtime deps only (MPI runtime when MP) — what the prebuilt native lib
-      # links against. No toolchain/cmake build in this job.
-      - name: Setup native deps
-        uses: ./.github/actions/setup-ubuntu-deps
-        with:
-          multiprocessing: ${{ matrix.mp_flag }}
-          tests: 'false'
-
-      - name: Setup JDK 25
-        uses: ./.github/actions/setup-java-jdk
-
       - name: Download prebuilt native library
         uses: actions/download-artifact@v8
         with:
           name: native-ubuntu-${{ matrix.classifier }}
           path: bindings/java/src/main/resources/natives
 
-      - name: Run Java tests
-        working-directory: bindings/java
-        run: mvn -B test -Dgempba.variant=${{ matrix.mvn_variant }}
+      # A clean JDK container with no gempba dependency installed (OpenMPI's
+      # runtime only for MP), so the tests fail if the native needs anything more.
+      - name: Run Java tests on a clean machine
+        run: bash scripts/test_java_linux_clean.sh ${{ matrix.variant }}
 
       - name: Upload test results
         if: ${{ !cancelled() }}
@@ -202,12 +179,8 @@ jobs:
       matrix:
         include:
           - variant: MT
-            mp_flag: 'OFF'
-            mvn_variant: multithreading
             classifier: mt
           - variant: MP
-            mp_flag: 'ON'
-            mvn_variant: multiprocessing
             classifier: mp-mpi
 
     steps:
@@ -217,13 +190,13 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ github.ref }}
 
-      - name: Setup native deps
-        uses: ./.github/actions/setup-windows-deps
+      # No MSYS2 here: the DLL links its C++ runtime and hwloc statically. MP
+      # needs only the MS-MPI runtime a user installs.
+      - name: Install MS-MPI runtime
+        if: matrix.variant == 'MP'
+        uses: mpi4py/setup-mpi@v1
         with:
-          multiprocessing: ${{ matrix.mp_flag }}
-          tests: 'false'
-          cache: 'false'
-          release: 'false'
+          mpi: msmpi
 
       - name: Setup JDK 25
         uses: ./.github/actions/setup-java-jdk
@@ -234,18 +207,9 @@ jobs:
           name: native-windows-${{ matrix.classifier }}
           path: bindings/java/src/main/resources/natives
 
-      # Run tests inside MSYS2: the JNI .dll links against mingw-w64's
-      # libstdc++/libgcc/libwinpthread, which only sit on PATH inside MSYS2 —
-      # launching mvn from cmd would load the .dll and fail to resolve those
-      # imports. _msys2_find_mvn.sh is the same helper build_jar_windows.sh
-      # sources, so dev + CI find Maven the same way.
-      - name: Run Java tests
-        shell: msys2 {0}
-        working-directory: bindings/java
-        run: |
-          source "$GITHUB_WORKSPACE/scripts/_msys2_find_mvn.sh"
-          setup_mvn_msys2_path
-          mvn -B test -Dgempba.variant=${{ matrix.mvn_variant }}
+      - name: Run Java tests on a clean machine
+        shell: pwsh
+        run: ./scripts/test_java_windows_clean.ps1 ${{ matrix.variant }}
 
       - name: Upload test results
         if: ${{ !cancelled() }}
