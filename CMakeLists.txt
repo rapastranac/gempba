@@ -189,9 +189,22 @@ target_include_directories(gempba PRIVATE $<TARGET_PROPERTY:gempba_logging,INTER
 target_compile_definitions(gempba PRIVATE $<TARGET_PROPERTY:gempba_logging,INTERFACE_COMPILE_DEFINITIONS>)
 target_link_libraries(gempba PRIVATE fmt::fmt)
 
-# C++23 stacktrace support (standard library, not external)
-if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 14)
+# std::stacktrace lives in libstdc++exp, which some GCC builds, such as Red Hat's gcc-toolset, don't ship.
+include(CheckCXXSourceCompiles)
+set(CMAKE_REQUIRED_LIBRARIES stdc++exp)
+check_cxx_source_compiles([=[
+    #include <stacktrace>
+    int main() { return static_cast<int>(std::stacktrace::current().size()); }
+]=] GEMPBA_STACKTRACE_LINKS)
+unset(CMAKE_REQUIRED_LIBRARIES)
+if (GEMPBA_STACKTRACE_LINKS)
     target_link_libraries(gempba PUBLIC stdc++exp)
+    set(GEMPBA_PC_STACKTRACE_LIBS "-lstdc++exp")
+    set(GEMPBA_PC_STACKTRACE_CFLAGS "")
+else ()
+    target_compile_definitions(gempba PUBLIC GEMPBA_HAS_STACKTRACE=0)
+    set(GEMPBA_PC_STACKTRACE_LIBS "")
+    set(GEMPBA_PC_STACKTRACE_CFLAGS "-DGEMPBA_HAS_STACKTRACE=0")
 endif ()
 
 if (GEMPBA_HWLOC)
