@@ -22,20 +22,20 @@ jobs:
       - name: Setup MSYS2
         uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
+          msystem: UCRT64
           release: false
           cache: false
           update: true
           install: >-
             base-devel
-            mingw-w64-x86_64-toolchain
-            mingw-w64-x86_64-cmake
-            mingw-w64-x86_64-ninja
-            mingw-w64-x86_64-msmpi
-            mingw-w64-x86_64-spdlog
-            mingw-w64-x86_64-fmt
-            mingw-w64-x86_64-hwloc
-            mingw-w64-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-toolchain
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-msmpi
+            mingw-w64-ucrt-x86_64-spdlog
+            mingw-w64-ucrt-x86_64-fmt
+            mingw-w64-ucrt-x86_64-hwloc
+            mingw-w64-ucrt-x86_64-pkgconf
             git
             zstd
 
@@ -55,13 +55,13 @@ jobs:
           # GitHub release tarball PKGBUILD normally validates against
           sed -i "s|^sha256sums=.*|sha256sums=('SKIP')|" PKGBUILD
 
-          PKGDEST="$WS" MINGW_ARCH=mingw64 makepkg-mingw --nocheck --noconfirm --noprogressbar
+          PKGDEST="$WS" MINGW_ARCH=ucrt64 makepkg-mingw --nocheck --noconfirm --noprogressbar
 
       - name: Upload MSYS2 package as workflow artifact
         uses: actions/upload-artifact@v7
         with:
           name: msys2-package
-          path: ${{ github.workspace }}/mingw-w64-x86_64-gempba-*.pkg.tar.zst
+          path: ${{ github.workspace }}/mingw-w64-ucrt-x86_64-gempba-*.pkg.tar.zst
           retention-days: 7
 
       # Wipe makepkg-mingw fakeroot dirs: read-only files inside trip the
