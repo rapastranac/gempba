@@ -8,7 +8,7 @@ pkgname=(
 )
 pkgver=4.3.0
 pkgrel=1
-pkgdesc="Generic Massive Parallelisation of Branching Algorithms — parallel branch-and-bound C++23 framework (mingw-w64)"
+pkgdesc="Generic Massive Parallelisation of Branching Algorithms — hybrid parallel C++23 framework (mingw-w64)"
 arch=('any')
 mingw_arch=('ucrt64')
 url="https://github.com/rapastranac/gempba"

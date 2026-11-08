@@ -3,5 +3,5 @@ Label: gempba
 Codename: noble
 Architectures: amd64
 Components: main
-Description: GemPBA parallel branch-and-bound framework
+Description: GemPBA hybrid parallel framework
 SignWith: SIGN_WITH_KEY_ID
