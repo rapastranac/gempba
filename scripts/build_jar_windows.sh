@@ -1,7 +1,7 @@
 #!/bin/bash
 # Build the gempba Windows JAR for one variant.
 #
-# Usage (from an MSYS2 MINGW64 shell):
+# Usage (from an MSYS2 UCRT64 shell):
 #   bash scripts/build_jar_windows.sh MT   # multithreading — no MPI runtime needed
 #   bash scripts/build_jar_windows.sh MP   # multiprocessing — links MS-MPI
 #
@@ -57,9 +57,14 @@ if ! setup_mvn_msys2_path; then
     exit 2
 fi
 
+if [[ "${MSYSTEM:-}" != "UCRT64" ]]; then
+    echo "Run this from an MSYS2 UCRT64 shell (MSYSTEM is '${MSYSTEM:-unset}')." >&2
+    exit 2
+fi
+
 if ! command -v cmake >/dev/null; then
     echo "cmake is not on PATH (MSYS2 shell)." >&2
-    echo "Install via 'pacman -S mingw-w64-x86_64-cmake' and rerun." >&2
+    echo "Install via 'pacman -S mingw-w64-ucrt-x86_64-cmake' and rerun." >&2
     exit 2
 fi
 
