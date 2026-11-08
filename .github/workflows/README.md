@@ -22,7 +22,7 @@ groups workflows by purpose.
 
 ### CI
 - `ci-cpp-ubuntu.yml` — C/C++ test (MP=ON, coverage, MPI integration tests) on Ubuntu 24.04, gempba-examples built against both installed flavors, and the deb + apt-index reusables
-- `ci-cpp-windows.yml` — C/C++ test and gempba-examples on Windows Server 2025 via MSYS2 mingw-w64, and the MSYS2 package
+- `ci-cpp-windows.yml` — C/C++ test and gempba-examples on Windows Server 2025 via MSYS2 UCRT64, and the MSYS2 package
 - `ci-cpp-macos.yml` — C/C++ test and gempba-examples on macOS 26 with Homebrew toolchain
 - `ci-java.yml` — JNI shared library + Java JAR build + test across Ubuntu / Windows / macOS, MT/MP matrix
 - `ci-lint.yml` — clang-format + clang-tidy
