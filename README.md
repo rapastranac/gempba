@@ -113,7 +113,7 @@ cmake -B build -DCMAKE_PREFIX_PATH=$(brew --prefix gempba-mpi)   # a project bui
 
 ### Maven dependency (Java)
 
-JARs are published to [GitHub Packages](https://maven.pkg.github.com/rapastranac/gempba) with one classifier per flavor: `mt` (multithreading) and `mp-mpi` (multiprocessing — requires an MPI runtime on the host). One fat JAR per classifier carries every supported OS's native binary; the loader picks the right one at runtime.
+JARs are published to [GitHub Packages](https://maven.pkg.github.com/rapastranac/gempba) with one classifier per flavor: `mt` (multithreading) and `mp-mpi` (multiprocessing — requires an MPI runtime on the host). One fat JAR per classifier carries every supported OS's native binary; the loader picks the right one at runtime. The natives need nothing beyond the OS (Linux with glibc 2.28 or newer, such as RHEL 8; Windows 10 or newer; macOS 14 or newer) and, for `mp-mpi`, the MPI runtime.
 
 **Available versions: `v4.1.0` and later.** Earlier tags predate the publish flow and have no artifact on the registry.
 

@@ -5,8 +5,9 @@
 #   bash scripts/build_jar_macos.sh MT   # multithreading — no MPI runtime needed
 #   bash scripts/build_jar_macos.sh MP   # multiprocessing — links OpenMPI
 #
-# Each variant gets its own .build-${variant}/ directory so the two CMake
-# caches don't collide.
+# hwloc links statically from the prefix bindings/jni/build_deps.sh fills, so
+# the library needs only macOS and, for MP, OpenMPI. Each variant gets its own
+# .build-${variant}/ directory so the two CMake caches don't collide.
 
 set -e
 
@@ -16,16 +17,14 @@ usage() {
 }
 
 case "${1:-}" in
-    MT) variant=multithreading;  mp_flag=OFF ;;
-    MP) variant=multiprocessing; mp_flag=ON  ;;
+    MT) variant=multithreading;  mp_flag=OFF; flavor=mt     ;;
+    MP) variant=multiprocessing; mp_flag=ON;  flavor=mp-mpi ;;
     *)  usage ;;
 esac
 
 # Fail fast on missing tools instead of letting `set -e` exit silently
-# halfway through.  brew is needed up-front to resolve boost
-# prefixes for the cmake flags below; cmake + mvn are the actual build
-# drivers.
-for tool in brew cmake mvn; do
+# halfway through.
+for tool in cmake mvn; do
     command -v "$tool" >/dev/null || {
         echo "Required tool '$tool' is not on PATH." >&2
         echo "Install it (or prepend its bin/ dir to PATH) and rerun." >&2
@@ -53,18 +52,27 @@ native_lib="$native_dir/gempba_jni.dylib"
 # variant's native).  Wipe the file before each cmake build.
 rm -f "$native_lib"
 
-cmake -B "$build_dir" -S "$WORKSPACE" \
+# The oldest macOS the library loads on; the static dependencies target it too.
+export MACOSX_DEPLOYMENT_TARGET=14.0
+deps_prefix="${GEMPBA_JNI_DEPS_PREFIX:-$HOME/.cache/gempba-jni-deps/macos-$arch-$MACOSX_DEPLOYMENT_TARGET}"
+bash "$WORKSPACE/bindings/jni/build_deps.sh" "$deps_prefix"
+
+PKG_CONFIG_PATH="$deps_prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" cmake -B "$build_dir" -S "$WORKSPACE" \
     -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_OSX_DEPLOYMENT_TARGET="$MACOSX_DEPLOYMENT_TARGET" \
+    -DCMAKE_PREFIX_PATH="$deps_prefix" \
+    -Dspdlog_DIR="$deps_prefix/lib/cmake/spdlog" \
+    -Dfmt_DIR="$deps_prefix/lib/cmake/fmt" \
     -DGEMPBA_BUILD_JAVA_BINDING=ON \
     -DGEMPBA_JNI_CLASSIFIER="$classifier" \
     -DGEMPBA_MULTIPROCESSING="$mp_flag" \
     -DGEMPBA_HWLOC=ON \
     -DGEMPBA_DEV_MODE=OFF \
     -DGEMPBA_BUILD_TESTS=OFF \
-    -DGEMPBA_DEBUG_COMMENTS=OFF \
-    -DCMAKE_PREFIX_PATH="$(brew --prefix boost)"
+    -DGEMPBA_DEBUG_COMMENTS=OFF
 
 cmake --build "$build_dir" --target gempba_jni -j"$(sysctl -n hw.logicalcpu)"
+bash "$WORKSPACE/scripts/check_jni_deps.sh" "$native_lib" "$flavor"
 
 cd "$WORKSPACE/bindings/java"
 # `install` (not `package`) so the produced JAR also lands in
