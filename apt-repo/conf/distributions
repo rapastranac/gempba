@@ -1,6 +1,6 @@
 Origin: gempba
 Label: gempba
-Codename: stable
+Codename: noble
 Architectures: amd64
 Components: main
 Description: GemPBA parallel branch-and-bound framework

@@ -64,7 +64,7 @@ Both can be installed side by side on **any** platform. You pick which one a pro
 
 ### Pre-built packages (C++)
 
-**Debian / Ubuntu** — the `.deb`s live in a signed APT repository hosted at `https://rapastranac.github.io/gempba`. Register the repo once, then install:
+**Ubuntu 24.04 (noble)** — the `.deb`s are built for Ubuntu 24.04 and live in a signed APT repository hosted at `https://rapastranac.github.io/gempba`. The repository serves the latest release; older `.deb`s stay attached to each [GitHub Release](https://github.com/rapastranac/gempba/releases). Register the repo once, then install:
 
 ```bash
 # 1. Trust the gempba signing key (one-time)
@@ -73,7 +73,7 @@ curl -fsSL https://rapastranac.github.io/gempba/gempba-archive-keyring.gpg \
   | sudo tee /etc/apt/keyrings/gempba.gpg > /dev/null
 
 # 2. Register the repo (one-time)
-echo "deb [signed-by=/etc/apt/keyrings/gempba.gpg] https://rapastranac.github.io/gempba stable main" \
+echo "deb [signed-by=/etc/apt/keyrings/gempba.gpg] https://rapastranac.github.io/gempba noble main" \
   | sudo tee /etc/apt/sources.list.d/gempba.list > /dev/null
 sudo apt update
 
