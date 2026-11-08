@@ -113,7 +113,7 @@ cmake -B build -DCMAKE_PREFIX_PATH=$(brew --prefix gempba-mpi)   # a project bui
 
 ### Maven dependency (Java)
 
-JARs are published to [GitHub Packages](https://maven.pkg.github.com/rapastranac/gempba) with one classifier per flavor: `mt` (multithreading) and `mp-mpi` (multiprocessing — requires an MPI runtime on the host). One fat JAR per classifier carries every supported OS's native binary; the loader picks the right one at runtime. The natives need nothing beyond the OS (Linux with glibc 2.28 or newer, such as RHEL 8; Windows 10 or newer; macOS 14 or newer) and, for `mp-mpi`, the MPI runtime.
+JARs are published to [GitHub Packages](https://maven.pkg.github.com/rapastranac/gempba) with one classifier per flavor: `mt` (multithreading) and `mp-mpi` (multiprocessing — requires an MPI runtime on the host). One fat JAR per classifier carries every supported OS's native binary; the loader picks the right one at runtime. The JAR needs Java 25 or newer, and its natives need nothing beyond the OS (Linux with glibc 2.28 or newer, such as RHEL 8; Windows 10 or newer; macOS 14 or newer) and, for `mp-mpi`, the MPI runtime.
 
 **Available versions: `v4.1.0` and later.** Earlier tags predate the publish flow and have no artifact on the registry.
 
@@ -199,7 +199,11 @@ Working example programs live in the sibling repo **[gempba-examples](https://gi
 |---|---|---|
 | C++ compiler | C++23 | GCC or Clang |
 | CMake | ≥ 3.28 | |
-| OpenMPI | ≥ 4.0 | Multiprocessing only |
+| fmt | ≥ 9.1 | |
+| spdlog | ≥ 1.12 | Build only; compiled into the library |
+| hwloc | ≥ 2.10 | Hardware topology; `GEMPBA_HWLOC`, on by default |
+| pkg-config | any recent | Finds hwloc, in the build and in `find_package(gempba)` |
+| OpenMPI | ≥ 4.0 | Multiprocessing only; MS-MPI on Windows |
 | Boost | any recent | Tests only |
 | GoogleTest | any recent | Tests only |
 
