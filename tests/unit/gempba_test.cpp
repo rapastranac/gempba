@@ -41,36 +41,6 @@
  * @date 2026
  */
 class scheduler_stub final : public gempba::scheduler {
-    struct center_stub final : center {
-        void barrier() override {}
-
-        [[nodiscard]] int rank_me() const override { return 0; }
-        [[nodiscard]] int world_size() const override { return 1; }
-        [[nodiscard]] std::unique_ptr<gempba::stats> get_stats() const override { return nullptr; }
-
-        void run(gempba::task_packet, int) override {}
-
-        gempba::task_packet get_result() override { return gempba::task_packet::EMPTY; }
-        std::vector<gempba::result> get_all_results() override { return {}; }
-    };
-
-    struct worker_stub final : worker {
-        void barrier() override {}
-
-        [[nodiscard]] int rank_me() const override { return 0; }
-        [[nodiscard]] int world_size() const override { return 1; }
-        [[nodiscard]] std::unique_ptr<gempba::stats> get_stats() const override { return nullptr; }
-
-        void run(gempba::node_manager&, std::map<int, std::shared_ptr<gempba::serial_runnable>>) override {}
-
-        unsigned int force_push(gempba::task_packet&&, int) override { return 0; }
-        [[nodiscard]] unsigned int next_process() const override { return 0; }
-        std::optional<gempba::transmission_guard> try_open_transmission_channel() override { return std::nullopt; }
-    };
-
-    center_stub m_center;
-    worker_stub m_worker;
-
 public:
     void barrier() override {}
 
@@ -89,8 +59,13 @@ public:
 
     void synchronize_stats() override {}
 
-    center& center_view() override { return m_center; }
-    worker& worker_view() override { return m_worker; }
+    unsigned int force_push(gempba::task_packet&&, int) override { return 0; }
+    std::optional<gempba::transmission_guard> try_open_transmission_channel() override { return std::nullopt; }
+
+protected:
+    void do_run(gempba::node_manager&, std::map<int, std::shared_ptr<gempba::serial_runnable>>, std::optional<gempba::task_bundle>) override {}
+    gempba::task_packet do_get_result() override { return gempba::task_packet::EMPTY; }
+    std::vector<gempba::result> do_get_all_results() override { return {}; }
 };
 
 
@@ -358,7 +333,7 @@ namespace {
     public:
         void run() override {}
         void delegate_locally(gempba::load_balancer*) override {}
-        void delegate_remotely(gempba::scheduler::worker*, int) override {}
+        void delegate_remotely(gempba::scheduler*, int) override {}
         void set_result(const gempba::task_packet&) override {}
         gempba::task_packet get_result() override { return gempba::task_packet::EMPTY; }
         gempba::task_packet serialize() override { return gempba::task_packet::EMPTY; }

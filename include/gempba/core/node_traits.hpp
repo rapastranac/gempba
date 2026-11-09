@@ -210,7 +210,7 @@ namespace gempba {
          *
          * @return true if the task was successfully delegated, false otherwise.
          */
-        virtual void delegate_remotely(scheduler::worker* p_scheduler, int p_runner_id) = 0;
+        virtual void delegate_remotely(scheduler* p_scheduler, int p_runner_id) = 0;
 
         virtual void set_result(const task_packet& p_result) = 0;
 

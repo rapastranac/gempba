@@ -39,6 +39,7 @@
 #include <gempba/stats/stats.hpp>
 #include <gempba/utils/transmission_guard.hpp>
 #include <impl/load_balancing/quasi_horizontal_load_balancer.hpp>
+#include <scheduler_mock.hpp>
 
 using namespace std::chrono_literals;
 
@@ -47,36 +48,24 @@ using namespace std::chrono_literals;
  * @date 2025-08-30
  */
 
-class scheduler_worker_mock final : public gempba::scheduler::worker {
-public:
-    MOCK_METHOD(void, barrier, (), (override));
-    MOCK_METHOD(int, rank_me, (), (const, override));
-    MOCK_METHOD(int, world_size, (), (const, override));
-    MOCK_METHOD(void, run, (gempba::node_manager & p_node_manager, (std::map<int, std::shared_ptr<gempba::serial_runnable>> p_runnables)), (override));
-    MOCK_METHOD(unsigned int, force_push, (gempba::task_packet && p_task, int p_function_id), (override));
-    MOCK_METHOD(std::optional<gempba::transmission_guard>, try_open_transmission_channel, (), (override));
-    MOCK_METHOD(std::unique_ptr<gempba::stats>, get_stats, (), (const, override));
-    MOCK_METHOD(unsigned int, next_process, (), (const, override));
-};
-
 
 class quasi_horizontal_load_balancer_test : public ::testing::Test {
 protected:
-    void SetUp() override { m_scheduler_worker_mock = new scheduler_worker_mock(); }
+    void SetUp() override { m_scheduler_mock = new gempba::testing_support::scheduler_mock(); }
 
-    void TearDown() override { delete m_scheduler_worker_mock; }
+    void TearDown() override { delete m_scheduler_mock; }
 
-    scheduler_worker_mock* m_scheduler_worker_mock{};
+    gempba::testing_support::scheduler_mock* m_scheduler_mock{};
 };
 
 
 TEST_F(quasi_horizontal_load_balancer_test, get_strategy) {
-    gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_mock);
     EXPECT_EQ(v_load_balancer.get_balancing_policy(), gempba::QUASI_HORIZONTAL);
 };
 
 TEST_F(quasi_horizontal_load_balancer_test, generate_unique_id) {
-    gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_mock);
     const unsigned int v_id1 = v_load_balancer.generate_unique_id();
     const unsigned int v_id2 = v_load_balancer.generate_unique_id();
     EXPECT_NE(v_id1, v_id2);
@@ -84,13 +73,13 @@ TEST_F(quasi_horizontal_load_balancer_test, generate_unique_id) {
 
 TEST_F(quasi_horizontal_load_balancer_test, constructor_returns_with_every_thread_idle) {
     for (unsigned v_i = 0; v_i < 1000; ++v_i) {
-        gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_worker_mock);
+        gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_mock);
         ASSERT_EQ(0u, v_load_balancer.get_tasks_running_count()) << "iteration " << v_i;
     }
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, set_thread_pool_size_returns_with_every_thread_idle) {
-    gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_mock);
     for (unsigned v_i = 0; v_i < 1000; ++v_i) {
         v_load_balancer.set_thread_pool_size(1 + v_i % 4);
         ASSERT_EQ(0u, v_load_balancer.get_tasks_running_count()) << "iteration " << v_i;
@@ -98,7 +87,7 @@ TEST_F(quasi_horizontal_load_balancer_test, set_thread_pool_size_returns_with_ev
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, set_thread_pool_size_resizes_pool_and_keeps_it_usable) {
-    gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_mock);
 
     std::atomic<int> v_runs{0};
     const auto v_submit = [&] {
@@ -120,7 +109,7 @@ TEST_F(quasi_horizontal_load_balancer_test, set_thread_pool_size_resizes_pool_an
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, get_idle_time_counts_threads_that_are_still_asleep) {
-    gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_mock);
     v_load_balancer.set_thread_pool_size(2);
     const double v_before = v_load_balancer.get_idle_time();
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
@@ -128,7 +117,7 @@ TEST_F(quasi_horizontal_load_balancer_test, get_idle_time_counts_threads_that_ar
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, get_starved_idle_time_grows_while_no_task_runs) {
-    gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_mock);
     v_load_balancer.set_thread_pool_size(2);
     const double v_starved_before = v_load_balancer.get_starved_idle_time();
     const double v_imbalanced_before = v_load_balancer.get_imbalanced_idle_time();
@@ -138,7 +127,7 @@ TEST_F(quasi_horizontal_load_balancer_test, get_starved_idle_time_grows_while_no
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, get_imbalanced_idle_time_grows_while_one_task_runs) {
-    gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_mock);
     v_load_balancer.set_thread_pool_size(4);
     std::promise<void> v_started;
     std::future<void> v_started_future = v_started.get_future();
@@ -162,7 +151,7 @@ TEST_F(quasi_horizontal_load_balancer_test, get_imbalanced_idle_time_grows_while
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, wait_blocks_until_submitted_task_completes) {
-    gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_load_balancer(m_scheduler_mock);
 
     std::atomic<bool> v_ran{false};
     auto v_future = v_load_balancer.force_local_submit([&v_ran]() -> std::any {
@@ -177,7 +166,7 @@ TEST_F(quasi_horizontal_load_balancer_test, wait_blocks_until_submitted_task_com
 
 
 TEST_F(quasi_horizontal_load_balancer_test, set_get_root) {
-    const auto v_balancer = new gempba::quasi_horizontal_load_balancer(m_scheduler_worker_mock);
+    const auto v_balancer = new gempba::quasi_horizontal_load_balancer(m_scheduler_mock);
     std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int, const gempba::node&) { FAIL(); };
     int v_dummy_value = 7;
 
@@ -230,7 +219,7 @@ TEST_F(quasi_horizontal_load_balancer_test, set_get_root) {
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, get_unique_id) {
-    auto v_balancer = new gempba::quasi_horizontal_load_balancer(m_scheduler_worker_mock);
+    auto v_balancer = new gempba::quasi_horizontal_load_balancer(m_scheduler_mock);
 
     ASSERT_EQ(1, v_balancer->generate_unique_id());
     ASSERT_EQ(2, v_balancer->generate_unique_id());
@@ -241,7 +230,7 @@ TEST_F(quasi_horizontal_load_balancer_test, get_unique_id) {
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, get_root_level_pending_node) {
-    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
 
     std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int, const gempba::node&) { FAIL(); };
     int v_dummy_value = 7;
@@ -305,7 +294,7 @@ TEST_F(quasi_horizontal_load_balancer_test, get_root_level_pending_node) {
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, thread_request_count_tracking) {
-    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
 
     EXPECT_EQ(0, v_balancer.get_thread_request_count());
 
@@ -322,7 +311,7 @@ TEST_F(quasi_horizontal_load_balancer_test, thread_request_count_tracking) {
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, forward_with_root_correction) {
-    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
     std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int, const gempba::node&) {
         // Simple function that does nothing but allows node execution
     };
@@ -367,7 +356,7 @@ TEST_F(quasi_horizontal_load_balancer_test, forward_with_root_correction) {
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, node_pruning_before_delegation) {
-    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
 
     bool v_function_called = false;
     std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [&](std::thread::id, int, const gempba::node&) { v_function_called = true; };
@@ -411,7 +400,7 @@ TEST_F(quasi_horizontal_load_balancer_test, node_pruning_before_delegation) {
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, top_node_pruning_in_push_operations_locally) {
-    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
 
     bool v_function_called = false;
     std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [&](std::thread::id, int, const gempba::node&) { v_function_called = true; };
@@ -450,9 +439,9 @@ TEST_F(quasi_horizontal_load_balancer_test, top_node_pruning_in_push_operations_
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, top_node_pruning_in_push_operations_remotely) {
-    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
 
-    EXPECT_CALL(*m_scheduler_worker_mock, force_push(testing::_, testing::_)).WillOnce([](gempba::task_packet&& p_task, const int p_function_id) {
+    EXPECT_CALL(*m_scheduler_mock, force_push(testing::_, testing::_)).WillOnce([](gempba::task_packet&& p_task, const int p_function_id) {
         EXPECT_EQ(0, p_function_id);
         EXPECT_EQ(gempba::task_packet::EMPTY, p_task);
         return 999;
@@ -503,7 +492,7 @@ TEST_F(quasi_horizontal_load_balancer_test, top_node_pruning_in_push_operations_
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, memory_leak_prevention_through_early_pruning_locally) {
-    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
 
     std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [](std::thread::id, int, const gempba::node&) {
         // Simple execution that completes quickly
@@ -552,16 +541,16 @@ TEST_F(quasi_horizontal_load_balancer_test, memory_leak_prevention_through_early
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, memory_leak_prevention_through_early_pruning_remotely) {
-    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
 
     std::mutex v_dummy_mutex;
-    EXPECT_CALL(*m_scheduler_worker_mock, try_open_transmission_channel()).Times(3).WillRepeatedly([&]() {
+    EXPECT_CALL(*m_scheduler_mock, try_open_transmission_channel()).Times(3).WillRepeatedly([&]() {
         std::unique_lock v_lock(v_dummy_mutex);
         gempba::transmission_guard v_guard(std::move(v_lock));
         return v_guard;
     });
 
-    EXPECT_CALL(*m_scheduler_worker_mock, force_push(testing::_, testing::_))
+    EXPECT_CALL(*m_scheduler_mock, force_push(testing::_, testing::_))
             .WillOnce([](gempba::task_packet&& p_task, const int p_function_id) {
                 EXPECT_EQ(0, p_function_id);
                 EXPECT_EQ(gempba::task_packet::EMPTY, p_task);
@@ -721,7 +710,7 @@ TEST_F(quasi_horizontal_load_balancer_test, missing_root_correction_after_prunin
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, reproduce_segfault_scenario_with_virtual_root) {
-    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
 
     std::atomic v_execution_count{0};
     std::function<void(std::thread::id, int, gempba::node)> v_dummy_function = [&v_execution_count](std::thread::id, int, const gempba::node&) {
@@ -859,7 +848,7 @@ TEST_F(quasi_horizontal_load_balancer_test, FLAKY_stress_test_root_correction_un
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, forward_root_node_with_no_parent_only_prunes) {
-    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
 
     bool v_function_called = false;
     std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node&) { v_function_called = true; };
@@ -888,10 +877,10 @@ TEST_F(quasi_horizontal_load_balancer_test, try_remote_submit_throws_without_sch
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, try_remote_submit_falls_back_to_local_when_no_channel) {
-    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
     v_balancer.set_thread_pool_size(2);
 
-    EXPECT_CALL(*m_scheduler_worker_mock, try_open_transmission_channel()).WillOnce(testing::Return(std::nullopt));
+    EXPECT_CALL(*m_scheduler_mock, try_open_transmission_channel()).WillOnce(testing::Return(std::nullopt));
 
     std::atomic<bool> v_fn_called{false};
     std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node&) { v_fn_called = true; };
@@ -910,7 +899,7 @@ TEST_F(quasi_horizontal_load_balancer_test, try_remote_submit_falls_back_to_loca
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, try_local_submit_when_pool_full_falls_back_to_forward) {
-    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
     v_balancer.set_thread_pool_size(1);
 
     std::promise<void> v_started;
@@ -941,7 +930,7 @@ TEST_F(quasi_horizontal_load_balancer_test, try_local_submit_when_pool_full_fall
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, get_root_returns_null_for_unknown_thread) {
-    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
 
     std::thread v_thread([] {});
     const std::thread::id v_unknown_id = v_thread.get_id();
@@ -952,7 +941,7 @@ TEST_F(quasi_horizontal_load_balancer_test, get_root_returns_null_for_unknown_th
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, send_local_throws_when_node_is_already_consumed) {
-    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
     v_balancer.set_thread_pool_size(2); // guarantee pool is ready before send() inspects it
     v_balancer.wait();
 
@@ -966,7 +955,7 @@ TEST_F(quasi_horizontal_load_balancer_test, send_local_throws_when_node_is_alrea
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, send_local_discards_lazy_node_when_not_worthy) {
-    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
     v_balancer.set_thread_pool_size(2); // guarantee pool is ready before send() inspects it
     v_balancer.wait();
 
@@ -988,10 +977,10 @@ TEST_F(quasi_horizontal_load_balancer_test, send_local_discards_lazy_node_when_n
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, send_remote_throws_when_node_is_already_consumed) {
-    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
 
     std::mutex v_channel_mutex;
-    EXPECT_CALL(*m_scheduler_worker_mock, try_open_transmission_channel()).WillOnce([&]() -> std::optional<gempba::transmission_guard> {
+    EXPECT_CALL(*m_scheduler_mock, try_open_transmission_channel()).WillOnce([&]() -> std::optional<gempba::transmission_guard> {
         std::unique_lock v_lock(v_channel_mutex);
         return gempba::transmission_guard(std::move(v_lock));
     });
@@ -1006,10 +995,10 @@ TEST_F(quasi_horizontal_load_balancer_test, send_remote_throws_when_node_is_alre
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, send_remote_discards_lazy_node_when_not_worthy) {
-    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
 
     std::mutex v_channel_mutex;
-    EXPECT_CALL(*m_scheduler_worker_mock, try_open_transmission_channel()).WillOnce([&]() -> std::optional<gempba::transmission_guard> {
+    EXPECT_CALL(*m_scheduler_mock, try_open_transmission_channel()).WillOnce([&]() -> std::optional<gempba::transmission_guard> {
         std::unique_lock v_lock(v_channel_mutex);
         return gempba::transmission_guard(std::move(v_lock));
     });
@@ -1032,14 +1021,14 @@ TEST_F(quasi_horizontal_load_balancer_test, send_remote_discards_lazy_node_when_
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, send_remote_continues_after_top_level_push) {
-    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
 
     std::mutex v_channel_mutex;
-    EXPECT_CALL(*m_scheduler_worker_mock, try_open_transmission_channel()).Times(3).WillRepeatedly([&]() -> std::optional<gempba::transmission_guard> {
+    EXPECT_CALL(*m_scheduler_mock, try_open_transmission_channel()).Times(3).WillRepeatedly([&]() -> std::optional<gempba::transmission_guard> {
         std::unique_lock v_lock(v_channel_mutex);
         return gempba::transmission_guard(std::move(v_lock));
     });
-    EXPECT_CALL(*m_scheduler_worker_mock, force_push(testing::_, testing::_)).Times(3).WillRepeatedly([](gempba::task_packet&&, int) { return 1u; });
+    EXPECT_CALL(*m_scheduler_mock, force_push(testing::_, testing::_)).Times(3).WillRepeatedly([](gempba::task_packet&&, int) { return 1u; });
 
     std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node&) { FAIL(); };
     const std::function<gempba::task_packet(int)> v_serializer = [](int) { return gempba::task_packet::EMPTY; };
@@ -1062,7 +1051,7 @@ TEST_F(quasi_horizontal_load_balancer_test, send_remote_continues_after_top_leve
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, send_local_returns_false_on_mutex_contention) {
-    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
 
     bool v_fn_b_called = false;
     std::function<void(std::thread::id, int, gempba::node)> v_fn_b = [&](std::thread::id, int, const gempba::node&) { v_fn_b_called = true; };
@@ -1079,7 +1068,7 @@ TEST_F(quasi_horizontal_load_balancer_test, send_local_returns_false_on_mutex_co
     std::promise<void> v_release;
     const auto v_release_future = v_release.get_future().share();
 
-    EXPECT_CALL(*m_scheduler_worker_mock, try_open_transmission_channel()).WillOnce([&]() -> std::optional<gempba::transmission_guard> {
+    EXPECT_CALL(*m_scheduler_mock, try_open_transmission_channel()).WillOnce([&]() -> std::optional<gempba::transmission_guard> {
         {
             std::scoped_lock v_lk(v_started_mutex);
             v_started = true;
@@ -1109,7 +1098,7 @@ TEST_F(quasi_horizontal_load_balancer_test, send_local_returns_false_on_mutex_co
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, send_remote_returns_false_on_mutex_contention) {
-    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
 
     bool v_fn_b_called = false;
     std::function<void(std::thread::id, int, gempba::node)> v_fn_b = [&](std::thread::id, int, const gempba::node&) { v_fn_b_called = true; };
@@ -1126,7 +1115,7 @@ TEST_F(quasi_horizontal_load_balancer_test, send_remote_returns_false_on_mutex_c
     std::promise<void> v_release;
     const auto v_release_future = v_release.get_future().share();
 
-    EXPECT_CALL(*m_scheduler_worker_mock, try_open_transmission_channel()).WillOnce([&]() -> std::optional<gempba::transmission_guard> {
+    EXPECT_CALL(*m_scheduler_mock, try_open_transmission_channel()).WillOnce([&]() -> std::optional<gempba::transmission_guard> {
         {
             std::scoped_lock v_lk(v_started_mutex);
             v_started = true;
@@ -1158,7 +1147,7 @@ TEST_F(quasi_horizontal_load_balancer_test, send_remote_returns_false_on_mutex_c
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, try_push_root_level_node_locally_throws_on_consumed_top) {
-    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
 
     std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node&) {};
     auto v_root = gempba::node_core_impl<void()>::create_dummy(v_balancer);
@@ -1175,7 +1164,7 @@ TEST_F(quasi_horizontal_load_balancer_test, try_push_root_level_node_locally_thr
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, try_push_root_level_node_locally_discards_lazy_top) {
-    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
 
     std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node&) { FAIL(); };
     const std::function<std::optional<std::tuple<int>>()> v_initializer = []() -> std::optional<std::tuple<int>> { return std::nullopt; };
@@ -1197,7 +1186,7 @@ TEST_F(quasi_horizontal_load_balancer_test, try_push_root_level_node_locally_dis
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, try_push_root_level_node_remotely_throws_on_consumed_top) {
-    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
 
     const std::function<gempba::task_packet(int)> v_serializer = [](int) { return gempba::task_packet::EMPTY; };
     const std::function<std::tuple<int>(gempba::task_packet)> v_deserializer = [](const gempba::task_packet&) { return std::make_tuple(0); };
@@ -1217,7 +1206,7 @@ TEST_F(quasi_horizontal_load_balancer_test, try_push_root_level_node_remotely_th
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, try_push_root_level_node_remotely_discards_lazy_top) {
-    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
 
     std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node&) { FAIL(); };
     const std::function<std::optional<std::tuple<int>>()> v_initializer = []() -> std::optional<std::tuple<int>> { return std::nullopt; };
@@ -1239,7 +1228,7 @@ TEST_F(quasi_horizontal_load_balancer_test, try_push_root_level_node_remotely_di
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, get_root_level_pending_node_returns_null_when_root_is_null) {
-    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
 
     std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node&) {};
     auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_balancer);
@@ -1258,7 +1247,7 @@ TEST_F(quasi_horizontal_load_balancer_test, get_root_level_pending_node_returns_
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, try_correct_root_is_a_noop_when_root_is_null) {
-    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
 
     std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node&) {};
     auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_balancer);
@@ -1277,7 +1266,7 @@ TEST_F(quasi_horizontal_load_balancer_test, try_correct_root_is_a_noop_when_root
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, try_correct_root_is_a_noop_when_node_is_root_and_leaf) {
-    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_worker_mock);
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
 
     std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node&) {};
     std::shared_ptr<gempba::node_core> v_no_parent;

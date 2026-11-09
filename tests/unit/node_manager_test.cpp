@@ -43,6 +43,7 @@
 #include <impl/load_balancing/work_stealing_load_balancer.hpp>
 #include <log_capture.hpp>
 #include <map>
+#include <scheduler_mock.hpp>
 
 /**
  * @author Andrés Pastrana
@@ -65,18 +66,6 @@ public:
     MOCK_METHOD(void, wait, (), (override));
     MOCK_METHOD(bool, is_done, (), (const, override));
     MOCK_METHOD(std::size_t, get_thread_request_count, (), (const, override));
-};
-
-class scheduler_worker_mock_nm : public gempba::scheduler::worker {
-public:
-    MOCK_METHOD(void, barrier, (), (override));
-    MOCK_METHOD(int, rank_me, (), (const, override));
-    MOCK_METHOD(int, world_size, (), (const, override));
-    MOCK_METHOD(void, run, (gempba::node_manager & p_node_manager, (std::map<int, std::shared_ptr<gempba::serial_runnable>> p_runnables)), (override));
-    MOCK_METHOD(unsigned int, force_push, (gempba::task_packet && p_task, int p_function_id), (override));
-    MOCK_METHOD(std::optional<gempba::transmission_guard>, try_open_transmission_channel, (), (override));
-    MOCK_METHOD(std::unique_ptr<gempba::stats>, get_stats, (), (const, override));
-    MOCK_METHOD(unsigned int, next_process, (), (const, override));
 };
 
 
@@ -335,7 +324,7 @@ TEST_F(node_manager_test, wait_delegates_to_balancer) {
 
 TEST(node_manager_with_scheduler_test, constructor_queries_scheduler_for_rank_and_world_size) {
     testing::NiceMock<load_balancer_mock_nm> v_balancer;
-    scheduler_worker_mock_nm v_scheduler;
+    gempba::testing_support::scheduler_mock v_scheduler;
 
     EXPECT_CALL(v_scheduler, rank_me()).Times(testing::AtLeast(1)).WillRepeatedly(testing::Return(3));
     EXPECT_CALL(v_scheduler, world_size()).Times(testing::AtLeast(1)).WillRepeatedly(testing::Return(8));

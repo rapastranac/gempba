@@ -9,12 +9,17 @@
 #include <gempba/utils/gempba_utils.hpp>
 #include <gempba/utils/result.hpp>
 #include <gempba/utils/score.hpp>
+#include <gempba/utils/task_bundle.hpp>
 #include <gempba/utils/task_packet.hpp>
 #include <gempba/utils/transmission_guard.hpp>
 #include <gempba/utils/tree.hpp>
 #include <map>
 #include <memory>
+#include <optional>
+#include <stdexcept>
+#include <string>
 #include <string_view>
+#include <vector>
 
 namespace gempba {
 
@@ -72,70 +77,80 @@ namespace gempba {
          */
         virtual void synchronize_stats() = 0;
 
-        // ————————— ↓↓↓↓  New development ↓↓↓↓ ——————————
+        /**
+         * @return whether this rank is the root, rank 0: the rank that seeds the run and reads its results
+         */
+        [[nodiscard]] bool is_root() const { return rank_me() == 0; }
 
         /**
-         * @brief The coordinator's view of the scheduler, on the rank whose @ref role_of is @ref rank_role::COORDINATOR.
+         * @brief Runs this rank's part of the search; every rank calls it and returns once the whole run has ended.
          *
-         * Keeps the name center until v5.0.0, which replaces these views (#394).
+         * @param p_node_manager this rank's node manager
+         * @param p_runnables the runnables by id, the same on every rank
+         * @param p_seed the root's first task; absent on every other rank
+         * @throws std::invalid_argument if the root passes no seed or another rank passes one
          */
-        class center : public scheduler_traits {
-        protected:
-            center() = default;
+        void run(node_manager& p_node_manager, std::map<int, std::shared_ptr<serial_runnable>> p_runnables, std::optional<task_bundle> p_seed = std::nullopt) {
+            if (is_root() != p_seed.has_value()) {
+                throw std::invalid_argument(is_root() ? "the root must pass a seed to scheduler::run" : "only the root passes a seed to scheduler::run");
+            }
+            do_run(p_node_manager, std::move(p_runnables), std::move(p_seed));
+        }
 
-        public:
-            ~center() override = default;
+        /**
+         * @return the best result found across all ranks, once @ref run has returned
+         * @throws std::logic_error on any rank but the root
+         */
+        [[nodiscard]] task_packet get_result() {
+            require_root("scheduler::get_result");
+            return do_get_result();
+        }
 
-            virtual void run(task_packet p_task, int p_runnable_id) = 0;
+        /**
+         * @return each rank's best result, indexed by rank and empty where a rank found none, once @ref run has returned
+         * @throws std::logic_error on any rank but the root
+         */
+        [[nodiscard]] std::vector<result> get_all_results() {
+            require_root("scheduler::get_all_results");
+            return do_get_all_results();
+        }
 
-            /**
-             *
-             * @return the best result found across all worker nodes
-             */
-            virtual task_packet get_result() = 0;
+        /**
+         * @brief Hands @p p_task to another rank, to run under runnable @p p_function_id.
+         * @return the rank the task is sent to
+         */
+        virtual unsigned int force_push(task_packet&& p_task, int p_function_id) = 0;
 
-            /**
-             * Each index of the returned vector corresponds to the rank of the worker node. If no result was found by a worker node, the corresponding index will contain an empty result.
-             *
-             * Also, for rank 0 (the coordinator), the corresponding index will contain an empty result, as the coordinator does not perform any computations.
-             *
-             * @return  all results found across all worker nodes
-             */
-            virtual std::vector<result> get_all_results() = 0;
-        };
+        /**
+         * @brief Attempts to open the transmission channel.
+         *
+         * This method attempts to open the transmission channel. The implementation should
+         * handle any necessary initialization or acquisition of resources, including mutexes
+         * or other synchronization mechanisms.
+         *
+         *
+         * @warning The method should be implemented to handle potential race conditions and
+         *          ensure that the resource is properly managed, especially if multiple threads
+         *          might interact with the transmission channel concurrently.
+         */
+        virtual std::optional<transmission_guard> try_open_transmission_channel() = 0;
 
-        class worker : public scheduler_traits {
-        protected:
-            worker() = default;
+    protected:
+        /// @brief This rank's part of @ref run; @p p_seed is set exactly when this rank is the root.
+        virtual void do_run(node_manager& p_node_manager, std::map<int, std::shared_ptr<serial_runnable>> p_runnables, std::optional<task_bundle> p_seed) = 0;
 
-        public:
-            ~worker() override = default;
+        /// @brief @ref get_result on the root.
+        virtual task_packet do_get_result() = 0;
 
-            virtual void run(node_manager& p_node_manager, std::map<int, std::shared_ptr<serial_runnable>> p_runnables) = 0;
+        /// @brief @ref get_all_results on the root.
+        virtual std::vector<result> do_get_all_results() = 0;
 
-            virtual unsigned int force_push(task_packet&& p_task, int p_function_id) = 0;
-
-
-            [[nodiscard]] virtual unsigned int next_process() const = 0;
-
-            /**
-             * @brief Attempts to open the transmission channel.
-             *
-             * This method attempts to open the transmission channel. The implementation should
-             * handle any necessary initialization or acquisition of resources, including mutexes
-             * or other synchronization mechanisms.
-             *
-             *
-             * @warning The method should be implemented to handle potential race conditions and
-             *          ensure that the resource is properly managed, especially if multiple threads
-             *          might interact with the transmission channel concurrently.
-             */
-            virtual std::optional<transmission_guard> try_open_transmission_channel() = 0;
-        };
-
-        virtual center& center_view() = 0;
-
-        virtual worker& worker_view() = 0;
+    private:
+        void require_root(const std::string_view p_call) const {
+            if (!is_root()) {
+                throw std::logic_error(std::string(p_call) + " is only available on the root, rank 0");
+            }
+        }
     };
 } // namespace gempba
 
