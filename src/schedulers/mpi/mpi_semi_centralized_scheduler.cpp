@@ -44,7 +44,6 @@ namespace gempba {
                 m_sent_tasks++;
                 m_total_requests_number++;
                 m_stats.m_sent_task_count++;
-                m_stats.m_total_requested_tasks++;
 
                 const int v_destination = m_destination_rank;
                 const auto v_send_start = std::chrono::steady_clock::now();

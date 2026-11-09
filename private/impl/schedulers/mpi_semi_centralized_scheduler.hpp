@@ -392,7 +392,6 @@ namespace gempba {
             notify_running_state();
             m_received_tasks++;
             m_stats.m_received_task_count++;
-            m_stats.m_total_requested_tasks++;
 
             if (auto* v_telemetry = telemetry::get()) {
                 v_telemetry->record_worker_running();
@@ -671,7 +670,6 @@ namespace gempba {
                 }
             }
             m_total_requests_number++;
-            m_stats.m_total_requested_tasks++;
         }
 
         void process_available(const MPI_Status& p_status) {
@@ -679,7 +677,6 @@ namespace gempba {
             ++m_nodes_available;
             --m_nodes_running;
             m_total_requests_number++;
-            m_stats.m_total_requested_tasks++;
             m_stats.m_coordinator_messages_handled++;
             if (auto* v_telemetry = telemetry::get()) {
                 v_telemetry->record_coordinator_state_msg();
@@ -757,7 +754,6 @@ namespace gempba {
             success++;
             spdlog::debug("SUCCESSFUL updates: {}, m_global_score updated to : {} by rank {}\n", success, m_global_score.to_string(), p_status.MPI_SOURCE);
             m_total_requests_number++;
-            m_stats.m_total_requested_tasks++;
         }
 
         /*	each node has an array containing its children were it is going to send tasks,
@@ -823,7 +819,6 @@ namespace gempba {
                     case AVAILABLE_STATE: {
                         consume_int_flag(v_status, m_world_communicator);
                         m_total_requests_number++;
-                        m_stats.m_total_requested_tasks++;
                         m_stats.m_coordinator_messages_handled++;
                         if (auto* v_telemetry = telemetry::get()) {
                             v_telemetry->record_coordinator_state_msg();
@@ -878,7 +873,6 @@ namespace gempba {
             m_sent_tasks++;
             m_total_requests_number++;
             m_stats.m_sent_task_count++;
-            m_stats.m_total_requested_tasks++;
             m_stats.m_coordinator_messages_handled++;
 
             if (auto* v_telemetry = telemetry::get()) {

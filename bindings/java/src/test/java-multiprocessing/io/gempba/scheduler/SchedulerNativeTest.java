@@ -186,7 +186,6 @@ class SchedulerNativeTest {
             String at = " at rank " + rs.rank;
             assertInstanceOf(Long.class, rs.get("received_task_count"), "received_task_count" + at);
             assertInstanceOf(Long.class, rs.get("sent_task_count"), "sent_task_count" + at);
-            assertInstanceOf(Long.class, rs.get("total_requested_tasks"), "total_requested_tasks" + at);
             assertInstanceOf(Long.class, rs.get("total_thread_requests"), "total_thread_requests" + at);
             assertInstanceOf(Long.class, rs.get("coordinator_messages_handled"), "coordinator_messages_handled" + at);
             assertInstanceOf(Double.class, rs.get("idle_time"), "idle_time" + at);
