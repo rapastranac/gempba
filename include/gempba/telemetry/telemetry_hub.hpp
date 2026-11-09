@@ -153,9 +153,6 @@ namespace gempba::telemetry {
         /// @return The latest frame of rank @p p_rank, if one has been received.
         [[nodiscard]] std::optional<worker_frame> latest_rank_frame(std::uint32_t p_rank) const;
 
-        /// @deprecated Use @ref latest_rank_frame. Removed in v5.0.0 (#373).
-        [[deprecated("use latest_rank_frame")]] [[nodiscard]] std::optional<worker_frame> latest_worker_frame(std::uint32_t p_rank) const;
-
         /// @return The latest node_frame of the host whose sentinel is rank @p p_sentinel_rank, if one has been received.
         [[nodiscard]] std::optional<node_frame> latest_node_frame(std::uint32_t p_sentinel_rank) const;
 
@@ -209,23 +206,11 @@ namespace gempba::telemetry {
         /// Set the telemetry interval at which rank frames, and each host sentinel's node frame, are emitted. Fans out to other ranks.
         void set_interval_ms(std::uint32_t p_interval_ms) noexcept;
 
-        /// @deprecated Use @ref set_interval_ms. Removed in v5.0.0 (#373).
-        [[deprecated("use set_interval_ms")]] void set_worker_interval_ms(std::uint32_t p_interval_ms) noexcept;
-
-        /// @deprecated Does nothing: node frames follow @ref set_interval_ms since v4.3.0. Removed in the next breaking release.
-        [[deprecated("node frames follow set_interval_ms")]] void set_node_interval_ms(std::uint32_t p_interval_ms) noexcept;
-
         /// Promote this rank to its host's sentinel; it will start emitting node frames.
         void mark_as_node_sentinel() noexcept;
 
         /// @return The current telemetry interval, in milliseconds.
         [[nodiscard]] std::uint32_t interval_ms() const noexcept;
-
-        /// @deprecated Use @ref interval_ms. Removed in v5.0.0 (#373).
-        [[deprecated("use interval_ms")]] [[nodiscard]] std::uint32_t worker_interval_ms() const noexcept;
-
-        /// @deprecated Node frames follow the telemetry interval since v4.3.0, so this returns @ref interval_ms. Removed in the next breaking release.
-        [[deprecated("node frames follow interval_ms")]] [[nodiscard]] std::uint32_t node_interval_ms() const noexcept;
 
         /// @return whether a @ref control_kind::PAUSE holds; frames are neither published nor ingested until a @ref control_kind::RESUME.
         [[nodiscard]] bool paused() const noexcept;

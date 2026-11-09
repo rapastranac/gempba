@@ -155,7 +155,7 @@ namespace gempba::telemetry {
 
         // Force a final snapshot so the aggregator (and any consumer reading
         // it) reflects post-wait counters, not the snapshot taken up to one
-        // worker_interval_ms before completion.
+        // interval before completion.
         if (m_transport) {
             m_seq_no.fetch_add(1, std::memory_order_relaxed);
             worker_frame v_final{};
@@ -422,8 +422,6 @@ namespace gempba::telemetry {
         return v_it->second;
     }
 
-    std::optional<worker_frame> telemetry_hub::latest_worker_frame(const std::uint32_t p_rank) const { return latest_rank_frame(p_rank); }
-
     std::optional<node_frame> telemetry_hub::latest_node_frame(const std::uint32_t p_sentinel_rank) const {
         if (!m_aggregator)
             return std::nullopt;
@@ -540,17 +538,9 @@ namespace gempba::telemetry {
 
     void telemetry_hub::set_interval_ms(const std::uint32_t p_interval_ms) noexcept { m_interval_ms.store(p_interval_ms, std::memory_order_relaxed); }
 
-    void telemetry_hub::set_worker_interval_ms(const std::uint32_t p_interval_ms) noexcept { set_interval_ms(p_interval_ms); }
-
     void telemetry_hub::mark_as_node_sentinel() noexcept { m_is_sentinel.store(true, std::memory_order_relaxed); }
 
     std::uint32_t telemetry_hub::interval_ms() const noexcept { return m_interval_ms.load(std::memory_order_relaxed); }
-
-    std::uint32_t telemetry_hub::worker_interval_ms() const noexcept { return interval_ms(); }
-
-    void telemetry_hub::set_node_interval_ms(std::uint32_t) noexcept {}
-
-    std::uint32_t telemetry_hub::node_interval_ms() const noexcept { return interval_ms(); }
 
     bool telemetry_hub::paused() const noexcept { return m_paused.load(std::memory_order_relaxed); }
 

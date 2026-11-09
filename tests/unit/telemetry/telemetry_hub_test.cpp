@@ -424,40 +424,6 @@ namespace {
         EXPECT_FALSE(v_hub.snapshot_outstanding());
     }
 
-    TEST_F(telemetry_hub_test, the_deprecated_node_interval_calls_follow_the_telemetry_interval) {
-        gempba::telemetry::telemetry_hub v_hub;
-        v_hub.set_interval_ms(250);
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-        v_hub.set_node_interval_ms(2000);
-        const std::uint32_t v_node_interval = v_hub.node_interval_ms();
-#pragma GCC diagnostic pop
-
-        EXPECT_EQ(250u, v_node_interval);
-        EXPECT_EQ(250u, v_hub.interval_ms());
-    }
-
-    TEST_F(telemetry_hub_test, the_deprecated_worker_named_calls_forward_to_the_rank_named_ones) {
-        gempba::telemetry::telemetry_hub v_hub;
-        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-        v_hub.set_worker_interval_ms(0);
-        const std::uint32_t v_worker_interval = v_hub.worker_interval_ms();
-        v_hub.tick_if_due();
-        const auto v_worker_frame = v_hub.latest_worker_frame(0);
-#pragma GCC diagnostic pop
-
-        EXPECT_EQ(0u, v_worker_interval);
-        EXPECT_EQ(v_hub.interval_ms(), v_worker_interval);
-        ASSERT_TRUE(v_worker_frame.has_value());
-        ASSERT_TRUE(v_hub.latest_rank_frame(0).has_value());
-        EXPECT_EQ(v_hub.latest_rank_frame(0)->m_seq_no, v_worker_frame->m_seq_no);
-        v_hub.shutdown();
-    }
-
     TEST_F(telemetry_hub_test, worker_scheduler_times_fit_in_the_run_and_stop_at_its_end) {
         using clock = std::chrono::steady_clock;
         gempba::telemetry::telemetry_hub v_hub;
