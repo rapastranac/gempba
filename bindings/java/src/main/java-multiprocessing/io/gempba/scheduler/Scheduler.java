@@ -23,18 +23,18 @@ import java.util.*;
  * Scheduler sched = GemPBA.createScheduler(SchedulerTopology.SEMI_CENTRALIZED);
  * sched.setGoal(Goal.MAXIMISE, ScoreType.I32);
  *
- * if (sched.rankMe() == 0) {
- *     sched.center().run(initialTaskBytes, RUNNABLE_ID);
- *     byte[] result = sched.center().getResult();
- * } else {
- *     LoadBalancer lb  = GemPBA.createLoadBalancer(BalancingPolicy.QUASI_HORIZONTAL);
- *     NodeManager  nm  = GemPBA.createNodeManager(lb);
- *     nm.setThreadPoolSize(4);
- *     nm.setScore(Score.make(Integer.MIN_VALUE));
+ * LoadBalancer lb = GemPBA.createLoadBalancer(BalancingPolicy.QUASI_HORIZONTAL, sched);
+ * NodeManager  nm = GemPBA.createNodeManager(lb, sched);
+ * nm.setThreadPoolSize(4);
+ * nm.setScore(Score.make(Integer.MIN_VALUE));
  *
- *     Map<Integer, SerialRunnable> runnables = Map.of(
- *         RUNNABLE_ID, GemPBA.runnableReturnNone(RUNNABLE_ID, (tid, bytes) -> explore(tid, bytes)));
- *     sched.worker().run(nm, runnables);
+ * Map<Integer, SerialRunnable> runnables = Map.of(
+ *     RUNNABLE_ID, GemPBA.runnableReturnNone(RUNNABLE_ID, (tid, bytes) -> explore(tid, bytes)));
+ * if (sched.isRoot()) {
+ *     sched.run(nm, runnables, initialTaskBytes, RUNNABLE_ID);
+ *     byte[] result = sched.getResult();
+ * } else {
+ *     sched.run(nm, runnables);
  * }
  * GemPBA.shutdown();
  * }</pre>
@@ -145,160 +145,80 @@ public final class Scheduler {
         return Collections.unmodifiableList(result);
     }
 
+    // ─── Run and the root's results ───────────────────────────────────────────
+
     /**
-     * Returns the coordinator view.  Call only from rank 0.
+     * Whether this rank is the root, rank 0: the rank that seeds the run and
+     * reads its results.
      *
-     * <p>Equivalent to {@code scheduler.center_view()} in C++.
+     * <p>Equivalent to {@code scheduler.is_root()} in C++.
      */
-    public Center center() {
-        return new Center(GemPBANative.Scheduler.getCenterHandle(handle));
+    public boolean isRoot() {
+        return GemPBANative.Scheduler.isRoot(handle);
     }
 
     /**
-     * Returns the worker view.  Call from all non-zero ranks.
+     * Runs this rank's part of the search on a rank other than the root;
+     * blocks until the whole run has ended.
      *
-     * <p>Equivalent to {@code scheduler.worker_view()} in C++.
+     * <p>Equivalent to {@code scheduler.run(node_manager, runnables)} in C++.
+     *
+     * @param nm        the local node manager that owns the thread pool
+     * @param runnables map from integer ID to the corresponding {@link SerialRunnable}, the same on every rank
      */
-    public Worker worker() {
-        return new Worker(GemPBANative.Scheduler.getWorkerHandle(handle));
+    public void run(NodeManager nm, Map<Integer, SerialRunnable> runnables) {
+        run(nm, runnables, null, 0);
     }
 
-    // ─── Center ───────────────────────────────────────────────────────────────
-
     /**
-     * MPI coordinator view of the scheduler.
+     * Runs this rank's part of the search; every rank calls it, and it blocks
+     * until the whole run has ended.  Only the root passes a seed.
      *
-     * <p>Mirrors {@code gempba::scheduler::center} in C++.
+     * <p>Equivalent to {@code scheduler.run(node_manager, runnables, seed)} in C++.
+     *
+     * @param nm             the local node manager that owns the thread pool
+     * @param runnables      map from integer ID to the corresponding {@link SerialRunnable}, the same on every rank
+     * @param seed           the root's first task, serialised; {@code null} on every other rank
+     * @param seedRunnableId ID of the {@link SerialRunnable} that runs the seed; ignored when {@code seed} is {@code null}
      */
-    public static final class Center {
-
-        private final long handle;
-
-        Center(long handle) {
-            this.handle = handle;
+    public void run(NodeManager nm, Map<Integer, SerialRunnable> runnables, byte[] seed, int seedRunnableId) {
+        int n = runnables.size();
+        int[] ids = new int[n];
+        long[] handles = new long[n];
+        int i = 0;
+        for (Map.Entry<Integer, SerialRunnable> e : runnables.entrySet()) {
+            ids[i] = e.getKey();
+            handles[i] = e.getValue().handle;
+            i++;
         }
-
-        /**
-         * MPI barrier — see {@link Scheduler#barrier()}.
-         */
-        public void barrier() {
-            GemPBANative.Scheduler.Center.barrier(handle);
-        }
-
-        /**
-         * Rank of this process — see {@link Scheduler#rankMe()}.
-         */
-        public int rankMe() {
-            return GemPBANative.Scheduler.Center.rankMe(handle);
-        }
-
-        /**
-         * World size — see {@link Scheduler#worldSize()}.
-         */
-        public int worldSize() {
-            return GemPBANative.Scheduler.Center.worldSize(handle);
-        }
-
-        /**
-         * Starts the coordinator loop, dispatching the initial task to a worker
-         * and orchestrating the distributed search until completion.
-         *
-         * <p>Equivalent to {@code center.run(task, runnable_id)} in C++.
-         * Blocks until the distributed search finishes.
-         *
-         * @param task       serialised initial arguments for the root task
-         * @param runnableId ID of the {@link SerialRunnable} registered on workers
-         */
-        public void run(byte[] task, int runnableId) {
-            GemPBANative.Scheduler.Center.run(handle, task, runnableId);
-        }
-
-        /**
-         * Returns the best result found across all worker processes.
-         *
-         * <p>Equivalent to {@code center.get_result()} in C++.
-         * Call after {@link #run} returns.
-         *
-         * @return serialised best result bytes, or {@code null} if no result was found
-         */
-        public byte[] getResult() {
-            return GemPBANative.Scheduler.Center.getResult(handle);
-        }
-
-        /**
-         * Returns all results from all worker processes.
-         *
-         * <p>Equivalent to {@code center.get_all_results()} in C++.
-         * The element at index {@code i} corresponds to rank {@code i};
-         * rank 0 (the center itself) is always {@code null}.
-         *
-         * @return list of per-rank result bytes; elements may be {@code null}
-         */
-        public List<byte[]> getAllResults() {
-            byte[][] raw = GemPBANative.Scheduler.Center.getAllResults(handle);
-            return (raw == null) ? Collections.emptyList() : Arrays.asList(raw);
-        }
+        GemPBANative.Scheduler.run(handle, nm.handle, ids, handles, seed, seedRunnableId);
     }
 
-    // ─── Worker ───────────────────────────────────────────────────────────────
+    /**
+     * Returns the best result found across all ranks.  Call on the root after
+     * {@link #run} returns.
+     *
+     * <p>Equivalent to {@code scheduler.get_result()} in C++.
+     *
+     * @return serialised best result bytes, empty if no result was found
+     */
+    public byte[] getResult() {
+        return GemPBANative.Scheduler.getResult(handle);
+    }
 
     /**
-     * MPI worker view of the scheduler.
+     * Returns each rank's best result.  Call on the root after {@link #run}
+     * returns.
      *
-     * <p>Mirrors {@code gempba::scheduler::worker} in C++.
+     * <p>Equivalent to {@code scheduler.get_all_results()} in C++.
+     * The element at index {@code i} corresponds to rank {@code i}, and is
+     * {@code null} where that rank found none, such as rank 0 under the
+     * built-in schedulers, whose coordinator runs no tasks.
+     *
+     * @return list of per-rank result bytes; elements may be {@code null}
      */
-    public static final class Worker {
-
-        /**
-         * Handle to the C++ {@code gempba::scheduler::worker*}.
-         */
-        public final long handle;
-
-        Worker(long handle) {
-            this.handle = handle;
-        }
-
-        /**
-         * MPI barrier — see {@link Scheduler#barrier()}.
-         */
-        public void barrier() {
-            GemPBANative.Scheduler.Worker.barrier(handle);
-        }
-
-        /**
-         * Rank of this process — see {@link Scheduler#rankMe()}.
-         */
-        public int rankMe() {
-            return GemPBANative.Scheduler.Worker.rankMe(handle);
-        }
-
-        /**
-         * World size — see {@link Scheduler#worldSize()}.
-         */
-        public int worldSize() {
-            return GemPBANative.Scheduler.Worker.worldSize(handle);
-        }
-
-        /**
-         * Enters the MPI worker loop; blocks until the distributed search is done.
-         *
-         * <p>Equivalent to {@code worker.run(node_manager, runnables)} in C++.
-         *
-         * @param nm        the local node manager that owns the thread pool
-         * @param runnables map from integer ID to the corresponding {@link SerialRunnable}
-         */
-        public void run(NodeManager nm, Map<Integer, SerialRunnable> runnables) {
-            int n = runnables.size();
-            int[] ids = new int[n];
-            long[] handles = new long[n];
-            int i = 0;
-            for (Map.Entry<Integer, SerialRunnable> e : runnables.entrySet()) {
-                ids[i] = e.getKey();
-                handles[i] = e.getValue().handle;
-                i++;
-            }
-            GemPBANative.Scheduler.Worker.run(handle, nm.handle, ids, handles);
-        }
-
+    public List<byte[]> getAllResults() {
+        byte[][] raw = GemPBANative.Scheduler.getAllResults(handle);
+        return (raw == null) ? Collections.emptyList() : Arrays.asList(raw);
     }
 }

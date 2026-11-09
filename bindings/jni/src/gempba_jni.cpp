@@ -278,16 +278,16 @@ namespace {
         recs->push_back({rank, std::string(label ? label : ""), *value});
     }
 
-    // ── Center.getAllResults visitor + counter ──────────────────────────────
+    // ── Scheduler.getAllResults visitor + counter ──────────────────────────────
 
     struct results_collector {
         JNIEnv* env;
         jobjectArray array;
     };
 
-    extern "C" void center_results_counter(void* user_data, size_t /*index*/, gempba_bytes_t /*bytes*/) { ++(*static_cast<size_t*>(user_data)); }
+    extern "C" void results_counter(void* user_data, size_t /*index*/, gempba_bytes_t /*bytes*/) { ++(*static_cast<size_t*>(user_data)); }
 
-    extern "C" void center_results_visitor(void* user_data, size_t index, gempba_bytes_t bytes) {
+    extern "C" void results_visitor(void* user_data, size_t index, gempba_bytes_t bytes) {
         auto* c = static_cast<results_collector*>(user_data);
         jbyteArray elem = bytes_to_jbytearray(c->env, bytes);
         c->env->SetObjectArrayElement(c->array, static_cast<jsize>(index), elem);
@@ -357,8 +357,6 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /*reserved*/) {
 #define JNI_SR(n) CAT(_JNI_BASE, _00024SerialRunnable_##n)
 #define JNI_MP(n) CAT(_JNI_BASE, _00024MP_##n)
 #define JNI_SCHED(n) CAT(_JNI_BASE, _00024Scheduler_##n)
-#define JNI_CENTER(n) CAT(_JNI_BASE, _00024Scheduler_00024Center_##n)
-#define JNI_WORKER(n) CAT(_JNI_BASE, _00024Scheduler_00024Worker_##n)
 #define JNI_TELEM(n) CAT(_JNI_BASE, _00024Telemetry_##n)
 
 extern "C" {
@@ -500,9 +498,8 @@ extern "C" {
         return to_jlong(node);
     }
 
-    JNIEXPORT jlong JNICALL JNI_MP(createLoadBalancer)(JNIEnv* env, jclass, jint policy_ordinal, jlong worker_handle) {
-        auto lb =
-                gempba_mp_create_load_balancer(static_cast<gempba_balancing_policy_t>(policy_ordinal), worker_handle == 0L ? nullptr : from_jlong<gempba_scheduler_worker_t>(worker_handle));
+    JNIEXPORT jlong JNICALL JNI_MP(createLoadBalancer)(JNIEnv* env, jclass, jint policy_ordinal, jlong scheduler_handle) {
+        auto lb = gempba_mp_create_load_balancer(static_cast<gempba_balancing_policy_t>(policy_ordinal), scheduler_handle == 0L ? nullptr : from_jlong<gempba_scheduler_t>(scheduler_handle));
         if (lb == nullptr) {
             throw_from_last_error(env, "native MP.createLoadBalancer failed");
             return 0L;
@@ -510,8 +507,8 @@ extern "C" {
         return to_jlong(lb);
     }
 
-    JNIEXPORT jlong JNICALL JNI_MP(createNodeManager)(JNIEnv* env, jclass, jlong lb_handle, jlong worker_handle) {
-        auto nm = gempba_mp_create_node_manager(from_jlong<gempba_load_balancer_t>(lb_handle), worker_handle == 0L ? nullptr : from_jlong<gempba_scheduler_worker_t>(worker_handle));
+    JNIEXPORT jlong JNICALL JNI_MP(createNodeManager)(JNIEnv* env, jclass, jlong lb_handle, jlong scheduler_handle) {
+        auto nm = gempba_mp_create_node_manager(from_jlong<gempba_load_balancer_t>(lb_handle), scheduler_handle == 0L ? nullptr : from_jlong<gempba_scheduler_t>(scheduler_handle));
         if (nm == nullptr) {
             throw_from_last_error(env, "native MP.createNodeManager failed");
             return 0L;
@@ -763,66 +760,9 @@ extern "C" {
         return result;
     }
 
-    JNIEXPORT jlong JNICALL JNI_SCHED(getCenterHandle)(JNIEnv*, jclass, jlong handle) { return to_jlong(gempba_scheduler_center_view(from_jlong<gempba_scheduler_t>(handle))); }
+    JNIEXPORT jboolean JNICALL JNI_SCHED(isRoot)(JNIEnv*, jclass, jlong handle) { return gempba_scheduler_is_root(from_jlong<gempba_scheduler_t>(handle)) ? JNI_TRUE : JNI_FALSE; }
 
-    JNIEXPORT jlong JNICALL JNI_SCHED(getWorkerHandle)(JNIEnv*, jclass, jlong handle) { return to_jlong(gempba_scheduler_worker_view(from_jlong<gempba_scheduler_t>(handle))); }
-
-    // ─── gempba::scheduler::center ──────────────────────────────────────────────
-
-    JNIEXPORT void JNICALL JNI_CENTER(barrier)(JNIEnv*, jclass, jlong handle) { gempba_scheduler_center_barrier(from_jlong<gempba_scheduler_center_t>(handle)); }
-
-    JNIEXPORT jint JNICALL JNI_CENTER(rankMe)(JNIEnv*, jclass, jlong handle) { return static_cast<jint>(gempba_scheduler_center_rank_me(from_jlong<gempba_scheduler_center_t>(handle))); }
-
-    JNIEXPORT jint JNICALL JNI_CENTER(worldSize)(JNIEnv*, jclass, jlong handle) {
-        return static_cast<jint>(gempba_scheduler_center_world_size(from_jlong<gempba_scheduler_center_t>(handle)));
-    }
-
-    JNIEXPORT void JNICALL JNI_CENTER(run)(JNIEnv* env, jclass, jlong handle, jbyteArray task, jint runnable_id) {
-        auto borrow = borrow_jbytearray(env, task);
-        if (gempba_scheduler_center_run(from_jlong<gempba_scheduler_center_t>(handle), borrow.bytes, static_cast<int32_t>(runnable_id)) != GEMPBA_OK) {
-            throw_from_last_error(env, "native Center.run failed");
-        }
-    }
-
-    JNIEXPORT jbyteArray JNICALL JNI_CENTER(getResult)(JNIEnv* env, jclass, jlong handle) {
-        gempba_buffer_t buf{nullptr, 0};
-        if (gempba_scheduler_center_get_result(from_jlong<gempba_scheduler_center_t>(handle), &buf) != GEMPBA_OK) {
-            throw_from_last_error(env, "native Center.getResult failed");
-            return nullptr;
-        }
-        if (buf.data == nullptr || buf.len == 0)
-            return bytes_to_jbytearray(env, gempba_bytes_t{nullptr, 0});
-        jbyteArray arr = bytes_to_jbytearray(env, gempba_bytes_t{buf.data, buf.len});
-        gempba_buffer_free(&buf);
-        return arr;
-    }
-
-    JNIEXPORT jobjectArray JNICALL JNI_CENTER(getAllResults)(JNIEnv* env, jclass, jlong handle) {
-        auto h = from_jlong<gempba_scheduler_center_t>(handle);
-
-        size_t count = 0;
-        gempba_scheduler_center_visit_all_results(h, center_results_counter, &count);
-
-        jclass byte_array_cls = env->FindClass("[B");
-        jobjectArray arr = env->NewObjectArray(static_cast<jsize>(count), byte_array_cls, nullptr);
-        env->DeleteLocalRef(byte_array_cls);
-
-        results_collector c{env, arr};
-        gempba_scheduler_center_visit_all_results(h, center_results_visitor, &c);
-        return arr;
-    }
-
-    // ─── gempba::scheduler::worker ──────────────────────────────────────────────
-
-    JNIEXPORT void JNICALL JNI_WORKER(barrier)(JNIEnv*, jclass, jlong handle) { gempba_scheduler_worker_barrier(from_jlong<gempba_scheduler_worker_t>(handle)); }
-
-    JNIEXPORT jint JNICALL JNI_WORKER(rankMe)(JNIEnv*, jclass, jlong handle) { return static_cast<jint>(gempba_scheduler_worker_rank_me(from_jlong<gempba_scheduler_worker_t>(handle))); }
-
-    JNIEXPORT jint JNICALL JNI_WORKER(worldSize)(JNIEnv*, jclass, jlong handle) {
-        return static_cast<jint>(gempba_scheduler_worker_world_size(from_jlong<gempba_scheduler_worker_t>(handle)));
-    }
-
-    JNIEXPORT void JNICALL JNI_WORKER(run)(JNIEnv* env, jclass, jlong worker_handle, jlong nm_handle, jintArray ids, jlongArray sr_handles) {
+    JNIEXPORT void JNICALL JNI_SCHED(run)(JNIEnv* env, jclass, jlong handle, jlong nm_handle, jintArray ids, jlongArray sr_handles, jbyteArray seed, jint seed_runnable_id) {
         const jsize n = env->GetArrayLength(ids);
         jint* id_elems = env->GetIntArrayElements(ids, nullptr);
         jlong* sr_elems = env->GetLongArrayElements(sr_handles, nullptr);
@@ -837,10 +777,40 @@ extern "C" {
         env->ReleaseIntArrayElements(ids, id_elems, JNI_ABORT);
         env->ReleaseLongArrayElements(sr_handles, sr_elems, JNI_ABORT);
 
-        if (gempba_scheduler_worker_run(from_jlong<gempba_scheduler_worker_t>(worker_handle), from_jlong<gempba_node_manager_t>(nm_handle), c_ids.data(), c_sr.data(),
-                                        static_cast<size_t>(n)) != GEMPBA_OK) {
-            throw_from_last_error(env, "native Worker.run failed");
+        auto seed_borrow = borrow_jbytearray(env, seed);
+        const gempba_bytes_t* seed_bytes = seed != nullptr ? &seed_borrow.bytes : nullptr;
+        if (gempba_scheduler_run(from_jlong<gempba_scheduler_t>(handle), from_jlong<gempba_node_manager_t>(nm_handle), c_ids.data(), c_sr.data(), static_cast<size_t>(n), seed_bytes,
+                                 static_cast<int32_t>(seed_runnable_id)) != GEMPBA_OK) {
+            throw_from_last_error(env, "native Scheduler.run failed");
         }
+    }
+
+    JNIEXPORT jbyteArray JNICALL JNI_SCHED(getResult)(JNIEnv* env, jclass, jlong handle) {
+        gempba_buffer_t buf{nullptr, 0};
+        if (gempba_scheduler_get_result(from_jlong<gempba_scheduler_t>(handle), &buf) != GEMPBA_OK) {
+            throw_from_last_error(env, "native Scheduler.getResult failed");
+            return nullptr;
+        }
+        if (buf.data == nullptr || buf.len == 0)
+            return bytes_to_jbytearray(env, gempba_bytes_t{nullptr, 0});
+        jbyteArray arr = bytes_to_jbytearray(env, gempba_bytes_t{buf.data, buf.len});
+        gempba_buffer_free(&buf);
+        return arr;
+    }
+
+    JNIEXPORT jobjectArray JNICALL JNI_SCHED(getAllResults)(JNIEnv* env, jclass, jlong handle) {
+        auto h = from_jlong<gempba_scheduler_t>(handle);
+
+        size_t count = 0;
+        gempba_scheduler_visit_all_results(h, results_counter, &count);
+
+        jclass byte_array_cls = env->FindClass("[B");
+        jobjectArray arr = env->NewObjectArray(static_cast<jsize>(count), byte_array_cls, nullptr);
+        env->DeleteLocalRef(byte_array_cls);
+
+        results_collector c{env, arr};
+        gempba_scheduler_visit_all_results(h, results_visitor, &c);
+        return arr;
     }
 
     // ─── gempba::telemetry (process-wide flag) ───────────────────────────────────

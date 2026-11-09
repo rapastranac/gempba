@@ -204,23 +204,22 @@ public final class GemPBANative {
         }
 
         /**
-         * Creates an MP load balancer, wiring in the scheduler worker view so
-         * that {@code try_remote_submit} can dispatch tasks to other ranks.
+         * Creates an MP load balancer, wiring in the scheduler so that
+         * {@code try_remote_submit} can dispatch tasks to other ranks.
          *
-         * @param policyOrdinal {@link io.gempba.value.BalancingPolicy} ordinal
-         * @param workerHandle  handle from {@link Scheduler#getWorkerHandle};
-         *                      {@code 0} for the center rank
+         * @param policyOrdinal   {@link io.gempba.value.BalancingPolicy} ordinal
+         * @param schedulerHandle handle from {@link Scheduler#create}; {@code 0} for single-process work
          */
-        public static native long createLoadBalancer(int policyOrdinal, long workerHandle);
+        public static native long createLoadBalancer(int policyOrdinal, long schedulerHandle);
 
         /**
          * Creates an MP node manager backed by {@code lb} and linked to the
-         * scheduler worker view.
+         * scheduler.
          *
-         * @param lbHandle     load-balancer handle from {@link #createLoadBalancer}
-         * @param workerHandle scheduler worker handle; {@code 0} for center rank
+         * @param lbHandle        load-balancer handle from {@link #createLoadBalancer}
+         * @param schedulerHandle handle from {@link Scheduler#create}; {@code 0} for single-process work
          */
-        public static native long createNodeManager(long lbHandle, long workerHandle);
+        public static native long createNodeManager(long lbHandle, long schedulerHandle);
 
         /**
          * Creates an MP explicit child node whose serialised args are stored
@@ -322,11 +321,7 @@ public final class GemPBANative {
     // ─── gempba::scheduler (MP) ──────────────────────────────────────────────
 
     /**
-     * JNI binding for {@code gempba::scheduler} and its nested
-     * {@code center} / {@code worker} views.
-     *
-     * <p>Center and worker handles are non-owning references into the scheduler
-     * object and must not be freed independently.
+     * JNI binding for {@code gempba::scheduler}.
      */
     public static final class Scheduler {
 
@@ -363,83 +358,32 @@ public final class GemPBANative {
         public static native Object[] getStats(long handle);
 
         /**
-         * Returns a non-owning handle to the scheduler's {@code center} view.
+         * Whether this rank is the root, rank 0.
          */
-        public static native long getCenterHandle(long handle);
+        public static native boolean isRoot(long handle);
 
         /**
-         * Returns a non-owning handle to the scheduler's {@code worker} view.
+         * Runs this rank's part of the search; blocks until the whole run has ended.
+         *
+         * @param handle         scheduler handle
+         * @param nmHandle       handle to the local node manager
+         * @param ids            runnable IDs (parallel array with {@code srHandles})
+         * @param srHandles      handles of the registered {@link SerialRunnable}s
+         * @param seed           the root's first task; {@code null} on every other rank
+         * @param seedRunnableId runnable ID for the seed; ignored when {@code seed} is {@code null}
          */
-        public static native long getWorkerHandle(long handle);
-
-        // ── Center ───────────────────────────────────────────────────────────
+        public static native void run(long handle, long nmHandle, int[] ids, long[] srHandles,
+                                      byte[] seed, int seedRunnableId);
 
         /**
-         * JNI binding for {@code gempba::scheduler::center}.
+         * Returns the best result bytes, empty if none.  Root only.
          */
-        public static final class Center {
-
-            static {
-                var ignored = GemPBANative.LOADED;
-            }
-
-            private Center() {
-            }
-
-            public static native void barrier(long handle);
-
-            public static native int rankMe(long handle);
-
-            public static native int worldSize(long handle);
-
-            /**
-             * Runs the coordinator loop; blocks until the search completes.
-             */
-            public static native void run(long handle, byte[] task, int runnableId);
-
-            /**
-             * Returns the best result bytes, or {@code null} if none.
-             */
-            public static native byte[] getResult(long handle);
-
-            /**
-             * Returns per-rank result bytes; rank 0 (center) is always {@code null}.
-             */
-            public static native byte[][] getAllResults(long handle);
-        }
-
-        // ── Worker ───────────────────────────────────────────────────────────
+        public static native byte[] getResult(long handle);
 
         /**
-         * JNI binding for {@code gempba::scheduler::worker}.
+         * Returns per-rank result bytes, {@code null} where a rank found none.  Root only.
          */
-        public static final class Worker {
-
-            static {
-                var ignored = GemPBANative.LOADED;
-            }
-
-            private Worker() {
-            }
-
-            public static native void barrier(long handle);
-
-            public static native int rankMe(long handle);
-
-            public static native int worldSize(long handle);
-
-            /**
-             * Enters the worker event loop; blocks until the search completes.
-             *
-             * @param workerHandle handle to the worker view
-             * @param nmHandle     handle to the local node manager
-             * @param ids          runnable IDs (parallel array with {@code srHandles})
-             * @param srHandles    handles of the registered {@link SerialRunnable}s
-             */
-            public static native void run(long workerHandle, long nmHandle,
-                                          int[] ids, long[] srHandles);
-
-        }
+        public static native byte[][] getAllResults(long handle);
     }
 
     // ─── gempba::telemetry (process-wide flag) ───────────────────────────────
