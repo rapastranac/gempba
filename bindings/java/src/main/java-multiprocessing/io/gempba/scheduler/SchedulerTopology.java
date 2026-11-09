@@ -3,7 +3,7 @@ package io.gempba.scheduler;
 /**
  * MPI scheduler topology, mirroring {@code gempba::mp::scheduler_topology}.
  *
- * <p>Passed to {@link io.gempba.GemPBA#createScheduler(SchedulerTopology, double)}.
+ * <p>Passed to {@link io.gempba.GemPBA#createScheduler(SchedulerTopology)}.
  */
 public enum SchedulerTopology {
     /**

@@ -61,7 +61,7 @@ class SchedulerNativeTest {
                 "Skipping: not in a distributed context — use the 'distributed' Maven profile"
         );
 
-        schedHandle = GemPBANative.Scheduler.create(SchedulerTopology.SEMI_CENTRALIZED.ordinal(), 3.0);
+        schedHandle = GemPBANative.Scheduler.create(SchedulerTopology.SEMI_CENTRALIZED.ordinal());
         rank = GemPBANative.Scheduler.rankMe(schedHandle);
         worldSize = GemPBANative.Scheduler.worldSize(schedHandle);
 

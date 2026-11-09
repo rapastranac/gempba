@@ -635,13 +635,13 @@ extern "C" {
 
     /* ── scheduler ─────────────────────────────────────────────────────────── */
 
-    gempba_status_t gempba_scheduler_create(gempba_scheduler_topology_t topology, double timeout, gempba_scheduler_t* out) {
+    gempba_status_t gempba_scheduler_create(gempba_scheduler_topology_t topology, gempba_scheduler_t* out) {
         GEMPBA_TRY
             if (out == nullptr) {
                 set_last_error("out is null");
                 return GEMPBA_ERR_INVALID_ARG;
             }
-            auto* sched = gempba::multiprocessing::create_scheduler(static_cast<gempba::multiprocessing::scheduler_topology>(topology), timeout);
+            auto* sched = gempba::multiprocessing::create_scheduler(static_cast<gempba::multiprocessing::scheduler_topology>(topology));
             auto wrapper = std::make_unique<gempba_scheduler_s>();
             wrapper->cpp = sched;
             *out = wrapper.release();
@@ -802,7 +802,7 @@ extern "C" {
         return GEMPBA_ERR_RUNTIME;
     }
 
-    gempba_status_t gempba_scheduler_create(gempba_scheduler_topology_t, double, gempba_scheduler_t*) {
+    gempba_status_t gempba_scheduler_create(gempba_scheduler_topology_t, gempba_scheduler_t*) {
         set_last_error(k_mp_disabled_msg);
         return GEMPBA_ERR_RUNTIME;
     }
