@@ -178,7 +178,7 @@ namespace {
         int m_failures = 0;
     };
 
-    std::uint64_t edge_bytes(const gempba::telemetry::worker_frame& p_frame) {
+    std::uint64_t edge_bytes(const gempba::telemetry::rank_frame& p_frame) {
         std::uint64_t v_sum = 0;
         for (const auto& v_edge: p_frame.m_edges_out) {
             v_sum += v_edge.m_bytes;
@@ -195,9 +195,9 @@ namespace {
         return p_done();
     }
 
-    gempba::telemetry::worker_frame own_frame(gempba::telemetry::telemetry_hub& p_hub) {
-        gempba::telemetry::worker_frame v_frame;
-        p_hub.snapshot_worker_frame(v_frame);
+    gempba::telemetry::rank_frame own_frame(gempba::telemetry::telemetry_hub& p_hub) {
+        gempba::telemetry::rank_frame v_frame;
+        p_hub.snapshot_rank_frame(v_frame);
         return v_frame;
     }
 } // namespace
@@ -238,8 +238,8 @@ int main(const int p_argc, char* p_argv[]) {
     const auto v_counter = leaf_count::run(*v_scheduler, v_max_depth);
     v_scheduler->barrier();
 
-    gempba::telemetry::worker_frame v_frame;
-    gempba::telemetry::get()->snapshot_worker_frame(v_frame);
+    gempba::telemetry::rank_frame v_frame;
+    gempba::telemetry::get()->snapshot_rank_frame(v_frame);
     v_checks.expect(edge_bytes(v_frame) == v_frame.m_bytes_sent_total, "summed edges_out bytes differ from bytes_sent_total");
     if (v_rank != 0) {
         const auto v_elapsed_us = static_cast<long long>(v_scheduler->elapsed_time() * 1e6);

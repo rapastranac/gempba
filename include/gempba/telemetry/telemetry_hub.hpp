@@ -145,13 +145,13 @@ namespace gempba::telemetry {
          * Safe alongside concurrent @c record_* calls (relaxed atomics).
          * Not @c const — the process probe maintains delta state for CPU%.
          */
-        void snapshot_worker_frame(worker_frame& p_out) noexcept;
+        void snapshot_rank_frame(rank_frame& p_out) noexcept;
 
         /// Fill @p p_out with the current host-level snapshot. Sentinel ranks only.
         void snapshot_node_frame(node_frame& p_out) noexcept;
 
         /// @return The latest frame of rank @p p_rank, if one has been received.
-        [[nodiscard]] std::optional<worker_frame> latest_rank_frame(std::uint32_t p_rank) const;
+        [[nodiscard]] std::optional<rank_frame> latest_rank_frame(std::uint32_t p_rank) const;
 
         /// @return The latest node_frame of the host whose sentinel is rank @p p_sentinel_rank, if one has been received.
         [[nodiscard]] std::optional<node_frame> latest_node_frame(std::uint32_t p_sentinel_rank) const;

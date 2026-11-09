@@ -44,7 +44,7 @@ namespace gempba::telemetry {
 
         std::uint32_t m_final_frames_received = 0;
 
-        void drain_worker_frames(const int p_tag, const worker_frame_sink& p_sink) {
+        void drain_worker_frames(const int p_tag, const rank_frame_sink& p_sink) {
             while (true) {
                 int v_flag = 0;
                 MPI_Status v_status;
@@ -59,7 +59,7 @@ namespace gempba::telemetry {
                 if (p_tag == k_tag_final_worker_frame) {
                     ++m_final_frames_received;
                 }
-                worker_frame v_frame;
+                rank_frame v_frame;
                 if (p_sink && detail::decode_worker_frame(v_buffer.data(), v_buffer.size(), v_frame)) {
                     p_sink(static_cast<std::uint32_t>(v_status.MPI_SOURCE), v_frame);
                 }
@@ -140,7 +140,7 @@ namespace gempba::telemetry {
         }
     }
 
-    void mpi_transport::publish_worker(const worker_frame& p_frame) {
+    void mpi_transport::publish_worker(const rank_frame& p_frame) {
         if (m_impl->m_comm == MPI_COMM_NULL)
             return;
 
@@ -148,7 +148,7 @@ namespace gempba::telemetry {
         m_impl->post_isend(detail::encode_worker_frame(p_frame), k_aggregator_rank, k_tag_worker_frame);
     }
 
-    void mpi_transport::publish_final_worker(const worker_frame& p_frame) {
+    void mpi_transport::publish_final_worker(const rank_frame& p_frame) {
         if (m_impl->m_comm == MPI_COMM_NULL)
             return;
 
@@ -169,7 +169,7 @@ namespace gempba::telemetry {
         m_impl->post_isend(std::move(v_buffer), k_aggregator_rank, k_tag_node_frame);
     }
 
-    void mpi_transport::poll(const worker_frame_sink& p_rank_sink, const node_frame_sink& p_node_sink) {
+    void mpi_transport::poll(const rank_frame_sink& p_rank_sink, const node_frame_sink& p_node_sink) {
         if (m_impl->m_comm == MPI_COMM_NULL)
             return;
         if (m_impl->m_rank != k_aggregator_rank)

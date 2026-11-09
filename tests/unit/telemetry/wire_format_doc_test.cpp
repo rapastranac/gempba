@@ -30,17 +30,17 @@ namespace {
     TEST(wire_format_doc_test, documents_every_key_a_broadcast_sends) {
         gempba::telemetry::topology_snapshot v_topology;
         gempba::telemetry::topology_node v_node;
-        v_node.m_worker_ids = {0, 1};
+        v_node.m_ranks = {0, 1};
         v_node.m_sockets.push_back(gempba::telemetry::topology_socket{0, "cpu", 2, 4, {0, 1, 2, 3}});
         v_topology.m_nodes.push_back(v_node);
         v_topology.m_identities.resize(2);
-        v_topology.m_identities[1].m_worker_id = 1;
+        v_topology.m_identities[1].m_rank = 1;
 
         gempba::telemetry::run_description v_run;
         v_run.m_mode = gempba::telemetry::runtime_mode::MP_MPI;
         v_run.m_markers = {{120, "phase 2", gempba::telemetry::marker_source::DASHBOARD}};
 
-        std::vector<gempba::telemetry::worker_frame> v_workers(1);
+        std::vector<gempba::telemetry::rank_frame> v_workers(1);
         v_workers[0].m_edges_out.push_back(gempba::telemetry::edge_counter{1, 64, 1});
         std::vector<gempba::telemetry::node_frame> v_nodes(1);
         v_nodes[0].m_socket_count = 1;

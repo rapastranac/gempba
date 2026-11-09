@@ -76,13 +76,13 @@ namespace gempba::telemetry {
 
     } // namespace
 
-    void serialize_worker_frame(std::string& p_out, const worker_frame& p_frame) {
+    void serialize_worker_frame(std::string& p_out, const rank_frame& p_frame) {
         p_out += "{\"rank\":";
-        emit_u32(p_out, p_frame.m_worker_id);
+        emit_u32(p_out, p_frame.m_rank);
         p_out += ",\"seq_no\":";
         emit_u32(p_out, p_frame.m_seq_no);
         p_out += ",\"rank_local_ms\":";
-        emit_u64(p_out, p_frame.m_worker_local_ms);
+        emit_u64(p_out, p_frame.m_rank_local_ms);
         p_out += ",\"tasks_started_total\":";
         emit_u64(p_out, p_frame.m_tasks_started_total);
         p_out += ",\"tasks_sent_total\":";
@@ -106,7 +106,7 @@ namespace gempba::telemetry {
         p_out += ",\"scheduler_pending_count\":";
         emit_u32(p_out, p_frame.m_scheduler_pending_count);
         p_out += ",\"idle_microseconds_per_thread\":";
-        emit_u64(p_out, p_frame.m_idle_microseconds_per_worker);
+        emit_u64(p_out, p_frame.m_idle_microseconds_per_thread);
         p_out += ",\"idle_microseconds_starved\":";
         emit_u64(p_out, p_frame.m_idle_microseconds_starved);
         p_out += ",\"idle_microseconds_imbalanced\":";
@@ -159,7 +159,7 @@ namespace gempba::telemetry {
                 p_out += ',';
             }
             p_out += "{\"to\":";
-            emit_u32(p_out, v_edge.m_dst_worker_id);
+            emit_u32(p_out, v_edge.m_dst_rank);
             p_out += ",\"bytes\":";
             emit_u64(p_out, v_edge.m_bytes);
             p_out += ",\"count\":";
@@ -172,7 +172,7 @@ namespace gempba::telemetry {
 
     void serialize_node_frame(std::string& p_out, const node_frame& p_frame) {
         p_out += "{\"sentinel_rank\":";
-        emit_u32(p_out, p_frame.m_sentinel_worker_id);
+        emit_u32(p_out, p_frame.m_sentinel_rank);
         p_out += ",\"sentinel_local_ms\":";
         emit_u64(p_out, p_frame.m_sentinel_local_ms);
         p_out += ",\"hostname\":";
@@ -216,7 +216,7 @@ namespace gempba::telemetry {
             p_out += "{\"hostname\":";
             escape_quoted(p_out, v_n.m_hostname);
             p_out += ",\"sentinel_rank\":";
-            emit_u32(p_out, v_n.m_sentinel_worker_id);
+            emit_u32(p_out, v_n.m_sentinel_rank);
             p_out += ",\"total_physical_cores\":";
             emit_u32(p_out, v_n.m_total_physical_cores);
             p_out += ",\"total_logical_cores\":";
@@ -225,10 +225,10 @@ namespace gempba::telemetry {
             emit_u64(p_out, v_n.m_mem_total_bytes);
 
             p_out += ",\"ranks\":[";
-            for (std::size_t v_j = 0; v_j < v_n.m_worker_ids.size(); ++v_j) {
+            for (std::size_t v_j = 0; v_j < v_n.m_ranks.size(); ++v_j) {
                 if (v_j > 0)
                     p_out += ',';
-                emit_u32(p_out, v_n.m_worker_ids[v_j]);
+                emit_u32(p_out, v_n.m_ranks[v_j]);
             }
             p_out += "],\"sockets\":[";
             for (std::size_t v_s = 0; v_s < v_n.m_sockets.size(); ++v_s) {
@@ -259,7 +259,7 @@ namespace gempba::telemetry {
                 p_out += ',';
             const auto& v_id = p_topology.m_identities[v_i];
             p_out += "{\"rank\":";
-            emit_u32(p_out, v_id.m_worker_id);
+            emit_u32(p_out, v_id.m_rank);
             p_out += ",\"hostname\":";
             escape_quoted(p_out, v_id.m_hostname);
             p_out += ",\"pid\":";
@@ -267,7 +267,7 @@ namespace gempba::telemetry {
             p_out += ",\"primary_socket\":";
             emit_u32(p_out, v_id.m_primary_socket);
             if (p_run) {
-                const bool v_is_coordinator = v_id.m_worker_id < p_run->m_roles.size() && p_run->m_roles[v_id.m_worker_id] == rank_role::COORDINATOR;
+                const bool v_is_coordinator = v_id.m_rank < p_run->m_roles.size() && p_run->m_roles[v_id.m_rank] == rank_role::COORDINATOR;
                 p_out += v_is_coordinator ? R"(,"role":"coordinator")" : R"(,"role":"worker")";
             }
             p_out += ",\"allowed_cpu_ids\":[";

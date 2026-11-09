@@ -320,15 +320,15 @@ namespace gempba::telemetry {
             }
 
             const auto& v_topology = p_hub.current_topology();
-            std::vector<worker_frame> v_workers;
+            std::vector<rank_frame> v_workers;
             std::vector<node_frame> v_nodes;
             for (const auto& v_node: v_topology.m_nodes) {
-                for (std::uint32_t v_id: v_node.m_worker_ids) {
+                for (std::uint32_t v_id: v_node.m_ranks) {
                     if (auto v_f = p_hub.latest_rank_frame(v_id)) {
                         v_workers.push_back(*v_f);
                     }
                 }
-                if (auto v_n = p_hub.latest_node_frame(v_node.m_sentinel_worker_id)) {
+                if (auto v_n = p_hub.latest_node_frame(v_node.m_sentinel_rank)) {
                     v_nodes.push_back(*v_n);
                 }
             }

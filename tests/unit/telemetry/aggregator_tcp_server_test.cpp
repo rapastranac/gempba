@@ -524,7 +524,7 @@ namespace {
         return v_arrivals;
     }
 
-    TEST_F(tcp_server_test, broadcast_follows_a_short_worker_interval) {
+    TEST_F(tcp_server_test, broadcast_follows_a_short_interval) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
         v_hub.set_interval_ms(100);
@@ -542,7 +542,7 @@ namespace {
         EXPECT_EQ(3u, v_arrivals.size());
     }
 
-    TEST_F(tcp_server_test, broadcast_waits_for_a_long_worker_interval) {
+    TEST_F(tcp_server_test, broadcast_waits_for_a_long_interval) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
         v_hub.set_interval_ms(1000);
@@ -579,7 +579,7 @@ namespace {
         EXPECT_EQ(3u, v_arrivals.size());
     }
 
-    TEST_F(tcp_server_test, stop_is_prompt_and_sends_the_final_line_with_a_long_worker_interval) {
+    TEST_F(tcp_server_test, stop_is_prompt_and_sends_the_final_line_with_a_long_interval) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
         v_hub.set_interval_ms(50);

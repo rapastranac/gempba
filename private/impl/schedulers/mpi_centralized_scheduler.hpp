@@ -303,7 +303,7 @@ namespace gempba {
                     branch = 0;
                 }
 
-                // Drive telemetry from inside the busy-wait so worker frames
+                // Drive telemetry from inside the busy-wait so rank frames
                 // ship in real time even when no task traffic is flowing.
                 if (auto* v_telemetry = telemetry::get())
                     v_telemetry->tick_if_due();
@@ -651,7 +651,7 @@ namespace gempba {
                 }
 
                 // Drive telemetry from inside the center busy-wait so the
-                // aggregator drains worker frames in real time even when
+                // aggregator drains rank frames in real time even when
                 // no task traffic is flowing.
                 if (auto* v_telemetry = telemetry::get()) {
                     v_telemetry->tick_if_due();

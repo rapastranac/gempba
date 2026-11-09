@@ -106,7 +106,7 @@ namespace gempba::telemetry {
 
     process_probe::process_probe() noexcept = default;
 
-    void process_probe::sample(worker_frame& p_out) noexcept {
+    void process_probe::sample(rank_frame& p_out) noexcept {
         std::uint64_t v_cpu_microseconds = 0;
         std::uint64_t v_rss_bytes = 0;
         sample_platform(v_cpu_microseconds, v_rss_bytes);

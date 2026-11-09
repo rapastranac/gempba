@@ -51,7 +51,7 @@ namespace {
 
         const auto v_node = v_hub.latest_node_frame(0);
         ASSERT_TRUE(v_node.has_value());
-        EXPECT_EQ(0u, v_node->m_sentinel_worker_id);
+        EXPECT_EQ(0u, v_node->m_sentinel_rank);
         EXPECT_GT(v_node->m_mem_total_bytes, 0u);
     }
 

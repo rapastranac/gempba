@@ -10,7 +10,7 @@
 namespace gempba::telemetry {
 
     /**
-     * @brief Turns a rank's scheduler events, stamped in microseconds, into the scheduler times of a @ref worker_frame.
+     * @brief Turns a rank's scheduler events, stamped in microseconds, into the scheduler times of a @ref rank_frame.
      *
      * Times accrue only between @ref on_run_start and @ref on_run_end. Available-rank time accrues only while the
      * coordinator queue is empty: the centralized coordinator hands a task to every available rank while its queue holds any.
@@ -59,13 +59,13 @@ namespace gempba::telemetry {
         }
 
         void on_assignment(const std::uint32_t p_rank, const std::uint64_t p_now) {
-            if (p_rank < MAX_WORKERS) {
+            if (p_rank < MAX_RANKS) {
                 m_assigned_at[p_rank] = p_now;
             }
         }
 
         void on_assignment_accepted(const std::uint32_t p_rank, const std::uint64_t p_now) {
-            if (p_rank >= MAX_WORKERS || m_assigned_at[p_rank] == k_unassigned) {
+            if (p_rank >= MAX_RANKS || m_assigned_at[p_rank] == k_unassigned) {
                 return;
             }
             const std::uint64_t v_latency = p_now - m_assigned_at[p_rank];
@@ -106,7 +106,7 @@ namespace gempba::telemetry {
             m_coordinator_full = false;
         }
 
-        void fill(worker_frame& p_out, const std::uint64_t p_now) const {
+        void fill(rank_frame& p_out, const std::uint64_t p_now) const {
             const std::uint64_t v_open = m_in_run ? p_now - m_since : 0;
 
             p_out.m_sched_running_microseconds = m_running + (m_phase == phase::RUNNING ? v_open : 0);
@@ -153,7 +153,7 @@ namespace gempba::telemetry {
         std::uint64_t m_first_task_ms = 0;
         std::uint64_t m_last_task_ms = 0;
 
-        std::array<std::uint64_t, MAX_WORKERS> m_assigned_at{};
+        std::array<std::uint64_t, MAX_RANKS> m_assigned_at{};
         std::uint64_t m_assign_latency_total = 0;
         std::uint64_t m_assign_latency_max = 0;
         std::uint64_t m_assign_count = 0;

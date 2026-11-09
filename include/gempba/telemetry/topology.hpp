@@ -35,8 +35,8 @@ namespace gempba::telemetry {
      */
     struct topology_node {
         std::string m_hostname;
-        std::vector<std::uint32_t> m_worker_ids;
-        std::uint32_t m_sentinel_worker_id = 0;
+        std::vector<std::uint32_t> m_ranks;
+        std::uint32_t m_sentinel_rank = 0;
         std::vector<topology_socket> m_sockets;
         /// Total physical cores on this host; 0 when the topology probe is unavailable.
         std::uint16_t m_total_physical_cores = 0;
@@ -47,12 +47,12 @@ namespace gempba::telemetry {
     /**
      * @brief Static snapshot of the full run topology: every host and every worker.
      *
-     * Captured once at hub startup. Frames carry numeric worker_ids; this
+     * Captured once at hub startup. Frames carry numeric ranks; this
      * snapshot is the mapping back to host + hardware identity.
      */
     struct topology_snapshot {
         std::vector<topology_node> m_nodes;
-        std::vector<worker_identity> m_identities;
+        std::vector<rank_identity> m_identities;
     };
 
     /** @brief Who recorded a @ref run_marker. */
