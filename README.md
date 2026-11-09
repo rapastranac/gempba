@@ -64,7 +64,7 @@ Both can be installed side by side on **any** platform. You pick which one a pro
 
 ### Pre-built packages (C++)
 
-**Debian / Ubuntu** — the `.deb`s live in a signed APT repository hosted at `https://rapastranac.github.io/gempba`. Register the repo once, then install:
+**Ubuntu 24.04 (noble)** — the `.deb`s are built for Ubuntu 24.04 and live in a signed APT repository hosted at `https://rapastranac.github.io/gempba`. The repository serves the latest release; older `.deb`s stay attached to each [GitHub Release](https://github.com/rapastranac/gempba/releases). Register the repo once, then install:
 
 ```bash
 # 1. Trust the gempba signing key (one-time)
@@ -73,7 +73,7 @@ curl -fsSL https://rapastranac.github.io/gempba/gempba-archive-keyring.gpg \
   | sudo tee /etc/apt/keyrings/gempba.gpg > /dev/null
 
 # 2. Register the repo (one-time)
-echo "deb [signed-by=/etc/apt/keyrings/gempba.gpg] https://rapastranac.github.io/gempba stable main" \
+echo "deb [signed-by=/etc/apt/keyrings/gempba.gpg] https://rapastranac.github.io/gempba noble main" \
   | sudo tee /etc/apt/sources.list.d/gempba.list > /dev/null
 sudo apt update
 
@@ -82,18 +82,18 @@ sudo apt install libgempba-dev          # multithreading flavor (default)
 sudo apt install libgempba-mpi-dev      # MPI flavor; depends on libgempba-dev
 ```
 
-**MSYS2 / MinGW** — packages are attached to each GitHub Release rather than served from a custom pacman repo. Download the two `.pkg.tar.zst` assets — their names carry the version (e.g. `mingw-w64-x86_64-gempba-4.1.1-1-any.pkg.tar.zst`) — from the [latest release](https://github.com/rapastranac/gempba/releases/latest), then install them locally:
+**MSYS2 (UCRT64)** — packages are attached to each GitHub Release rather than served from a custom pacman repo. Download the two `.pkg.tar.zst` assets — their names carry the version (e.g. `mingw-w64-ucrt-x86_64-gempba-4.4.0-1-any.pkg.tar.zst`) — from the [latest release](https://github.com/rapastranac/gempba/releases/latest), then install them from an MSYS2 UCRT64 shell:
 
 ```bash
-pacman -U mingw-w64-x86_64-gempba-<version>-any.pkg.tar.zst       # multithreading (default)
-pacman -U mingw-w64-x86_64-gempba-mpi-<version>-any.pkg.tar.zst   # MPI; depends on the mt package above
+pacman -U mingw-w64-ucrt-x86_64-gempba-<version>-any.pkg.tar.zst       # multithreading (default)
+pacman -U mingw-w64-ucrt-x86_64-gempba-mpi-<version>-any.pkg.tar.zst   # MPI; depends on the mt package above
 ```
 
-If you'd rather build from `PKGBUILD`:
+If you'd rather build from `PKGBUILD`, in the same shell:
 
 ```bash
 curl -LO https://raw.githubusercontent.com/rapastranac/gempba/main/packaging/msys2/PKGBUILD
-makepkg -si
+MINGW_ARCH=ucrt64 makepkg-mingw -si
 ```
 
 **macOS** — install from the project's Homebrew tap:
@@ -113,7 +113,7 @@ cmake -B build -DCMAKE_PREFIX_PATH=$(brew --prefix gempba-mpi)   # a project bui
 
 ### Maven dependency (Java)
 
-JARs are published to [GitHub Packages](https://maven.pkg.github.com/rapastranac/gempba) with one classifier per flavor: `mt` (multithreading) and `mp-mpi` (multiprocessing — requires an MPI runtime on the host). One fat JAR per classifier carries every supported OS's native binary; the loader picks the right one at runtime.
+JARs are published to [GitHub Packages](https://maven.pkg.github.com/rapastranac/gempba) with one classifier per flavor: `mt` (multithreading) and `mp-mpi` (multiprocessing — requires an MPI runtime on the host). One fat JAR per classifier carries every supported OS's native binary; the loader picks the right one at runtime. The JAR needs Java 25 or newer, and its natives need nothing beyond the OS (Linux with glibc 2.28 or newer, such as RHEL 8; Windows 10 or newer; macOS 14 or newer) and, for `mp-mpi`, the MPI runtime.
 
 **Available versions: `v4.1.0` and later.** Earlier tags predate the publish flow and have no artifact on the registry.
 
@@ -199,7 +199,11 @@ Working example programs live in the sibling repo **[gempba-examples](https://gi
 |---|---|---|
 | C++ compiler | C++23 | GCC or Clang |
 | CMake | ≥ 3.28 | |
-| OpenMPI | ≥ 4.0 | Multiprocessing only |
+| fmt | ≥ 9.1 | |
+| spdlog | ≥ 1.12 | Build only; compiled into the library |
+| hwloc | ≥ 2.10 | Hardware topology; `GEMPBA_HWLOC`, on by default |
+| pkg-config | any recent | Finds hwloc, in the build and in `find_package(gempba)` |
+| OpenMPI | ≥ 4.0 | Multiprocessing only; MS-MPI on Windows |
 | Boost | any recent | Tests only |
 | GoogleTest | any recent | Tests only |
 

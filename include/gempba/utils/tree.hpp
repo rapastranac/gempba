@@ -24,7 +24,8 @@
 #ifndef TREE_HPP
 #define TREE_HPP
 
-#include <spdlog/spdlog.h>
+#include <sstream>
+#include <string>
 #include <vector>
 
 class tree {

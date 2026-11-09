@@ -27,32 +27,51 @@
 #include <any>
 #include <cfloat>
 #include <chrono>
+#include <climits>
+#include <cmath>
+#include <format>
 #include <future>
 #include <gempba/utils/gempba_utils.hpp>
 #include <gempba/utils/score.hpp>
 #include <gempba/utils/tree.hpp>
-#include <spdlog/spdlog.h>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 
 /**
  * Created by Andrés Pastrana on 2024-04-08.
  */
 namespace utils {
+    /// Formats @p p_format with @p p_args and writes the result through gempba's logger at debug level, formatting nothing when that level is off.
+    void vlog_debug(std::string_view p_format, std::format_args p_args);
+
+    /// Writes @p p_message through gempba's logger at error level.
+    void log_error(std::string_view p_message);
+
+    /// Writes the message formatted from @p p_format and @p p_args through gempba's logger at debug level, formatting it only when that level is on.
     template<typename... T>
-    void print_ipc_debug_comments([[maybe_unused]] const fmt::format_string<T...>& p_format_string, [[maybe_unused]] T&&... p_args) {
+    void log_debug(const std::format_string<T...> p_format, T&&... p_args) {
+        vlog_debug(p_format.get(), std::make_format_args(p_args...));
+    }
+
+    template<typename... T>
+    void print_ipc_debug_comments([[maybe_unused]] std::format_string<T...> p_format_string, [[maybe_unused]] T&&... p_args) {
 #if GEMPBA_DEBUG_COMMENTS
-        spdlog::debug(p_format_string, std::forward<T>(p_args)...);
+        log_debug(p_format_string, std::forward<T>(p_args)...);
 #endif
     }
 
     [[noreturn]] inline void log_and_throw(const std::string& p_v_message) {
-        spdlog::error(p_v_message);
+        log_error(p_v_message);
         throw std::runtime_error(p_v_message);
     }
 
     template<typename... T>
-    [[noreturn]] void log_and_throw(const fmt::format_string<T...>& p_format_string, T&&... p_args) {
-        const std::string v_message = fmt::format(p_format_string, std::forward<T>(p_args)...);
+    [[noreturn]] void log_and_throw(std::format_string<T...> p_format_string, T&&... p_args) {
+        const std::string v_message = std::format(p_format_string, std::forward<T>(p_args)...);
         log_and_throw(v_message);
     }
 
@@ -79,7 +98,7 @@ namespace utils {
                     continue;
                 }
                 p_tree[p_parent].add_next(v_next_child);
-                spdlog::debug("process: {}, child: {}\n", p_parent, v_next_child);
+                log_debug("process: {}, child: {}\n", p_parent, v_next_child);
                 build_topology(p_tree, v_next_child, v_depth + 1, p_children_per_node, p_total);
             }
         }

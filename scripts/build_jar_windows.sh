@@ -1,7 +1,7 @@
 #!/bin/bash
 # Build the gempba Windows JAR for one variant.
 #
-# Usage (from an MSYS2 MINGW64 shell):
+# Usage (from an MSYS2 UCRT64 shell):
 #   bash scripts/build_jar_windows.sh MT   # multithreading — no MPI runtime needed
 #   bash scripts/build_jar_windows.sh MP   # multiprocessing — links MS-MPI
 #
@@ -16,8 +16,8 @@ usage() {
 }
 
 case "${1:-}" in
-    MT) variant=multithreading;  mp_flag=OFF ;;
-    MP) variant=multiprocessing; mp_flag=ON  ;;
+    MT) variant=multithreading;  mp_flag=OFF; flavor=mt     ;;
+    MP) variant=multiprocessing; mp_flag=ON;  flavor=mp-mpi ;;
     *)  usage ;;
 esac
 
@@ -57,9 +57,14 @@ if ! setup_mvn_msys2_path; then
     exit 2
 fi
 
+if [[ "${MSYSTEM:-}" != "UCRT64" ]]; then
+    echo "Run this from an MSYS2 UCRT64 shell (MSYSTEM is '${MSYSTEM:-unset}')." >&2
+    exit 2
+fi
+
 if ! command -v cmake >/dev/null; then
     echo "cmake is not on PATH (MSYS2 shell)." >&2
-    echo "Install via 'pacman -S mingw-w64-x86_64-cmake' and rerun." >&2
+    echo "Install via 'pacman -S mingw-w64-ucrt-x86_64-cmake' and rerun." >&2
     exit 2
 fi
 
@@ -95,6 +100,7 @@ cmake -B "$build_dir" -S "$WORKSPACE" \
     -DJAVA_HOME="$JAVA_HOME_UNIX"
 
 cmake --build "$build_dir" --target gempba_jni -j"$(nproc)"
+bash "$WORKSPACE/scripts/check_jni_deps.sh" "$native_lib" "$flavor"
 
 cd "$WORKSPACE/bindings/java"
 # `install` (not `package`) so the produced JAR also lands in

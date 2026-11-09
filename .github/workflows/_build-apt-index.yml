@@ -41,7 +41,7 @@ jobs:
       - name: Build APT index with reprepro
         run: |
           for deb in deb-download/*.deb; do
-            reprepro -b apt-repo includedeb stable "$deb"
+            reprepro -b apt-repo includedeb noble "$deb"
           done
 
       - name: Upload apt-repo as workflow artifact
