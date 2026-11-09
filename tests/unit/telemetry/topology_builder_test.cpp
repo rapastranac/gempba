@@ -6,7 +6,7 @@
 
 namespace {
 
-    TEST(topology_builder_test, mt_only_self_registers_one_node_one_worker) {
+    TEST(topology_builder_test, mt_only_self_registers_one_node_one_rank) {
         const auto v_snap = gempba::telemetry::build_topology_snapshot(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1);
 
         ASSERT_EQ(1u, v_snap.m_identities.size());

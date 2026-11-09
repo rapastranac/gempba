@@ -40,7 +40,7 @@ namespace gempba::telemetry {
      * @brief Process-wide runtime-telemetry hub.
      *
      * Owns the transport, counters, probes, and (on the aggregator) the
-     * dashboard server. Workers feed it via the @c record_* hot-path hooks;
+     * dashboard server. Each rank feeds it via the @c record_* hot-path hooks;
      * the pump thread periodically snapshots the counters into frames and
      * pushes them through the transport.
      *

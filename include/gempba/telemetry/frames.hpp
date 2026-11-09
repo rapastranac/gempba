@@ -39,7 +39,7 @@ namespace gempba::telemetry {
         /** @brief Socket the rank's affinity places it on (0 when affinity is unknown). */
         std::uint8_t m_primary_socket;
         /**
-         * @brief Bitmap of the logical CPUs this worker may run on, one bit per CPU
+         * @brief Bitmap of the logical CPUs this rank may run on, one bit per CPU
          * across @ref MAX_LOGICAL_CPUS: word @c w bit @c b means CPU @c w*64+b.
          * Wide enough to represent every CPU on big nodes, not just the low 64.
          */
@@ -72,9 +72,9 @@ namespace gempba::telemetry {
          * with @ref m_tasks_sent_total or @ref m_tasks_recv_total.
          */
         std::uint64_t m_tasks_started_total;
-        /** @brief Tasks sent to a remote worker. */
+        /** @brief Tasks sent to another rank. */
         std::uint64_t m_tasks_sent_total;
-        /** @brief Tasks received from a remote worker. */
+        /** @brief Tasks received from another rank. */
         std::uint64_t m_tasks_recv_total;
         /** @brief Bytes of the tasks sent; the sum of @ref rank_frame::m_edges_out bytes. */
         std::uint64_t m_bytes_sent_total;
@@ -157,7 +157,7 @@ namespace gempba::telemetry {
      * Its size follows the destinations the rank actually sent tasks to, not the size of the run.
      */
     struct rank_frame : rank_frame_header {
-        /** @brief One entry per destination this worker sent tasks to, in ascending @c m_dst_rank; others are absent. */
+        /** @brief One entry per destination this rank sent tasks to, in ascending @c m_dst_rank; others are absent. */
         std::vector<edge_counter> m_edges_out;
     };
 
@@ -174,7 +174,7 @@ namespace gempba::telemetry {
      *
      * Emitted by the host's sentinel rank with each of its rank frames.
      * Aggregates host-wide signals (CPU, memory) that are not meaningful
-     * per-worker.
+     * per rank.
      */
     struct node_frame {
         std::uint16_t m_version;

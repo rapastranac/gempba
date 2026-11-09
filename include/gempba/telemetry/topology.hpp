@@ -29,9 +29,9 @@ namespace gempba::telemetry {
     };
 
     /**
-     * @brief One host in the run, with the workers it owns and its hardware layout.
+     * @brief One host in the run, with the ranks it runs and its hardware layout.
      *
-     * One sentinel worker per node emits the @ref node_frame stream for the host.
+     * One sentinel rank per node emits the @ref node_frame stream for the host.
      */
     struct topology_node {
         std::string m_hostname;
@@ -45,7 +45,7 @@ namespace gempba::telemetry {
     };
 
     /**
-     * @brief Static snapshot of the full run topology: every host and every worker.
+     * @brief Static snapshot of the full run topology: every host and every rank.
      *
      * Captured once at hub startup. Frames carry numeric ranks; this
      * snapshot is the mapping back to host + hardware identity.
@@ -81,9 +81,9 @@ namespace gempba::telemetry {
         /// Load balancer name, "quasi_horizontal" or "work_stealing"; empty until one is created.
         std::string m_load_balancer;
         std::uint32_t m_world_size = 1;
-        /// Each rank's role, indexed by worker id, as its scheduler reports it; a rank past the end is a worker.
+        /// Each rank's role, indexed by rank, as its scheduler reports it; a rank past the end is a worker.
         std::vector<rank_role> m_roles;
-        /// Largest thread pool the workers report in their frames; 0 before any frame arrives.
+        /// Largest thread pool the ranks report in their frames; 0 before any frame arrives.
         std::uint32_t m_threads_per_process = 0;
         std::string m_gempba_version;
         std::vector<std::pair<std::string, std::string>> m_annotations;

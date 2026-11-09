@@ -1,5 +1,5 @@
-#ifndef GEMPBA_TELEMETRY_WORKER_FRAME_CODEC_HPP
-#define GEMPBA_TELEMETRY_WORKER_FRAME_CODEC_HPP
+#ifndef GEMPBA_TELEMETRY_RANK_FRAME_CODEC_HPP
+#define GEMPBA_TELEMETRY_RANK_FRAME_CODEC_HPP
 
 #include <cstddef>
 #include <cstring>
@@ -9,7 +9,7 @@
 namespace gempba::telemetry::detail {
 
     /** @brief Wire form of @p p_frame: its @ref rank_frame_header followed by one @ref edge_counter per edge. */
-    inline std::vector<std::byte> encode_worker_frame(const rank_frame& p_frame) {
+    inline std::vector<std::byte> encode_rank_frame(const rank_frame& p_frame) {
         const rank_frame_header v_header(static_cast<const rank_frame_header&>(p_frame));
         const std::size_t v_edges_bytes = p_frame.m_edges_out.size() * sizeof(edge_counter);
         std::vector<std::byte> v_buffer(sizeof(rank_frame_header) + v_edges_bytes);
@@ -20,8 +20,8 @@ namespace gempba::telemetry::detail {
         return v_buffer;
     }
 
-    /** @brief Reads a frame written by @ref encode_worker_frame; @return false, leaving @p p_out untouched, when the size fits no frame. */
-    inline bool decode_worker_frame(const std::byte* p_data, const std::size_t p_size, rank_frame& p_out) {
+    /** @brief Reads a frame written by @ref encode_rank_frame; @return false, leaving @p p_out untouched, when the size fits no frame. */
+    inline bool decode_rank_frame(const std::byte* p_data, const std::size_t p_size, rank_frame& p_out) {
         if (p_size < sizeof(rank_frame_header) || (p_size - sizeof(rank_frame_header)) % sizeof(edge_counter) != 0) {
             return false;
         }
@@ -37,4 +37,4 @@ namespace gempba::telemetry::detail {
 
 } // namespace gempba::telemetry::detail
 
-#endif // GEMPBA_TELEMETRY_WORKER_FRAME_CODEC_HPP
+#endif // GEMPBA_TELEMETRY_RANK_FRAME_CODEC_HPP

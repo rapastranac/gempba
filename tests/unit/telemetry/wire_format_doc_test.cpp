@@ -40,8 +40,8 @@ namespace {
         v_run.m_mode = gempba::telemetry::runtime_mode::MP_MPI;
         v_run.m_markers = {{120, "phase 2", gempba::telemetry::marker_source::DASHBOARD}};
 
-        std::vector<gempba::telemetry::rank_frame> v_workers(1);
-        v_workers[0].m_edges_out.push_back(gempba::telemetry::edge_counter{1, 64, 1});
+        std::vector<gempba::telemetry::rank_frame> v_rank_frames(1);
+        v_rank_frames[0].m_edges_out.push_back(gempba::telemetry::edge_counter{1, 64, 1});
         std::vector<gempba::telemetry::node_frame> v_nodes(1);
         v_nodes[0].m_socket_count = 1;
 
@@ -49,7 +49,7 @@ namespace {
         v_payload.m_run_id = "123e4567-e89b-42d3-a456-426614174000";
         v_payload.m_topology = &v_topology;
         v_payload.m_run = &v_run;
-        v_payload.m_workers = &v_workers;
+        v_payload.m_rank_frames = &v_rank_frames;
         v_payload.m_nodes = &v_nodes;
 
         std::string v_lines;

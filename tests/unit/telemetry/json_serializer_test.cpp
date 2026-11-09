@@ -16,7 +16,7 @@ namespace {
         v_f.m_tasks_sent_total = 8;
 
         std::string v_out;
-        gempba::telemetry::serialize_worker_frame(v_out, v_f);
+        gempba::telemetry::serialize_rank_frame(v_out, v_f);
 
         EXPECT_NE(std::string::npos, v_out.find("\"rank\":3"));
         EXPECT_NE(std::string::npos, v_out.find("\"seq_no\":7"));
@@ -32,7 +32,7 @@ namespace {
         v_f.m_recv_microseconds_total = 34;
 
         std::string v_out;
-        gempba::telemetry::serialize_worker_frame(v_out, v_f);
+        gempba::telemetry::serialize_rank_frame(v_out, v_f);
 
         EXPECT_NE(std::string::npos, v_out.find("\"bytes_sent_total\":31"));
         EXPECT_NE(std::string::npos, v_out.find("\"bytes_recv_total\":32"));
@@ -48,7 +48,7 @@ namespace {
         v_f.m_last_score_improvement_ms = 44;
 
         std::string v_out;
-        gempba::telemetry::serialize_worker_frame(v_out, v_f);
+        gempba::telemetry::serialize_rank_frame(v_out, v_f);
 
         EXPECT_NE(std::string::npos, v_out.find("\"spawn_rejected_pool_full\":41"));
         EXPECT_NE(std::string::npos, v_out.find("\"spawn_remote_rejected\":42"));
@@ -63,7 +63,7 @@ namespace {
         v_f.m_idle_microseconds_imbalanced = 300;
 
         std::string v_out;
-        gempba::telemetry::serialize_worker_frame(v_out, v_f);
+        gempba::telemetry::serialize_rank_frame(v_out, v_f);
 
         EXPECT_NE(std::string::npos, v_out.find("\"idle_microseconds_per_thread\":900"));
         EXPECT_NE(std::string::npos, v_out.find("\"idle_microseconds_starved\":600"));
@@ -82,7 +82,7 @@ namespace {
         v_f.m_available_microseconds_queue_empty = 18;
 
         std::string v_out;
-        gempba::telemetry::serialize_worker_frame(v_out, v_f);
+        gempba::telemetry::serialize_rank_frame(v_out, v_f);
 
         EXPECT_NE(std::string::npos, v_out.find("\"sched_running_microseconds\":11"));
         EXPECT_NE(std::string::npos, v_out.find("\"sched_waiting_microseconds\":12"));
@@ -103,7 +103,7 @@ namespace {
         v_f.m_telemetry_microseconds_total = 25;
 
         std::string v_out;
-        gempba::telemetry::serialize_worker_frame(v_out, v_f);
+        gempba::telemetry::serialize_rank_frame(v_out, v_f);
 
         EXPECT_NE(std::string::npos, v_out.find("\"coordinator_state_msgs_total\":21"));
         EXPECT_NE(std::string::npos, v_out.find("\"coordinator_score_proposals_total\":22"));
@@ -112,12 +112,12 @@ namespace {
         EXPECT_NE(std::string::npos, v_out.find("\"telemetry_microseconds_total\":25"));
     }
 
-    TEST(json_serializer_test, worker_frame_emits_only_non_zero_edges) {
+    TEST(json_serializer_test, rank_frame_emits_only_non_zero_edges) {
         gempba::telemetry::rank_frame v_f{};
         v_f.m_edges_out = {{2, 100, 5}, {7, 0, 0}};
 
         std::string v_out;
-        gempba::telemetry::serialize_worker_frame(v_out, v_f);
+        gempba::telemetry::serialize_rank_frame(v_out, v_f);
 
         EXPECT_NE(std::string::npos, v_out.find("\"to\":2"));
         EXPECT_EQ(std::string::npos, v_out.find("\"to\":7"));
@@ -306,7 +306,7 @@ namespace {
 
     TEST(json_serializer_test, broadcast_envelope_carries_version_and_top_level_keys) {
         gempba::telemetry::topology_snapshot v_topo;
-        std::vector<gempba::telemetry::rank_frame> v_workers;
+        std::vector<gempba::telemetry::rank_frame> v_rank_frames;
         std::vector<gempba::telemetry::node_frame> v_nodes;
 
         gempba::telemetry::broadcast_payload v_p{};
@@ -314,7 +314,7 @@ namespace {
         v_p.m_now_ms = 1700000000000ULL;
         v_p.m_elapsed_seconds = 12345ULL;
         v_p.m_topology = &v_topo;
-        v_p.m_workers = &v_workers;
+        v_p.m_rank_frames = &v_rank_frames;
         v_p.m_nodes = &v_nodes;
 
         std::string v_out;
@@ -330,13 +330,13 @@ namespace {
 
     TEST(json_serializer_test, broadcast_reports_whether_telemetry_is_paused_after_the_header) {
         gempba::telemetry::topology_snapshot v_topo;
-        std::vector<gempba::telemetry::rank_frame> v_workers(1);
+        std::vector<gempba::telemetry::rank_frame> v_rank_frames(1);
         std::vector<gempba::telemetry::node_frame> v_nodes;
 
         gempba::telemetry::broadcast_payload v_p{};
         v_p.m_elapsed_seconds = 12;
         v_p.m_topology = &v_topo;
-        v_p.m_workers = &v_workers;
+        v_p.m_rank_frames = &v_rank_frames;
         v_p.m_nodes = &v_nodes;
 
         std::string v_running;
@@ -352,7 +352,7 @@ namespace {
 
     TEST(json_serializer_test, paused_broadcast_is_the_header_alone) {
         gempba::telemetry::topology_snapshot v_topo;
-        std::vector<gempba::telemetry::rank_frame> v_workers(1);
+        std::vector<gempba::telemetry::rank_frame> v_rank_frames(1);
         std::vector<gempba::telemetry::node_frame> v_nodes(1);
 
         gempba::telemetry::broadcast_payload v_p{};
@@ -360,7 +360,7 @@ namespace {
         v_p.m_now_ms = 1700000000000ULL;
         v_p.m_elapsed_seconds = 12345ULL;
         v_p.m_topology = &v_topo;
-        v_p.m_workers = &v_workers;
+        v_p.m_rank_frames = &v_rank_frames;
         v_p.m_nodes = &v_nodes;
 
         std::string v_out;
@@ -371,13 +371,13 @@ namespace {
 
     TEST(json_serializer_test, only_the_shutdown_line_is_marked_final) {
         gempba::telemetry::topology_snapshot v_topo;
-        std::vector<gempba::telemetry::rank_frame> v_workers;
+        std::vector<gempba::telemetry::rank_frame> v_rank_frames;
         std::vector<gempba::telemetry::node_frame> v_nodes;
 
         gempba::telemetry::broadcast_payload v_p{};
         v_p.m_elapsed_seconds = 12;
         v_p.m_topology = &v_topo;
-        v_p.m_workers = &v_workers;
+        v_p.m_rank_frames = &v_rank_frames;
         v_p.m_nodes = &v_nodes;
         v_p.m_final = true;
 

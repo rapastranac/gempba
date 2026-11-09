@@ -299,9 +299,9 @@ namespace {
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
         v_hub.set_interval_ms(0);
         v_hub.tick_if_due();
-        const auto v_worker = v_hub.latest_rank_frame(0);
+        const auto v_rank_frame = v_hub.latest_rank_frame(0);
         const auto v_node = v_hub.latest_node_frame(0);
-        ASSERT_TRUE(v_worker.has_value());
+        ASSERT_TRUE(v_rank_frame.has_value());
         ASSERT_TRUE(v_node.has_value());
 
         v_hub.apply_control_from_client(gempba::telemetry::control_kind::PAUSE, 0);
@@ -311,7 +311,7 @@ namespace {
             v_hub.tick_if_due();
         }
 
-        EXPECT_EQ(v_worker->m_seq_no, v_hub.latest_rank_frame(0)->m_seq_no);
+        EXPECT_EQ(v_rank_frame->m_seq_no, v_hub.latest_rank_frame(0)->m_seq_no);
         EXPECT_EQ(v_node->m_sentinel_local_ms, v_hub.latest_node_frame(0)->m_sentinel_local_ms);
     }
 

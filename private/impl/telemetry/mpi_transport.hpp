@@ -22,9 +22,9 @@ namespace gempba::telemetry {
         mpi_transport(const mpi_transport&) = delete;
         mpi_transport& operator=(const mpi_transport&) = delete;
 
-        void publish_worker(const rank_frame& p_frame) override;
+        void publish_rank(const rank_frame& p_frame) override;
         void publish_node(const node_frame& p_frame) override;
-        void publish_final_worker(const rank_frame& p_frame) override;
+        void publish_final_rank(const rank_frame& p_frame) override;
         [[nodiscard]] std::uint32_t final_frames_received() const override;
 
         void poll(const rank_frame_sink& p_rank_sink, const node_frame_sink& p_node_sink) override;

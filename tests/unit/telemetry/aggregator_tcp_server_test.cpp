@@ -73,7 +73,7 @@ namespace {
         ASSERT_GT(v_port, 0u);
 
         // Drive at least one publish into the aggregator so the broadcast has
-        // workers to report.
+        // ranks to report.
         v_hub.record_send(2, 64);
         v_hub.tick_if_due();
 

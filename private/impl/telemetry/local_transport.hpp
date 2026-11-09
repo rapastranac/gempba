@@ -17,7 +17,7 @@ namespace gempba::telemetry {
         local_transport();
         ~local_transport() override;
 
-        void publish_worker(const rank_frame& p_frame) override;
+        void publish_rank(const rank_frame& p_frame) override;
         void publish_node(const node_frame& p_frame) override;
 
         void poll(const rank_frame_sink& p_rank_sink, const node_frame_sink& p_node_sink) override;

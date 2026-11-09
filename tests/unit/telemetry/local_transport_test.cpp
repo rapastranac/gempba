@@ -5,14 +5,14 @@
 
 namespace {
 
-    TEST(local_transport_test, publish_then_poll_delivers_worker_frame) {
+    TEST(local_transport_test, publish_then_poll_delivers_rank_frame) {
         gempba::telemetry::local_transport v_transport;
 
         gempba::telemetry::rank_frame v_in{};
         v_in.m_version = gempba::telemetry::TELEMETRY_SCHEMA_VERSION;
         v_in.m_rank = 3;
         v_in.m_tasks_started_total = 42;
-        v_transport.publish_worker(v_in);
+        v_transport.publish_rank(v_in);
 
         std::vector<gempba::telemetry::rank_frame> v_received;
         v_transport.poll([&](std::uint32_t, const gempba::telemetry::rank_frame& p_f) { v_received.push_back(p_f); }, [&](std::uint32_t, const gempba::telemetry::node_frame&) {});
@@ -26,7 +26,7 @@ namespace {
         gempba::telemetry::local_transport v_transport;
         gempba::telemetry::rank_frame v_in{};
         v_in.m_rank = 1;
-        v_transport.publish_worker(v_in);
+        v_transport.publish_rank(v_in);
 
         int v_first_count = 0;
         v_transport.poll([&](std::uint32_t, const gempba::telemetry::rank_frame&) { ++v_first_count; }, [&](std::uint32_t, const gempba::telemetry::node_frame&) {});
@@ -43,12 +43,12 @@ namespace {
         gempba::telemetry::rank_frame v_first{};
         v_first.m_rank = 0;
         v_first.m_tasks_started_total = 1;
-        v_transport.publish_worker(v_first);
+        v_transport.publish_rank(v_first);
 
         gempba::telemetry::rank_frame v_second{};
         v_second.m_rank = 0;
         v_second.m_tasks_started_total = 99;
-        v_transport.publish_worker(v_second);
+        v_transport.publish_rank(v_second);
 
         std::uint64_t v_seen = 0;
         v_transport.poll([&](std::uint32_t, const gempba::telemetry::rank_frame& p_f) { v_seen = p_f.m_tasks_started_total; }, [&](std::uint32_t, const gempba::telemetry::node_frame&) {});

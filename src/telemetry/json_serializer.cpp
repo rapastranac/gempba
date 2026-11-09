@@ -76,7 +76,7 @@ namespace gempba::telemetry {
 
     } // namespace
 
-    void serialize_worker_frame(std::string& p_out, const rank_frame& p_frame) {
+    void serialize_rank_frame(std::string& p_out, const rank_frame& p_frame) {
         p_out += "{\"rank\":";
         emit_u32(p_out, p_frame.m_rank);
         p_out += ",\"seq_no\":";
@@ -334,11 +334,11 @@ namespace gempba::telemetry {
         }
 
         p_out += ",\"ranks\":[";
-        if (p_payload.m_workers) {
-            for (std::size_t v_i = 0; v_i < p_payload.m_workers->size(); ++v_i) {
+        if (p_payload.m_rank_frames) {
+            for (std::size_t v_i = 0; v_i < p_payload.m_rank_frames->size(); ++v_i) {
                 if (v_i > 0)
                     p_out += ',';
-                serialize_worker_frame(p_out, (*p_payload.m_workers)[v_i]);
+                serialize_rank_frame(p_out, (*p_payload.m_rank_frames)[v_i]);
             }
         }
         p_out += "],\"nodes\":[";
