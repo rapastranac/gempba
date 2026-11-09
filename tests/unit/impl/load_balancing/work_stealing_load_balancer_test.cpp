@@ -82,6 +82,13 @@ TEST_F(work_stealing_load_balancer_test, generate_unique_id) {
     EXPECT_NE(v_id1, v_id2);
 }
 
+TEST_F(work_stealing_load_balancer_test, constructor_returns_with_every_thread_idle) {
+    for (unsigned v_i = 0; v_i < 1000; ++v_i) {
+        gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+        ASSERT_EQ(0u, v_load_balancer.get_tasks_running_count()) << "iteration " << v_i;
+    }
+}
+
 TEST_F(work_stealing_load_balancer_test, set_thread_pool_size) {
     gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
     v_load_balancer.set_thread_pool_size(4);

@@ -56,7 +56,7 @@ namespace gempba {
         std::atomic<std::size_t> m_spawn_remote_rejected_count{0};
 
     public:
-        explicit quasi_horizontal_load_balancer(scheduler::worker* const p_scheduler_worker = nullptr) : m_scheduler_worker(p_scheduler_worker) {}
+        explicit quasi_horizontal_load_balancer(scheduler::worker* const p_scheduler_worker = nullptr) : m_scheduler_worker(p_scheduler_worker) { m_thread_pool.wait(); }
 
         balancing_policy get_balancing_policy() override { return QUASI_HORIZONTAL; }
 
