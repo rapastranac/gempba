@@ -35,7 +35,7 @@ import io.gempba.internal.GemPBANative;
  *
  * <h2>Typical usage</h2>
  * <pre>{@code
- * Scheduler sched = GemPBA.createScheduler(SchedulerTopology.SEMI_CENTRALIZED, 3.0);
+ * Scheduler sched = GemPBA.createScheduler(SchedulerTopology.SEMI_CENTRALIZED);
  * sched.setGoal(Goal.MAXIMISE, ScoreType.I32);
  *
  * if (sched.rankMe() == 0) {
@@ -205,16 +205,14 @@ public final class GemPBA {
     /**
      * Creates a distributed scheduler with the given topology.
      *
-     * <p>Equivalent to {@code gempba::multiprocessing::create_scheduler(topology, timeout)}
+     * <p>Equivalent to {@code gempba::multiprocessing::create_scheduler(topology)}
      * in C++.  Must be called on every process in the communicator.
      *
      * @param topology distributed coordination pattern
-     * @param timeout  ignored: termination does not wait for a quiet period. Kept for
-     *                 compatibility and removed in the next major version
      * @return a new {@link Scheduler}
      */
-    public static Scheduler createScheduler(SchedulerTopology topology, double timeout) {
-        long handle = GemPBANative.Scheduler.create(topology.ordinal(), timeout);
+    public static Scheduler createScheduler(SchedulerTopology topology) {
+        long handle = GemPBANative.Scheduler.create(topology.ordinal());
         return new Scheduler(handle);
     }
 

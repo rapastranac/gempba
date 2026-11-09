@@ -20,7 +20,7 @@ import java.util.*;
  *
  * <p>The typical MPI pattern is:
  * <pre>{@code
- * Scheduler sched = GemPBA.createScheduler(SchedulerTopology.SEMI_CENTRALIZED, 3.0);
+ * Scheduler sched = GemPBA.createScheduler(SchedulerTopology.SEMI_CENTRALIZED);
  * sched.setGoal(Goal.MAXIMISE, ScoreType.I32);
  *
  * if (sched.rankMe() == 0) {

@@ -62,7 +62,7 @@ namespace gempba::cabi_tests {
     // ─── No-handle / null-arg guards ────────────────────────────────────────
 
     TEST_F(cabi_scheduler_test, create_null_out_returns_invalid_arg) {
-        EXPECT_EQ(gempba_scheduler_create(GEMPBA_TOPOLOGY_CENTRALIZED, /*timeout=*/0.0, /*out=*/nullptr), GEMPBA_ERR_INVALID_ARG);
+        EXPECT_EQ(gempba_scheduler_create(GEMPBA_TOPOLOGY_CENTRALIZED, /*out=*/nullptr), GEMPBA_ERR_INVALID_ARG);
         EXPECT_NE(gempba_last_error_message(), nullptr);
     }
 

@@ -652,9 +652,9 @@ extern "C" {
 
     // ─── gempba::scheduler ──────────────────────────────────────────────────────
 
-    JNIEXPORT jlong JNICALL JNI_SCHED(create)(JNIEnv* env, jclass, jint topology_ordinal, jdouble timeout) {
+    JNIEXPORT jlong JNICALL JNI_SCHED(create)(JNIEnv* env, jclass, jint topology_ordinal) {
         gempba_scheduler_t sched = nullptr;
-        if (gempba_scheduler_create(static_cast<gempba_scheduler_topology_t>(topology_ordinal), static_cast<double>(timeout), &sched) != GEMPBA_OK) {
+        if (gempba_scheduler_create(static_cast<gempba_scheduler_topology_t>(topology_ordinal), &sched) != GEMPBA_OK) {
             throw_from_last_error(env, "native Scheduler.create failed");
             return 0L;
         }

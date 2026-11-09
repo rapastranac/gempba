@@ -138,7 +138,7 @@ gempba::scheduler* gempba::multiprocessing::create_scheduler(std::unique_ptr<sch
     return g_scheduler.get();
 }
 
-gempba::scheduler* gempba::multiprocessing::create_scheduler(const scheduler_topology& p_topology, [[maybe_unused]] const double p_timeout) {
+gempba::scheduler* gempba::multiprocessing::create_scheduler(const scheduler_topology& p_topology) {
     if (g_scheduler != nullptr) {
         throw std::runtime_error("scheduler already exists!");
     }

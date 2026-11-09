@@ -473,11 +473,9 @@ extern "C" {
     /**
      * Creates the process-wide scheduler with the given topology.  Wraps
      * gempba::mp::create_scheduler.  Calling MPI must already be initialised before this; the scheduler does not own
-     * the MPI lifecycle.  `timeout` is ignored: termination does not wait for a quiet period.  It is kept for ABI
-     * compatibility and removed in the next major version.
+     * the MPI lifecycle.
      */
-    gempba_status_t gempba_scheduler_create(gempba_scheduler_topology_t topology, double timeout,
-                                            gempba_scheduler_t* out);
+    gempba_status_t gempba_scheduler_create(gempba_scheduler_topology_t topology, gempba_scheduler_t* out);
 
     /** Tears down the scheduler.  Releases the C++ object held inside the wrapper; MPI itself is unaffected. */
     void gempba_scheduler_destroy(gempba_scheduler_t s);
