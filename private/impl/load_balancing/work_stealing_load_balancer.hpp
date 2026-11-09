@@ -51,7 +51,7 @@ namespace gempba {
         scheduler::worker* const m_scheduler_worker;
 
     public:
-        explicit work_stealing_load_balancer(scheduler::worker* const p_scheduler_worker = nullptr) : m_scheduler_worker(p_scheduler_worker) {}
+        explicit work_stealing_load_balancer(scheduler::worker* const p_scheduler_worker = nullptr) : m_scheduler_worker(p_scheduler_worker) { m_thread_pool.wait(); }
 
         balancing_policy get_balancing_policy() override { return WORK_STEALING; }
 
