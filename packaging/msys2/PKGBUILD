@@ -6,7 +6,7 @@ pkgname=(
     "${MINGW_PACKAGE_PREFIX}-${_realname}"
     "${MINGW_PACKAGE_PREFIX}-${_realname}-mpi"
 )
-pkgver=4.3.0
+pkgver=4.4.0
 pkgrel=1
 pkgdesc="Generic Massive Parallelisation of Branching Algorithms — hybrid parallel C++23 framework (mingw-w64)"
 arch=('any')
@@ -25,7 +25,7 @@ makedepends=(
 )
 options=('staticlibs')
 source=("${_realname}-${pkgver}.tar.gz::https://github.com/rapastranac/gempba/archive/refs/tags/v${pkgver}.tar.gz")
-sha256sums=('9e880da5f9accfc65a244a1515cee84606585a54dfb531315c6b8a7b52306f04')
+sha256sums=('965325d5fab633df4a3f722be69e607388760088d1aee8507f683fa7bfc5feb5')
 
 build() {
     # Multithreading flavor (the base package: ships headers, gempbaConfig,
