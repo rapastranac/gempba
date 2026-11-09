@@ -1,7 +1,7 @@
 #!/bin/bash
 # Build both the MT and MP JARs in one invocation.
 #
-# Usage (from an MSYS2 MINGW64 shell):
+# Usage (from an MSYS2 UCRT64 shell):
 #   bash scripts/build_all_jars_windows.sh
 #
 # Outputs:

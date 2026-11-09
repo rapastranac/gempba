@@ -5,6 +5,7 @@
 #include <impl/load_balancing/quasi_horizontal_load_balancer.hpp>
 #include <impl/load_balancing/work_stealing_load_balancer.hpp>
 #include <memory>
+#include <spdlog/spdlog.h>
 #include <utility>
 #include <vector>
 

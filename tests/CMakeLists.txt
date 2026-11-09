@@ -44,6 +44,7 @@ add_executable(all_tests ${TEST_SOURCES})
 target_link_libraries(all_tests
         PRIVATE
         gempba
+        gempba_logging
         GTest::gtest
         GTest::gmock_main
         GTest::gtest_main

@@ -25,6 +25,7 @@
 #ifndef GEMPBA_NODE_IMPL_HPP
 #define GEMPBA_NODE_IMPL_HPP
 
+#include <algorithm>
 #include <any>
 #include <functional>
 #include <future>
@@ -33,6 +34,7 @@
 #include <optional>
 #include <string>
 #include <thread>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 #include <variant>

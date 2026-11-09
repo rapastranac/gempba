@@ -63,12 +63,31 @@ else ()
            "Install headers, config.h and gempbaConfig.cmake into this build's prefix" ON)
 endif ()
 
+option(GEMPBA_BUILD_JAVA_BINDING "Build the Java JNI shared library (requires JDK)" OFF)
+if (GEMPBA_BUILD_JAVA_BINDING)
+    if (NOT DEFINED GEMPBA_JNI_CLASSIFIER OR GEMPBA_JNI_CLASSIFIER STREQUAL "")
+        message(FATAL_ERROR
+                "GEMPBA_BUILD_JAVA_BINDING requires -DGEMPBA_JNI_CLASSIFIER=<os>-<arch> "
+                "(e.g. linux-x86_64, win-x86_64, osx-aarch64)")
+    endif ()
+endif ()
+
 # 📦 Dependencies
 find_package(Threads REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(fmt REQUIRED)
+message(STATUS "Found spdlog ${spdlog_VERSION} in ${spdlog_DIR}")
+message(STATUS "Found fmt ${fmt_VERSION} in ${fmt_DIR}")
+
+# The JNI library ships alone inside the JAR, so it compiles fmt in and links hwloc statically (#408).
+if (GEMPBA_BUILD_JAVA_BINDING)
+    set(GEMPBA_FMT_TARGET fmt::fmt-header-only)
+else ()
+    set(GEMPBA_FMT_TARGET fmt::fmt)
+endif ()
 
 if (GEMPBA_MULTIPROCESSING)
+    set(MPI_CXX_SKIP_MPICXX ON)
     find_package(MPI REQUIRED)
 endif ()
 
@@ -95,15 +114,6 @@ elseif (GEMPBA_BUILD_TESTS AND NOT GEMPBA_MULTIPROCESSING)
     message(STATUS "Skipping tests: tests reference gempba::multiprocessing::* and require GEMPBA_MULTIPROCESSING=ON")
 elseif (GEMPBA_BUILD_TESTS AND NOT GEMPBA_DEV_MODE)
     message(STATUS "Skipping tests: tests use the explicit gempba::multithreading::* form and require GEMPBA_DEV_MODE=ON")
-endif ()
-
-option(GEMPBA_BUILD_JAVA_BINDING "Build the Java JNI shared library (requires JDK)" OFF)
-if (GEMPBA_BUILD_JAVA_BINDING)
-    if (NOT DEFINED GEMPBA_JNI_CLASSIFIER OR GEMPBA_JNI_CLASSIFIER STREQUAL "")
-        message(FATAL_ERROR
-                "GEMPBA_BUILD_JAVA_BINDING requires -DGEMPBA_JNI_CLASSIFIER=<os>-<arch> "
-                "(e.g. linux-x86_64, win-x86_64, osx-aarch64)")
-    endif ()
 endif ()
 
 # 📄 Main source files
@@ -170,26 +180,55 @@ target_compile_options(gempba PRIVATE
 # Its contents (BS_thread_pool headers, spdlog) are wired in via target_include_directories.
 target_link_libraries(gempba PUBLIC
         Threads::Threads
-        fmt::fmt
 )
 
 if (GEMPBA_MULTIPROCESSING)
     target_link_libraries(gempba PUBLIC MPI::MPI_CXX)
 endif ()
 
-# spdlog is used in header-only mode. Deliberately NOT linked as a CMake target
-# so spdlog::spdlog_header_only never appears in the exported targets file and
-# consumers don't need find_package(spdlog) just to use gempba.
+# The public headers use only the standard library (#412). spdlog is internal and header-only, so libgempba.a carries
+# the code it uses and the exported targets don't name it. fmt stays a private link dependency: a static library can't
+# hide one, and a copy compiled into libgempba.a would clash with a consumer's own fmt at link time. spdlog's target is
+# not linked because the export would name it. In-tree targets that include private headers link gempba_logging.
+add_library(gempba_logging INTERFACE)
 get_target_property(_spdlog_includes spdlog::spdlog_header_only INTERFACE_INCLUDE_DIRECTORIES)
-target_include_directories(gempba PRIVATE ${_spdlog_includes})
-target_compile_definitions(gempba PUBLIC SPDLOG_HEADER_ONLY)
+get_target_property(_spdlog_definitions spdlog::spdlog_header_only INTERFACE_COMPILE_DEFINITIONS)
+target_include_directories(gempba_logging INTERFACE ${_spdlog_includes})
+target_compile_definitions(gempba_logging INTERFACE SPDLOG_HEADER_ONLY ${_spdlog_definitions})
+target_link_libraries(gempba_logging INTERFACE ${GEMPBA_FMT_TARGET})
+target_include_directories(gempba PRIVATE $<TARGET_PROPERTY:gempba_logging,INTERFACE_INCLUDE_DIRECTORIES>)
+target_compile_definitions(gempba PRIVATE $<TARGET_PROPERTY:gempba_logging,INTERFACE_COMPILE_DEFINITIONS>)
+target_link_libraries(gempba PRIVATE ${GEMPBA_FMT_TARGET})
 
-# C++23 stacktrace support (standard library, not external)
-if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 14)
+# std::stacktrace lives in libstdc++exp, which some GCC builds, such as Red Hat's gcc-toolset, don't ship.
+include(CheckCXXSourceCompiles)
+set(CMAKE_REQUIRED_LIBRARIES stdc++exp)
+check_cxx_source_compiles([=[
+    #include <stacktrace>
+    int main() { return static_cast<int>(std::stacktrace::current().size()); }
+]=] GEMPBA_STACKTRACE_LINKS)
+unset(CMAKE_REQUIRED_LIBRARIES)
+if (GEMPBA_STACKTRACE_LINKS)
     target_link_libraries(gempba PUBLIC stdc++exp)
+    set(GEMPBA_PC_STACKTRACE_LIBS "-lstdc++exp")
+    set(GEMPBA_PC_STACKTRACE_CFLAGS "")
+else ()
+    target_compile_definitions(gempba PUBLIC GEMPBA_HAS_STACKTRACE=0)
+    set(GEMPBA_PC_STACKTRACE_LIBS "")
+    set(GEMPBA_PC_STACKTRACE_CFLAGS "-DGEMPBA_HAS_STACKTRACE=0")
 endif ()
 
-if (GEMPBA_HWLOC)
+if (GEMPBA_HWLOC AND GEMPBA_BUILD_JAVA_BINDING)
+    find_library(GEMPBA_HWLOC_ARCHIVE NAMES libhwloc.a HINTS ${HWLOC_STATIC_LIBRARY_DIRS} NO_DEFAULT_PATH REQUIRED)
+    set(_hwloc_static_dependencies ${HWLOC_STATIC_LIBRARIES})
+    list(REMOVE_ITEM _hwloc_static_dependencies hwloc)
+    target_include_directories(gempba PRIVATE ${HWLOC_STATIC_INCLUDE_DIRS})
+    target_link_libraries(gempba PRIVATE ${GEMPBA_HWLOC_ARCHIVE} ${_hwloc_static_dependencies} ${HWLOC_STATIC_LDFLAGS_OTHER})
+    # hwloc.pc leaves out the frameworks hwloc's macOS backend calls: hwloc passes them only to its own shared library.
+    if (APPLE)
+        target_link_libraries(gempba PRIVATE "-framework CoreFoundation" "-framework IOKit")
+    endif ()
+elseif (GEMPBA_HWLOC)
     target_link_libraries(gempba PRIVATE PkgConfig::HWLOC)
 endif ()
 

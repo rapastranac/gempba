@@ -10,7 +10,7 @@
     <packaging>jar</packaging>
 
     <name>gempba</name>
-    <description>Java bindings for the GemPBA parallel branch-and-bound library</description>
+    <description>Java bindings for the GemPBA hybrid parallel framework</description>
     <url>https://github.com/rapastranac/gempba</url>
 
     <licenses>

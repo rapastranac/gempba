@@ -29,12 +29,15 @@ target_include_directories(gempba_jni PRIVATE
 # ─── Link ─────────────────────────────────────────────────────────────────────
 # gempba is a STATIC library; linking it into a SHARED lib embeds all its
 # symbols, so Java users only need the single .so / .dll artifact.
-# MPI, fmt and Threads are transitively pulled in from gempba's
-# PUBLIC link interface.
-target_link_libraries(gempba_jni PRIVATE
-    gempba
-    ${JNI_LIBRARIES}
-)
+# The JVM already provides every JNI function, so the library links no JVM library.
+target_link_libraries(gempba_jni PRIVATE gempba)
+
+# The C++ runtime goes in too, so the library needs only the OS, the JVM and, for mp-mpi, MPI.
+if (MINGW)
+    target_link_options(gempba_jni PRIVATE -static)
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_options(gempba_jni PRIVATE -static-libstdc++ -static-libgcc LINKER:--exclude-libs,ALL LINKER:--as-needed)
+endif ()
 
 # ─── Output directory ─────────────────────────────────────────────────────────
 # Place the binary where Maven's resource tree expects it so "mvn package"

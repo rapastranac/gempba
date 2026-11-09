@@ -32,7 +32,7 @@ else ()
 tree, gempbaConfig.cmake dispatcher, libgempba.a. The default flavor for \
 fast local iteration; install libgempba-mpi-dev to add MPI support.")
     set(CPACK_DEBIAN_PACKAGE_DEPENDS
-        "libspdlog-dev, libfmt-dev, libhwloc-dev, libgomp1, libc6 (>= 2.17)")
+        "libfmt-dev, libhwloc-dev, pkgconf, libc6 (>= 2.38), libstdc++6 (>= 13.1)")
 endif ()
 
 # ─── DEB-specific ─────────────────────────────────────────────────────────────

@@ -8,9 +8,9 @@ pkgname=(
 )
 pkgver=4.3.0
 pkgrel=1
-pkgdesc="Generic Massive Parallelisation of Branching Algorithms — parallel branch-and-bound C++23 framework (mingw-w64)"
+pkgdesc="Generic Massive Parallelisation of Branching Algorithms — hybrid parallel C++23 framework (mingw-w64)"
 arch=('any')
-mingw_arch=('mingw64' 'ucrt64' 'clang64')
+mingw_arch=('ucrt64')
 url="https://github.com/rapastranac/gempba"
 license=('spdx:MIT')
 makedepends=(
@@ -68,9 +68,9 @@ package_gempba() {
     pkgdesc="GemPBA — multithreading flavor (development files, mingw-w64)"
     depends=(
         "${MINGW_PACKAGE_PREFIX}-gcc-libs"
-        "${MINGW_PACKAGE_PREFIX}-spdlog"
         "${MINGW_PACKAGE_PREFIX}-fmt"
         "${MINGW_PACKAGE_PREFIX}-hwloc"
+        "${MINGW_PACKAGE_PREFIX}-pkgconf"
     )
 
     cd "${srcdir}/build-mt-${MSYSTEM}"

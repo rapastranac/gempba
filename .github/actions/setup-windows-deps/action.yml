@@ -5,7 +5,7 @@ inputs:
     description: 'ON or OFF — controls msmpi SDK + runtime install'
     required: true
   tests:
-    description: 'true to install mingw-w64-x86_64-gtest'
+    description: 'true to install mingw-w64-ucrt-x86_64-gtest'
     required: false
     default: 'false'
   extra:
@@ -26,22 +26,22 @@ runs:
     - name: Setup MSYS2
       uses: msys2/setup-msys2@v2
       with:
-        msystem: MINGW64
+        msystem: UCRT64
         release: ${{ inputs.release }}
         cache: ${{ inputs.cache }}
         update: true
         install: >-
           base-devel
-          mingw-w64-x86_64-toolchain
-          mingw-w64-x86_64-cmake
-          mingw-w64-x86_64-make
-          mingw-w64-x86_64-boost
-          mingw-w64-x86_64-spdlog
-          mingw-w64-x86_64-fmt
-          mingw-w64-x86_64-hwloc
-          mingw-w64-x86_64-pkgconf
-          ${{ inputs.multiprocessing == 'ON' && 'mingw-w64-x86_64-msmpi' || '' }}
-          ${{ inputs.tests == 'true' && 'mingw-w64-x86_64-gtest' || '' }}
+          mingw-w64-ucrt-x86_64-toolchain
+          mingw-w64-ucrt-x86_64-cmake
+          mingw-w64-ucrt-x86_64-make
+          mingw-w64-ucrt-x86_64-boost
+          mingw-w64-ucrt-x86_64-spdlog
+          mingw-w64-ucrt-x86_64-fmt
+          mingw-w64-ucrt-x86_64-hwloc
+          mingw-w64-ucrt-x86_64-pkgconf
+          ${{ inputs.multiprocessing == 'ON' && 'mingw-w64-ucrt-x86_64-msmpi' || '' }}
+          ${{ inputs.tests == 'true' && 'mingw-w64-ucrt-x86_64-gtest' || '' }}
           ${{ inputs.extra }}
 
     - name: Install MS-MPI runtime
