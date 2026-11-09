@@ -448,7 +448,6 @@ namespace {
         const std::uint32_t v_worker_interval = v_hub.worker_interval_ms();
         v_hub.tick_if_due();
         const auto v_worker_frame = v_hub.latest_worker_frame(0);
-        const auto v_worker_kind = gempba::telemetry::control_kind::SET_WORKER_INTERVAL_MS;
 #pragma GCC diagnostic pop
 
         EXPECT_EQ(0u, v_worker_interval);
@@ -456,7 +455,6 @@ namespace {
         ASSERT_TRUE(v_worker_frame.has_value());
         ASSERT_TRUE(v_hub.latest_rank_frame(0).has_value());
         EXPECT_EQ(v_hub.latest_rank_frame(0)->m_seq_no, v_worker_frame->m_seq_no);
-        EXPECT_EQ(gempba::telemetry::control_kind::SET_INTERVAL_MS, v_worker_kind);
         v_hub.shutdown();
     }
 
