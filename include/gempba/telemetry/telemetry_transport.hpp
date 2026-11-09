@@ -8,8 +8,8 @@
 
 namespace gempba::telemetry {
 
-    /// Callback for one worker_frame delivered to the aggregator.
-    using worker_frame_sink = std::function<void(std::uint32_t p_src_rank, const worker_frame&)>;
+    /// Callback for one rank_frame delivered to the aggregator.
+    using rank_frame_sink = std::function<void(std::uint32_t p_src_rank, const rank_frame&)>;
     /// Callback for one node_frame delivered to the aggregator.
     using node_frame_sink = std::function<void(std::uint32_t p_src_rank, const node_frame&)>;
 
@@ -32,24 +32,24 @@ namespace gempba::telemetry {
         telemetry_transport& operator=(const telemetry_transport&) = delete;
 
         /**
-         * @brief Publish a worker frame from the local worker. Must be non-blocking.
+         * @brief Publish a rank frame from the local rank. Must be non-blocking.
          *
          * Backends may drop or coalesce under back-pressure; the hot path must
          * not stall on transport state.
          */
-        virtual void publish_worker(const worker_frame& p_frame) = 0;
+        virtual void publish_rank(const rank_frame& p_frame) = 0;
 
-        /// Publish a node frame from the local sentinel worker. Same non-blocking contract.
+        /// Publish a node frame from the local sentinel rank. Same non-blocking contract.
         virtual void publish_node(const node_frame& p_frame) = 0;
 
         /**
-         * @brief Publish the local worker's last frame before shutdown, so the aggregator can tell it apart.
+         * @brief Publish the local rank's last frame before shutdown, so the aggregator can tell it apart.
          *
-         * Defaults to @ref publish_worker for backends where every frame reaches the aggregator before shutdown.
+         * Defaults to @ref publish_rank for backends where every frame reaches the aggregator before shutdown.
          */
-        virtual void publish_final_worker(const worker_frame& p_frame) { publish_worker(p_frame); }
+        virtual void publish_final_rank(const rank_frame& p_frame) { publish_rank(p_frame); }
 
-        /// @return How many final worker frames @ref poll has delivered to the aggregator so far.
+        /// @return How many final rank frames @ref poll has delivered to the aggregator so far.
         [[nodiscard]] virtual std::uint32_t final_frames_received() const { return 0; }
 
         /**
@@ -58,7 +58,7 @@ namespace gempba::telemetry {
          * Each callback fires once per frame; sinks must be re-entrant against
          * other hub state but the hub serializes @ref poll calls.
          */
-        virtual void poll(const worker_frame_sink& p_rank_sink, const node_frame_sink& p_node_sink) = 0;
+        virtual void poll(const rank_frame_sink& p_rank_sink, const node_frame_sink& p_node_sink) = 0;
 
         /**
          * @brief Send a control message from the aggregator to one rank.
@@ -68,7 +68,7 @@ namespace gempba::telemetry {
         virtual void send_control(std::uint32_t p_dst_rank, const control_msg& p_msg) = 0;
 
         /**
-         * @brief Pull the next inbound control message addressed to this worker.
+         * @brief Pull the next inbound control message addressed to this rank.
          *
          * @return The message, or @c std::nullopt when no message is pending.
          */

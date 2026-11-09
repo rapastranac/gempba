@@ -43,7 +43,6 @@ namespace gempba {
                 m_sent_tasks++;
                 m_total_requests_number++;
                 m_stats.m_sent_task_count++;
-                m_stats.m_total_requested_tasks++;
 
                 const auto v_send_start = std::chrono::steady_clock::now();
                 send_task_to_center(*v_packet);

@@ -10,7 +10,7 @@ namespace gempba::telemetry {
     /**
      * @brief Host-level signal sampler that fills a @ref node_frame.
      *
-     * Driven by the sentinel worker only, at the node-frame cadence.
+     * Driven by the sentinel rank only, at the node-frame cadence.
      * Per-socket CPU% and net/disk aggregates are placeholders pending
      * platform-specific sampling.
      */

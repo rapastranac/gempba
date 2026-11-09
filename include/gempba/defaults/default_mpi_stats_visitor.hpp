@@ -36,12 +36,6 @@ namespace gempba {
 
         std::size_t m_received_task_count{};
         std::size_t m_sent_task_count{};
-        /**
-         * @deprecated Means sent plus received tasks on workers but requests handled on the coordinator. Use
-         * @ref m_coordinator_messages_handled on the coordinator; on workers it is @ref m_sent_task_count plus @ref m_received_task_count.
-         * The key stays for one release.
-         */
-        std::size_t m_total_requested_tasks{};
         std::size_t m_total_thread_requests{};
         double m_idle_time{};
         double m_elapsed_time{};
@@ -55,8 +49,6 @@ namespace gempba {
                     m_received_task_count = std::any_cast<std::size_t>(p_value);
                 } else if (p_key == "sent_task_count") {
                     m_sent_task_count = std::any_cast<std::size_t>(p_value);
-                } else if (p_key == "total_requested_tasks") {
-                    m_total_requested_tasks = std::any_cast<std::size_t>(p_value);
                 } else if (p_key == "total_thread_requests") {
                     m_total_thread_requests = std::any_cast<std::size_t>(p_value);
                 } else if (p_key == "idle_time") {

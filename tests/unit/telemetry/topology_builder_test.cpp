@@ -6,18 +6,18 @@
 
 namespace {
 
-    TEST(topology_builder_test, mt_only_self_registers_one_node_one_worker) {
+    TEST(topology_builder_test, mt_only_self_registers_one_node_one_rank) {
         const auto v_snap = gempba::telemetry::build_topology_snapshot(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1);
 
         ASSERT_EQ(1u, v_snap.m_identities.size());
         ASSERT_EQ(1u, v_snap.m_nodes.size());
 
-        EXPECT_EQ(0u, v_snap.m_identities.front().m_worker_id);
+        EXPECT_EQ(0u, v_snap.m_identities.front().m_rank);
         EXPECT_GT(v_snap.m_identities.front().m_pid, 0u);
 
-        EXPECT_EQ(1u, v_snap.m_nodes.front().m_worker_ids.size());
-        EXPECT_EQ(0u, v_snap.m_nodes.front().m_worker_ids.front());
-        EXPECT_EQ(0u, v_snap.m_nodes.front().m_sentinel_worker_id);
+        EXPECT_EQ(1u, v_snap.m_nodes.front().m_ranks.size());
+        EXPECT_EQ(0u, v_snap.m_nodes.front().m_ranks.front());
+        EXPECT_EQ(0u, v_snap.m_nodes.front().m_sentinel_rank);
     }
 
     TEST(topology_builder_test, hostname_field_is_non_empty) {
@@ -27,11 +27,11 @@ namespace {
         EXPECT_GT(std::strlen(v_snap.m_identities.front().m_hostname), 0u);
     }
 
-    TEST(topology_builder_test, custom_worker_id_carried_through) {
+    TEST(topology_builder_test, custom_rank_carried_through) {
         const auto v_snap = gempba::telemetry::build_topology_snapshot(gempba::telemetry::runtime_mode::MT_ONLY, 7, 1);
         ASSERT_FALSE(v_snap.m_identities.empty());
-        EXPECT_EQ(7u, v_snap.m_identities.front().m_worker_id);
-        EXPECT_EQ(7u, v_snap.m_nodes.front().m_sentinel_worker_id);
+        EXPECT_EQ(7u, v_snap.m_identities.front().m_rank);
+        EXPECT_EQ(7u, v_snap.m_nodes.front().m_sentinel_rank);
     }
 
     TEST(topology_builder_test, hub_exposes_topology_after_runtime_ready) {
@@ -39,7 +39,7 @@ namespace {
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
         const auto& v_topo = v_hub.current_topology();
         ASSERT_EQ(1u, v_topo.m_nodes.size());
-        EXPECT_EQ(1u, v_topo.m_nodes.front().m_worker_ids.size());
+        EXPECT_EQ(1u, v_topo.m_nodes.front().m_ranks.size());
     }
 
     TEST(topology_builder_test, node_carries_logical_cores_and_memory) {

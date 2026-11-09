@@ -338,14 +338,14 @@ A client can write lines back on the same socket, one JSON object per line. The 
 | Line | Effect | Since |
 |---|---|---|
 | `{"kind":"set_interval_ms","value":N}` | Sets the telemetry interval to `N` ms, clamped to 50–600000, for rank frames, node frames and the broadcast alike. | v4.3.0 (#396) |
-| `{"kind":"set_worker_interval_ms","value":N}` | The same as `set_interval_ms`, under its schema-1 name; accepted until v5.0.0 (#373). | v3.3.0 |
-| `{"kind":"set_node_interval_ms","value":N}` | Accepted and ignored since v4.3.0, when node frames started following the telemetry interval (#367); to be removed in v5.0.0 (#373). | v3.3.0 |
 | `{"kind":"pause"}` | Stops all ranks sending frames and the aggregator reading them. Counters keep counting, so totals after the resume include the paused stretch. | v4.3.0 (#368) |
 | `{"kind":"resume"}` | Ends a pause; frames resume at the current interval. | v4.3.0 (#368) |
 | `{"kind":"snapshot"}` | Every rank sends one frame on its next tick, whatever the interval and even while paused, and the aggregator sends one full line once all have arrived, or one second after the request. A request within 50 ms of the last accepted one is merged into it. | v4.3.0 (#369) |
 | `{"kind":"mark","label":"..."}` | Records a marker with `source` `"dashboard"`, stamped by the aggregator. Labels take 1 to 64 bytes; at most 32 markers per run, and any over a limit are dropped with a warning. | v4.3.0 (#370) |
 
 `pause`, `resume` and `snapshot` also accept a `value`, which they ignore.
+
+gempba v5.0.0 drops schema 1's `set_worker_interval_ms` and `set_node_interval_ms`, which v4.3.0 and v4.4.0 still accepted (#373). A line with either kind is now unknown and dropped.
 
 ## Compatibility rules
 

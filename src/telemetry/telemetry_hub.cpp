@@ -87,7 +87,7 @@ namespace gempba::telemetry {
     // maps avoid the 16 KB-per-slot cost up front.
     struct telemetry_hub::aggregator {
         mutable std::mutex m_mtx;
-        std::map<std::uint32_t, worker_frame> m_latest_worker;
+        std::map<std::uint32_t, rank_frame> m_latest_rank;
         std::map<std::uint32_t, node_frame> m_latest_node;
         std::map<std::uint32_t, std::uint64_t> m_last_seen_ms;
     };
@@ -127,7 +127,7 @@ namespace gempba::telemetry {
 
         m_topology = build_topology_snapshot(p_mode, p_rank, p_world_size);
         for (const auto& v_node: m_topology.m_nodes) {
-            if (v_node.m_sentinel_worker_id == p_rank) {
+            if (v_node.m_sentinel_rank == p_rank) {
                 m_is_sentinel.store(true, std::memory_order_relaxed);
                 break;
             }
@@ -155,12 +155,12 @@ namespace gempba::telemetry {
 
         // Force a final snapshot so the aggregator (and any consumer reading
         // it) reflects post-wait counters, not the snapshot taken up to one
-        // worker_interval_ms before completion.
+        // interval before completion.
         if (m_transport) {
             m_seq_no.fetch_add(1, std::memory_order_relaxed);
-            worker_frame v_final{};
-            snapshot_worker_frame(v_final);
-            m_transport->publish_final_worker(v_final);
+            rank_frame v_final{};
+            snapshot_rank_frame(v_final);
+            m_transport->publish_final_rank(v_final);
             if (m_is_sentinel.load(std::memory_order_relaxed)) {
                 node_frame v_node_final{};
                 snapshot_node_frame(v_node_final);
@@ -299,9 +299,9 @@ namespace gempba::telemetry {
                 m_snapshot_answered.store(v_snapshot, std::memory_order_relaxed);
             }
             m_seq_no.fetch_add(1, std::memory_order_relaxed);
-            worker_frame v_frame{};
-            snapshot_worker_frame(v_frame);
-            m_transport->publish_worker(v_frame);
+            rank_frame v_frame{};
+            snapshot_rank_frame(v_frame);
+            m_transport->publish_rank(v_frame);
             if (m_is_sentinel.load(std::memory_order_relaxed)) {
                 node_frame v_node_frame{};
                 snapshot_node_frame(v_node_frame);
@@ -337,9 +337,9 @@ namespace gempba::telemetry {
         const std::uint64_t v_ts = monotonic_ms();
         bool v_received = false;
         m_transport->poll(
-                [this, v_ts, &v_received](const std::uint32_t p_src, const worker_frame& p_frame) {
+                [this, v_ts, &v_received](const std::uint32_t p_src, const rank_frame& p_frame) {
                     const std::scoped_lock v_lock(m_aggregator->m_mtx);
-                    m_aggregator->m_latest_worker[p_src] = p_frame;
+                    m_aggregator->m_latest_rank[p_src] = p_frame;
                     m_aggregator->m_last_seen_ms[p_src] = v_ts;
                     v_received = true;
                 },
@@ -351,13 +351,13 @@ namespace gempba::telemetry {
         return v_received;
     }
 
-    void telemetry_hub::snapshot_worker_frame(worker_frame& p_out) noexcept {
-        p_out = worker_frame{};
+    void telemetry_hub::snapshot_rank_frame(rank_frame& p_out) noexcept {
+        p_out = rank_frame{};
         p_out.m_version = TELEMETRY_SCHEMA_VERSION;
-        p_out.m_worker_id = m_rank;
+        p_out.m_rank = m_rank;
         p_out.m_seq_no = m_seq_no.load(std::memory_order_relaxed);
         p_out.m_snapshot_id = m_snapshot_answered.load(std::memory_order_relaxed);
-        p_out.m_worker_local_ms = monotonic_ms();
+        p_out.m_rank_local_ms = monotonic_ms();
 
         p_out.m_tasks_started_total = m_counters->m_tasks_started_total.load(std::memory_order_relaxed);
         p_out.m_tasks_sent_total = m_counters->m_tasks_sent_total.load(std::memory_order_relaxed);
@@ -389,7 +389,7 @@ namespace gempba::telemetry {
 
         if (auto* v_lb = gempba::get_load_balancer()) {
             p_out.m_process_threads = v_lb->get_thread_pool_size() + 1;
-            p_out.m_idle_microseconds_per_worker = static_cast<std::uint64_t>(v_lb->get_idle_time() * 1'000'000.0);
+            p_out.m_idle_microseconds_per_thread = static_cast<std::uint64_t>(v_lb->get_idle_time() * 1'000'000.0);
             p_out.m_idle_microseconds_starved = static_cast<std::uint64_t>(v_lb->get_starved_idle_time() * 1'000'000.0);
             p_out.m_idle_microseconds_imbalanced = static_cast<std::uint64_t>(v_lb->get_imbalanced_idle_time() * 1'000'000.0);
             p_out.m_tasks_running = static_cast<std::uint32_t>(v_lb->get_tasks_running_count());
@@ -407,22 +407,20 @@ namespace gempba::telemetry {
     void telemetry_hub::snapshot_node_frame(node_frame& p_out) noexcept {
         std::memset(&p_out, 0, sizeof(node_frame));
         p_out.m_version = TELEMETRY_SCHEMA_VERSION;
-        p_out.m_sentinel_worker_id = m_rank;
+        p_out.m_sentinel_rank = m_rank;
         p_out.m_sentinel_local_ms = monotonic_ms();
         m_node_probe->sample(p_out);
     }
 
-    std::optional<worker_frame> telemetry_hub::latest_rank_frame(const std::uint32_t p_rank) const {
+    std::optional<rank_frame> telemetry_hub::latest_rank_frame(const std::uint32_t p_rank) const {
         if (!m_aggregator)
             return std::nullopt;
         const std::scoped_lock v_lock(m_aggregator->m_mtx);
-        const auto v_it = m_aggregator->m_latest_worker.find(p_rank);
-        if (v_it == m_aggregator->m_latest_worker.end())
+        const auto v_it = m_aggregator->m_latest_rank.find(p_rank);
+        if (v_it == m_aggregator->m_latest_rank.end())
             return std::nullopt;
         return v_it->second;
     }
-
-    std::optional<worker_frame> telemetry_hub::latest_worker_frame(const std::uint32_t p_rank) const { return latest_rank_frame(p_rank); }
 
     std::optional<node_frame> telemetry_hub::latest_node_frame(const std::uint32_t p_sentinel_rank) const {
         if (!m_aggregator)
@@ -520,7 +518,7 @@ namespace gempba::telemetry {
         }
         if (m_aggregator) {
             const std::scoped_lock v_lock(m_aggregator->m_mtx);
-            for (const auto& [v_id, v_frame]: m_aggregator->m_latest_worker) {
+            for (const auto& [v_id, v_frame]: m_aggregator->m_latest_rank) {
                 const bool v_is_coordinator = v_id < v_run.m_roles.size() && v_run.m_roles[v_id] == rank_role::COORDINATOR;
                 if (!v_is_coordinator && v_frame.m_process_threads > 0) {
                     v_run.m_threads_per_process = std::max(v_run.m_threads_per_process, v_frame.m_process_threads - 1);
@@ -540,17 +538,9 @@ namespace gempba::telemetry {
 
     void telemetry_hub::set_interval_ms(const std::uint32_t p_interval_ms) noexcept { m_interval_ms.store(p_interval_ms, std::memory_order_relaxed); }
 
-    void telemetry_hub::set_worker_interval_ms(const std::uint32_t p_interval_ms) noexcept { set_interval_ms(p_interval_ms); }
-
     void telemetry_hub::mark_as_node_sentinel() noexcept { m_is_sentinel.store(true, std::memory_order_relaxed); }
 
     std::uint32_t telemetry_hub::interval_ms() const noexcept { return m_interval_ms.load(std::memory_order_relaxed); }
-
-    std::uint32_t telemetry_hub::worker_interval_ms() const noexcept { return interval_ms(); }
-
-    void telemetry_hub::set_node_interval_ms(std::uint32_t) noexcept {}
-
-    std::uint32_t telemetry_hub::node_interval_ms() const noexcept { return interval_ms(); }
 
     bool telemetry_hub::paused() const noexcept { return m_paused.load(std::memory_order_relaxed); }
 
@@ -563,8 +553,8 @@ namespace gempba::telemetry {
         }
         const std::scoped_lock v_lock(m_aggregator->m_mtx);
         for (std::uint32_t v_rank = 0; v_rank < m_world_size; ++v_rank) {
-            const auto v_it = m_aggregator->m_latest_worker.find(v_rank);
-            if (v_it == m_aggregator->m_latest_worker.end() || v_it->second.m_snapshot_id < v_id) {
+            const auto v_it = m_aggregator->m_latest_rank.find(v_rank);
+            if (v_it == m_aggregator->m_latest_rank.end() || v_it->second.m_snapshot_id < v_id) {
                 return true;
             }
         }

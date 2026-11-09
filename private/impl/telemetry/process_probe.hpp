@@ -8,7 +8,7 @@
 namespace gempba::telemetry {
 
     /**
-     * @brief Process-level signal sampler that fills part of a @ref worker_frame.
+     * @brief Process-level signal sampler that fills part of a @ref rank_frame.
      *
      * Single-threaded by construction. @c m_process_cpu_pct is a delta between
      * consecutive @ref sample calls, so the first sample on a fresh instance
@@ -23,7 +23,7 @@ namespace gempba::telemetry {
         process_probe(const process_probe&) = delete;
         process_probe& operator=(const process_probe&) = delete;
 
-        void sample(worker_frame& p_out) noexcept;
+        void sample(rank_frame& p_out) noexcept;
 
     private:
         std::uint64_t m_last_cpu_microseconds = 0;

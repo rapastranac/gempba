@@ -35,7 +35,6 @@ TEST(default_mpi_stats_test, construction_and_defaults) {
     EXPECT_EQ(5, v_stats_impl.m_rank);
     EXPECT_EQ(0u, v_stats_impl.m_received_task_count);
     EXPECT_EQ(0u, v_stats_impl.m_sent_task_count);
-    EXPECT_EQ(0u, v_stats_impl.m_total_requested_tasks);
     EXPECT_EQ(0u, v_stats_impl.m_total_thread_requests);
     EXPECT_DOUBLE_EQ(0.0, v_stats_impl.m_idle_time);
     EXPECT_DOUBLE_EQ(0.0, v_stats_impl.m_elapsed_time);
@@ -54,7 +53,6 @@ TEST(default_mpi_stats_test, visitor_returns_all_fields_correctly) {
     gempba::default_mpi_stats v_stats_impl(3);
     v_stats_impl.m_received_task_count = 10;
     v_stats_impl.m_sent_task_count = 20;
-    v_stats_impl.m_total_requested_tasks = 30;
     v_stats_impl.m_total_thread_requests = 40;
     v_stats_impl.m_idle_time = 1.5;
     v_stats_impl.m_elapsed_time = 2.5;
@@ -64,11 +62,10 @@ TEST(default_mpi_stats_test, visitor_returns_all_fields_correctly) {
 
     v_stats_impl.visit([&](const std::string& p_key, std::any&& p_value) { v_collected[p_key] = std::move(p_value); });
 
-    EXPECT_EQ(8, v_collected.size());
+    EXPECT_EQ(7, v_collected.size());
     EXPECT_EQ(3, std::any_cast<int>(v_collected["rank"]));
     EXPECT_EQ(10u, std::any_cast<std::size_t>(v_collected["received_task_count"]));
     EXPECT_EQ(20u, std::any_cast<std::size_t>(v_collected["sent_task_count"]));
-    EXPECT_EQ(30u, std::any_cast<std::size_t>(v_collected["total_requested_tasks"]));
     EXPECT_EQ(40u, std::any_cast<std::size_t>(v_collected["total_thread_requests"]));
     EXPECT_DOUBLE_EQ(1.5, std::any_cast<double>(v_collected["idle_time"]));
     EXPECT_DOUBLE_EQ(2.5, std::any_cast<double>(v_collected["elapsed_time"]));
@@ -79,7 +76,6 @@ TEST(default_mpi_stats_test, serialize_and_from_packet_round_trip) {
     gempba::default_mpi_stats v_stats_impl(7);
     v_stats_impl.m_received_task_count = 11;
     v_stats_impl.m_sent_task_count = 22;
-    v_stats_impl.m_total_requested_tasks = 33;
     v_stats_impl.m_total_thread_requests = 44;
     v_stats_impl.m_idle_time = 3.3;
     v_stats_impl.m_elapsed_time = 4.4;
@@ -91,7 +87,6 @@ TEST(default_mpi_stats_test, serialize_and_from_packet_round_trip) {
     EXPECT_EQ(7, v_deserialized.m_rank);
     EXPECT_EQ(11u, v_deserialized.m_received_task_count);
     EXPECT_EQ(22u, v_deserialized.m_sent_task_count);
-    EXPECT_EQ(33u, v_deserialized.m_total_requested_tasks);
     EXPECT_EQ(44u, v_deserialized.m_total_thread_requests);
     EXPECT_DOUBLE_EQ(3.3, v_deserialized.m_idle_time);
     EXPECT_DOUBLE_EQ(4.4, v_deserialized.m_elapsed_time);
@@ -109,7 +104,6 @@ TEST(default_mpi_stats_test, copy_assignment_operator_same_rank) {
     gempba::default_mpi_stats v_stats_impl1(5);
     v_stats_impl1.m_received_task_count = 10;
     v_stats_impl1.m_sent_task_count = 20;
-    v_stats_impl1.m_total_requested_tasks = 30;
     v_stats_impl1.m_total_thread_requests = 40;
     v_stats_impl1.m_idle_time = 1.5;
     v_stats_impl1.m_elapsed_time = 2.5;
@@ -117,7 +111,6 @@ TEST(default_mpi_stats_test, copy_assignment_operator_same_rank) {
     gempba::default_mpi_stats v_stats_impl2(5);
     v_stats_impl2.m_received_task_count = 1;
     v_stats_impl2.m_sent_task_count = 2;
-    v_stats_impl2.m_total_requested_tasks = 3;
     v_stats_impl2.m_total_thread_requests = 4;
     v_stats_impl2.m_idle_time = 0.1;
     v_stats_impl2.m_elapsed_time = 0.2;
@@ -127,7 +120,6 @@ TEST(default_mpi_stats_test, copy_assignment_operator_same_rank) {
     EXPECT_EQ(5, v_stats_impl2.m_rank);
     EXPECT_EQ(10u, v_stats_impl2.m_received_task_count);
     EXPECT_EQ(20u, v_stats_impl2.m_sent_task_count);
-    EXPECT_EQ(30u, v_stats_impl2.m_total_requested_tasks);
     EXPECT_EQ(40u, v_stats_impl2.m_total_thread_requests);
     EXPECT_DOUBLE_EQ(1.5, v_stats_impl2.m_idle_time);
     EXPECT_DOUBLE_EQ(2.5, v_stats_impl2.m_elapsed_time);
@@ -137,7 +129,6 @@ TEST(default_mpi_stats_test, copy_assignment_operator_self_assignment) {
     gempba::default_mpi_stats v_stats_impl(3);
     v_stats_impl.m_received_task_count = 15;
     v_stats_impl.m_sent_task_count = 25;
-    v_stats_impl.m_total_requested_tasks = 35;
     v_stats_impl.m_total_thread_requests = 40;
     v_stats_impl.m_idle_time = 2.5;
     v_stats_impl.m_elapsed_time = 3.5;
@@ -147,7 +138,6 @@ TEST(default_mpi_stats_test, copy_assignment_operator_self_assignment) {
     EXPECT_EQ(3, v_stats_impl.m_rank);
     EXPECT_EQ(15u, v_stats_impl.m_received_task_count);
     EXPECT_EQ(25u, v_stats_impl.m_sent_task_count);
-    EXPECT_EQ(35u, v_stats_impl.m_total_requested_tasks);
     EXPECT_EQ(40u, v_stats_impl.m_total_thread_requests);
     EXPECT_DOUBLE_EQ(2.5, v_stats_impl.m_idle_time);
     EXPECT_DOUBLE_EQ(3.5, v_stats_impl.m_elapsed_time);
@@ -157,7 +147,6 @@ TEST(default_mpi_stats_test, move_assignment_operator_same_rank) {
     gempba::default_mpi_stats v_stats_impl1(8);
     v_stats_impl1.m_received_task_count = 100;
     v_stats_impl1.m_sent_task_count = 200;
-    v_stats_impl1.m_total_requested_tasks = 300;
     v_stats_impl1.m_total_thread_requests = 400;
     v_stats_impl1.m_idle_time = 10.5;
     v_stats_impl1.m_elapsed_time = 20.5;
@@ -169,7 +158,6 @@ TEST(default_mpi_stats_test, move_assignment_operator_same_rank) {
     EXPECT_EQ(8, v_stats_impl2.m_rank);
     EXPECT_EQ(100u, v_stats_impl2.m_received_task_count);
     EXPECT_EQ(200u, v_stats_impl2.m_sent_task_count);
-    EXPECT_EQ(300u, v_stats_impl2.m_total_requested_tasks);
     EXPECT_EQ(400u, v_stats_impl2.m_total_thread_requests);
     EXPECT_DOUBLE_EQ(10.5, v_stats_impl2.m_idle_time);
     EXPECT_DOUBLE_EQ(20.5, v_stats_impl2.m_elapsed_time);
@@ -179,7 +167,6 @@ TEST(default_mpi_stats_test, move_assignment_operator_self_assignment) {
     gempba::default_mpi_stats v_stats_impl(9);
     v_stats_impl.m_received_task_count = 50;
     v_stats_impl.m_sent_task_count = 60;
-    v_stats_impl.m_total_requested_tasks = 70;
     v_stats_impl.m_total_thread_requests = 80;
     v_stats_impl.m_idle_time = 5.5;
     v_stats_impl.m_elapsed_time = 6.5;
@@ -189,7 +176,6 @@ TEST(default_mpi_stats_test, move_assignment_operator_self_assignment) {
     EXPECT_EQ(9, v_stats_impl.m_rank);
     EXPECT_EQ(50u, v_stats_impl.m_received_task_count);
     EXPECT_EQ(60u, v_stats_impl.m_sent_task_count);
-    EXPECT_EQ(70u, v_stats_impl.m_total_requested_tasks);
     EXPECT_EQ(80u, v_stats_impl.m_total_thread_requests);
     EXPECT_DOUBLE_EQ(5.5, v_stats_impl.m_idle_time);
     EXPECT_DOUBLE_EQ(6.5, v_stats_impl.m_elapsed_time);
@@ -199,7 +185,6 @@ TEST(default_mpi_stats_test, copy_constructor) {
     gempba::default_mpi_stats v_stats_impl1(4);
     v_stats_impl1.m_received_task_count = 40;
     v_stats_impl1.m_sent_task_count = 50;
-    v_stats_impl1.m_total_requested_tasks = 60;
     v_stats_impl1.m_total_thread_requests = 70;
     v_stats_impl1.m_idle_time = 4.5;
     v_stats_impl1.m_elapsed_time = 5.5;
@@ -209,7 +194,6 @@ TEST(default_mpi_stats_test, copy_constructor) {
     EXPECT_EQ(4, v_stats_impl2.m_rank);
     EXPECT_EQ(40u, v_stats_impl2.m_received_task_count);
     EXPECT_EQ(50u, v_stats_impl2.m_sent_task_count);
-    EXPECT_EQ(60u, v_stats_impl2.m_total_requested_tasks);
     EXPECT_EQ(70u, v_stats_impl2.m_total_thread_requests);
     EXPECT_DOUBLE_EQ(4.5, v_stats_impl2.m_idle_time);
     EXPECT_DOUBLE_EQ(5.5, v_stats_impl2.m_elapsed_time);
@@ -219,7 +203,6 @@ TEST(default_mpi_stats_test, move_constructor) {
     gempba::default_mpi_stats v_stats_impl1(6);
     v_stats_impl1.m_received_task_count = 80;
     v_stats_impl1.m_sent_task_count = 90;
-    v_stats_impl1.m_total_requested_tasks = 100;
     v_stats_impl1.m_total_thread_requests = 110;
     v_stats_impl1.m_idle_time = 8.5;
     v_stats_impl1.m_elapsed_time = 9.5;
@@ -229,7 +212,6 @@ TEST(default_mpi_stats_test, move_constructor) {
     EXPECT_EQ(6, v_stats_impl2.m_rank);
     EXPECT_EQ(80u, v_stats_impl2.m_received_task_count);
     EXPECT_EQ(90u, v_stats_impl2.m_sent_task_count);
-    EXPECT_EQ(100u, v_stats_impl2.m_total_requested_tasks);
     EXPECT_EQ(110u, v_stats_impl2.m_total_thread_requests);
     EXPECT_DOUBLE_EQ(8.5, v_stats_impl2.m_idle_time);
     EXPECT_DOUBLE_EQ(9.5, v_stats_impl2.m_elapsed_time);
@@ -239,7 +221,6 @@ TEST(stats_interface_test, serialize_deserialize_comparison_identical_objects) {
     gempba::default_mpi_stats v_stats_impl1(3);
     v_stats_impl1.m_received_task_count = 15;
     v_stats_impl1.m_sent_task_count = 25;
-    v_stats_impl1.m_total_requested_tasks = 35;
     v_stats_impl1.m_total_thread_requests = 40;
     v_stats_impl1.m_idle_time = 2.5;
     v_stats_impl1.m_elapsed_time = 3.5;
@@ -247,7 +228,6 @@ TEST(stats_interface_test, serialize_deserialize_comparison_identical_objects) {
     gempba::default_mpi_stats v_stats_impl2(3);
     v_stats_impl2.m_received_task_count = 15;
     v_stats_impl2.m_sent_task_count = 25;
-    v_stats_impl2.m_total_requested_tasks = 35;
     v_stats_impl2.m_total_thread_requests = 40;
     v_stats_impl2.m_idle_time = 2.5;
     v_stats_impl2.m_elapsed_time = 3.5;
@@ -266,7 +246,6 @@ TEST(stats_interface_test, visitor_comparison_identical_objects) {
     gempba::default_mpi_stats v_stats_impl1(7);
     v_stats_impl1.m_received_task_count = 100;
     v_stats_impl1.m_sent_task_count = 200;
-    v_stats_impl1.m_total_requested_tasks = 300;
     v_stats_impl1.m_total_thread_requests = 400;
     v_stats_impl1.m_idle_time = 10.5;
     v_stats_impl1.m_elapsed_time = 20.5;
@@ -274,7 +253,6 @@ TEST(stats_interface_test, visitor_comparison_identical_objects) {
     gempba::default_mpi_stats v_stats_impl2(7);
     v_stats_impl2.m_received_task_count = 100;
     v_stats_impl2.m_sent_task_count = 200;
-    v_stats_impl2.m_total_requested_tasks = 300;
     v_stats_impl2.m_total_thread_requests = 400;
     v_stats_impl2.m_idle_time = 10.5;
     v_stats_impl2.m_elapsed_time = 20.5;
@@ -290,7 +268,7 @@ TEST(stats_interface_test, visitor_comparison_identical_objects) {
     v_stats_ref2.visit([&](const std::string& p_key, std::any&& p_value) { v_collected2[p_key] = std::move(p_value); });
 
     EXPECT_EQ(v_collected2.size(), v_collected1.size());
-    EXPECT_EQ(8, v_collected1.size());
+    EXPECT_EQ(7, v_collected1.size());
 
     for (const auto& [v_key, v_value]: v_collected1) {
         EXPECT_TRUE(v_collected2.contains(v_key));
@@ -309,15 +287,14 @@ TEST(stats_interface_test, visitor_comparison_identical_objects) {
 TEST(default_mpi_stats_test, labels_returns_expected_column_names) {
     const gempba::default_mpi_stats v_stats(0);
     const auto v_labels = v_stats.labels();
-    ASSERT_EQ(8u, v_labels.size());
+    ASSERT_EQ(7u, v_labels.size());
     EXPECT_EQ("rank", v_labels[0]);
     EXPECT_EQ("received_task_count", v_labels[1]);
     EXPECT_EQ("sent_task_count", v_labels[2]);
-    EXPECT_EQ("total_requested_tasks", v_labels[3]);
-    EXPECT_EQ("total_thread_requests", v_labels[4]);
-    EXPECT_EQ("idle_time", v_labels[5]);
-    EXPECT_EQ("elapsed_time", v_labels[6]);
-    EXPECT_EQ("coordinator_messages_handled", v_labels[7]);
+    EXPECT_EQ("total_thread_requests", v_labels[3]);
+    EXPECT_EQ("idle_time", v_labels[4]);
+    EXPECT_EQ("elapsed_time", v_labels[5]);
+    EXPECT_EQ("coordinator_messages_handled", v_labels[6]);
 }
 
 TEST(default_mpi_stats_test, equality_operator_equal_objects) {

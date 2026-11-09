@@ -8,9 +8,9 @@
 namespace gempba::telemetry {
 
     struct local_transport::impl {
-        struct worker_slot {
+        struct rank_slot {
             std::mutex m_mtx;
-            worker_frame m_frame{};
+            rank_frame m_frame{};
             bool m_dirty = false;
         };
 
@@ -20,8 +20,8 @@ namespace gempba::telemetry {
             bool m_dirty = false;
         };
 
-        std::array<worker_slot, MAX_WORKERS> m_worker_slots;
-        std::array<node_slot, MAX_WORKERS> m_node_slots;
+        std::array<rank_slot, MAX_RANKS> m_rank_slots;
+        std::array<node_slot, MAX_RANKS> m_node_slots;
 
         std::mutex m_control_mtx;
         std::deque<std::pair<std::uint32_t, control_msg>> m_control_queue;
@@ -31,28 +31,28 @@ namespace gempba::telemetry {
 
     local_transport::~local_transport() = default;
 
-    void local_transport::publish_worker(const worker_frame& p_frame) {
-        if (p_frame.m_worker_id >= MAX_WORKERS)
+    void local_transport::publish_rank(const rank_frame& p_frame) {
+        if (p_frame.m_rank >= MAX_RANKS)
             return;
-        auto& v_slot = m_impl->m_worker_slots[p_frame.m_worker_id];
+        auto& v_slot = m_impl->m_rank_slots[p_frame.m_rank];
         const std::scoped_lock v_lock(v_slot.m_mtx);
         v_slot.m_frame = p_frame;
         v_slot.m_dirty = true;
     }
 
     void local_transport::publish_node(const node_frame& p_frame) {
-        if (p_frame.m_sentinel_worker_id >= MAX_WORKERS)
+        if (p_frame.m_sentinel_rank >= MAX_RANKS)
             return;
-        auto& v_slot = m_impl->m_node_slots[p_frame.m_sentinel_worker_id];
+        auto& v_slot = m_impl->m_node_slots[p_frame.m_sentinel_rank];
         const std::scoped_lock v_lock(v_slot.m_mtx);
         v_slot.m_frame = p_frame;
         v_slot.m_dirty = true;
     }
 
-    void local_transport::poll(const worker_frame_sink& p_rank_sink, const node_frame_sink& p_node_sink) {
-        for (std::uint32_t v_i = 0; v_i < MAX_WORKERS; ++v_i) {
-            auto& v_slot = m_impl->m_worker_slots[v_i];
-            worker_frame v_local{};
+    void local_transport::poll(const rank_frame_sink& p_rank_sink, const node_frame_sink& p_node_sink) {
+        for (std::uint32_t v_i = 0; v_i < MAX_RANKS; ++v_i) {
+            auto& v_slot = m_impl->m_rank_slots[v_i];
+            rank_frame v_local{};
             bool v_was_dirty = false;
             {
                 const std::scoped_lock v_lock(v_slot.m_mtx);
@@ -66,7 +66,7 @@ namespace gempba::telemetry {
                 p_rank_sink(v_i, v_local);
             }
         }
-        for (std::uint32_t v_i = 0; v_i < MAX_WORKERS; ++v_i) {
+        for (std::uint32_t v_i = 0; v_i < MAX_RANKS; ++v_i) {
             auto& v_slot = m_impl->m_node_slots[v_i];
             node_frame v_local{};
             bool v_was_dirty = false;

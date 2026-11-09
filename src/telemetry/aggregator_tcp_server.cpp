@@ -294,14 +294,10 @@ namespace gempba::telemetry {
             if (!v_value) {
                 return false;
             }
-            if (v_kind_trimmed == "set_interval_ms" || v_kind_trimmed == "set_worker_interval_ms") {
-                p_out_kind = control_kind::SET_INTERVAL_MS;
-            } else if (v_kind_trimmed == "set_node_interval_ms") {
-                // Sent by dashboards from before #367 folded the node rate into the worker rate; accepted and ignored for v4.3.0, to be removed in the next breaking release.
-                p_out_kind = control_kind::UNSPECIFIED;
-            } else {
+            if (v_kind_trimmed != "set_interval_ms") {
                 return false;
             }
+            p_out_kind = control_kind::SET_INTERVAL_MS;
             p_out_value = *v_value;
             return true;
         }
@@ -324,15 +320,15 @@ namespace gempba::telemetry {
             }
 
             const auto& v_topology = p_hub.current_topology();
-            std::vector<worker_frame> v_workers;
+            std::vector<rank_frame> v_rank_frames;
             std::vector<node_frame> v_nodes;
             for (const auto& v_node: v_topology.m_nodes) {
-                for (std::uint32_t v_id: v_node.m_worker_ids) {
+                for (std::uint32_t v_id: v_node.m_ranks) {
                     if (auto v_f = p_hub.latest_rank_frame(v_id)) {
-                        v_workers.push_back(*v_f);
+                        v_rank_frames.push_back(*v_f);
                     }
                 }
-                if (auto v_n = p_hub.latest_node_frame(v_node.m_sentinel_worker_id)) {
+                if (auto v_n = p_hub.latest_node_frame(v_node.m_sentinel_rank)) {
                     v_nodes.push_back(*v_n);
                 }
             }
@@ -340,7 +336,7 @@ namespace gempba::telemetry {
             const run_description v_run = p_hub.describe_run();
             v_payload.m_topology = &v_topology;
             v_payload.m_run = &v_run;
-            v_payload.m_workers = &v_workers;
+            v_payload.m_rank_frames = &v_rank_frames;
             v_payload.m_nodes = &v_nodes;
 
             v_line.reserve(2048);

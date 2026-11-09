@@ -1,5 +1,5 @@
 #include <impl/telemetry/mpi_transport.hpp>
-#include <impl/telemetry/worker_frame_codec.hpp>
+#include <impl/telemetry/rank_frame_codec.hpp>
 
 #include <cstring>
 #include <deque>
@@ -15,10 +15,10 @@ namespace gempba::telemetry {
         // Tag space is private to the dup'd communicator, but distinct values
         // help when reading wireshark/printf debugging output. Far enough from
         // the scheduler's 0..14 range to avoid confusion.
-        constexpr int k_tag_worker_frame = 9001;
+        constexpr int k_tag_rank_frame = 9001;
         constexpr int k_tag_node_frame = 9002;
         constexpr int k_tag_control = 9003;
-        constexpr int k_tag_final_worker_frame = 9004;
+        constexpr int k_tag_final_rank_frame = 9004;
         constexpr int k_aggregator_rank = 0;
 
     } // namespace
@@ -44,7 +44,7 @@ namespace gempba::telemetry {
 
         std::uint32_t m_final_frames_received = 0;
 
-        void drain_worker_frames(const int p_tag, const worker_frame_sink& p_sink) {
+        void drain_rank_frames(const int p_tag, const rank_frame_sink& p_sink) {
             while (true) {
                 int v_flag = 0;
                 MPI_Status v_status;
@@ -56,11 +56,11 @@ namespace gempba::telemetry {
                 MPI_Get_count(&v_status, MPI_BYTE, &v_count);
                 std::vector<std::byte> v_buffer(static_cast<std::size_t>(v_count));
                 MPI_Recv(v_buffer.data(), v_count, MPI_BYTE, v_status.MPI_SOURCE, p_tag, m_comm, MPI_STATUS_IGNORE);
-                if (p_tag == k_tag_final_worker_frame) {
+                if (p_tag == k_tag_final_rank_frame) {
                     ++m_final_frames_received;
                 }
-                worker_frame v_frame;
-                if (p_sink && detail::decode_worker_frame(v_buffer.data(), v_buffer.size(), v_frame)) {
+                rank_frame v_frame;
+                if (p_sink && detail::decode_rank_frame(v_buffer.data(), v_buffer.size(), v_frame)) {
                     p_sink(static_cast<std::uint32_t>(v_status.MPI_SOURCE), v_frame);
                 }
             }
@@ -79,7 +79,7 @@ namespace gempba::telemetry {
             }
         }
 
-        // dst_rank == k_aggregator_rank for worker frames, an explicit rank for
+        // dst_rank == k_aggregator_rank for rank frames, an explicit rank for
         // controls. Buffer is moved in so it stays alive until reaped.
         void post_isend(std::vector<std::byte>&& p_buffer, int p_dst_rank, int p_tag) {
             const std::scoped_lock v_lock(m_sends_mtx);
@@ -140,20 +140,20 @@ namespace gempba::telemetry {
         }
     }
 
-    void mpi_transport::publish_worker(const worker_frame& p_frame) {
+    void mpi_transport::publish_rank(const rank_frame& p_frame) {
         if (m_impl->m_comm == MPI_COMM_NULL)
             return;
 
         m_impl->reap_completed_sends();
-        m_impl->post_isend(detail::encode_worker_frame(p_frame), k_aggregator_rank, k_tag_worker_frame);
+        m_impl->post_isend(detail::encode_rank_frame(p_frame), k_aggregator_rank, k_tag_rank_frame);
     }
 
-    void mpi_transport::publish_final_worker(const worker_frame& p_frame) {
+    void mpi_transport::publish_final_rank(const rank_frame& p_frame) {
         if (m_impl->m_comm == MPI_COMM_NULL)
             return;
 
         m_impl->reap_completed_sends();
-        m_impl->post_isend(detail::encode_worker_frame(p_frame), k_aggregator_rank, k_tag_final_worker_frame);
+        m_impl->post_isend(detail::encode_rank_frame(p_frame), k_aggregator_rank, k_tag_final_rank_frame);
     }
 
     std::uint32_t mpi_transport::final_frames_received() const { return m_impl->m_final_frames_received; }
@@ -169,15 +169,15 @@ namespace gempba::telemetry {
         m_impl->post_isend(std::move(v_buffer), k_aggregator_rank, k_tag_node_frame);
     }
 
-    void mpi_transport::poll(const worker_frame_sink& p_rank_sink, const node_frame_sink& p_node_sink) {
+    void mpi_transport::poll(const rank_frame_sink& p_rank_sink, const node_frame_sink& p_node_sink) {
         if (m_impl->m_comm == MPI_COMM_NULL)
             return;
         if (m_impl->m_rank != k_aggregator_rank)
             return;
 
         // Regular frames first, so a rank's final frame lands in the sink after its earlier ones.
-        m_impl->drain_worker_frames(k_tag_worker_frame, p_rank_sink);
-        m_impl->drain_worker_frames(k_tag_final_worker_frame, p_rank_sink);
+        m_impl->drain_rank_frames(k_tag_rank_frame, p_rank_sink);
+        m_impl->drain_rank_frames(k_tag_final_rank_frame, p_rank_sink);
 
         // Drain node frames from sentinels.
         while (true) {
