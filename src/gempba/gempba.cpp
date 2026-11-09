@@ -31,13 +31,7 @@ namespace {
         }
         auto v_hub = std::make_unique<gempba::telemetry::telemetry_hub>();
         if (g_scheduler) {
-            const int v_world_size = g_scheduler->world_size();
-            std::vector<gempba::rank_role> v_roles;
-            v_roles.reserve(static_cast<std::size_t>(v_world_size));
-            for (int v_rank = 0; v_rank < v_world_size; ++v_rank) {
-                v_roles.push_back(g_scheduler->role_of(v_rank));
-            }
-            v_hub->describe_scheduler(g_scheduler->get_name(), std::move(v_roles));
+            v_hub->describe_scheduler(g_scheduler->get_name(), g_scheduler->role_of(g_scheduler->rank_me()));
         }
         if (g_load_balancer) {
             v_hub->describe_load_balancer(g_load_balancer->get_balancing_policy());

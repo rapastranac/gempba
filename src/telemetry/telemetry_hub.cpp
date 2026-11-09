@@ -125,7 +125,23 @@ namespace gempba::telemetry {
             }
         }
 
-        m_topology = build_topology_snapshot(p_mode, p_rank, p_world_size);
+        rank_role v_role;
+        {
+            const std::scoped_lock v_lock(m_run_mtx);
+            v_role = m_scheduler_role;
+        }
+        m_topology = build_topology_snapshot(p_mode, p_rank, p_world_size, v_role);
+        std::vector<rank_role> v_roles;
+        for (const rank_identity& v_identity: m_topology.m_identities) {
+            if (v_identity.m_rank >= v_roles.size()) {
+                v_roles.resize(v_identity.m_rank + 1, rank_role::WORKER);
+            }
+            v_roles[v_identity.m_rank] = v_identity.m_role;
+        }
+        {
+            const std::scoped_lock v_lock(m_run_mtx);
+            m_rank_roles = std::move(v_roles);
+        }
         for (const auto& v_node: m_topology.m_nodes) {
             if (v_node.m_sentinel_rank == p_rank) {
                 m_is_sentinel.store(true, std::memory_order_relaxed);
@@ -485,10 +501,10 @@ namespace gempba::telemetry {
         return m_run_markers;
     }
 
-    void telemetry_hub::describe_scheduler(const std::string_view p_name, std::vector<rank_role> p_roles) {
+    void telemetry_hub::describe_scheduler(const std::string_view p_name, const rank_role p_role) {
         const std::scoped_lock v_lock(m_run_mtx);
         m_scheduler_name = p_name;
-        m_scheduler_roles = std::move(p_roles);
+        m_scheduler_role = p_role;
     }
 
     void telemetry_hub::describe_load_balancer(const balancing_policy p_policy) {
@@ -511,7 +527,7 @@ namespace gempba::telemetry {
         {
             const std::scoped_lock v_lock(m_run_mtx);
             v_run.m_scheduler = m_scheduler_name;
-            v_run.m_roles = m_scheduler_roles;
+            v_run.m_roles = m_rank_roles;
             v_run.m_load_balancer = m_load_balancer_name;
             v_run.m_annotations = m_run_annotations;
             v_run.m_markers = m_run_markers;

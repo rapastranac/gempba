@@ -53,8 +53,8 @@ namespace gempba {
         /**
          * @param p_rank a rank in [0, world_size())
          * @return the role @p p_rank plays in this scheduler; @ref rank_role::WORKER for every rank of schedulers that do not say otherwise
-         * @note Telemetry's aggregator, rank 0, asks its own scheduler for every rank's role once, at startup, and reports those answers.
-         * The answer must therefore depend on @p p_rank alone: the same on every rank, and fixed for the whole run.
+         * @note Each rank reports its own role, @c role_of(rank_me()), to telemetry once, at startup, so the answer must stay fixed for the
+         * whole run.
          */
         [[nodiscard]] virtual rank_role role_of([[maybe_unused]] int p_rank) const { return rank_role::WORKER; }
 

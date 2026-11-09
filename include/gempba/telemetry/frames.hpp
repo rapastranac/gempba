@@ -2,6 +2,7 @@
 #define GEMPBA_TELEMETRY_FRAMES_HPP
 
 #include <cstdint>
+#include <gempba/core/rank_role.hpp>
 #include <vector>
 
 namespace gempba::telemetry {
@@ -38,6 +39,8 @@ namespace gempba::telemetry {
         std::uint32_t m_pid;
         /** @brief Socket the rank's affinity places it on (0 when affinity is unknown). */
         std::uint8_t m_primary_socket;
+        /** @brief This rank's role, as its own scheduler's @c role_of reports it at startup. */
+        rank_role m_role;
         /**
          * @brief Bitmap of the logical CPUs this rank may run on, one bit per CPU
          * across @ref MAX_LOGICAL_CPUS: word @c w bit @c b means CPU @c w*64+b.

@@ -34,6 +34,16 @@ namespace {
         EXPECT_EQ(7u, v_snap.m_nodes.front().m_sentinel_rank);
     }
 
+    TEST(topology_builder_test, the_identity_carries_the_ranks_own_role) {
+        const auto v_worker = gempba::telemetry::build_topology_snapshot(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1);
+        ASSERT_FALSE(v_worker.m_identities.empty());
+        EXPECT_EQ(gempba::rank_role::WORKER, v_worker.m_identities.front().m_role);
+
+        const auto v_coordinator = gempba::telemetry::build_topology_snapshot(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, gempba::rank_role::COORDINATOR);
+        ASSERT_FALSE(v_coordinator.m_identities.empty());
+        EXPECT_EQ(gempba::rank_role::COORDINATOR, v_coordinator.m_identities.front().m_role);
+    }
+
     TEST(topology_builder_test, hub_exposes_topology_after_runtime_ready) {
         gempba::telemetry::telemetry_hub v_hub;
         v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
