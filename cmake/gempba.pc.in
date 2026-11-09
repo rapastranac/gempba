@@ -4,7 +4,7 @@ libdir=${prefix}/@CMAKE_INSTALL_LIBDIR@
 includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
 
 Name: @GEMPBA_PC_NAME@
-Description: Generic Massive Parallelisation of Branching Algorithms — parallel branch-and-bound C++23 framework
+Description: Generic Massive Parallelisation of Branching Algorithms — hybrid parallel C++23 framework
 Version: @PROJECT_VERSION@
 Requires: @GEMPBA_PC_REQUIRES@
 Libs: -L${libdir} -l@GEMPBA_PC_LIB@ @GEMPBA_PC_STACKTRACE_LIBS@ -lpthread
