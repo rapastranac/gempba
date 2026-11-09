@@ -2,6 +2,14 @@
 
 A scheduler passed to `gempba::multiprocessing::create_scheduler(std::unique_ptr<scheduler>)` gets telemetry the same way the built-in schedulers do. What reaches the dashboard depends on the rules below. The words rank, coordinator, worker, aggregator and sentinel mean what [the wire format's vocabulary](wire-format.md#vocabulary) says.
 
+## What your scheduler implements
+
+Every rank calls `scheduler::run(node_manager, runnables, seed)`, and only the root, rank 0, passes the seed. `run`, `get_result()` and `get_all_results()` check that rule and the root before they reach your scheduler (#394). Your scheduler implements:
+- `do_run(node_manager&, runnables, std::optional<task_bundle> seed)`: this rank's part of the run, returning once the whole run has ended. The seed is set exactly on the root. Whether the root also runs tasks is up to your scheduler; the built-in ones keep it as their coordinator.
+- `do_get_result()` and `do_get_all_results()`: the best result, and each rank's, which the root reads after `run`.
+- `force_push(task, runnable_id)` and `try_open_transmission_channel()`: how the load balancer hands a task to another rank.
+- The rest of `scheduler`: `barrier()`, `rank_me()`, `world_size()`, the stats calls, `set_goal()` and `set_custom_initial_topology()`.
+
 ## Two layers over the same ranks
 
 ![The scheduler's traffic and telemetry's traffic as two separate layers over the same ranks](figures/telemetry-layers.svg)
@@ -20,7 +28,7 @@ A scheduler passed to `gempba::multiprocessing::create_scheduler(std::unique_ptr
 4. **Shut down on every rank.** `gempba::shutdown()` sends each rank's final frame. The aggregator waits up to one second for the final frames, then sends the line marked `"final":true`.
 5. **Say who coordinates.**
    - Override `role_of(int)` to return `rank_role::COORDINATOR` for a rank that hands out work and runs no tasks. By default every rank is a worker.
-   - The answer must depend on the rank alone: the same on every rank, and fixed for the run. The aggregator asks its own copy of your scheduler once, for every rank.
+   - Each rank reports its own answer, `role_of(rank_me())`, once at startup, so the answer must stay fixed for the run (#394).
    - Override `get_name()` to name your scheduler in the stream's `run.scheduler`. The default is `"custom"`.
 6. **Report what happens with `record_*()`.** Each call is cheap and safe from any thread. `get()` returns `nullptr` when telemetry is off, so guard every call:
    ```cpp
