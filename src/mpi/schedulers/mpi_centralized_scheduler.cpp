@@ -85,6 +85,7 @@ namespace gempba {
             if (auto* v_telemetry = telemetry::get())
                 v_telemetry->tick_if_due();
         }
+        update_score(p_node_manager);
         utils::print_ipc_debug_comments("rank {} sent {} tasks\n", m_world_rank, m_sent_tasks);
 
         if (!m_tasks_bundle_queue.empty()) {

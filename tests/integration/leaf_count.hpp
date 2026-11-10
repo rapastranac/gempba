@@ -15,8 +15,8 @@
 #include <tuple>
 
 /**
- * Counts the leaves of a full binary tree across all ranks with many tiny tasks. Each leaf's score is its
- * rank-local visit index, so the best score keeps improving and the center keeps broadcasting score updates
+ * Counts the leaves of a full binary tree across all ranks with many tiny tasks. Each leaf's score and result are
+ * its rank-local visit index, so the best score keeps improving and the center keeps broadcasting score updates
  * until the search ends.
  */
 namespace leaf_count {
@@ -43,8 +43,8 @@ namespace leaf_count {
     private:
         void explore(const int p_depth, const int p_max_depth, const gempba::node& p_parent) {
             if (p_depth == p_max_depth) {
-                const long long v_leaf_index = m_leaves.fetch_add(1, std::memory_order_relaxed);
-                m_node_manager.try_update_score_and_invalidate_result(gempba::score::make(static_cast<int>(v_leaf_index)));
+                int v_leaf_index = static_cast<int>(m_leaves.fetch_add(1, std::memory_order_relaxed));
+                m_node_manager.try_update_result(v_leaf_index, gempba::score::make(v_leaf_index), m_result_serializer);
                 return;
             }
             gempba::node v_parent = p_parent == nullptr ? gempba::create_dummy_node(m_load_balancer) : p_parent;
@@ -63,7 +63,19 @@ namespace leaf_count {
         };
         std::function<gempba::task_packet(int, int)> m_serializer = serialize;
         std::function<std::tuple<int, int>(gempba::task_packet)> m_deserializer = [](const gempba::task_packet& p_packet) { return deserialize(p_packet); };
+        std::function<gempba::task_packet(int&)> m_result_serializer = [](const int& p_leaf_index) {
+            return gempba::task_packet{reinterpret_cast<const char*>(&p_leaf_index), sizeof(p_leaf_index)};
+        };
     };
+
+    inline std::optional<int> deserialize_leaf_index(const gempba::task_packet& p_packet) {
+        if (p_packet.size() != sizeof(int)) {
+            return std::nullopt;
+        }
+        int v_leaf_index;
+        std::memcpy(&v_leaf_index, p_packet.data(), sizeof(v_leaf_index));
+        return v_leaf_index;
+    }
 
     inline gempba::mpi::scheduler_topology parse_topology(const std::string_view p_name) {
         return p_name == "centralized" ? gempba::mpi::scheduler_topology::CENTRALIZED : gempba::mpi::scheduler_topology::SEMI_CENTRALIZED;
