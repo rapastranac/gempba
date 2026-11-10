@@ -9,6 +9,8 @@ import io.gempba.value.Score;
 import io.gempba.value.ScoreType;
 
 import io.gempba.internal.GemPBANative;
+import io.gempba.mpi.Mpi;
+import io.gempba.mpi.SchedulerTopology;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -61,14 +63,14 @@ class SchedulerNativeTest {
                 "Skipping: not in a distributed context — use the 'distributed' Maven profile"
         );
 
-        schedHandle = GemPBANative.Scheduler.create(SchedulerTopology.SEMI_CENTRALIZED.ordinal());
+        schedHandle = Mpi.createScheduler(SchedulerTopology.SEMI_CENTRALIZED).handle;
         rank = GemPBANative.Scheduler.rankMe(schedHandle);
         worldSize = GemPBANative.Scheduler.worldSize(schedHandle);
 
         GemPBANative.Scheduler.setGoal(schedHandle, Goal.MAXIMISE.ordinal(), ScoreType.I32.cppOrdinal());
 
-        long lbHandle = GemPBANative.MP.createLoadBalancer(BalancingPolicy.QUASI_HORIZONTAL.ordinal(), schedHandle);
-        long nmHandle = GemPBANative.MP.createNodeManager(lbHandle, schedHandle);
+        long lbHandle = GemPBANative.createLoadBalancer(BalancingPolicy.QUASI_HORIZONTAL.ordinal(), schedHandle);
+        long nmHandle = GemPBANative.createNodeManager(lbHandle, schedHandle);
 
         NodeManager nm = new NodeManager(nmHandle);
         nm.setGoal(Goal.MAXIMISE, ScoreType.I32);

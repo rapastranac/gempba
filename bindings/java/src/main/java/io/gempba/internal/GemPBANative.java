@@ -67,6 +67,34 @@ public final class GemPBANative {
 
     public static native int shutdown();
 
+    /**
+     * Creates the load balancer.  Wraps {@code gempba_create_load_balancer}.
+     *
+     * @param policyOrdinal   {@link io.gempba.value.BalancingPolicy} ordinal
+     * @param schedulerHandle a {@link io.gempba.scheduler.Scheduler} handle; {@code 0} for a single-process run
+     */
+    public static native long createLoadBalancer(int policyOrdinal, long schedulerHandle);
+
+    /**
+     * Creates the node manager backed by {@code lbHandle}.  Wraps {@code gempba_create_node_manager}.
+     *
+     * @param lbHandle        load-balancer handle from {@link #createLoadBalancer}
+     * @param schedulerHandle a {@link io.gempba.scheduler.Scheduler} handle; {@code 0} for a single-process run
+     */
+    public static native long createNodeManager(long lbHandle, long schedulerHandle);
+
+    /**
+     * Creates an explicit child node whose serialised args stay inside it, so it can run on another rank.
+     * Wraps {@code gempba_create_explicit_node}.
+     */
+    public static native long createExplicitNode(long lbHandle, long parentHandle, Object callback, byte[] argsBytes);
+
+    /**
+     * Creates a lazy child node; arguments are produced by {@code callback._lazyInitArgs()}.  Wraps
+     * {@code gempba_create_lazy_node}.
+     */
+    public static native long createLazyNode(long lbHandle, long parentHandle, Object callback, byte[] argsBytes);
+
     // ─── gempba::node ─────────────────────────────────────────────────────────
 
     /**
@@ -184,97 +212,10 @@ public final class GemPBANative {
         public static native void destroy(long handle);
     }
 
-    // ─── gempba::mp factory functions ────────────────────────────────────────
+    // ─── gempba::serial_runnable ─────────────────────────────────────────────
 
     /**
-     * JNI binding for {@code gempba::mp} factory functions that require a
-     * scheduler worker view (non-zero MPI ranks).
-     *
-     * <p>Pass {@code workerHandle = 0} for rank 0 (center), which passes
-     * {@code nullptr} to the C++ factory — equivalent to
-     * {@code gempba::mp::create_load_balancer(policy, nullptr)}.
-     */
-    public static final class MP {
-
-        static {
-            var ignored = GemPBANative.LOADED;
-        }
-
-        private MP() {
-        }
-
-        /**
-         * Creates an MP load balancer, wiring in the scheduler so that
-         * {@code try_remote_submit} can dispatch tasks to other ranks.
-         *
-         * @param policyOrdinal   {@link io.gempba.value.BalancingPolicy} ordinal
-         * @param schedulerHandle handle from {@link Scheduler#create}; {@code 0} for single-process work
-         */
-        public static native long createLoadBalancer(int policyOrdinal, long schedulerHandle);
-
-        /**
-         * Creates an MP node manager backed by {@code lb} and linked to the
-         * scheduler.
-         *
-         * @param lbHandle        load-balancer handle from {@link #createLoadBalancer}
-         * @param schedulerHandle handle from {@link Scheduler#create}; {@code 0} for single-process work
-         */
-        public static native long createNodeManager(long lbHandle, long schedulerHandle);
-
-        /**
-         * Creates an MP explicit child node whose serialised args are stored
-         * inside the node for remote submission via
-         * {@link NodeManager#tryRemoteSubmit}.
-         *
-         * <p>Equivalent to {@code gempba::mp::create_explicit_node} in C++ with
-         * identity serialiser/deserialiser — args are already {@code task_packet}
-         * bytes from the Java side.
-         */
-        public static native long createExplicitNode(long lbHandle, long parentHandle,
-                                                     Object callback, byte[] argsBytes);
-    }
-
-    // ─── gempba::mt ──────────────────────────────────────────────────────────
-
-    /**
-     * JNI binding for {@code gempba::mt} factory functions.
-     */
-    public static final class MT {
-
-        static {
-            var ignored = GemPBANative.LOADED;
-        }
-
-        private MT() {
-        }
-
-        /**
-         * Creates a multithreaded load balancer with the given balancing policy ordinal.
-         */
-        public static native long createLoadBalancer(int policyOrdinal);
-
-        /**
-         * Creates a multithreaded node manager backed by the given load balancer.
-         */
-        public static native long createNodeManager(long lbHandle);
-
-        /**
-         * Creates an explicit child node with pre-serialised arguments.
-         */
-        public static native long createExplicitNode(long lbHandle, long parentHandle,
-                                                     Object callback, byte[] argsBytes);
-
-        /**
-         * Creates a lazy child node; arguments are produced by {@code callback._lazyInitArgs()}.
-         */
-        public static native long createLazyNode(long lbHandle, long parentHandle,
-                                                 Object callback, byte[] argsBytes);
-    }
-
-    // ─── gempba::mp::serial_runnable ─────────────────────────────────────────
-
-    /**
-     * JNI binding for {@code gempba::mp::serial_runnable}.
+     * JNI binding for {@code gempba::serial_runnable}.
      */
     public static final class SerialRunnable {
 
@@ -331,11 +272,6 @@ public final class GemPBANative {
 
         private Scheduler() {
         }
-
-        /**
-         * Creates a scheduler with the given topology ordinal.
-         */
-        public static native long create(int topologyOrdinal);
 
         public static native void barrier(long handle);
 

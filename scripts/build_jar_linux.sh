@@ -66,9 +66,8 @@ docker run --rm "${docker_workspace_mounts[@]}" --user "$(id -u):$(id -g)" -e HO
         -DCMAKE_BUILD_TYPE=Release \
         -DGEMPBA_BUILD_JAVA_BINDING=ON \
         -DGEMPBA_JNI_CLASSIFIER=$classifier \
-        -DGEMPBA_MULTIPROCESSING=$mp_flag \
+        -DGEMPBA_BUILD_MPI=$mp_flag \
         -DGEMPBA_HWLOC=ON \
-        -DGEMPBA_DEV_MODE=OFF \
         -DGEMPBA_BUILD_TESTS=OFF \
         -DGEMPBA_DEBUG_COMMENTS=OFF
     cmake --build '$build_dir' --target gempba_jni -j\$(nproc)

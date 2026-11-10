@@ -15,12 +15,12 @@ import java.util.*;
 /**
  * Java handle to a C++ {@code gempba::scheduler} instance.
  *
- * <p>Controls MPI-level coordination between processes.  Instances are
- * obtained from {@link io.gempba.GemPBA#createScheduler}.
+ * <p>Controls the coordination between processes.  The built-in MPI ones
+ * come from {@code io.gempba.mpi.Mpi#createScheduler}, in the {@code mp-mpi} JAR.
  *
  * <p>The typical MPI pattern is:
  * <pre>{@code
- * Scheduler sched = GemPBA.createScheduler(SchedulerTopology.SEMI_CENTRALIZED);
+ * Scheduler sched = Mpi.createScheduler(SchedulerTopology.SEMI_CENTRALIZED);
  * sched.setGoal(Goal.MAXIMISE, ScoreType.I32);
  *
  * LoadBalancer lb = GemPBA.createLoadBalancer(BalancingPolicy.QUASI_HORIZONTAL, sched);

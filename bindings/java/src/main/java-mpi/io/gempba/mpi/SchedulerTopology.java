@@ -1,9 +1,9 @@
-package io.gempba.scheduler;
+package io.gempba.mpi;
 
 /**
- * MPI scheduler topology, mirroring {@code gempba::mp::scheduler_topology}.
+ * MPI scheduler topology, mirroring {@code gempba::mpi::scheduler_topology}.
  *
- * <p>Passed to {@link io.gempba.GemPBA#createScheduler(SchedulerTopology)}.
+ * <p>Passed to {@link Mpi#createScheduler(SchedulerTopology)}.
  */
 public enum SchedulerTopology {
     /**

@@ -3,6 +3,9 @@ package io.gempba;
 import io.gempba.core.LoadBalancer;
 import io.gempba.core.Node;
 import io.gempba.core.NodeManager;
+import io.gempba.scheduler.Scheduler;
+import io.gempba.scheduler.SerialRunnable;
+import io.gempba.scheduler.SerialTask;
 import io.gempba.task.ClosureTask;
 import io.gempba.task.Deserializer;
 import io.gempba.task.NodeTask;
@@ -18,20 +21,11 @@ import io.gempba.internal.GemPBANative;
 import java.util.function.BooleanSupplier;
 
 /**
- * Main entry point for the gempba Java binding (multithreading variant).
+ * Main entry point for the gempba Java binding.
  *
- * <p>This class mirrors the C++ {@code gempba::} namespace plus the
- * {@code gempba::multithreading::} sub-namespace.  In a multithreading-only
- * build the C++ side makes {@code multithreading} the inline namespace, so
- * consumers write {@code gempba::create_load_balancer(...)} without typing
- * {@code multithreading::} — this Java class provides the same flat surface.
- *
- * <p>The multiprocessing variant of this JAR ships a different {@code GemPBA}
- * class with a different factory surface (see {@code Scheduler},
- * {@link #createLoadBalancer(BalancingPolicy)} vs. its MP overload, etc.) and
- * mutually-exclusive imports, so a project depending on
- * {@code gempba:<version>:multithreading} will not see any MP type on
- * its classpath.
+ * <p>This class mirrors the C++ {@code gempba::} namespace, the same in both JARs.
+ * Creating an MPI scheduler is {@code io.gempba.mpi.Mpi#createScheduler}, which only
+ * the {@code mp-mpi} JAR contains, as C++ needs the {@code gempba::mpi} component for it.
  *
  * <h2>Typical usage</h2>
  * <pre>{@code
@@ -195,43 +189,68 @@ public final class GemPBA {
         GemPBANative.Telemetry.configurePort(port);
     }
 
-    // ─── Multithreading factories (mirror gempba::multithreading::) ─────────
+    // ─── Factories (mirror gempba::create_*) ─────────────────────────────────
 
     /**
-     * Creates a multithreaded load balancer with the given strategy.
+     * Creates a load balancer with the given strategy, for a single-process run.
      *
-     * <p>Equivalent to {@code gempba::multithreading::create_load_balancer(policy)}
-     * in C++.
+     * <p>Equivalent to {@code gempba::create_load_balancer(policy)} in C++.
      *
      * @param policy load-balancing strategy
      * @return a new {@link LoadBalancer}
      */
     public static LoadBalancer createLoadBalancer(BalancingPolicy policy) {
-        long handle = GemPBANative.MT.createLoadBalancer(policy.ordinal());
-        return new LoadBalancer(handle);
+        return createLoadBalancer(policy, null);
     }
 
     /**
-     * Creates a multithreaded node manager backed by the given load balancer.
+     * Creates a load balancer wired to the scheduler, so that
+     * {@link NodeManager#tryRemoteSubmit} can send tasks to other ranks.
      *
-     * <p>Equivalent to {@code gempba::multithreading::create_node_manager(lb)}
-     * in C++.
+     * <p>Equivalent to {@code gempba::create_load_balancer(policy, scheduler)} in C++.
+     *
+     * @param policy    load-balancing strategy
+     * @param scheduler the scheduler, or {@code null} for a single-process run
+     * @return a new {@link LoadBalancer}
+     */
+    public static LoadBalancer createLoadBalancer(BalancingPolicy policy, Scheduler scheduler) {
+        long schedulerHandle = (scheduler != null) ? scheduler.handle : 0L;
+        return new LoadBalancer(GemPBANative.createLoadBalancer(policy.ordinal(), schedulerHandle));
+    }
+
+    /**
+     * Creates a node manager backed by the given load balancer, for a single-process run.
+     *
+     * <p>Equivalent to {@code gempba::create_node_manager(lb)} in C++.
      *
      * @param lb the load balancer to associate with this node manager
      * @return a new {@link NodeManager}
      */
     public static NodeManager createNodeManager(LoadBalancer lb) {
-        long handle = GemPBANative.MT.createNodeManager(lb.handle);
-        return new NodeManager(handle);
+        return createNodeManager(lb, null);
+    }
+
+    /**
+     * Creates a node manager backed by {@code lb} and linked to the scheduler.
+     *
+     * <p>Equivalent to {@code gempba::create_node_manager(lb, scheduler)} in C++.
+     *
+     * @param lb        the load balancer backing this node manager
+     * @param scheduler the scheduler, or {@code null} for a single-process run
+     * @return a new {@link NodeManager}
+     */
+    public static NodeManager createNodeManager(LoadBalancer lb, Scheduler scheduler) {
+        long schedulerHandle = (scheduler != null) ? scheduler.handle : 0L;
+        return new NodeManager(GemPBANative.createNodeManager(lb.handle, schedulerHandle));
     }
 
     /**
      * Creates a closure-mode explicit child node.
      *
-     * <p>Equivalent to {@code gempba::multithreading::create_explicit_node(lb, parent, fn, args)}
+     * <p>Equivalent to {@code gempba::create_explicit_node(lb, parent, fn, args)}
      * in C++.  The arguments are captured inside the Java lambda rather than
-     * serialised to bytes — the preferred form for single-machine
-     * (multithreading) use.
+     * serialised to bytes — the preferred form for nodes that never leave
+     * this process.
      *
      * @param lb     the load balancer that will schedule this node
      * @param parent the parent node; may be a dummy node at the root level
@@ -245,16 +264,18 @@ public final class GemPBA {
             task.run(tid, ctx);
             return null;
         });
-        child.state.handle = GemPBANative.MT.createExplicitNode(lb.handle, parent.state.handle, child, null);
+        child.state.handle = GemPBANative.createExplicitNode(lb.handle, parent.state.handle, child, null);
         return child;
     }
 
     /**
      * Creates a serialisation-mode explicit child node.
      *
-     * <p>Equivalent to {@code gempba::multithreading::create_explicit_node(lb, parent, fn, args)}
+     * <p>Equivalent to {@code gempba::create_explicit_node(lb, parent, fn, args, ser, deser)}
      * in C++.  Arguments are serialised to bytes, enabling the same task function
-     * to be reused across multiple node levels via method references.
+     * to be reused across multiple node levels via method references.  The bytes
+     * stay inside the node, so {@link NodeManager#tryRemoteSubmit} can send it to
+     * another rank.
      *
      * @param lb           the load balancer that will schedule this node
      * @param parent       the parent node
@@ -275,7 +296,7 @@ public final class GemPBA {
             task.execute(tid, a, ctx);
             return null;
         });
-        child.state.handle = GemPBANative.MT.createExplicitNode(
+        child.state.handle = GemPBANative.createExplicitNode(
                 lb.handle, parent.state.handle, child, serializer.serialize(args));
         return child;
     }
@@ -283,7 +304,7 @@ public final class GemPBA {
     /**
      * Creates a closure-mode lazy child node.
      *
-     * <p>Equivalent to {@code gempba::multithreading::create_lazy_node(lb, parent, fn, init)}
+     * <p>Equivalent to {@code gempba::create_lazy_node(lb, parent, fn, init)}
      * in C++.  The framework evaluates {@code gate} just before executing the node:
      * if it returns {@code false} the node is pruned; if {@code true} the task runs.
      *
@@ -303,7 +324,7 @@ public final class GemPBA {
                     return null;
                 },
                 () -> gate.getAsBoolean() ? Node.EMPTY_BYTES : null);
-        child.state.handle = GemPBANative.MT.createLazyNode(lb.handle, parent.state.handle, child, null);
+        child.state.handle = GemPBANative.createLazyNode(lb.handle, parent.state.handle, child, null);
         return child;
     }
 
@@ -334,7 +355,7 @@ public final class GemPBA {
             R result = task.run(tid, ctx);
             return result == null ? null : resultSerializer.serialize(result);
         });
-        child.state.handle = GemPBANative.MT.createExplicitNode(lb.handle, parent.state.handle, child, null);
+        child.state.handle = GemPBANative.createExplicitNode(lb.handle, parent.state.handle, child, null);
         return child;
     }
 
@@ -367,7 +388,7 @@ public final class GemPBA {
             R result = task.execute(tid, a, ctx);
             return result == null ? null : resultSerializer.serialize(result);
         });
-        child.state.handle = GemPBANative.MT.createExplicitNode(
+        child.state.handle = GemPBANative.createExplicitNode(
                 lb.handle, parent.state.handle, child, argsSerializer.serialize(args));
         return child;
     }
@@ -401,7 +422,41 @@ public final class GemPBA {
                     return result == null ? null : resultSerializer.serialize(result);
                 },
                 () -> gate.getAsBoolean() ? Node.EMPTY_BYTES : null);
-        child.state.handle = GemPBANative.MT.createLazyNode(lb.handle, parent.state.handle, child, null);
+        child.state.handle = GemPBANative.createLazyNode(lb.handle, parent.state.handle, child, null);
         return child;
+    }
+
+    // ─── Serial runnable factories (mirror gempba::runnables::) ──────────────
+
+    /**
+     * Creates a void serial runnable — the result bytes are discarded.
+     *
+     * <p>Equivalent to {@code gempba::runnables::return_none::create(id, fn, deser)}
+     * in C++.  Use when a rank does not need to send a result back to the root.
+     *
+     * @param id   integer ID used to look up this runnable in each rank's map
+     * @param task body called with {@code (threadId, argsBytes)} on each invocation
+     * @return a new {@link SerialRunnable}; must be closed after use
+     */
+    public static SerialRunnable runnableReturnNone(int id, SerialTask task) {
+        SerialRunnable sr = new SerialRunnable(id, 0L, task);
+        sr.handle = GemPBANative.SerialRunnable.create(id, sr, false);
+        return sr;
+    }
+
+    /**
+     * Creates a non-void serial runnable — result bytes are forwarded to the root.
+     *
+     * <p>Equivalent to {@code gempba::runnables::return_value::create(id, fn, deser, ser)}
+     * in C++.  Use when a rank computes a value that must be aggregated at rank 0.
+     *
+     * @param id   integer ID used to look up this runnable in each rank's map
+     * @param task body called with {@code (threadId, argsBytes)}; must return result bytes
+     * @return a new {@link SerialRunnable}; must be closed after use
+     */
+    public static SerialRunnable runnableReturnValue(int id, SerialTask task) {
+        SerialRunnable sr = new SerialRunnable(id, 0L, task);
+        sr.handle = GemPBANative.SerialRunnable.create(id, sr, true);
+        return sr;
     }
 }
