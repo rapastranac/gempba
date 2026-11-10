@@ -25,13 +25,14 @@
 #ifndef RESULT_HPP
 #define RESULT_HPP
 
+#include <gempba/export.h>
 #include <utility>
 
 #include <gempba/utils/score.hpp>
 #include <gempba/utils/task_packet.hpp>
 
 namespace gempba {
-    class result {
+    class GEMPBA_API result {
         result() noexcept : m_score(score::make(-1)) {}
 
         score m_score;

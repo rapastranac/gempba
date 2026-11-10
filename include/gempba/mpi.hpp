@@ -25,7 +25,8 @@
 #define GEMPBA_MPI_HPP
 
 #include <gempba/core/scheduler.hpp>
-#include <gempba/defaults/default_mpi_stats_visitor.hpp>
+#include <gempba/export.h>
+#include <gempba/mpi/default_mpi_stats_visitor.hpp>
 #include <memory>
 
 /** @brief The MPI component, @c gempba::mpi in CMake: the schedulers that run a search across MPI ranks. */
@@ -42,17 +43,17 @@ namespace gempba::mpi {
      *
      * @throws std::runtime_error when a scheduler already exists.
      */
-    scheduler* create_scheduler(const scheduler_topology& p_topology);
+    GEMPBA_MPI_API scheduler* create_scheduler(const scheduler_topology& p_topology);
 
     /**
      * @brief Install your own scheduler, which runs on MPI, and telemetry over MPI. Every rank calls it.
      *
      * @throws std::runtime_error when a scheduler already exists.
      */
-    scheduler* create_scheduler(std::unique_ptr<scheduler> p_your_implementation);
+    GEMPBA_MPI_API scheduler* create_scheduler(std::unique_ptr<scheduler> p_your_implementation);
 
     /** @brief A visitor that reads the built-in MPI schedulers' statistics. */
-    std::unique_ptr<default_mpi_stats_visitor> get_default_mpi_stats_visitor();
+    GEMPBA_MPI_API std::unique_ptr<default_mpi_stats_visitor> get_default_mpi_stats_visitor();
 
 } // namespace gempba::mpi
 

@@ -34,11 +34,10 @@
 #include <gempba/detail/runnables/serial_runnable_non_void.hpp>
 #include <gempba/detail/runnables/serial_runnable_void.hpp>
 #include <gempba/gempba.hpp>
+#include <gempba/stats/stats.hpp>
+#include <gempba/stats/stats_visitor.hpp>
 #include <gempba/telemetry/telemetry_hub.hpp>
 
-#if GEMPBA_MULTIPROCESSING
-    #include <gempba/mpi.hpp>
-#endif
 
 using gempba::cabi::detail::buffer_from_packet;
 using gempba::cabi::detail::g_last_error;
@@ -56,60 +55,16 @@ using gempba::cabi::detail::set_last_error;
 
 // NOLINTBEGIN(readability-identifier-naming)
 
+std::string& gempba::cabi::detail::g_last_error() {
+    thread_local std::string v_message;
+    return v_message;
+}
+
 /**
  * load_balancer / node_manager handles are reinterpret_cast directly from
  * their C++ counterparts; they never live inside a wrapper because lifetime is
  * owned by gempba (singletons).
  */
-
-/* ─── Macro: try / catch envelope for fallible entry points ─────────────── */
-
-#define GEMPBA_TRY                                                                                                                                                                           \
-    try {                                                                                                                                                                                    \
-        gempba_clear_last_error();
-
-#define GEMPBA_CATCH_RETURN_STATUS                                                                                                                                                           \
-    }                                                                                                                                                                                        \
-    catch (const std::bad_alloc&) {                                                                                                                                                          \
-        set_last_error("std::bad_alloc");                                                                                                                                                    \
-        return GEMPBA_ERR_OUT_OF_MEMORY;                                                                                                                                                     \
-    }                                                                                                                                                                                        \
-    catch (const std::invalid_argument& e) {                                                                                                                                                 \
-        set_last_error(e.what());                                                                                                                                                            \
-        return GEMPBA_ERR_INVALID_ARG;                                                                                                                                                       \
-    }                                                                                                                                                                                        \
-    catch (const std::exception& e) {                                                                                                                                                        \
-        set_last_error(e.what());                                                                                                                                                            \
-        return GEMPBA_ERR_RUNTIME;                                                                                                                                                           \
-    }                                                                                                                                                                                        \
-    catch (...) {                                                                                                                                                                            \
-        set_last_error("unknown C++ exception");                                                                                                                                             \
-        return GEMPBA_ERR_UNKNOWN;                                                                                                                                                           \
-    }
-
-/** For void entry points, swallow the exception into the thread-local error. */
-#define GEMPBA_CATCH_VOID                                                                                                                                                                    \
-    }                                                                                                                                                                                        \
-    catch (const std::exception& e) {                                                                                                                                                        \
-        set_last_error(e.what());                                                                                                                                                            \
-    }                                                                                                                                                                                        \
-    catch (...) {                                                                                                                                                                            \
-        set_last_error("unknown C++ exception");                                                                                                                                             \
-    }
-
-/** For factory functions that return a handle directly (not a status):
- * on exception, set last_error and return nullptr.  Bindings check the
- * return for nullptr and call gempba_last_error_message() on failure. */
-#define GEMPBA_CATCH_RETURN_NULL                                                                                                                                                             \
-    }                                                                                                                                                                                        \
-    catch (const std::exception& e) {                                                                                                                                                        \
-        set_last_error(e.what());                                                                                                                                                            \
-        return nullptr;                                                                                                                                                                      \
-    }                                                                                                                                                                                        \
-    catch (...) {                                                                                                                                                                            \
-        set_last_error("unknown C++ exception");                                                                                                                                             \
-        return nullptr;                                                                                                                                                                      \
-    }
 
 /* ─── extern "C" surface ────────────────────────────────────────────────── */
 
@@ -229,7 +184,6 @@ extern "C" {
 
     /* ── multithreading ─────────────────────────────────────────────────────── */
 
-#if !GEMPBA_MULTIPROCESSING || GEMPBA_DEV_MODE
 
     gempba_load_balancer_t gempba_mt_create_load_balancer(gempba_balancing_policy_t policy) {
         GEMPBA_TRY
@@ -293,75 +247,6 @@ extern "C" {
         GEMPBA_CATCH_RETURN_STATUS
     }
 
-#else
-
-    gempba_load_balancer_t gempba_mt_create_load_balancer(gempba_balancing_policy_t policy) {
-        GEMPBA_TRY
-            auto* lb = gempba::create_load_balancer(static_cast<gempba::balancing_policy>(policy), nullptr);
-            return reinterpret_cast<gempba_load_balancer_t>(lb);
-        GEMPBA_CATCH_RETURN_NULL
-    }
-
-    gempba_node_manager_t gempba_mt_create_node_manager(gempba_load_balancer_t lb) {
-        GEMPBA_TRY
-            auto* lb_cpp = reinterpret_cast<gempba::load_balancer*>(lb);
-            return reinterpret_cast<gempba_node_manager_t>(&gempba::create_node_manager(lb_cpp, nullptr));
-        GEMPBA_CATCH_RETURN_NULL
-    }
-
-    gempba_status_t gempba_mt_create_explicit_node(gempba_load_balancer_t lb, gempba_node_t parent, gempba_runnable_fn runnable, void* user_data, gempba_release_fn release_user_data,
-                                                   gempba_bytes_t args, gempba_node_t* out) {
-        GEMPBA_TRY
-            auto holder = safe_make_holder(user_data, release_user_data);
-            if (out == nullptr || runnable == nullptr || parent == nullptr) {
-                set_last_error("out, runnable, or parent is null");
-                return GEMPBA_ERR_INVALID_ARG;
-            }
-            auto* lb_cpp = reinterpret_cast<gempba::load_balancer*>(lb);
-            gempba::node parent_local = parent->cpp;
-
-            auto wrapper = std::make_unique<gempba_node_s>();
-            gempba_node_t self = wrapper.get();
-
-            auto cpp_fn = make_cpp_runnable(holder, runnable, self);
-            gempba::task_packet args_pkt = packet_from_borrowed(args);
-
-            wrapper->cpp = gempba::create_explicit_node<gempba::task_packet, gempba::task_packet>(*lb_cpp, parent_local, std::move(cpp_fn), std::make_tuple(std::move(args_pkt)),
-                                                                                                  identity_ser(), identity_deser_value());
-
-            *out = wrapper.release();
-            return GEMPBA_OK;
-        GEMPBA_CATCH_RETURN_STATUS
-    }
-
-    gempba_status_t gempba_mt_create_lazy_node(gempba_load_balancer_t lb, gempba_node_t parent, gempba_runnable_fn runnable, gempba_lazy_args_fn lazy_args, void* user_data,
-                                               gempba_release_fn release_user_data, gempba_node_t* out) {
-        GEMPBA_TRY
-            auto holder = safe_make_holder(user_data, release_user_data);
-            if (out == nullptr || runnable == nullptr || lazy_args == nullptr || parent == nullptr) {
-                set_last_error("out, runnable, lazy_args, or parent is null");
-                return GEMPBA_ERR_INVALID_ARG;
-            }
-            auto* lb_cpp = reinterpret_cast<gempba::load_balancer*>(lb);
-            gempba::node parent_local = parent->cpp;
-
-            auto wrapper = std::make_unique<gempba_node_s>();
-            gempba_node_t self = wrapper.get();
-
-            auto cpp_fn = make_cpp_runnable(holder, runnable, self);
-            auto cpp_lazy = make_cpp_lazy_args(holder, lazy_args);
-
-            wrapper->cpp =
-                    gempba::create_lazy_node<gempba::task_packet, gempba::task_packet>(*lb_cpp, parent_local, std::move(cpp_fn), std::move(cpp_lazy), identity_ser(), identity_deser_value());
-
-            *out = wrapper.release();
-            return GEMPBA_OK;
-        GEMPBA_CATCH_RETURN_STATUS
-    }
-
-#endif // !GEMPBA_MULTIPROCESSING || GEMPBA_DEV_MODE
-
-#if GEMPBA_MULTIPROCESSING
 
     /* ── multiprocessing ────────────────────────────────────────────────────── */
 
@@ -404,34 +289,6 @@ extern "C" {
         GEMPBA_CATCH_RETURN_STATUS
     }
 
-#else // !GEMPBA_MULTIPROCESSING
-
-    /** ── multiprocessing stubs ──────────────────────────────────────────────────
-     * Non-MP builds still export every MP entry point so a single language
-     * binding (JNI, ctypes, …) can link against either variant of the native
-     * library.  Each stub sets last_error and returns a failure code; the
-     * binding's MP-related calls therefore surface a clean runtime error
-     * instead of an UnsatisfiedLinkError. */
-
-    static constexpr const char* k_mp_disabled_msg = "gempba was built without GEMPBA_MULTIPROCESSING; this entry point is unavailable";
-
-    gempba_load_balancer_t gempba_mp_create_load_balancer(gempba_balancing_policy_t, gempba_scheduler_t) {
-        set_last_error(k_mp_disabled_msg);
-        return nullptr;
-    }
-    gempba_node_manager_t gempba_mp_create_node_manager(gempba_load_balancer_t, gempba_scheduler_t) {
-        set_last_error(k_mp_disabled_msg);
-        return nullptr;
-    }
-    gempba_status_t gempba_mp_create_explicit_node(gempba_load_balancer_t, gempba_node_t, gempba_runnable_fn, void* user_data, gempba_release_fn release_user_data, gempba_bytes_t,
-                                                   gempba_node_t*) {
-        if (release_user_data && user_data)
-            release_user_data(user_data);
-        set_last_error(k_mp_disabled_msg);
-        return GEMPBA_ERR_RUNTIME;
-    }
-
-#endif // GEMPBA_MULTIPROCESSING
 
     /* ── node_manager ──────────────────────────────────────────────────────── */
 
@@ -568,8 +425,6 @@ extern "C" {
         GEMPBA_CATCH_RETURN_STATUS
     }
 
-#if GEMPBA_MULTIPROCESSING
-
     /* ── serial_runnable (mp) ──────────────────────────────────────────────── */
 
     gempba_status_t gempba_serial_runnable_create(int32_t id, gempba_bool_t returns_value, gempba_runnable_fn runnable, void* user_data, gempba_release_fn release_user_data,
@@ -636,20 +491,6 @@ extern "C" {
     }
 
     /* ── scheduler ─────────────────────────────────────────────────────────── */
-
-    gempba_status_t gempba_scheduler_create(gempba_scheduler_topology_t topology, gempba_scheduler_t* out) {
-        GEMPBA_TRY
-            if (out == nullptr) {
-                set_last_error("out is null");
-                return GEMPBA_ERR_INVALID_ARG;
-            }
-            auto* sched = gempba::mpi::create_scheduler(static_cast<gempba::mpi::scheduler_topology>(topology));
-            auto wrapper = std::make_unique<gempba_scheduler_s>();
-            wrapper->cpp = sched;
-            *out = wrapper.release();
-            return GEMPBA_OK;
-        GEMPBA_CATCH_RETURN_STATUS
-    }
 
     void gempba_scheduler_destroy(gempba_scheduler_t s) {
         if (!s)
@@ -764,48 +605,6 @@ extern "C" {
         GEMPBA_CATCH_VOID
     }
 
-#else // !GEMPBA_MULTIPROCESSING
-
-    /** ── serial_runnable / scheduler stubs ─────────────────────────────────────
-     * Mirrors the surface guarded above so non-MP builds still link cleanly. */
-
-    gempba_status_t gempba_serial_runnable_create(int32_t, gempba_bool_t, gempba_runnable_fn, void* user_data, gempba_release_fn release_user_data, gempba_serial_runnable_t*) {
-        if (release_user_data && user_data)
-            release_user_data(user_data);
-        set_last_error(k_mp_disabled_msg);
-        return GEMPBA_ERR_RUNTIME;
-    }
-    void gempba_serial_runnable_destroy(gempba_serial_runnable_t) {}
-    gempba_status_t gempba_serial_runnable_invoke(gempba_serial_runnable_t, gempba_node_manager_t, gempba_bytes_t, gempba_buffer_t*) {
-        set_last_error(k_mp_disabled_msg);
-        return GEMPBA_ERR_RUNTIME;
-    }
-
-    gempba_status_t gempba_scheduler_create(gempba_scheduler_topology_t, gempba_scheduler_t*) {
-        set_last_error(k_mp_disabled_msg);
-        return GEMPBA_ERR_RUNTIME;
-    }
-    void gempba_scheduler_destroy(gempba_scheduler_t) {}
-    void gempba_scheduler_barrier(gempba_scheduler_t) { set_last_error(k_mp_disabled_msg); }
-    int32_t gempba_scheduler_rank_me(gempba_scheduler_t) { return -1; }
-    int32_t gempba_scheduler_world_size(gempba_scheduler_t) { return 0; }
-    void gempba_scheduler_set_goal(gempba_scheduler_t, gempba_goal_t, gempba_score_type_t) { set_last_error(k_mp_disabled_msg); }
-    double gempba_scheduler_elapsed_time(gempba_scheduler_t) { return 0.0; }
-    void gempba_scheduler_synchronize_stats(gempba_scheduler_t) { set_last_error(k_mp_disabled_msg); }
-    void gempba_scheduler_visit_stats(gempba_scheduler_t, gempba_stat_visitor_fn, void*) { set_last_error(k_mp_disabled_msg); }
-
-    gempba_bool_t gempba_scheduler_is_root(gempba_scheduler_t) { return 0; }
-    gempba_status_t gempba_scheduler_run(gempba_scheduler_t, gempba_node_manager_t, const int32_t*, const gempba_serial_runnable_t*, size_t, const gempba_bytes_t*, int32_t) {
-        set_last_error(k_mp_disabled_msg);
-        return GEMPBA_ERR_RUNTIME;
-    }
-    gempba_status_t gempba_scheduler_get_result(gempba_scheduler_t, gempba_buffer_t*) {
-        set_last_error(k_mp_disabled_msg);
-        return GEMPBA_ERR_RUNTIME;
-    }
-    void gempba_scheduler_visit_all_results(gempba_scheduler_t, gempba_result_visitor_fn, void*) { set_last_error(k_mp_disabled_msg); }
-
-#endif // GEMPBA_MULTIPROCESSING
 
     /** ── telemetry (process-wide flag) ─────────────────────────────────────────
      * The C++ functions are noexcept; no try/catch envelope needed. */

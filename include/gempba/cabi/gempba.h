@@ -48,6 +48,8 @@
 /** Use the C++ <c*> wrappers when compiled as C++ so modernize-deprecated-headers stays quiet, fall back to the C-style
  * headers for C consumers (Python ctypes, Rust bindgen, plain-C bindings) — neither <cstddef> nor <cstdint> exist in C.
  */
+#include <gempba/export.h>
+
 #ifdef __cplusplus
     #include <cstddef>
     #include <cstdint>
@@ -92,10 +94,10 @@ extern "C" {
      * Returns a UTF-8 message describing the last error on the calling thread, or NULL if no error has been recorded.
      * The pointer remains valid until the next gempba call on the same thread.
      */
-    const char* gempba_last_error_message(void);
+    GEMPBA_API const char* gempba_last_error_message(void);
 
     /** Resets the thread-local last-error string. */
-    void gempba_clear_last_error(void);
+    GEMPBA_API void gempba_clear_last_error(void);
 
     /* ─── Primitive types ───────────────────────────────────────────────────── */
 
@@ -129,11 +131,11 @@ extern "C" {
      * The underlying allocator is an implementation detail; do not pair this with free() / delete[].  Always release
      * with gempba_buffer_free.
      */
-    gempba_buffer_t gempba_buffer_alloc(size_t len);
+    GEMPBA_API gempba_buffer_t gempba_buffer_alloc(size_t len);
 
     /** Releases a buffer previously returned by gempba_buffer_alloc or by any gempba_* function that documents its out
      * parameter as owned.  After the call, *buf is reset to {NULL, 0}.  Safe to call on {NULL, 0}. */
-    void gempba_buffer_free(gempba_buffer_t* buf);
+    GEMPBA_API void gempba_buffer_free(gempba_buffer_t* buf);
 
     /* ─── Enums (mirror gempba C++ ordinals; keep in sync) ──────────────────── */
 
@@ -164,12 +166,6 @@ extern "C" {
         GEMPBA_SCORE_F32   = 4,
         GEMPBA_SCORE_F64   = 5
     } gempba_score_type_t;
-
-    /** Mirrors gempba::mp::scheduler_topology. */
-    typedef enum {
-        GEMPBA_TOPOLOGY_SEMI_CENTRALIZED = 0,
-        GEMPBA_TOPOLOGY_CENTRALIZED      = 1
-    } gempba_scheduler_topology_t;
 
     /* ─── Opaque handles ────────────────────────────────────────────────────── */
 
@@ -241,19 +237,19 @@ extern "C" {
      * Returns the process-wide load balancer, or NULL if none has been created yet.  Wraps gempba::get_load_balancer.
      * Does not transfer ownership.
      */
-    gempba_load_balancer_t gempba_get_load_balancer(void);
+    GEMPBA_API gempba_load_balancer_t gempba_get_load_balancer(void);
 
     /**
      * Returns the process-wide node manager.  Wraps gempba::get_node_manager.  Returns NULL and sets last-error if
      * the node manager has not been created yet (the C++ accessor throws in that case).
      */
-    gempba_node_manager_t gempba_get_node_manager(void);
+    GEMPBA_API gempba_node_manager_t gempba_get_node_manager(void);
 
     /**
      * Tears down every gempba singleton (load balancer, node manager, scheduler).  Wraps gempba::shutdown and forwards
      * its return code.  Returns -1 on exception with the message recorded in last-error.
      */
-    int32_t gempba_shutdown(void);
+    GEMPBA_API int32_t gempba_shutdown(void);
 
     /* ─── Node creation (engine-agnostic) ───────────────────────────────────── */
 
@@ -261,7 +257,7 @@ extern "C" {
      * Creates a placeholder node with no runnable, suitable as a stand-in parent when the gempba core hands the
      * runnable a NULL parent (delegated execution).  Wraps gempba::create_dummy_node.
      */
-    gempba_status_t gempba_create_dummy_node(gempba_load_balancer_t lb, gempba_node_t* out);
+    GEMPBA_API gempba_status_t gempba_create_dummy_node(gempba_load_balancer_t lb, gempba_node_t* out);
 
     /**
      * Creates the root of a search tree.  Wraps gempba::create_seed_node.
@@ -269,13 +265,14 @@ extern "C" {
      * user_data + release_user_data follow the runnable-ownership rule documented on gempba_release_fn — release fires
      * exactly once, success or failure.
      */
-    gempba_status_t gempba_create_seed_node(gempba_load_balancer_t lb, gempba_runnable_fn runnable, void* user_data,
-                                            gempba_release_fn release_user_data, /* nullable */
-                                            gempba_bytes_t args, gempba_node_t* out);
+    GEMPBA_API gempba_status_t gempba_create_seed_node(gempba_load_balancer_t lb, gempba_runnable_fn runnable,
+                                                       void*             user_data,
+                                                       gempba_release_fn release_user_data, /* nullable */
+                                                       gempba_bytes_t args, gempba_node_t* out);
 
     /** Releases the C ABI wrapper.  The underlying gempba::node refcount is decremented; the runnable's user_data
      * release_fn fires when the last std::function copy is dropped, not necessarily here. */
-    void gempba_node_destroy(gempba_node_t node);
+    GEMPBA_API void gempba_node_destroy(gempba_node_t node);
 
     /**
      * Blocks until the node's runnable has finished and returns the serialised result bytes via *out (caller frees
@@ -286,7 +283,7 @@ extern "C" {
      * *out is {NULL, 0} when the runnable returned an empty result (prune / void runnable).  Returns
      * GEMPBA_ERR_INVALID_ARG on null inputs and GEMPBA_ERR_RUNTIME if the wait raised an exception.
      */
-    gempba_status_t gempba_node_get_result(gempba_node_t node, gempba_buffer_t* out);
+    GEMPBA_API gempba_status_t gempba_node_get_result(gempba_node_t node, gempba_buffer_t* out);
 
     /* ─── Multithreaded engine (mt) ─────────────────────────────────────────── */
 
@@ -294,13 +291,13 @@ extern "C" {
      * Installs the process-wide MT load balancer with the given policy.  Wraps gempba::mt::create_load_balancer.
      * Returns NULL with last-error set if a load balancer already exists (the C++ factory throws in that case).
      */
-    gempba_load_balancer_t gempba_mt_create_load_balancer(gempba_balancing_policy_t policy);
+    GEMPBA_API gempba_load_balancer_t gempba_mt_create_load_balancer(gempba_balancing_policy_t policy);
 
     /**
      * Installs the process-wide MT node manager bound to `lb`.  Wraps gempba::mt::create_node_manager.  Returns NULL
      * with last-error set if a node manager already exists.
      */
-    gempba_node_manager_t gempba_mt_create_node_manager(gempba_load_balancer_t lb);
+    GEMPBA_API gempba_node_manager_t gempba_mt_create_node_manager(gempba_load_balancer_t lb);
 
     /**
      * Creates a child node whose runnable is captured at construction time.  Wraps gempba::mt::create_explicit_node.
@@ -308,10 +305,10 @@ extern "C" {
      * `parent` must not be NULL — substitute gempba_create_dummy_node in the binding when the runnable receives a
      * NULL parent.  user_data lifetime follows gempba_release_fn.
      */
-    gempba_status_t gempba_mt_create_explicit_node(gempba_load_balancer_t lb, gempba_node_t parent,
-                                                   gempba_runnable_fn runnable, void* user_data,
-                                                   gempba_release_fn release_user_data, /* nullable */
-                                                   gempba_bytes_t args, gempba_node_t* out);
+    GEMPBA_API gempba_status_t gempba_mt_create_explicit_node(gempba_load_balancer_t lb, gempba_node_t parent,
+                                                              gempba_runnable_fn runnable, void* user_data,
+                                                              gempba_release_fn release_user_data, /* nullable */
+                                                              gempba_bytes_t args, gempba_node_t* out);
 
     /**
      * Creates a child node whose args are produced lazily.  Wraps gempba::mt::create_lazy_node.
@@ -320,10 +317,11 @@ extern "C" {
      * pruned and `runnable` is never invoked.  Both callbacks share the same user_data, so a single release_fn frees
      * it.
      */
-    gempba_status_t gempba_mt_create_lazy_node(gempba_load_balancer_t lb, gempba_node_t parent,
-                                               gempba_runnable_fn runnable, gempba_lazy_args_fn lazy_args,
-                                               void* user_data, gempba_release_fn release_user_data, /* nullable */
-                                               gempba_node_t* out);
+    GEMPBA_API gempba_status_t gempba_mt_create_lazy_node(gempba_load_balancer_t lb, gempba_node_t parent,
+                                                          gempba_runnable_fn runnable, gempba_lazy_args_fn lazy_args,
+                                                          void*             user_data,
+                                                          gempba_release_fn release_user_data, /* nullable */
+                                                          gempba_node_t*    out);
 
     /* ─── Multiprocess engine (mp) ──────────────────────────────────────────── */
 
@@ -331,112 +329,113 @@ extern "C" {
      * Installs the MP load balancer.  Wraps gempba::mp::create_load_balancer.  `scheduler` may be NULL when the
      * binding only intends single-process work.
      */
-    gempba_load_balancer_t gempba_mp_create_load_balancer(gempba_balancing_policy_t policy,
-                                                          gempba_scheduler_t        scheduler /* nullable */);
+    GEMPBA_API gempba_load_balancer_t gempba_mp_create_load_balancer(gempba_balancing_policy_t policy,
+                                                                     gempba_scheduler_t scheduler /* nullable */);
 
     /**
      * Installs the MP node manager.  Wraps gempba::mp::create_node_manager.  `scheduler` may be NULL — see
      * gempba_mp_create_load_balancer.
      */
-    gempba_node_manager_t gempba_mp_create_node_manager(gempba_load_balancer_t lb,
-                                                        gempba_scheduler_t     scheduler /* nullable */);
+    GEMPBA_API gempba_node_manager_t gempba_mp_create_node_manager(gempba_load_balancer_t lb,
+                                                                   gempba_scheduler_t     scheduler /* nullable */);
 
     /**
      * Creates an MP child node.  Wraps gempba::mp::create_explicit_node with identity ser/deser — args are already
      * serialised on the binding side, the core just shuffles task_packets through.  See
      * gempba_mt_create_explicit_node for the parent / user_data / release_fn contract.
      */
-    gempba_status_t gempba_mp_create_explicit_node(gempba_load_balancer_t lb, gempba_node_t parent,
-                                                   gempba_runnable_fn runnable, void* user_data,
-                                                   gempba_release_fn release_user_data, /* nullable */
-                                                   gempba_bytes_t args, gempba_node_t* out);
+    GEMPBA_API gempba_status_t gempba_mp_create_explicit_node(gempba_load_balancer_t lb, gempba_node_t parent,
+                                                              gempba_runnable_fn runnable, void* user_data,
+                                                              gempba_release_fn release_user_data, /* nullable */
+                                                              gempba_bytes_t args, gempba_node_t* out);
 
     /* ─── Node manager ──────────────────────────────────────────────────────── */
 
     /** Wraps gempba::node_manager::set_goal.  Sets both the optimisation direction and the score storage kind in one
      * call. */
-    void gempba_nm_set_goal(gempba_node_manager_t nm, gempba_goal_t goal, gempba_score_type_t score_kind);
+    GEMPBA_API void gempba_nm_set_goal(gempba_node_manager_t nm, gempba_goal_t goal, gempba_score_type_t score_kind);
 
     /** Wraps gempba::node_manager::set_balancing_policy. */
-    void gempba_nm_set_balancing_policy(gempba_node_manager_t nm, gempba_balancing_policy_t policy);
+    GEMPBA_API void gempba_nm_set_balancing_policy(gempba_node_manager_t nm, gempba_balancing_policy_t policy);
 
     /** Wraps gempba::node_manager::set_thread_pool_size.  Resizes the underlying BS::thread_pool — call before
      * submitting work. */
-    void gempba_nm_set_thread_pool_size(gempba_node_manager_t nm, uint32_t n);
+    GEMPBA_API void gempba_nm_set_thread_pool_size(gempba_node_manager_t nm, uint32_t n);
 
     /**
      * Wraps gempba::node_manager::try_local_submit.  Sets *out_accepted to 1 iff the load balancer accepted the node
      * for local execution; 0 means it was forwarded.  The status itself reports ABI / exception failure, not the
      * accept/forward decision.
      */
-    gempba_status_t gempba_nm_try_local_submit(gempba_node_manager_t nm, gempba_node_t node,
-                                               gempba_bool_t* out_accepted);
+    GEMPBA_API gempba_status_t gempba_nm_try_local_submit(gempba_node_manager_t nm, gempba_node_t node,
+                                                          gempba_bool_t* out_accepted);
 
     /** Wraps gempba::node_manager::forward.  Hands the node to the load balancer for forwarding without local
      * execution. */
-    gempba_status_t gempba_nm_forward(gempba_node_manager_t nm, gempba_node_t node);
+    GEMPBA_API gempba_status_t gempba_nm_forward(gempba_node_manager_t nm, gempba_node_t node);
 
     /**
      * Wraps gempba::node_manager::try_update_score_and_invalidate_result.  Returns 1 if the candidate score improved
      * on the current best (and the stored result was therefore invalidated), 0 otherwise.  raw_bits/kind round through
      * gempba::score::from_raw.
      */
-    gempba_bool_t gempba_nm_try_update_score(gempba_node_manager_t nm, int64_t raw_bits, gempba_score_type_t kind);
+    GEMPBA_API gempba_bool_t gempba_nm_try_update_score(gempba_node_manager_t nm, int64_t raw_bits,
+                                                        gempba_score_type_t kind);
 
     /**
      * Wraps gempba::node_manager::try_update_result.  Atomically updates score and result iff the candidate score
      * improves on the current best.  Returns 1 on commit, 0 if the score did not improve.
      */
-    gempba_bool_t gempba_nm_try_update_result(gempba_node_manager_t nm, gempba_bytes_t result, int64_t raw_bits,
-                                              gempba_score_type_t kind);
+    GEMPBA_API gempba_bool_t gempba_nm_try_update_result(gempba_node_manager_t nm, gempba_bytes_t result,
+                                                         int64_t raw_bits, gempba_score_type_t kind);
 
     /** gempba::node_manager::get_score().to_raw() / .kind().  Pair them when the caller needs to reconstruct the score
      * type-correctly. */
-    int64_t             gempba_nm_get_score_raw(gempba_node_manager_t nm);
-    gempba_score_type_t gempba_nm_get_score_kind(gempba_node_manager_t nm);
+    GEMPBA_API int64_t             gempba_nm_get_score_raw(gempba_node_manager_t nm);
+    GEMPBA_API gempba_score_type_t gempba_nm_get_score_kind(gempba_node_manager_t nm);
 
     /** Wraps gempba::node_manager::set_score.  Replaces the stored score unconditionally; bindings that need
      * conditional update should call gempba_nm_try_update_score. */
-    void gempba_nm_set_score(gempba_node_manager_t nm, int64_t raw_bits, gempba_score_type_t kind);
+    GEMPBA_API void gempba_nm_set_score(gempba_node_manager_t nm, int64_t raw_bits, gempba_score_type_t kind);
 
     /**
      * Wraps gempba::node_manager::get_result_bytes.  *out is {NULL, 0} if no result is set.  Caller frees *out via
      * gempba_buffer_free if non-empty.
      */
-    gempba_status_t gempba_nm_get_result(gempba_node_manager_t nm, gempba_buffer_t* out);
+    GEMPBA_API gempba_status_t gempba_nm_get_result(gempba_node_manager_t nm, gempba_buffer_t* out);
 
     /** gempba::node_manager::generate_unique_id. */
-    uint32_t gempba_nm_generate_unique_id(gempba_node_manager_t nm);
+    GEMPBA_API uint32_t gempba_nm_generate_unique_id(gempba_node_manager_t nm);
 
     /** gempba::node_manager::get_wall_time (static). */
-    double gempba_nm_wall_time(void);
+    GEMPBA_API double gempba_nm_wall_time(void);
 
     /** gempba::node_manager::rank_me — non-zero only in MP mode. */
-    int32_t gempba_nm_rank_me(gempba_node_manager_t nm);
+    GEMPBA_API int32_t gempba_nm_rank_me(gempba_node_manager_t nm);
 
     /** gempba::node_manager::get_thread_request_count — cumulative submit count. */
-    int64_t gempba_nm_thread_request_count(gempba_node_manager_t nm);
+    GEMPBA_API int64_t gempba_nm_thread_request_count(gempba_node_manager_t nm);
 
     /** gempba::node_manager::get_idle_time — wall-clock seconds the underlying thread pool spent idle. */
-    double gempba_nm_idle_time(gempba_node_manager_t nm);
+    GEMPBA_API double gempba_nm_idle_time(gempba_node_manager_t nm);
 
     /** gempba::node_manager::get_balancing_policy. */
-    gempba_balancing_policy_t gempba_nm_get_balancing_policy(gempba_node_manager_t nm);
+    GEMPBA_API gempba_balancing_policy_t gempba_nm_get_balancing_policy(gempba_node_manager_t nm);
 
     /**
      * Wraps gempba::node_manager::try_remote_submit.  Asks the scheduler to ship the node to another rank under the
      * given runnable id.  *out_accepted is 1 iff the scheduler took it; the runnable id must match a registered
      * gempba_serial_runnable on the receiving rank.
      */
-    gempba_status_t gempba_nm_try_remote_submit(gempba_node_manager_t nm, gempba_node_t node, int32_t runnable_id,
-                                                gempba_bool_t* out_accepted);
+    GEMPBA_API gempba_status_t gempba_nm_try_remote_submit(gempba_node_manager_t nm, gempba_node_t node,
+                                                           int32_t runnable_id, gempba_bool_t* out_accepted);
 
     /** gempba::node_manager::is_done — non-blocking pool-state check. */
-    gempba_bool_t gempba_nm_is_done(gempba_node_manager_t nm);
+    GEMPBA_API gempba_bool_t gempba_nm_is_done(gempba_node_manager_t nm);
 
     /** gempba::node_manager::wait — blocks until the underlying thread pool is drained.  Returns GEMPBA_ERR_RUNTIME if
      * the wait raised an exception. */
-    gempba_status_t gempba_nm_wait(gempba_node_manager_t nm);
+    GEMPBA_API gempba_status_t gempba_nm_wait(gempba_node_manager_t nm);
 
     /* ─── Serial runnable (mp) ──────────────────────────────────────────────── */
 
@@ -449,12 +448,13 @@ extern "C" {
      * the gempba_release_fn rule: the release fires exactly once when the runnable is dropped (or immediately on
      * creation failure).
      */
-    gempba_status_t gempba_serial_runnable_create(int32_t id, gempba_bool_t returns_value, gempba_runnable_fn runnable,
-                                                  void* user_data, gempba_release_fn release_user_data, /* nullable */
-                                                  gempba_serial_runnable_t* out);
+    GEMPBA_API gempba_status_t gempba_serial_runnable_create(int32_t id, gempba_bool_t returns_value,
+                                                             gempba_runnable_fn runnable, void* user_data,
+                                                             gempba_release_fn         release_user_data, /* nullable */
+                                                             gempba_serial_runnable_t* out);
 
     /** Releases the runnable wrapper and decrements the underlying shared_ptr. */
-    void gempba_serial_runnable_destroy(gempba_serial_runnable_t sr);
+    GEMPBA_API void gempba_serial_runnable_destroy(gempba_serial_runnable_t sr);
 
     /**
      * Invokes the runnable against a node manager.
@@ -462,38 +462,33 @@ extern "C" {
      *   - Non-void runnables block until the result is ready and populate *out.
      * Caller frees *out via gempba_buffer_free if non-empty.
      */
-    gempba_status_t gempba_serial_runnable_invoke(gempba_serial_runnable_t sr, gempba_node_manager_t nm,
-                                                  gempba_bytes_t args, gempba_buffer_t* out);
+    GEMPBA_API gempba_status_t gempba_serial_runnable_invoke(gempba_serial_runnable_t sr, gempba_node_manager_t nm,
+                                                             gempba_bytes_t args, gempba_buffer_t* out);
 
-    /* ─── Scheduler (mp) ────────────────────────────────────────────────────── */
+    /* ─── Scheduler ─────────────────────────────────────────────────────────── */
 
-    /**
-     * Creates the process-wide scheduler with the given topology.  Wraps
-     * gempba::mp::create_scheduler.  Calling MPI must already be initialised before this; the scheduler does not own
-     * the MPI lifecycle.
-     */
-    gempba_status_t gempba_scheduler_create(gempba_scheduler_topology_t topology, gempba_scheduler_t* out);
+    /* gempba_mpi_create_scheduler, in gempba_mpi.h, creates one. */
 
     /** Tears down the scheduler.  Releases the C++ object held inside the wrapper; MPI itself is unaffected. */
-    void gempba_scheduler_destroy(gempba_scheduler_t s);
+    GEMPBA_API void gempba_scheduler_destroy(gempba_scheduler_t s);
 
     /** gempba::scheduler::barrier — collective; every rank must reach it. */
-    void gempba_scheduler_barrier(gempba_scheduler_t s);
+    GEMPBA_API void gempba_scheduler_barrier(gempba_scheduler_t s);
 
     /** gempba::scheduler::rank_me / world_size. */
-    int32_t gempba_scheduler_rank_me(gempba_scheduler_t s);
-    int32_t gempba_scheduler_world_size(gempba_scheduler_t s);
+    GEMPBA_API int32_t gempba_scheduler_rank_me(gempba_scheduler_t s);
+    GEMPBA_API int32_t gempba_scheduler_world_size(gempba_scheduler_t s);
 
     /** gempba::scheduler::set_goal — sets goal + score kind for the centralised tournament.  Must be called on every
      * rank with the same arguments. */
-    void gempba_scheduler_set_goal(gempba_scheduler_t s, gempba_goal_t goal, gempba_score_type_t kind);
+    GEMPBA_API void gempba_scheduler_set_goal(gempba_scheduler_t s, gempba_goal_t goal, gempba_score_type_t kind);
 
     /** gempba::scheduler::elapsed_time — seconds since the scheduler started. */
-    double gempba_scheduler_elapsed_time(gempba_scheduler_t s);
+    GEMPBA_API double gempba_scheduler_elapsed_time(gempba_scheduler_t s);
 
     /** gempba::scheduler::synchronize_stats — collective; gathers per-rank stats onto rank 0.  Visit them via
      * gempba_scheduler_visit_stats. */
-    void gempba_scheduler_synchronize_stats(gempba_scheduler_t s);
+    GEMPBA_API void gempba_scheduler_synchronize_stats(gempba_scheduler_t s);
 
     /* ── Stats: callback-based iteration (no allocation, language-neutral) ──── */
 
@@ -527,12 +522,12 @@ extern "C" {
      * gempba::scheduler::get_stats_vector + per-stats visit().  Call gempba_scheduler_synchronize_stats first to
      * populate non-zero ranks.  Bindings that need a flat list build it inside `visitor`.
      */
-    void gempba_scheduler_visit_stats(gempba_scheduler_t s, gempba_stat_visitor_fn visitor, void* user_data);
+    GEMPBA_API void gempba_scheduler_visit_stats(gempba_scheduler_t s, gempba_stat_visitor_fn visitor, void* user_data);
 
     /* ── Scheduler run and results ──────────────────────────────────────────── */
 
     /** Wraps gempba::scheduler::is_root.  The root is rank 0: the rank that seeds the run and reads its results. */
-    gempba_bool_t gempba_scheduler_is_root(gempba_scheduler_t s);
+    GEMPBA_API gempba_bool_t gempba_scheduler_is_root(gempba_scheduler_t s);
 
     /**
      * Wraps gempba::scheduler::run.  Every rank calls it: it registers the runnables (paired ids[i] / runnables[i] for
@@ -540,14 +535,15 @@ extern "C" {
      * root's first task, run under `seed_runnable_id`, and is NULL on every other rank.  GEMPBA_ERR_INVALID_ARG when
      * the root passes no seed or another rank passes one.
      */
-    gempba_status_t gempba_scheduler_run(gempba_scheduler_t s, gempba_node_manager_t nm, const int32_t* ids,
-                                         const gempba_serial_runnable_t* runnables, size_t count,
-                                         const gempba_bytes_t* seed /* NULL off the root */, int32_t seed_runnable_id);
+    GEMPBA_API gempba_status_t gempba_scheduler_run(gempba_scheduler_t s, gempba_node_manager_t nm, const int32_t* ids,
+                                                    const gempba_serial_runnable_t* runnables, size_t count,
+                                                    const gempba_bytes_t* seed /* NULL off the root */,
+                                                    int32_t               seed_runnable_id);
 
     /** Wraps gempba::scheduler::get_result.  On the root, after gempba_scheduler_run: *out is the best result gathered
      * from all ranks, or {NULL, 0} if none was produced.  Caller frees *out via gempba_buffer_free if non-empty.
      * GEMPBA_ERR_RUNTIME on any other rank. */
-    gempba_status_t gempba_scheduler_get_result(gempba_scheduler_t s, gempba_buffer_t* out);
+    GEMPBA_API gempba_status_t gempba_scheduler_get_result(gempba_scheduler_t s, gempba_buffer_t* out);
 
     /**
      * Visits each result in order.  Visitor receives borrowed bytes valid only for the call — copy if retention is
@@ -558,7 +554,8 @@ extern "C" {
     /** Wraps gempba::scheduler::get_all_results.  On the root, after gempba_scheduler_run: iterates results in rank
      * order, where index 0 is rank 0 and empty under the built-in schedulers.  On any other rank it visits nothing and
      * sets the last error. */
-    void gempba_scheduler_visit_all_results(gempba_scheduler_t s, gempba_result_visitor_fn visitor, void* user_data);
+    GEMPBA_API void gempba_scheduler_visit_all_results(gempba_scheduler_t s, gempba_result_visitor_fn visitor,
+                                                       void* user_data);
 
     /** ─── Telemetry (process-wide, no handle) ───────────────────────────────────
      *
@@ -571,7 +568,7 @@ extern "C" {
      *
      * Recommended pattern (mp), to suppress telemetry before any create_*:
      *     gempba_telemetry_disable();      // every process, before create_*
-     *     gempba_status_t st = gempba_scheduler_create(...);
+     *     gempba_status_t st = gempba_mpi_create_scheduler(...);
      */
 
     /**
@@ -579,25 +576,25 @@ extern "C" {
      * gempba_mp_create_* until gempba_telemetry_enable is called.  Idempotent.  Safe to call before any hub has been
      * installed.
      */
-    void gempba_telemetry_disable(void);
+    GEMPBA_API void gempba_telemetry_disable(void);
 
     /**
      * Lift a previous gempba_telemetry_disable so subsequent gempba_mp_create_* calls install the telemetry hub again.
      * Idempotent.  Does not itself install a hub.
      */
-    void gempba_telemetry_enable(void);
+    GEMPBA_API void gempba_telemetry_enable(void);
 
     /**
      * Returns 1 while installs are allowed (default), 0 after disable and before the matching enable.  Reflects only
      * this process's flag.
      */
-    gempba_bool_t gempba_telemetry_is_enabled(void);
+    GEMPBA_API gempba_bool_t gempba_telemetry_is_enabled(void);
 
     /**
      * Set the loopback TCP port the telemetry hub binds (default 9000).  Must be called before the first create_*
      * installs a hub; a later call does not move an already-bound hub.  Mirrors gempba::telemetry::configure_port.
      */
-    void gempba_telemetry_configure_port(uint16_t port);
+    GEMPBA_API void gempba_telemetry_configure_port(uint16_t port);
 
 #ifdef __cplusplus
 } /* extern "C" */

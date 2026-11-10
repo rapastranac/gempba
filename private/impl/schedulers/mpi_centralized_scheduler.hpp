@@ -1023,7 +1023,7 @@ namespace gempba {
             MPI_Comm_rank(m_world_communicator, &m_world_rank);
             MPI_Barrier(m_world_communicator);
 
-#if !GEMPBA_DEV_MODE
+#if !GEMPBA_BUILD_TESTS
             if (m_world_size < 2) {
                 utils::log_debug("At least two processes required !!\n");
                 MPI_Abort(m_world_communicator, EXIT_FAILURE);

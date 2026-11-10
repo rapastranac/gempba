@@ -27,6 +27,7 @@
 
 #include <functional>
 #include <gempba/core/scheduler.hpp>
+#include <gempba/export.h>
 #include <memory>
 
 namespace gempba::telemetry {
@@ -44,7 +45,7 @@ namespace gempba::detail {
      *
      * @throws std::runtime_error when a scheduler already exists.
      */
-    scheduler* install_scheduler(std::unique_ptr<scheduler> p_scheduler, telemetry_transport_factory p_make_transport);
+    GEMPBA_API scheduler* install_scheduler(std::unique_ptr<scheduler> p_scheduler, telemetry_transport_factory p_make_transport);
 
 } // namespace gempba::detail
 

@@ -25,6 +25,7 @@
 #ifndef GEMPBA_SCHEDULER_TRAITS_HPP
 #define GEMPBA_SCHEDULER_TRAITS_HPP
 
+#include <gempba/stats/stats.hpp>
 #include <memory>
 
 /**
@@ -32,8 +33,6 @@
  * @date 2025-06-28
  */
 namespace gempba {
-
-    class stats;
 
     class scheduler_traits {
     protected:

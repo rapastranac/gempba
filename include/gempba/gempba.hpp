@@ -29,6 +29,7 @@
 #include <gempba/detail/nodes/node_core_impl.hpp>
 #include <gempba/detail/runnables/serial_runnable_non_void.hpp>
 #include <gempba/detail/runnables/serial_runnable_void.hpp>
+#include <gempba/export.h>
 #include <gempba/telemetry/telemetry_hub.hpp>
 #include <gempba/utils/gempba_utils.hpp>
 
@@ -37,27 +38,27 @@ namespace gempba {
     /////////////////////////////////////////////////////////////////////////////////////////////////
     /// SCHEDULING
     /// /////////////////////////////////////////////////////////////////////////////////////////////
-    scheduler* get_scheduler();
+    GEMPBA_API scheduler* get_scheduler();
 
-    scheduler* try_get_scheduler() noexcept;
+    GEMPBA_API scheduler* try_get_scheduler() noexcept;
 
-    void reset_scheduler();
+    GEMPBA_API void reset_scheduler();
 
     /////////////////////////////////////////////////////////////////////////////////////////////////
     /// LOAD BALANCING
     /// /////////////////////////////////////////////////////////////////////////////////////////////
-    load_balancer* get_load_balancer();
+    GEMPBA_API load_balancer* get_load_balancer();
 
-    void reset_load_balancer();
+    GEMPBA_API void reset_load_balancer();
 
     /////////////////////////////////////////////////////////////////////////////////////////////////
     /// BRANCH HANDLING
     /// /////////////////////////////////////////////////////////////////////////////////////////////
-    node_manager& get_node_manager();
+    GEMPBA_API node_manager& get_node_manager();
 
-    void reset_node_manager();
+    GEMPBA_API void reset_node_manager();
 
-    int shutdown();
+    GEMPBA_API int shutdown();
 
     template<typename Ret, typename... Args>
     static node create_seed_node(load_balancer& p_load_balancer, invokable<Ret, Args...> auto&& p_runnable, std::tuple<Args...> p_args) {
@@ -73,20 +74,20 @@ namespace gempba {
 
     [[maybe_unused]] static node create_custom_node(const std::shared_ptr<node_core>& p_core) noexcept { return node(p_core); }
 
-    void check_not_null([[maybe_unused]] const node& p_parent);
+    GEMPBA_API void check_not_null([[maybe_unused]] const node& p_parent);
 
     /////////////////////////////////////////////////////////////////////////////////////////////////
     /// LOAD BALANCING
     /// /////////////////////////////////////////////////////////////////////////////////////////////
     /** @brief Take ownership of a caller-provided `load_balancer` implementation. */
-    load_balancer* create_load_balancer(std::unique_ptr<load_balancer> p_your_implementation);
+    GEMPBA_API load_balancer* create_load_balancer(std::unique_ptr<load_balancer> p_your_implementation);
 
     /**
      * @brief Create the built-in load balancer for @p p_policy.
      *
      * @param p_scheduler The scheduler that sends tasks to other ranks, or nullptr in a single-process run.
      */
-    load_balancer* create_load_balancer(const balancing_policy& p_policy, scheduler* p_scheduler = nullptr);
+    GEMPBA_API load_balancer* create_load_balancer(const balancing_policy& p_policy, scheduler* p_scheduler = nullptr);
 
     /////////////////////////////////////////////////////////////////////////////////////////////////
     /// BRANCH HANDLING
@@ -96,7 +97,7 @@ namespace gempba {
      *
      * @param p_scheduler The scheduler that sends tasks to other ranks, or nullptr in a single-process run.
      */
-    node_manager& create_node_manager(load_balancer* p_load_balancer, scheduler* p_scheduler = nullptr);
+    GEMPBA_API node_manager& create_node_manager(load_balancer* p_load_balancer, scheduler* p_scheduler = nullptr);
 
     /////////////////////////////////////////////////////////////////////////////////////////////////
     /// SERIAL RUNNABLES

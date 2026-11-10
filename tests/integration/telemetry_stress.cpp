@@ -34,8 +34,8 @@
 
 #include "leaf_count.hpp"
 
-#include <gempba/defaults/default_mpi_stats_visitor.hpp>
 #include <gempba/gempba.hpp>
+#include <gempba/mpi/default_mpi_stats_visitor.hpp>
 #include <gempba/telemetry/frames.hpp>
 #include <gempba/telemetry/telemetry_hub.hpp>
 #include <mpi.h>

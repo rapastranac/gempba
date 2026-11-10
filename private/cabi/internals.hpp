@@ -48,6 +48,7 @@
 #include <gempba/cabi/gempba.h>
 #include <gempba/core/scheduler.hpp>
 #include <gempba/core/serial_runnable.hpp>
+#include <gempba/export.h>
 #include <gempba/gempba.hpp>
 #include <gempba/utils/score.hpp>
 #include <gempba/utils/task_packet.hpp>
@@ -78,17 +79,10 @@ struct gempba_scheduler_s {
 namespace gempba::cabi::detail {
 
     /**
-     * Thread-local last-error string, shared across every translation unit that
-     * includes this header.  Wrapped in a function returning a reference (the
-     * "Meyers' singleton" pattern, applied to thread_local) so the underlying
-     * storage has exactly one definition regardless of how many TUs include
-     * this header — `inline thread_local` at namespace scope trips mingw-gcc's
-     * per-TU TLS-init-function emission and links double.
+     * Thread-local last-error string, defined once in libgempba so libgempba_mpi's entry points report through the same
+     * one that gempba_last_error_message reads.
      */
-    inline std::string& g_last_error() {
-        thread_local std::string s;
-        return s;
-    }
+    GEMPBA_API std::string& g_last_error();
 
     inline void set_last_error(const char* msg) { g_last_error() = msg ? msg : ""; }
 
@@ -217,6 +211,55 @@ namespace gempba::cabi::detail {
     inline gempba::score score_from_raw(int64_t raw_bits, gempba_score_type_t kind) { return gempba::score::from_raw(static_cast<gempba::score_type>(kind), raw_bits); }
 
 } // namespace gempba::cabi::detail
+
+/* ─── Macro: try / catch envelope for fallible entry points ─────────────── */
+
+#define GEMPBA_TRY                                                                                                                                                                           \
+    try {                                                                                                                                                                                    \
+        gempba_clear_last_error();
+
+#define GEMPBA_CATCH_RETURN_STATUS                                                                                                                                                           \
+    }                                                                                                                                                                                        \
+    catch (const std::bad_alloc&) {                                                                                                                                                          \
+        set_last_error("std::bad_alloc");                                                                                                                                                    \
+        return GEMPBA_ERR_OUT_OF_MEMORY;                                                                                                                                                     \
+    }                                                                                                                                                                                        \
+    catch (const std::invalid_argument& e) {                                                                                                                                                 \
+        set_last_error(e.what());                                                                                                                                                            \
+        return GEMPBA_ERR_INVALID_ARG;                                                                                                                                                       \
+    }                                                                                                                                                                                        \
+    catch (const std::exception& e) {                                                                                                                                                        \
+        set_last_error(e.what());                                                                                                                                                            \
+        return GEMPBA_ERR_RUNTIME;                                                                                                                                                           \
+    }                                                                                                                                                                                        \
+    catch (...) {                                                                                                                                                                            \
+        set_last_error("unknown C++ exception");                                                                                                                                             \
+        return GEMPBA_ERR_UNKNOWN;                                                                                                                                                           \
+    }
+
+/** For void entry points, swallow the exception into the thread-local error. */
+#define GEMPBA_CATCH_VOID                                                                                                                                                                    \
+    }                                                                                                                                                                                        \
+    catch (const std::exception& e) {                                                                                                                                                        \
+        set_last_error(e.what());                                                                                                                                                            \
+    }                                                                                                                                                                                        \
+    catch (...) {                                                                                                                                                                            \
+        set_last_error("unknown C++ exception");                                                                                                                                             \
+    }
+
+/** For factory functions that return a handle directly (not a status):
+ * on exception, set last_error and return nullptr.  Bindings check the
+ * return for nullptr and call gempba_last_error_message() on failure. */
+#define GEMPBA_CATCH_RETURN_NULL                                                                                                                                                             \
+    }                                                                                                                                                                                        \
+    catch (const std::exception& e) {                                                                                                                                                        \
+        set_last_error(e.what());                                                                                                                                                            \
+        return nullptr;                                                                                                                                                                      \
+    }                                                                                                                                                                                        \
+    catch (...) {                                                                                                                                                                            \
+        set_last_error("unknown C++ exception");                                                                                                                                             \
+        return nullptr;                                                                                                                                                                      \
+    }
 
 // NOLINTEND(readability-identifier-naming)
 

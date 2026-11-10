@@ -31,11 +31,12 @@
 #include <vector>
 
 #include <gempba/gempba.hpp>
-#include <gempba/mpi.hpp>
 #include <gempba/node_manager.hpp>
 #include <gempba/telemetry/telemetry_hub.hpp>
+#include <impl/install_scheduler.hpp>
 #include <impl/load_balancing/quasi_horizontal_load_balancer.hpp>
 #include <impl/load_balancing/work_stealing_load_balancer.hpp>
+#include <impl/telemetry/local_transport.hpp>
 
 /**
  * @author Andrés Pastrana
@@ -69,6 +70,12 @@ protected:
     std::vector<gempba::result> do_get_all_results() override { return {}; }
 };
 
+
+namespace {
+    gempba::scheduler* install_stub() {
+        return gempba::detail::install_scheduler(std::make_unique<scheduler_stub>(), [] { return std::make_unique<gempba::telemetry::local_transport>(); });
+    }
+} // namespace
 
 class gempba_test : public ::testing::Test {
 protected:
@@ -150,23 +157,14 @@ TEST_F(gempba_test, reset_node_manager_clears_instance) {
 
 TEST_F(gempba_test, get_scheduler_throws_when_not_instantiated) { EXPECT_THROW([[maybe_unused]] auto* v_ptr = gempba::get_scheduler(), std::runtime_error); }
 
-TEST_F(gempba_test, mpi_create_scheduler_custom_implementation) {
-    auto v_stub = std::make_unique<scheduler_stub>();
-    const scheduler_stub* v_raw = v_stub.get();
-    gempba::scheduler* v_sched = gempba::mpi::create_scheduler(std::move(v_stub));
-    ASSERT_NE(nullptr, v_sched);
-    EXPECT_EQ(v_raw, v_sched);
-    EXPECT_EQ(v_sched, gempba::get_scheduler());
-}
-
 TEST_F(gempba_test, unnamed_scheduler_is_described_to_telemetry_as_custom) {
-    gempba::mpi::create_scheduler(std::make_unique<scheduler_stub>());
+    install_stub();
     ASSERT_NE(nullptr, gempba::telemetry::get());
     EXPECT_EQ("custom", gempba::telemetry::get()->describe_run().m_scheduler);
 }
 
 TEST_F(gempba_test, scheduler_roles_are_described_to_telemetry) {
-    gempba::mpi::create_scheduler(std::make_unique<scheduler_stub>());
+    install_stub();
     ASSERT_NE(nullptr, gempba::telemetry::get());
     const std::vector<gempba::rank_role> v_expected{gempba::rank_role::WORKER};
     EXPECT_EQ(v_expected, gempba::telemetry::get()->describe_run().m_roles);
@@ -179,7 +177,7 @@ TEST_F(gempba_test, a_scheduler_that_names_no_coordinator_reports_every_rank_a_w
 }
 
 TEST_F(gempba_test, load_balancer_created_after_the_hub_is_described_to_telemetry) {
-    gempba::mpi::create_scheduler(std::make_unique<scheduler_stub>());
+    install_stub();
     ASSERT_NE(nullptr, gempba::telemetry::get());
     EXPECT_TRUE(gempba::telemetry::get()->describe_run().m_load_balancer.empty());
 
@@ -230,26 +228,16 @@ TEST_F(gempba_test, threads_per_process_leaves_out_a_rank_its_scheduler_declares
     v_hub.shutdown();
 }
 
-TEST_F(gempba_test, mpi_create_scheduler_throws_if_already_exists) {
-    gempba::mpi::create_scheduler(std::make_unique<scheduler_stub>());
-    EXPECT_THROW(gempba::mpi::create_scheduler(std::make_unique<scheduler_stub>()), std::runtime_error);
-}
-
 TEST_F(gempba_test, reset_scheduler_clears_instance) {
-    gempba::mpi::create_scheduler(std::make_unique<scheduler_stub>());
+    install_stub();
     ASSERT_NE(nullptr, gempba::get_scheduler());
     gempba::reset_scheduler();
     EXPECT_THROW([[maybe_unused]] auto* v_ptr = gempba::get_scheduler(), std::runtime_error);
 }
 
-TEST_F(gempba_test, mpi_get_default_mpi_stats_visitor_returns_non_null) {
-    auto v_visitor = gempba::mpi::get_default_mpi_stats_visitor();
-    ASSERT_NE(nullptr, v_visitor);
-}
-
 TEST_F(gempba_test, telemetry_disable_before_create_scheduler_suppresses_auto_install) {
     gempba::telemetry::disable();
-    gempba::mpi::create_scheduler(std::make_unique<scheduler_stub>());
+    install_stub();
     EXPECT_EQ(nullptr, gempba::telemetry::get());
 }
 
@@ -261,7 +249,7 @@ TEST_F(gempba_test, telemetry_disable_before_create_node_manager_suppresses_auto
 }
 
 TEST_F(gempba_test, telemetry_disable_after_create_scheduler_tears_down_auto_installed_hub) {
-    gempba::mpi::create_scheduler(std::make_unique<scheduler_stub>());
+    install_stub();
     ASSERT_NE(nullptr, gempba::telemetry::get());
 
     gempba::telemetry::disable();
@@ -271,7 +259,7 @@ TEST_F(gempba_test, telemetry_disable_after_create_scheduler_tears_down_auto_ins
 TEST_F(gempba_test, shutdown_resets_all_singletons) {
     gempba::load_balancer* v_lb = gempba::create_load_balancer(gempba::QUASI_HORIZONTAL);
     gempba::create_node_manager(v_lb);
-    gempba::mpi::create_scheduler(std::make_unique<scheduler_stub>());
+    install_stub();
 
     const int v_ret = gempba::shutdown();
 

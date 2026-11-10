@@ -24,12 +24,13 @@
 #ifndef TREE_HPP
 #define TREE_HPP
 
+#include <gempba/export.h>
 #include <sstream>
 #include <string>
 #include <vector>
 
-class tree {
-    struct tree_node {
+class GEMPBA_API tree {
+    struct GEMPBA_API tree_node {
         explicit tree_node(tree& p_tree, const int p_index) : m_tree(p_tree) {
             this->m_index = p_index;
             this->m_children_count = 0;
