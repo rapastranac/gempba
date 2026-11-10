@@ -619,13 +619,15 @@ namespace {
         EXPECT_EQ("semi_centralized", v_hub.describe_run().m_scheduler);
     }
 
-    TEST_F(telemetry_hub_test, describe_run_reports_the_roles_the_scheduler_declares) {
+    TEST_F(telemetry_hub_test, describe_run_reports_the_role_each_rank_declares_for_itself) {
         gempba::telemetry::telemetry_hub v_hub;
+        v_hub.describe_scheduler("centralized", gempba::rank_role::COORDINATOR);
         EXPECT_TRUE(v_hub.describe_run().m_roles.empty());
 
-        const std::vector<gempba::rank_role> v_roles{gempba::rank_role::COORDINATOR, gempba::rank_role::WORKER, gempba::rank_role::WORKER};
-        v_hub.describe_scheduler("centralized", v_roles);
-        EXPECT_EQ(v_roles, v_hub.describe_run().m_roles);
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+        const std::vector<gempba::rank_role> v_expected{gempba::rank_role::COORDINATOR};
+        EXPECT_EQ(v_expected, v_hub.describe_run().m_roles);
+        v_hub.shutdown();
     }
 
     void expect_edge(const gempba::telemetry::edge_counter& p_edge, const std::uint32_t p_dst, const std::uint64_t p_bytes, const std::uint64_t p_count) {

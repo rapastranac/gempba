@@ -8,6 +8,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string_view>
 #include <thread>
 #include <tuple>
@@ -68,29 +69,29 @@ namespace leaf_count {
     }
 
     /**
-     * Creates the load balancer and node manager for @p p_scheduler and counts the leaves of a tree of depth @p p_max_depth
-     * from the center with two threads per worker. Returns once this rank's run ends; keep the counter until shutdown.
+     * Creates the load balancer and node manager for @p p_scheduler and counts the leaves of a tree of depth @p p_max_depth,
+     * seeded from the root, with two threads per rank that runs tasks. Returns once this rank's run ends; keep the counter until shutdown.
      */
     inline std::unique_ptr<leaf_counter> run(gempba::scheduler& p_scheduler, const int p_max_depth) {
-        const int v_rank = p_scheduler.rank_me();
-        gempba::scheduler::worker* v_worker = v_rank == 0 ? nullptr : &p_scheduler.worker_view();
-        gempba::load_balancer* v_load_balancer = gempba::create_load_balancer(gempba::balancing_policy::QUASI_HORIZONTAL, v_worker);
-        gempba::node_manager& v_node_manager = gempba::create_node_manager(v_load_balancer, v_worker);
+        gempba::load_balancer* v_load_balancer = gempba::create_load_balancer(gempba::balancing_policy::QUASI_HORIZONTAL, &p_scheduler);
+        gempba::node_manager& v_node_manager = gempba::create_node_manager(v_load_balancer, &p_scheduler);
         v_node_manager.set_goal(gempba::MAXIMISE, gempba::score_type::I32);
         p_scheduler.set_goal(gempba::MAXIMISE, gempba::score_type::I32);
         v_node_manager.set_score(gempba::score::make(0));
         auto v_counter = std::make_unique<leaf_counter>(*v_load_balancer, v_node_manager);
         p_scheduler.barrier();
 
-        if (v_rank == 0) {
-            p_scheduler.center_view().run(serialize(0, p_max_depth), 0);
-        } else {
+        if (!p_scheduler.is_root()) {
             v_node_manager.set_thread_pool_size(2);
-            const std::function<std::tuple<int, int>(const gempba::task_packet&&)> v_deserializer = [](const gempba::task_packet&& p_packet) { return deserialize(p_packet); };
-            const auto v_runnable = gempba::runnables::return_none::create(0, v_counter->function(), v_deserializer);
-            const std::map<int, std::shared_ptr<gempba::serial_runnable>> v_runnables{{v_runnable->get_id(), v_runnable}};
-            p_scheduler.worker_view().run(v_node_manager, v_runnables);
         }
+        const std::function<std::tuple<int, int>(const gempba::task_packet&&)> v_deserializer = [](const gempba::task_packet&& p_packet) { return deserialize(p_packet); };
+        const auto v_runnable = gempba::runnables::return_none::create(0, v_counter->function(), v_deserializer);
+        const std::map<int, std::shared_ptr<gempba::serial_runnable>> v_runnables{{v_runnable->get_id(), v_runnable}};
+        std::optional<gempba::task_bundle> v_seed;
+        if (p_scheduler.is_root()) {
+            v_seed.emplace(serialize(0, p_max_depth), 0);
+        }
+        p_scheduler.run(v_node_manager, v_runnables, std::move(v_seed));
         return v_counter;
     }
 

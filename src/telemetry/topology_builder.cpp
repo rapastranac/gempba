@@ -188,10 +188,11 @@ namespace gempba::telemetry {
 #endif
         }
 
-        rank_identity build_self_identity(std::uint32_t p_rank) noexcept {
+        rank_identity build_self_identity(std::uint32_t p_rank, rank_role p_role) noexcept {
             rank_identity v_self{};
             v_self.m_version = TELEMETRY_SCHEMA_VERSION;
             v_self.m_rank = p_rank;
+            v_self.m_role = p_role;
             fill_hostname(v_self.m_hostname, sizeof(v_self.m_hostname));
             v_self.m_pid = current_pid();
             query_allowed_cpu_mask(v_self.m_allowed_cpu_mask);
@@ -229,9 +230,9 @@ namespace gempba::telemetry {
             p_node.m_sockets.push_back(std::move(v_socket));
         }
 
-        topology_snapshot build_mt_only_snapshot(std::uint32_t p_rank) {
+        topology_snapshot build_mt_only_snapshot(std::uint32_t p_rank, rank_role p_role) {
             topology_snapshot v_snapshot;
-            const rank_identity v_self = build_self_identity(p_rank);
+            const rank_identity v_self = build_self_identity(p_rank, p_role);
             v_snapshot.m_identities.push_back(v_self);
 
             topology_node v_node;
@@ -244,9 +245,9 @@ namespace gempba::telemetry {
         }
 
 #if GEMPBA_MULTIPROCESSING
-        topology_snapshot build_mpi_snapshot(std::uint32_t p_rank, std::uint32_t p_world_size) {
+        topology_snapshot build_mpi_snapshot(std::uint32_t p_rank, std::uint32_t p_world_size, rank_role p_role) {
             topology_snapshot v_snapshot;
-            const rank_identity v_self = build_self_identity(p_rank);
+            const rank_identity v_self = build_self_identity(p_rank, p_role);
 
             int v_initialized = 0;
             MPI_Initialized(&v_initialized);
@@ -478,19 +479,19 @@ namespace gempba::telemetry {
 
     } // namespace detail
 
-    topology_snapshot build_topology_snapshot(const runtime_mode p_mode, const std::uint32_t p_rank, const std::uint32_t p_world_size) {
+    topology_snapshot build_topology_snapshot(const runtime_mode p_mode, const std::uint32_t p_rank, const std::uint32_t p_world_size, const rank_role p_role) {
         switch (p_mode) {
             case runtime_mode::MT_ONLY:
-                return build_mt_only_snapshot(p_rank);
+                return build_mt_only_snapshot(p_rank, p_role);
 #if GEMPBA_MULTIPROCESSING
             case runtime_mode::MP_MPI:
-                return build_mpi_snapshot(p_rank, p_world_size);
+                return build_mpi_snapshot(p_rank, p_world_size, p_role);
 #else
             case runtime_mode::MP_MPI:
-                return build_mt_only_snapshot(p_rank);
+                return build_mt_only_snapshot(p_rank, p_role);
 #endif
         }
-        return build_mt_only_snapshot(p_rank);
+        return build_mt_only_snapshot(p_rank, p_role);
     }
 
 } // namespace gempba::telemetry

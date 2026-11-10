@@ -173,13 +173,11 @@ extern "C" {
 
     /* ─── Opaque handles ────────────────────────────────────────────────────── */
 
-    typedef struct gempba_load_balancer_s*    gempba_load_balancer_t;    /* gempba::load_balancer*           */
-    typedef struct gempba_node_manager_s*     gempba_node_manager_t;     /* gempba::node_manager*            */
-    typedef struct gempba_node_s*             gempba_node_t;             /* wraps gempba::node               */
-    typedef struct gempba_serial_runnable_s*  gempba_serial_runnable_t;  /* wraps gempba::serial_runnable    */
-    typedef struct gempba_scheduler_s*        gempba_scheduler_t;        /* wraps gempba::scheduler          */
-    typedef struct gempba_scheduler_center_s* gempba_scheduler_center_t; /* gempba::scheduler::center*       */
-    typedef struct gempba_scheduler_worker_s* gempba_scheduler_worker_t; /* gempba::scheduler::worker*       */
+    typedef struct gempba_load_balancer_s*   gempba_load_balancer_t;   /* gempba::load_balancer*           */
+    typedef struct gempba_node_manager_s*    gempba_node_manager_t;    /* gempba::node_manager*            */
+    typedef struct gempba_node_s*            gempba_node_t;            /* wraps gempba::node               */
+    typedef struct gempba_serial_runnable_s* gempba_serial_runnable_t; /* wraps gempba::serial_runnable    */
+    typedef struct gempba_scheduler_s*       gempba_scheduler_t;       /* wraps gempba::scheduler          */
 
     /**
      * Ownership summary
@@ -189,7 +187,6 @@ extern "C" {
      *   gempba_scheduler_t       : caller-owned. Free with gempba_scheduler_destroy.
      *   gempba_load_balancer_t   : singleton-owned. DO NOT free.  Released by gempba_shutdown.
      *   gempba_node_manager_t    : singleton-owned. DO NOT free.  Released by gempba_shutdown.
-     *   gempba_scheduler_center_t / _worker_t : borrowed view into a scheduler. DO NOT free.
      *
      * NULL is the canonical "absent / invalid" value for every handle.
      */
@@ -331,18 +328,18 @@ extern "C" {
     /* ─── Multiprocess engine (mp) ──────────────────────────────────────────── */
 
     /**
-     * Installs the MP load balancer.  Wraps gempba::mp::create_load_balancer.  `worker` may be NULL when the binding
-     * only intends single-process work.
+     * Installs the MP load balancer.  Wraps gempba::mp::create_load_balancer.  `scheduler` may be NULL when the
+     * binding only intends single-process work.
      */
     gempba_load_balancer_t gempba_mp_create_load_balancer(gempba_balancing_policy_t policy,
-                                                          gempba_scheduler_worker_t worker /* nullable */);
+                                                          gempba_scheduler_t        scheduler /* nullable */);
 
     /**
-     * Installs the MP node manager.  Wraps gempba::mp::create_node_manager.  `worker` may be NULL — see
+     * Installs the MP node manager.  Wraps gempba::mp::create_node_manager.  `scheduler` may be NULL — see
      * gempba_mp_create_load_balancer.
      */
-    gempba_node_manager_t gempba_mp_create_node_manager(gempba_load_balancer_t    lb,
-                                                        gempba_scheduler_worker_t worker /* nullable */);
+    gempba_node_manager_t gempba_mp_create_node_manager(gempba_load_balancer_t lb,
+                                                        gempba_scheduler_t     scheduler /* nullable */);
 
     /**
      * Creates an MP child node.  Wraps gempba::mp::create_explicit_node with identity ser/deser — args are already
@@ -498,11 +495,6 @@ extern "C" {
      * gempba_scheduler_visit_stats. */
     void gempba_scheduler_synchronize_stats(gempba_scheduler_t s);
 
-    /** Borrowed views into the scheduler — never free.  Only one role is meaningful per rank: center on rank 0, worker
-     * on every other rank. */
-    gempba_scheduler_center_t gempba_scheduler_center_view(gempba_scheduler_t s);
-    gempba_scheduler_worker_t gempba_scheduler_worker_view(gempba_scheduler_t s);
-
     /* ── Stats: callback-based iteration (no allocation, language-neutral) ──── */
 
     /** Discriminator for gempba_stat_value_t.v — picked to round-trip the scalar types gempba::stats::visit emits
@@ -537,23 +529,25 @@ extern "C" {
      */
     void gempba_scheduler_visit_stats(gempba_scheduler_t s, gempba_stat_visitor_fn visitor, void* user_data);
 
-    /* ── Scheduler center ───────────────────────────────────────────────────── */
+    /* ── Scheduler run and results ──────────────────────────────────────────── */
 
-    /** Pass-throughs to gempba::scheduler::center.  Same semantics as the scheduler-level versions — the views just
-     * disambiguate role. */
-    void    gempba_scheduler_center_barrier(gempba_scheduler_center_t c);
-    int32_t gempba_scheduler_center_rank_me(gempba_scheduler_center_t c);
-    int32_t gempba_scheduler_center_world_size(gempba_scheduler_center_t c);
+    /** Wraps gempba::scheduler::is_root.  The root is rank 0: the rank that seeds the run and reads its results. */
+    gempba_bool_t gempba_scheduler_is_root(gempba_scheduler_t s);
 
     /**
-     * Wraps gempba::scheduler::center::run.  Drives the centralised work-loop: sends `task` as the seed under
-     * `runnable_id`, then orchestrates the tournament until every rank goes idle.  Blocks until termination.
+     * Wraps gempba::scheduler::run.  Every rank calls it: it registers the runnables (paired ids[i] / runnables[i] for
+     * i in [0, count)), runs this rank's part of the search, and returns once the whole run has ended.  `seed` is the
+     * root's first task, run under `seed_runnable_id`, and is NULL on every other rank.  GEMPBA_ERR_INVALID_ARG when
+     * the root passes no seed or another rank passes one.
      */
-    gempba_status_t gempba_scheduler_center_run(gempba_scheduler_center_t c, gempba_bytes_t task, int32_t runnable_id);
+    gempba_status_t gempba_scheduler_run(gempba_scheduler_t s, gempba_node_manager_t nm, const int32_t* ids,
+                                         const gempba_serial_runnable_t* runnables, size_t count,
+                                         const gempba_bytes_t* seed /* NULL off the root */, int32_t seed_runnable_id);
 
-    /** Wraps gempba::scheduler::center::get_result.  *out is the best result gathered from all ranks, or {NULL, 0} if
-     * none was produced.  Caller frees *out via gempba_buffer_free if non-empty. */
-    gempba_status_t gempba_scheduler_center_get_result(gempba_scheduler_center_t c, gempba_buffer_t* out);
+    /** Wraps gempba::scheduler::get_result.  On the root, after gempba_scheduler_run: *out is the best result gathered
+     * from all ranks, or {NULL, 0} if none was produced.  Caller frees *out via gempba_buffer_free if non-empty.
+     * GEMPBA_ERR_RUNTIME on any other rank. */
+    gempba_status_t gempba_scheduler_get_result(gempba_scheduler_t s, gempba_buffer_t* out);
 
     /**
      * Visits each result in order.  Visitor receives borrowed bytes valid only for the call — copy if retention is
@@ -561,25 +555,10 @@ extern "C" {
      */
     typedef void (*gempba_result_visitor_fn)(void* user_data, size_t index, gempba_bytes_t bytes);
 
-    /** Wraps gempba::scheduler::center::get_all_results.  Iterates results in rank order; index 0 is rank 0 (the
-     * center, normally null). */
-    void gempba_scheduler_center_visit_all_results(gempba_scheduler_center_t c, gempba_result_visitor_fn visitor,
-                                                   void* user_data);
-
-    /* ── Scheduler worker ───────────────────────────────────────────────────── */
-
-    /** Pass-throughs to gempba::scheduler::worker. */
-    void    gempba_scheduler_worker_barrier(gempba_scheduler_worker_t w);
-    int32_t gempba_scheduler_worker_rank_me(gempba_scheduler_worker_t w);
-    int32_t gempba_scheduler_worker_world_size(gempba_scheduler_worker_t w);
-
-    /**
-     * Wraps gempba::scheduler::worker::run.  Drives the worker loop on a non-center rank: registers the runnables
-     * (paired ids[i] / runnables[i] for i in [0, count)), then blocks until the center notifies termination.
-     */
-    gempba_status_t gempba_scheduler_worker_run(gempba_scheduler_worker_t w, gempba_node_manager_t nm,
-                                                const int32_t* ids, const gempba_serial_runnable_t* runnables,
-                                                size_t count);
+    /** Wraps gempba::scheduler::get_all_results.  On the root, after gempba_scheduler_run: iterates results in rank
+     * order, where index 0 is rank 0 and empty under the built-in schedulers.  On any other rank it visits nothing and
+     * sets the last error. */
+    void gempba_scheduler_visit_all_results(gempba_scheduler_t s, gempba_result_visitor_fn visitor, void* user_data);
 
     /** ─── Telemetry (process-wide, no handle) ───────────────────────────────────
      *

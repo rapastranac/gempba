@@ -48,7 +48,7 @@ namespace gempba {
         BS::thread_pool<> m_thread_pool{1};
         unsigned int m_unique_id_counter = 0;
         std::recursive_mutex m_recursive_mutex;
-        scheduler::worker* const m_scheduler_worker;
+        scheduler* const m_scheduler;
         std::map<std::thread::id, std::shared_ptr<std::shared_ptr<node_core>>> m_roots; // every thread will be solving a subtree, this point to their roots
         unsigned int m_thread_count = std::thread::hardware_concurrency();
         std::size_t m_thread_request_count = 0;
@@ -56,7 +56,7 @@ namespace gempba {
         std::atomic<std::size_t> m_spawn_remote_rejected_count{0};
 
     public:
-        explicit quasi_horizontal_load_balancer(scheduler::worker* const p_scheduler_worker = nullptr) : m_scheduler_worker(p_scheduler_worker) { m_thread_pool.wait(); }
+        explicit quasi_horizontal_load_balancer(scheduler* const p_scheduler = nullptr) : m_scheduler(p_scheduler) { m_thread_pool.wait(); }
 
         balancing_policy get_balancing_policy() override { return QUASI_HORIZONTAL; }
 
@@ -96,7 +96,7 @@ namespace gempba {
         }
 
         bool try_remote_submit(node& p_node, const int p_runnable_id) override {
-            if (!m_scheduler_worker) {
+            if (!m_scheduler) {
                 utils::log_and_throw("Attempted to do remote submission without a scheduler worker");
             }
             if (send(p_node, p_runnable_id)) {
@@ -241,7 +241,7 @@ namespace gempba {
                     return false;
                 }
 
-                const std::optional<transmission_guard> v_lock_optional = m_scheduler_worker->try_open_transmission_channel();
+                const std::optional<transmission_guard> v_lock_optional = m_scheduler->try_open_transmission_channel();
                 if (!v_lock_optional.has_value()) {
                     m_spawn_remote_rejected_count.fetch_add(1, std::memory_order_relaxed);
                     return false;
@@ -259,7 +259,7 @@ namespace gempba {
                 // node should be pruned before submission —— ORDER MATTERS (avoids memory leaks)
                 prune_and_fix_parent_root_if_needed(p_node);
                 if (p_node.should_branch()) {
-                    p_node.delegate_remotely(m_scheduler_worker, p_runnable_id);
+                    p_node.delegate_remotely(m_scheduler, p_runnable_id);
                 } else {
                     p_node.set_state(DISCARDED);
                 }
@@ -297,7 +297,7 @@ namespace gempba {
 
                 try_correct_root(p_node); // VERY IMPORTANT!!
                 if (v_top_node.should_branch()) {
-                    v_top_node.delegate_remotely(m_scheduler_worker, p_runnable_id);
+                    v_top_node.delegate_remotely(m_scheduler, p_runnable_id);
                 } else {
                     v_top_node.set_state(DISCARDED);
                 }

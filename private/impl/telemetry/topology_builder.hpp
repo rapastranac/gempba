@@ -16,8 +16,9 @@ namespace gempba::telemetry {
      * Called once by @ref telemetry_hub::on_runtime_ready. The MT-only path
      * synthesizes a single-node snapshot; the multi-process path gathers each
      * host's layout from its sentinel and merges them into one snapshot.
+     * Each rank's identity carries @p p_role, its own scheduler role.
      */
-    topology_snapshot build_topology_snapshot(runtime_mode p_mode, std::uint32_t p_rank, std::uint32_t p_world_size);
+    topology_snapshot build_topology_snapshot(runtime_mode p_mode, std::uint32_t p_rank, std::uint32_t p_world_size, rank_role p_role = rank_role::WORKER);
 
     namespace detail {
 

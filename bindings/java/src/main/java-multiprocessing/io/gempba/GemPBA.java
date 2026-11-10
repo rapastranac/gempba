@@ -38,18 +38,18 @@ import io.gempba.internal.GemPBANative;
  * Scheduler sched = GemPBA.createScheduler(SchedulerTopology.SEMI_CENTRALIZED);
  * sched.setGoal(Goal.MAXIMISE, ScoreType.I32);
  *
- * if (sched.rankMe() == 0) {
- *     sched.center().run(initialTaskBytes, RUNNABLE_ID);
- *     byte[] result = sched.center().getResult();
- * } else {
- *     LoadBalancer lb = GemPBA.createLoadBalancer(BalancingPolicy.QUASI_HORIZONTAL, sched.worker());
- *     NodeManager  nm = GemPBA.createNodeManager(lb, sched.worker());
- *     nm.setThreadPoolSize(4);
- *     nm.setScore(Score.make(Integer.MIN_VALUE));
+ * LoadBalancer lb = GemPBA.createLoadBalancer(BalancingPolicy.QUASI_HORIZONTAL, sched);
+ * NodeManager  nm = GemPBA.createNodeManager(lb, sched);
+ * nm.setThreadPoolSize(4);
+ * nm.setScore(Score.make(Integer.MIN_VALUE));
  *
- *     Map<Integer, SerialRunnable> runnables = Map.of(
- *         RUNNABLE_ID, GemPBA.runnableReturnNone(RUNNABLE_ID, (tid, bytes) -> explore(tid, bytes)));
- *     sched.worker().run(nm, runnables);
+ * Map<Integer, SerialRunnable> runnables = Map.of(
+ *     RUNNABLE_ID, GemPBA.runnableReturnNone(RUNNABLE_ID, (tid, bytes) -> explore(tid, bytes)));
+ * if (sched.isRoot()) {
+ *     sched.run(nm, runnables, initialTaskBytes, RUNNABLE_ID);
+ *     byte[] result = sched.getResult();
+ * } else {
+ *     sched.run(nm, runnables);
  * }
  * GemPBA.shutdown();
  * }</pre>
@@ -217,37 +217,36 @@ public final class GemPBA {
     }
 
     /**
-     * Creates an MP load balancer, wiring in the scheduler worker view so
-     * that {@link NodeManager#tryRemoteSubmit} can dispatch tasks to other
-     * MPI ranks.
+     * Creates an MP load balancer, wiring in the scheduler so that
+     * {@link NodeManager#tryRemoteSubmit} can dispatch tasks to other MPI ranks.
      *
-     * <p>Equivalent to {@code gempba::multiprocessing::create_load_balancer(policy, worker)}
-     * in C++.  Pass {@code null} for the center rank (rank 0).
+     * <p>Equivalent to {@code gempba::multiprocessing::create_load_balancer(policy, scheduler)}
+     * in C++.
      *
-     * @param policy load-balancing strategy
-     * @param worker scheduler worker view, or {@code null} for rank 0
+     * @param policy    load-balancing strategy
+     * @param scheduler the scheduler, or {@code null} for single-process work
      * @return a new {@link LoadBalancer}
      */
-    public static LoadBalancer createLoadBalancer(BalancingPolicy policy, Scheduler.Worker worker) {
-        long workerHandle = (worker != null) ? worker.handle : 0L;
-        long handle = GemPBANative.MP.createLoadBalancer(policy.ordinal(), workerHandle);
+    public static LoadBalancer createLoadBalancer(BalancingPolicy policy, Scheduler scheduler) {
+        long schedulerHandle = (scheduler != null) ? scheduler.handle : 0L;
+        long handle = GemPBANative.MP.createLoadBalancer(policy.ordinal(), schedulerHandle);
         return new LoadBalancer(handle);
     }
 
     /**
      * Creates an MP node manager backed by {@code lb} and linked to the
-     * scheduler worker view.
+     * scheduler.
      *
-     * <p>Equivalent to {@code gempba::multiprocessing::create_node_manager(lb, worker)}
-     * in C++.  Pass {@code null} for the center rank (rank 0).
+     * <p>Equivalent to {@code gempba::multiprocessing::create_node_manager(lb, scheduler)}
+     * in C++.
      *
-     * @param lb     the load balancer backing this node manager
-     * @param worker scheduler worker view, or {@code null} for rank 0
+     * @param lb        the load balancer backing this node manager
+     * @param scheduler the scheduler, or {@code null} for single-process work
      * @return a new {@link NodeManager}
      */
-    public static NodeManager createNodeManager(LoadBalancer lb, Scheduler.Worker worker) {
-        long workerHandle = (worker != null) ? worker.handle : 0L;
-        long handle = GemPBANative.MP.createNodeManager(lb.handle, workerHandle);
+    public static NodeManager createNodeManager(LoadBalancer lb, Scheduler scheduler) {
+        long schedulerHandle = (scheduler != null) ? scheduler.handle : 0L;
+        long handle = GemPBANative.MP.createNodeManager(lb.handle, schedulerHandle);
         return new NodeManager(handle);
     }
 

@@ -31,13 +31,7 @@ namespace {
         }
         auto v_hub = std::make_unique<gempba::telemetry::telemetry_hub>();
         if (g_scheduler) {
-            const int v_world_size = g_scheduler->world_size();
-            std::vector<gempba::rank_role> v_roles;
-            v_roles.reserve(static_cast<std::size_t>(v_world_size));
-            for (int v_rank = 0; v_rank < v_world_size; ++v_rank) {
-                v_roles.push_back(g_scheduler->role_of(v_rank));
-            }
-            v_hub->describe_scheduler(g_scheduler->get_name(), std::move(v_roles));
+            v_hub->describe_scheduler(g_scheduler->get_name(), g_scheduler->role_of(g_scheduler->rank_me()));
         }
         if (g_load_balancer) {
             v_hub->describe_load_balancer(g_load_balancer->get_balancing_policy());
@@ -65,17 +59,17 @@ namespace {
         return g_load_balancer.get();
     }
 
-    gempba::load_balancer* build_load_balancer(const gempba::balancing_policy& p_policy, gempba::scheduler::worker* const p_worker) {
+    gempba::load_balancer* build_load_balancer(const gempba::balancing_policy& p_policy, gempba::scheduler* const p_scheduler) {
         if (g_load_balancer != nullptr) {
             throw std::runtime_error("load_balancer already exists!");
         }
         switch (p_policy) {
             case gempba::QUASI_HORIZONTAL: {
-                g_load_balancer = std::unique_ptr<gempba::load_balancer>(new gempba::quasi_horizontal_load_balancer(p_worker));
+                g_load_balancer = std::unique_ptr<gempba::load_balancer>(new gempba::quasi_horizontal_load_balancer(p_scheduler));
                 break;
             }
             case gempba::WORK_STEALING: {
-                g_load_balancer = std::unique_ptr<gempba::load_balancer>(new gempba::work_stealing_load_balancer(p_worker));
+                g_load_balancer = std::unique_ptr<gempba::load_balancer>(new gempba::work_stealing_load_balancer(p_scheduler));
                 break;
             }
         }
@@ -83,11 +77,11 @@ namespace {
         return g_load_balancer.get();
     }
 
-    gempba::node_manager& build_node_manager(gempba::load_balancer* const p_load_balancer, gempba::scheduler::worker* const p_worker) {
+    gempba::node_manager& build_node_manager(gempba::load_balancer* const p_load_balancer, gempba::scheduler* const p_scheduler) {
         if (g_node_manager != nullptr) {
             throw std::runtime_error("node_manager already exist!");
         }
-        g_node_manager = std::make_unique<gempba::node_manager>(p_load_balancer, p_worker);
+        g_node_manager = std::make_unique<gempba::node_manager>(p_load_balancer, p_scheduler);
         install_telemetry_hub_if_needed();
         return *g_node_manager;
     }
@@ -156,13 +150,11 @@ gempba::scheduler* gempba::multiprocessing::create_scheduler(const scheduler_top
     return g_scheduler.get();
 }
 
-gempba::load_balancer* gempba::multiprocessing::create_load_balancer(const balancing_policy& p_policy, scheduler::worker* const p_scheduler_worker) {
-    return build_load_balancer(p_policy, p_scheduler_worker);
-}
+gempba::load_balancer* gempba::multiprocessing::create_load_balancer(const balancing_policy& p_policy, scheduler* const p_scheduler) { return build_load_balancer(p_policy, p_scheduler); }
 
 std::unique_ptr<gempba::default_mpi_stats_visitor> gempba::multiprocessing::get_default_mpi_stats_visitor() { return std::make_unique<default_mpi_stats_visitor>(); }
 
-gempba::node_manager& gempba::multiprocessing::create_node_manager(load_balancer* p_load_balancer, scheduler::worker* p_worker) { return build_node_manager(p_load_balancer, p_worker); }
+gempba::node_manager& gempba::multiprocessing::create_node_manager(load_balancer* p_load_balancer, scheduler* p_scheduler) { return build_node_manager(p_load_balancer, p_scheduler); }
 
 gempba::scheduler* gempba::get_scheduler() {
     if (!g_scheduler) {

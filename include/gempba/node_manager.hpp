@@ -51,7 +51,7 @@ namespace gempba {
     public:
         //<editor-fold desc="Construction/Destruction">
 
-        explicit node_manager(load_balancer* const p_load_balancer, scheduler::worker* p_scheduler) : m_balancer(p_load_balancer), m_scheduler(p_scheduler) {
+        explicit node_manager(load_balancer* const p_load_balancer, scheduler* p_scheduler) : m_balancer(p_load_balancer), m_scheduler(p_scheduler) {
 
             m_processor_count = std::thread::hardware_concurrency();
             m_idle_time = 0;
@@ -213,7 +213,7 @@ namespace gempba {
 
         // ——————— IPC related attributes and member functions ———————//
     private:
-        scheduler::worker* m_scheduler;
+        scheduler* m_scheduler;
         std::mutex m_ipc_mutex; // mutex to ensure funnel access to IPC
         int m_world_rank = -1; // get the rank of the process
         int m_world_size = -1; // get the number of processes/nodes

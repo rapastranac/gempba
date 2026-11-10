@@ -5,15 +5,15 @@ import io.gempba.core.NodeManager;
 import io.gempba.internal.GemPBANative;
 
 /**
- * A serializable task registered on a {@link Scheduler.Worker} by integer ID.
+ * A serializable task registered with {@link Scheduler#run} by integer ID.
  *
- * <p>When the MPI center dispatches work to a worker process the worker looks
- * up the runnable by ID, deserialises the incoming bytes, and executes the
- * task on a thread-pool thread.
+ * <p>When a rank receives a task, it looks up the runnable by ID,
+ * deserialises the incoming bytes, and executes the task on a thread-pool
+ * thread.
  *
  * <p>Instances are created via {@link io.gempba.GemPBA#runnableReturnNone} or
  * {@link io.gempba.GemPBA#runnableReturnValue} and passed to
- * {@link Scheduler.Worker#run(NodeManager, java.util.Map)}.
+ * {@link Scheduler#run(NodeManager, java.util.Map)}.
  */
 public final class SerialRunnable implements AutoCloseable {
 

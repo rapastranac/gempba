@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * <pre>
  *   mvn test -Pdistributed                             # default: mpirun -n 2
  *   mvn test -Pdistributed -Dgempba.launcher=mpiexec   # MS-MPI on Windows
- *   mvn test -Pdistributed -Dgempba.np=4               # 1 center + 3 workers
+ *   mvn test -Pdistributed -Dgempba.np=4               # 1 coordinator + 3 workers
  * </pre>
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -44,7 +44,7 @@ class SchedulerNativeTest {
     private long schedHandle;
     private int rank;
     private int worldSize;
-    private byte[] centerResult;        // rank 0 only
+    private byte[] rootResult;          // rank 0 only
     private byte[][] allResults;        // rank 0 only
     private java.util.List<RankStats> stats; // rank 0 only, captured after synchronizeStats
 
@@ -67,42 +67,34 @@ class SchedulerNativeTest {
 
         GemPBANative.Scheduler.setGoal(schedHandle, Goal.MAXIMISE.ordinal(), ScoreType.I32.cppOrdinal());
 
-        if (rank == 0) {
-            // ── Center ──────────────────────────────────────────────────────
-            long centerHandle = GemPBANative.Scheduler.getCenterHandle(schedHandle);
-            GemPBANative.Scheduler.Center.run(
-                    centerHandle,
-                    "Marco!".getBytes(StandardCharsets.UTF_8),
-                    RUNNABLE_ID);
-            centerResult = GemPBANative.Scheduler.Center.getResult(centerHandle);
-            allResults = GemPBANative.Scheduler.Center.getAllResults(centerHandle);
+        long lbHandle = GemPBANative.MP.createLoadBalancer(BalancingPolicy.QUASI_HORIZONTAL.ordinal(), schedHandle);
+        long nmHandle = GemPBANative.MP.createNodeManager(lbHandle, schedHandle);
 
-        } else {
-            // ── Worker ──────────────────────────────────────────────────────
-            long lbHandle = GemPBANative.MT.createLoadBalancer(BalancingPolicy.QUASI_HORIZONTAL.ordinal());
-            long nmHandle = GemPBANative.MT.createNodeManager(lbHandle);
-
-            NodeManager nm = new NodeManager(nmHandle);
-            nm.setGoal(Goal.MAXIMISE, ScoreType.I32);
+        NodeManager nm = new NodeManager(nmHandle);
+        nm.setGoal(Goal.MAXIMISE, ScoreType.I32);
+        boolean root = GemPBANative.Scheduler.isRoot(schedHandle);
+        if (!root) {
             nm.setThreadPoolSize(2);
-            nm.setScore(Score.make(Integer.MIN_VALUE));
+        }
+        nm.setScore(Score.make(Integer.MIN_VALUE));
 
-            // Void runnable: receives "Marco!", stores "Polo!" via tryUpdateResult.
-            // send_final_solution_to_center reads result bytes from the node manager,
-            // so the task must call tryUpdateResult explicitly — the runnable's return
-            // value is not used by the semi-centralized scheduler.
-            SerialRunnable sr = new SerialRunnable(RUNNABLE_ID, 0L, (tid, args) -> {
-                nm.tryUpdateResult("Polo!".getBytes(StandardCharsets.UTF_8), Score.make(1));
-                return null;
-            });
-            sr.handle = GemPBANative.SerialRunnable.create(RUNNABLE_ID, sr, false);
+        // Void runnable: receives "Marco!", stores "Polo!" via tryUpdateResult.
+        // send_final_solution_to_center reads result bytes from the node manager,
+        // so the task must call tryUpdateResult explicitly — the runnable's return
+        // value is not used by the semi-centralized scheduler.
+        SerialRunnable sr = new SerialRunnable(RUNNABLE_ID, 0L, (tid, args) -> {
+            nm.tryUpdateResult("Polo!".getBytes(StandardCharsets.UTF_8), Score.make(1));
+            return null;
+        });
+        sr.handle = GemPBANative.SerialRunnable.create(RUNNABLE_ID, sr, false);
 
-            long workerHandle = GemPBANative.Scheduler.getWorkerHandle(schedHandle);
-            GemPBANative.Scheduler.Worker.run(
-                    workerHandle, nmHandle,
-                    new int[]{RUNNABLE_ID},
-                    new long[]{sr.handle});
-            sr.close();
+        byte[] seed = root ? "Marco!".getBytes(StandardCharsets.UTF_8) : null;
+        GemPBANative.Scheduler.run(schedHandle, nmHandle, new int[]{RUNNABLE_ID}, new long[]{sr.handle}, seed, RUNNABLE_ID);
+        sr.close();
+
+        if (root) {
+            rootResult = GemPBANative.Scheduler.getResult(schedHandle);
+            allResults = GemPBANative.Scheduler.getAllResults(schedHandle);
         }
 
         GemPBANative.Scheduler.synchronizeStats(schedHandle);
@@ -129,18 +121,18 @@ class SchedulerNativeTest {
     }
 
     @Test
-    void center_receives_polo() {
-        assumeTrue(rank == 0, "center assertions only run on rank 0");
-        assertNotNull(centerResult, "center must receive a result from the workers");
-        assertEquals("Polo!", new String(centerResult, StandardCharsets.UTF_8));
+    void root_receives_polo() {
+        assumeTrue(rank == 0, "root assertions only run on rank 0");
+        assertNotNull(rootResult, "the root must receive a result from the workers");
+        assertEquals("Polo!", new String(rootResult, StandardCharsets.UTF_8));
     }
 
     @Test
     void get_all_results_has_one_entry_per_rank() {
-        assumeTrue(rank == 0, "center assertions only run on rank 0");
+        assumeTrue(rank == 0, "root assertions only run on rank 0");
         assertNotNull(allResults, "getAllResults must not return null");
         assertEquals(worldSize, allResults.length, "getAllResults must have one entry per MPI rank");
-        assertNull(allResults[0], "center rank (index 0) must have null result");
+        assertNull(allResults[0], "rank 0, the coordinator, must have a null result");
     }
 
     // ── getStats / RankStats ──────────────────────────────────────────────────

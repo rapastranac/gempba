@@ -249,7 +249,7 @@ namespace gempba::cabi_tests {
     // ─── multiprocessing explicit node (MP/DEV builds) ──────────────────────
 
     TEST_F(cabi_node_test, mp_create_explicit_node_null_parent_releases_user_data) {
-        gempba_load_balancer_t v_lb = gempba_mp_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING, /*worker=*/nullptr);
+        gempba_load_balancer_t v_lb = gempba_mp_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING, /*scheduler=*/nullptr);
         ASSERT_NE(v_lb, nullptr);
 
         cb_state v_state;
@@ -264,9 +264,9 @@ namespace gempba::cabi_tests {
         // own code path (separate identity_ser / identity_deser_value bridges
         // from the MT one). This test pins the MP shim end-to-end without
         // needing MPI.
-        gempba_load_balancer_t v_lb = gempba_mp_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING, /*worker=*/nullptr);
+        gempba_load_balancer_t v_lb = gempba_mp_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING, /*scheduler=*/nullptr);
         ASSERT_NE(v_lb, nullptr);
-        gempba_node_manager_t v_nm = gempba_mp_create_node_manager(v_lb, /*worker=*/nullptr);
+        gempba_node_manager_t v_nm = gempba_mp_create_node_manager(v_lb, /*scheduler=*/nullptr);
         ASSERT_NE(v_nm, nullptr);
         gempba_nm_set_thread_pool_size(v_nm, 2);
 

@@ -194,8 +194,8 @@ namespace gempba::telemetry {
         /// @return this run's markers, in the order they were recorded.
         [[nodiscard]] std::vector<run_marker> run_markers() const;
 
-        /// Record the scheduler this run uses, by its scheduler::get_name(), and each rank's scheduler::role_of(), indexed by rank.
-        void describe_scheduler(std::string_view p_name, std::vector<rank_role> p_roles = {});
+        /// Record the scheduler this run uses, by its scheduler::get_name(), and this rank's own role, its scheduler::role_of(rank_me()); call it before @ref on_runtime_ready.
+        void describe_scheduler(std::string_view p_name, rank_role p_role = rank_role::WORKER);
 
         /// Record the load balancer this run uses.
         void describe_load_balancer(balancing_policy p_policy);
@@ -273,7 +273,8 @@ namespace gempba::telemetry {
         std::vector<std::pair<std::string, std::string>> m_run_annotations;
         std::vector<run_marker> m_run_markers;
         std::string m_scheduler_name;
-        std::vector<rank_role> m_scheduler_roles;
+        rank_role m_scheduler_role = rank_role::WORKER;
+        std::vector<rank_role> m_rank_roles;
         std::string m_load_balancer_name;
     };
 

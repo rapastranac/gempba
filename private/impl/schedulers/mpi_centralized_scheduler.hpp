@@ -166,7 +166,7 @@ namespace gempba {
         }
 
     private:
-        std::optional<transmission_guard> try_open_transmission_channel() {
+        std::optional<transmission_guard> try_open_transmission_channel() override {
             std::unique_lock v_lock(m_mutex, std::try_to_lock);
             // acquires mutex
             if (!v_lock.owns_lock()) {
@@ -190,7 +190,7 @@ namespace gempba {
         }
 
     private:
-        void run(node_manager& p_node_manager, std::map<int, std::shared_ptr<serial_runnable>> p_runnables) {
+        void run_worker(node_manager& p_node_manager, std::map<int, std::shared_ptr<serial_runnable>> p_runnables) {
             MPI_Barrier(m_world_communicator);
             m_start_time = MPI_Wtime();
             if (auto* v_telemetry = telemetry::get()) {
@@ -258,7 +258,7 @@ namespace gempba {
 
         void send_final_solution_to_center(node_manager& p_node_manager) const;
 
-        unsigned int force_push(task_packet&& p_task_packet, const int p_function_id) {
+        unsigned int force_push(task_packet&& p_task_packet, const int p_function_id) override {
             if (p_task_packet.empty()) {
                 throw std::runtime_error(fmt::format("rank {}, attempted to send empty buffer \n", m_world_rank));
             }
@@ -266,7 +266,7 @@ namespace gempba {
             m_transmitting = true;
             utils::print_ipc_debug_comments("rank {} entered MPI_Scheduler::push(..) for the node {}\n", m_world_rank, m_destination_rank);
 
-            const auto v_bundle = std::make_shared<task_bundle>(p_task_packet, static_cast<unsigned int>(p_function_id));
+            const auto v_bundle = std::make_shared<task_bundle>(p_task_packet, p_function_id);
 
             if (!m_tasks_bundle_queue.empty()) {
                 throw std::runtime_error("ERROR: q is not empty !!!!\n");
@@ -556,7 +556,7 @@ namespace gempba {
             }
         }
 
-        void run(const task_packet& p_seed, const int p_runnable_id) {
+        void run_coordinator(const task_packet& p_seed, const int p_runnable_id) {
             MPI_Barrier(m_world_communicator);
             m_start_time = MPI_Wtime();
             if (auto* v_telemetry = telemetry::get()) {
@@ -1074,74 +1074,18 @@ namespace gempba {
         }
 
 
-        class center_view final : public center {
-
-            mpi_centralized_scheduler& m_parent;
-
-        public:
-            explicit center_view(mpi_centralized_scheduler& p_parent) : m_parent(p_parent) {}
-
-            ~center_view() override = default;
-
-            void barrier() override { m_parent.barrier(); }
-
-            [[nodiscard]] int rank_me() const override { return m_parent.rank_me(); }
-
-            [[nodiscard]] int world_size() const override { return m_parent.world_size(); }
-
-            [[nodiscard]] std::unique_ptr<stats> get_stats() const override { return m_parent.get_stats(); }
-
-            void run(const task_packet p_task, const int p_runnable_id) override { m_parent.run(p_task, p_runnable_id); }
-
-            task_packet get_result() override { return m_parent.fetch_solution(); }
-
-            std::vector<result> get_all_results() override { return m_parent.fetch_result_vector(); }
-        };
-
-        class worker_view final : public worker {
-            mpi_centralized_scheduler& m_parent;
-
-        public:
-            explicit worker_view(mpi_centralized_scheduler& p_parent) : m_parent(p_parent) {}
-
-            ~worker_view() override = default;
-
-            void barrier() override { m_parent.barrier(); }
-
-            [[nodiscard]] int rank_me() const override { return m_parent.rank_me(); }
-
-            [[nodiscard]] int world_size() const override { return m_parent.world_size(); }
-
-            [[nodiscard]] std::unique_ptr<stats> get_stats() const override { return m_parent.get_stats(); }
-
-            void run(node_manager& p_node_manager, std::map<int, std::shared_ptr<serial_runnable>> p_runnables) override { m_parent.run(p_node_manager, std::move(p_runnables)); }
-
-            unsigned int force_push(task_packet&& p_task, const int p_function_id) override { return m_parent.force_push(std::move(p_task), p_function_id); }
-
-            [[nodiscard]] unsigned int next_process() const override { return 0; }
-
-            std::optional<transmission_guard> try_open_transmission_channel() override { return m_parent.try_open_transmission_channel(); }
-        };
-
-        // scheduler views
-        center_view m_center_view{*this};
-        worker_view m_worker_view{*this};
-
-    public:
-        // ————————— ↓↓↓↓  New development ↓↓↓↓ ——————————
-        center& center_view() override {
-            if (m_world_rank != 0) {
-                utils::log_and_throw("Only rank 0 can access center_view()");
+    protected:
+        void do_run(node_manager& p_node_manager, std::map<int, std::shared_ptr<serial_runnable>> p_runnables, std::optional<task_bundle> p_seed) override {
+            if (p_seed) {
+                run_coordinator(p_seed->get_task_packet(), p_seed->get_runnable_id());
+            } else {
+                run_worker(p_node_manager, std::move(p_runnables));
             }
-            return m_center_view;
         }
 
-        worker& worker_view() override {
-            if (m_world_rank == 0) {
-                utils::log_and_throw("Rank 0 cannot access worker_view()");
-            }
-            return m_worker_view;
-        }
+        task_packet do_get_result() override { return fetch_solution(); }
+
+        std::vector<result> do_get_all_results() override { return fetch_result_vector(); }
     };
 
 } // namespace gempba

@@ -52,7 +52,7 @@ namespace gempba::cabi_tests {
         // In an MP/DEV build, gempba_mp_create_load_balancer(policy, NULL)
         // hits the same underlying multiprocessing::create_load_balancer
         // overload the MT shim uses, but through the MP-side entry point.
-        gempba_load_balancer_t v_lb = gempba_mp_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING, /*worker=*/nullptr);
+        gempba_load_balancer_t v_lb = gempba_mp_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING, /*scheduler=*/nullptr);
         ASSERT_NE(v_lb, nullptr);
         EXPECT_EQ(v_lb, gempba_get_load_balancer());
     }

@@ -48,10 +48,10 @@ namespace gempba {
         std::atomic<std::size_t> m_spawn_rejected_pool_full_count{0};
         std::atomic<std::size_t> m_spawn_remote_rejected_count{0};
 
-        scheduler::worker* const m_scheduler_worker;
+        scheduler* const m_scheduler;
 
     public:
-        explicit work_stealing_load_balancer(scheduler::worker* const p_scheduler_worker = nullptr) : m_scheduler_worker(p_scheduler_worker) { m_thread_pool.wait(); }
+        explicit work_stealing_load_balancer(scheduler* const p_scheduler = nullptr) : m_scheduler(p_scheduler) { m_thread_pool.wait(); }
 
         balancing_policy get_balancing_policy() override { return WORK_STEALING; }
 
@@ -80,7 +80,7 @@ namespace gempba {
         }
 
         bool try_remote_submit(node& p_node, const int p_runnable_id) override {
-            if (!m_scheduler_worker) {
+            if (!m_scheduler) {
                 utils::log_and_throw("Attempted to do remote submission without a scheduler worker");
             }
             if (send(p_node, p_runnable_id)) {
@@ -170,7 +170,7 @@ namespace gempba {
                 return false;
             }
 
-            const std::optional<transmission_guard> v_guard_optional = m_scheduler_worker->try_open_transmission_channel();
+            const std::optional<transmission_guard> v_guard_optional = m_scheduler->try_open_transmission_channel();
             if (!v_guard_optional.has_value()) {
                 m_spawn_remote_rejected_count.fetch_add(1, std::memory_order_relaxed);
                 return false;
@@ -183,7 +183,7 @@ namespace gempba {
             // node should be pruned before submission —— ORDER MATTERS (avoids memory leaks)
             p_node.prune();
             if (p_node.should_branch()) {
-                p_node.delegate_remotely(m_scheduler_worker, p_runnable_id);
+                p_node.delegate_remotely(m_scheduler, p_runnable_id);
             } else {
                 p_node.set_state(DISCARDED);
             }

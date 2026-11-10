@@ -294,12 +294,12 @@ namespace gempba {
             m_state = PUSHED;
         }
 
-        void delegate_remotely(scheduler::worker* p_worker, const int p_runner_id) override {
+        void delegate_remotely(scheduler* p_scheduler, const int p_runner_id) override {
             if (m_state != UNUSED) {
                 utils::log_and_throw("node is already consumed, node: {}, state: {}", m_node_id, get_state_string(m_state));
             }
             ensure_args_initialized();
-            m_remote_node = p_worker->force_push(serialize(), p_runner_id);
+            m_remote_node = p_scheduler->force_push(serialize(), p_runner_id);
             m_state = SENT_TO_ANOTHER_PROCESS;
         }
 

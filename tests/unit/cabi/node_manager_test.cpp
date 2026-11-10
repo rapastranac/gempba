@@ -45,9 +45,9 @@ namespace gempba::cabi_tests {
     }
 
     TEST_F(cabi_node_manager_test, mp_create_with_null_worker_succeeds) {
-        gempba_load_balancer_t v_lb = gempba_mp_create_load_balancer(GEMPBA_BALANCING_QUASI_HORIZONTAL, /*worker=*/nullptr);
+        gempba_load_balancer_t v_lb = gempba_mp_create_load_balancer(GEMPBA_BALANCING_QUASI_HORIZONTAL, /*scheduler=*/nullptr);
         ASSERT_NE(v_lb, nullptr);
-        gempba_node_manager_t v_nm = gempba_mp_create_node_manager(v_lb, /*worker=*/nullptr);
+        gempba_node_manager_t v_nm = gempba_mp_create_node_manager(v_lb, /*scheduler=*/nullptr);
         ASSERT_NE(v_nm, nullptr);
         EXPECT_EQ(v_nm, gempba_get_node_manager());
     }

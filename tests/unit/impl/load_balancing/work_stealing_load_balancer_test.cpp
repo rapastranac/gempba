@@ -39,6 +39,7 @@
 #include <gempba/stats/stats.hpp>
 #include <gempba/utils/transmission_guard.hpp>
 #include <impl/load_balancing/work_stealing_load_balancer.hpp>
+#include <scheduler_mock.hpp>
 
 using namespace std::chrono_literals;
 
@@ -47,36 +48,24 @@ using namespace std::chrono_literals;
  * @date 2025-08-30
  */
 
-class scheduler_worker_mock final : public gempba::scheduler::worker {
-public:
-    MOCK_METHOD(void, barrier, (), (override));
-    MOCK_METHOD(int, rank_me, (), (const, override));
-    MOCK_METHOD(int, world_size, (), (const, override));
-    MOCK_METHOD(void, run, (gempba::node_manager & p_node_manager, (std::map<int, std::shared_ptr<gempba::serial_runnable>> p_runnables)), (override));
-    MOCK_METHOD(unsigned int, force_push, (gempba::task_packet && p_task, int p_function_id), (override));
-    MOCK_METHOD(std::optional<gempba::transmission_guard>, try_open_transmission_channel, (), (override));
-    MOCK_METHOD(std::unique_ptr<gempba::stats>, get_stats, (), (const, override));
-    MOCK_METHOD(unsigned int, next_process, (), (const, override));
-};
-
 
 class work_stealing_load_balancer_test : public ::testing::Test {
 protected:
-    void SetUp() override { m_scheduler_worker_mock = new scheduler_worker_mock(); }
+    void SetUp() override { m_scheduler_mock = new gempba::testing_support::scheduler_mock(); }
 
-    void TearDown() override { delete m_scheduler_worker_mock; }
+    void TearDown() override { delete m_scheduler_mock; }
 
-    scheduler_worker_mock* m_scheduler_worker_mock = nullptr;
+    gempba::testing_support::scheduler_mock* m_scheduler_mock = nullptr;
 };
 
 
 TEST_F(work_stealing_load_balancer_test, get_strategy) {
-    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
     EXPECT_EQ(gempba::WORK_STEALING, v_load_balancer.get_balancing_policy());
 };
 
 TEST_F(work_stealing_load_balancer_test, generate_unique_id) {
-    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
     const unsigned int v_id1 = v_load_balancer.generate_unique_id();
     const unsigned int v_id2 = v_load_balancer.generate_unique_id();
     EXPECT_NE(v_id1, v_id2);
@@ -84,19 +73,19 @@ TEST_F(work_stealing_load_balancer_test, generate_unique_id) {
 
 TEST_F(work_stealing_load_balancer_test, constructor_returns_with_every_thread_idle) {
     for (unsigned v_i = 0; v_i < 1000; ++v_i) {
-        gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+        gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
         ASSERT_EQ(0u, v_load_balancer.get_tasks_running_count()) << "iteration " << v_i;
     }
 }
 
 TEST_F(work_stealing_load_balancer_test, set_thread_pool_size) {
-    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
     v_load_balancer.set_thread_pool_size(4);
     EXPECT_NO_THROW(v_load_balancer.set_thread_pool_size(2));
 }
 
 TEST_F(work_stealing_load_balancer_test, set_thread_pool_size_returns_with_every_thread_idle) {
-    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
     for (unsigned v_i = 0; v_i < 1000; ++v_i) {
         v_load_balancer.set_thread_pool_size(1 + v_i % 4);
         ASSERT_EQ(0u, v_load_balancer.get_tasks_running_count()) << "iteration " << v_i;
@@ -104,7 +93,7 @@ TEST_F(work_stealing_load_balancer_test, set_thread_pool_size_returns_with_every
 }
 
 TEST_F(work_stealing_load_balancer_test, get_idle_time_counts_threads_that_are_still_asleep) {
-    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
     v_load_balancer.set_thread_pool_size(2);
     const double v_before = v_load_balancer.get_idle_time();
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
@@ -112,7 +101,7 @@ TEST_F(work_stealing_load_balancer_test, get_idle_time_counts_threads_that_are_s
 }
 
 TEST_F(work_stealing_load_balancer_test, get_starved_idle_time_grows_while_no_task_runs) {
-    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
     v_load_balancer.set_thread_pool_size(2);
     const double v_starved_before = v_load_balancer.get_starved_idle_time();
     const double v_imbalanced_before = v_load_balancer.get_imbalanced_idle_time();
@@ -122,7 +111,7 @@ TEST_F(work_stealing_load_balancer_test, get_starved_idle_time_grows_while_no_ta
 }
 
 TEST_F(work_stealing_load_balancer_test, get_imbalanced_idle_time_grows_while_one_task_runs) {
-    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
     v_load_balancer.set_thread_pool_size(4);
     std::promise<void> v_started;
     std::future<void> v_started_future = v_started.get_future();
@@ -146,13 +135,13 @@ TEST_F(work_stealing_load_balancer_test, get_imbalanced_idle_time_grows_while_on
 }
 
 TEST_F(work_stealing_load_balancer_test, wait_and_is_done) {
-    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
     EXPECT_NO_THROW(v_load_balancer.wait());
     EXPECT_TRUE(v_load_balancer.is_done());
 }
 
 TEST_F(work_stealing_load_balancer_test, force_local_submit_executes_function) {
-    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
 
     bool v_executed = false;
     const auto v_future = v_load_balancer.force_local_submit([&v_executed]() -> std::any {
@@ -165,7 +154,7 @@ TEST_F(work_stealing_load_balancer_test, force_local_submit_executes_function) {
 }
 
 TEST_F(work_stealing_load_balancer_test, force_local_submit_increments_thread_request_count) {
-    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
 
     EXPECT_EQ(0u, v_load_balancer.get_thread_request_count());
 
@@ -179,20 +168,20 @@ TEST_F(work_stealing_load_balancer_test, force_local_submit_increments_thread_re
 }
 
 TEST_F(work_stealing_load_balancer_test, get_root_returns_empty_for_work_stealing) {
-    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
     const auto v_root = v_load_balancer.get_root(std::this_thread::get_id());
     EXPECT_EQ(nullptr, v_root);
 }
 
 TEST_F(work_stealing_load_balancer_test, set_root_is_noop_for_work_stealing) {
-    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
     std::shared_ptr<gempba::node_core> v_dummy;
     EXPECT_NO_THROW(v_load_balancer.set_root(std::this_thread::get_id(), v_dummy));
     EXPECT_EQ(nullptr, v_load_balancer.get_root(std::this_thread::get_id()));
 }
 
 TEST_F(work_stealing_load_balancer_test, forward_unused_initialized_node_calls_run_then_prunes) {
-    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
 
     bool v_function_called = false;
     std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node&) { v_function_called = true; };
@@ -213,7 +202,7 @@ TEST_F(work_stealing_load_balancer_test, forward_unused_initialized_node_calls_r
 }
 
 TEST_F(work_stealing_load_balancer_test, forward_consumed_node_only_prunes_no_run) {
-    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
 
     bool v_function_called = false;
     std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node&) { v_function_called = true; };
@@ -232,7 +221,7 @@ TEST_F(work_stealing_load_balancer_test, forward_consumed_node_only_prunes_no_ru
 }
 
 TEST_F(work_stealing_load_balancer_test, forward_lazy_node_with_nullopt_initializer_only_prunes) {
-    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
 
     bool v_function_called = false;
     std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node&) { v_function_called = true; };
@@ -255,7 +244,7 @@ TEST_F(work_stealing_load_balancer_test, forward_lazy_node_with_nullopt_initiali
 }
 
 TEST_F(work_stealing_load_balancer_test, try_local_submit_with_available_pool_executes_node) {
-    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
     v_load_balancer.set_thread_pool_size(2);
     v_load_balancer.wait();
 
@@ -278,7 +267,7 @@ TEST_F(work_stealing_load_balancer_test, try_local_submit_with_available_pool_ex
 }
 
 TEST_F(work_stealing_load_balancer_test, try_local_submit_when_pool_full_falls_back_to_forward) {
-    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
     v_load_balancer.set_thread_pool_size(1);
 
     std::mutex v_blocker_mutex;
@@ -336,10 +325,10 @@ TEST_F(work_stealing_load_balancer_test, try_remote_submit_throws_without_schedu
 }
 
 TEST_F(work_stealing_load_balancer_test, try_remote_submit_falls_back_to_local_when_no_channel) {
-    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
     v_load_balancer.set_thread_pool_size(2);
 
-    EXPECT_CALL(*m_scheduler_worker_mock, try_open_transmission_channel()).WillOnce(testing::Return(std::nullopt));
+    EXPECT_CALL(*m_scheduler_mock, try_open_transmission_channel()).WillOnce(testing::Return(std::nullopt));
 
     std::atomic<bool> v_fn_called{false};
     std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node&) { v_fn_called = true; };
@@ -361,15 +350,15 @@ TEST_F(work_stealing_load_balancer_test, try_remote_submit_falls_back_to_local_w
 }
 
 TEST_F(work_stealing_load_balancer_test, try_remote_submit_delegates_remotely_when_channel_open) {
-    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
 
     std::mutex v_channel_mutex;
-    EXPECT_CALL(*m_scheduler_worker_mock, try_open_transmission_channel()).WillOnce([&]() -> std::optional<gempba::transmission_guard> {
+    EXPECT_CALL(*m_scheduler_mock, try_open_transmission_channel()).WillOnce([&]() -> std::optional<gempba::transmission_guard> {
         std::unique_lock v_lock(v_channel_mutex);
         return gempba::transmission_guard(std::move(v_lock));
     });
 
-    EXPECT_CALL(*m_scheduler_worker_mock, force_push(testing::_, testing::_)).WillOnce([](gempba::task_packet&&, int) { return 1u; });
+    EXPECT_CALL(*m_scheduler_mock, force_push(testing::_, testing::_)).WillOnce([](gempba::task_packet&&, int) { return 1u; });
 
     const std::function<gempba::task_packet(int)> v_serializer = [](int) { return gempba::task_packet::EMPTY; };
     const std::function<std::tuple<int>(gempba::task_packet)> v_deserializer = [](const gempba::task_packet&) { return std::make_tuple(0); };
@@ -390,7 +379,7 @@ TEST_F(work_stealing_load_balancer_test, try_remote_submit_delegates_remotely_wh
 }
 
 TEST_F(work_stealing_load_balancer_test, send_local_throws_when_node_is_already_consumed) {
-    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
     v_load_balancer.set_thread_pool_size(2); // guarantee pool is ready before send() inspects it
     v_load_balancer.wait();
 
@@ -404,7 +393,7 @@ TEST_F(work_stealing_load_balancer_test, send_local_throws_when_node_is_already_
 }
 
 TEST_F(work_stealing_load_balancer_test, send_local_discards_lazy_node_when_not_worthy) {
-    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
     v_load_balancer.set_thread_pool_size(2); // guarantee pool is ready before send() inspects it
     v_load_balancer.wait();
 
@@ -428,7 +417,7 @@ TEST_F(work_stealing_load_balancer_test, send_local_discards_lazy_node_when_not_
 }
 
 TEST_F(work_stealing_load_balancer_test, send_local_returns_false_on_mutex_contention) {
-    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
 
     std::mutex v_started_mutex;
     std::condition_variable v_started_cv;
@@ -437,7 +426,7 @@ TEST_F(work_stealing_load_balancer_test, send_local_returns_false_on_mutex_conte
     const auto v_release_future = v_release.get_future().share();
 
     // Thread A calls try_remote_submit; the mock blocks while holding m_recursive_mutex
-    EXPECT_CALL(*m_scheduler_worker_mock, try_open_transmission_channel()).WillOnce([&]() -> std::optional<gempba::transmission_guard> {
+    EXPECT_CALL(*m_scheduler_mock, try_open_transmission_channel()).WillOnce([&]() -> std::optional<gempba::transmission_guard> {
         {
             std::scoped_lock v_lk(v_started_mutex);
             v_started = true;
@@ -479,10 +468,10 @@ TEST_F(work_stealing_load_balancer_test, send_local_returns_false_on_mutex_conte
 }
 
 TEST_F(work_stealing_load_balancer_test, send_remote_throws_when_node_is_already_consumed) {
-    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
 
     std::mutex v_channel_mutex;
-    EXPECT_CALL(*m_scheduler_worker_mock, try_open_transmission_channel()).WillOnce([&]() -> std::optional<gempba::transmission_guard> {
+    EXPECT_CALL(*m_scheduler_mock, try_open_transmission_channel()).WillOnce([&]() -> std::optional<gempba::transmission_guard> {
         std::unique_lock v_lock(v_channel_mutex);
         return gempba::transmission_guard(std::move(v_lock));
     });
@@ -497,10 +486,10 @@ TEST_F(work_stealing_load_balancer_test, send_remote_throws_when_node_is_already
 }
 
 TEST_F(work_stealing_load_balancer_test, send_remote_discards_lazy_node_when_not_worthy) {
-    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
 
     std::mutex v_channel_mutex;
-    EXPECT_CALL(*m_scheduler_worker_mock, try_open_transmission_channel()).WillOnce([&]() -> std::optional<gempba::transmission_guard> {
+    EXPECT_CALL(*m_scheduler_mock, try_open_transmission_channel()).WillOnce([&]() -> std::optional<gempba::transmission_guard> {
         std::unique_lock v_lock(v_channel_mutex);
         return gempba::transmission_guard(std::move(v_lock));
     });
@@ -525,7 +514,7 @@ TEST_F(work_stealing_load_balancer_test, send_remote_discards_lazy_node_when_not
 }
 
 TEST_F(work_stealing_load_balancer_test, send_remote_returns_false_on_mutex_contention) {
-    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_worker_mock);
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
 
     std::mutex v_started_mutex;
     std::condition_variable v_started_cv;
@@ -534,7 +523,7 @@ TEST_F(work_stealing_load_balancer_test, send_remote_returns_false_on_mutex_cont
     const auto v_release_future = v_release.get_future().share();
 
     // Thread A holds m_recursive_mutex inside try_open_transmission_channel()
-    EXPECT_CALL(*m_scheduler_worker_mock, try_open_transmission_channel()).WillOnce([&]() -> std::optional<gempba::transmission_guard> {
+    EXPECT_CALL(*m_scheduler_mock, try_open_transmission_channel()).WillOnce([&]() -> std::optional<gempba::transmission_guard> {
         {
             std::scoped_lock v_lk(v_started_mutex);
             v_started = true;

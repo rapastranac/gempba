@@ -26,6 +26,7 @@
 #include <cstdlib>
 #include <map>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 
 #include <cabi/internals.hpp>
@@ -52,9 +53,9 @@ using gempba::cabi::detail::set_last_error;
 // NOLINTBEGIN(readability-identifier-naming)
 
 /**
- * load_balancer / node_manager / scheduler_center / scheduler_worker handles
- * are reinterpret_cast directly from their C++ counterparts; they never live
- * inside a wrapper because lifetime is owned by gempba (singletons / views).
+ * load_balancer / node_manager handles are reinterpret_cast directly from
+ * their C++ counterparts; they never live inside a wrapper because lifetime is
+ * owned by gempba (singletons).
  */
 
 /* ─── Macro: try / catch envelope for fallible entry points ─────────────── */
@@ -361,19 +362,17 @@ extern "C" {
 
     /* ── multiprocessing ────────────────────────────────────────────────────── */
 
-    gempba_load_balancer_t gempba_mp_create_load_balancer(gempba_balancing_policy_t policy, gempba_scheduler_worker_t worker) {
+    gempba_load_balancer_t gempba_mp_create_load_balancer(gempba_balancing_policy_t policy, gempba_scheduler_t scheduler) {
         GEMPBA_TRY
-            auto* w = reinterpret_cast<gempba::scheduler::worker*>(worker);
-            auto* lb = gempba::multiprocessing::create_load_balancer(static_cast<gempba::balancing_policy>(policy), w);
+            auto* lb = gempba::multiprocessing::create_load_balancer(static_cast<gempba::balancing_policy>(policy), scheduler ? scheduler->cpp : nullptr);
             return reinterpret_cast<gempba_load_balancer_t>(lb);
         GEMPBA_CATCH_RETURN_NULL
     }
 
-    gempba_node_manager_t gempba_mp_create_node_manager(gempba_load_balancer_t lb, gempba_scheduler_worker_t worker) {
+    gempba_node_manager_t gempba_mp_create_node_manager(gempba_load_balancer_t lb, gempba_scheduler_t scheduler) {
         GEMPBA_TRY
             auto* lb_cpp = reinterpret_cast<gempba::load_balancer*>(lb);
-            auto* w = reinterpret_cast<gempba::scheduler::worker*>(worker);
-            return reinterpret_cast<gempba_node_manager_t>(&gempba::multiprocessing::create_node_manager(lb_cpp, w));
+            return reinterpret_cast<gempba_node_manager_t>(&gempba::multiprocessing::create_node_manager(lb_cpp, scheduler ? scheduler->cpp : nullptr));
         GEMPBA_CATCH_RETURN_NULL
     }
 
@@ -413,11 +412,11 @@ extern "C" {
 
     static constexpr const char* k_mp_disabled_msg = "gempba was built without GEMPBA_MULTIPROCESSING; this entry point is unavailable";
 
-    gempba_load_balancer_t gempba_mp_create_load_balancer(gempba_balancing_policy_t, gempba_scheduler_worker_t) {
+    gempba_load_balancer_t gempba_mp_create_load_balancer(gempba_balancing_policy_t, gempba_scheduler_t) {
         set_last_error(k_mp_disabled_msg);
         return nullptr;
     }
-    gempba_node_manager_t gempba_mp_create_node_manager(gempba_load_balancer_t, gempba_scheduler_worker_t) {
+    gempba_node_manager_t gempba_mp_create_node_manager(gempba_load_balancer_t, gempba_scheduler_t) {
         set_last_error(k_mp_disabled_msg);
         return nullptr;
     }
@@ -678,9 +677,6 @@ extern "C" {
         GEMPBA_CATCH_VOID
     }
 
-    gempba_scheduler_center_t gempba_scheduler_center_view(gempba_scheduler_t s) { return reinterpret_cast<gempba_scheduler_center_t>(&s->cpp->center_view()); }
-    gempba_scheduler_worker_t gempba_scheduler_worker_view(gempba_scheduler_t s) { return reinterpret_cast<gempba_scheduler_worker_t>(&s->cpp->worker_view()); }
-
     void gempba_scheduler_visit_stats(gempba_scheduler_t s, gempba_stat_visitor_fn visitor, void* user_data) {
         if (!s || !visitor)
             return;
@@ -717,72 +713,52 @@ extern "C" {
         GEMPBA_CATCH_VOID
     }
 
-    /* ── scheduler::center ─────────────────────────────────────────────────── */
+    /* ── scheduler run and results ──────────────────────────────────────────── */
 
-    void gempba_scheduler_center_barrier(gempba_scheduler_center_t c) {
+    gempba_bool_t gempba_scheduler_is_root(gempba_scheduler_t s) { return s->cpp->is_root() ? 1 : 0; }
+
+    gempba_status_t gempba_scheduler_run(gempba_scheduler_t s, gempba_node_manager_t nm, const int32_t* ids, const gempba_serial_runnable_t* runnables, size_t count,
+                                         const gempba_bytes_t* seed, int32_t seed_runnable_id) {
         GEMPBA_TRY
-            reinterpret_cast<gempba::scheduler::center*>(c)->barrier();
-        GEMPBA_CATCH_VOID
-    }
-    int32_t gempba_scheduler_center_rank_me(gempba_scheduler_center_t c) { return static_cast<int32_t>(reinterpret_cast<gempba::scheduler::center*>(c)->rank_me()); }
-    int32_t gempba_scheduler_center_world_size(gempba_scheduler_center_t c) { return static_cast<int32_t>(reinterpret_cast<gempba::scheduler::center*>(c)->world_size()); }
-
-    gempba_status_t gempba_scheduler_center_run(gempba_scheduler_center_t c, gempba_bytes_t task, int32_t runnable_id) {
-        GEMPBA_TRY
-            gempba::task_packet pkt = packet_from_borrowed(task);
-            reinterpret_cast<gempba::scheduler::center*>(c)->run(std::move(pkt), static_cast<int>(runnable_id));
-            return GEMPBA_OK;
-        GEMPBA_CATCH_RETURN_STATUS
-    }
-
-    gempba_status_t gempba_scheduler_center_get_result(gempba_scheduler_center_t c, gempba_buffer_t* out) {
-        GEMPBA_TRY
-            if (out == nullptr) {
-                set_last_error("out is null");
-                return GEMPBA_ERR_INVALID_ARG;
-            }
-            gempba::task_packet pkt = reinterpret_cast<gempba::scheduler::center*>(c)->get_result();
-            *out = buffer_from_packet(pkt);
-            return GEMPBA_OK;
-        GEMPBA_CATCH_RETURN_STATUS
-    }
-
-    void gempba_scheduler_center_visit_all_results(gempba_scheduler_center_t c, gempba_result_visitor_fn visitor, void* user_data) {
-        if (!c || !visitor)
-            return;
-        GEMPBA_TRY
-            auto results = reinterpret_cast<gempba::scheduler::center*>(c)->get_all_results();
-            for (size_t i = 0; i < results.size(); ++i) {
-                const gempba::task_packet& pkt = results[i].get_task_packet();
-                gempba_bytes_t bytes{pkt.empty() ? nullptr : reinterpret_cast<const std::uint8_t*>(pkt.data()), pkt.size()};
-                visitor(user_data, i, bytes);
-            }
-        GEMPBA_CATCH_VOID
-    }
-
-    /* ── scheduler::worker ─────────────────────────────────────────────────── */
-
-    void gempba_scheduler_worker_barrier(gempba_scheduler_worker_t w) {
-        GEMPBA_TRY
-            reinterpret_cast<gempba::scheduler::worker*>(w)->barrier();
-        GEMPBA_CATCH_VOID
-    }
-    int32_t gempba_scheduler_worker_rank_me(gempba_scheduler_worker_t w) { return static_cast<int32_t>(reinterpret_cast<gempba::scheduler::worker*>(w)->rank_me()); }
-    int32_t gempba_scheduler_worker_world_size(gempba_scheduler_worker_t w) { return static_cast<int32_t>(reinterpret_cast<gempba::scheduler::worker*>(w)->world_size()); }
-
-    gempba_status_t gempba_scheduler_worker_run(gempba_scheduler_worker_t w, gempba_node_manager_t nm, const int32_t* ids, const gempba_serial_runnable_t* runnables, size_t count) {
-        GEMPBA_TRY
-            if (w == nullptr || nm == nullptr || ids == nullptr || runnables == nullptr) {
-                set_last_error("w, nm, ids, or runnables is null");
+            if (s == nullptr || nm == nullptr || ids == nullptr || runnables == nullptr) {
+                set_last_error("s, nm, ids, or runnables is null");
                 return GEMPBA_ERR_INVALID_ARG;
             }
             std::map<int, std::shared_ptr<gempba::serial_runnable>> map;
             for (size_t i = 0; i < count; ++i) {
                 map[static_cast<int>(ids[i])] = runnables[i]->cpp;
             }
-            reinterpret_cast<gempba::scheduler::worker*>(w)->run(*reinterpret_cast<gempba::node_manager*>(nm), std::move(map));
+            std::optional<gempba::task_bundle> v_seed;
+            if (seed != nullptr) {
+                v_seed.emplace(packet_from_borrowed(*seed), static_cast<int>(seed_runnable_id));
+            }
+            s->cpp->run(*reinterpret_cast<gempba::node_manager*>(nm), std::move(map), std::move(v_seed));
             return GEMPBA_OK;
         GEMPBA_CATCH_RETURN_STATUS
+    }
+
+    gempba_status_t gempba_scheduler_get_result(gempba_scheduler_t s, gempba_buffer_t* out) {
+        GEMPBA_TRY
+            if (s == nullptr || out == nullptr) {
+                set_last_error("s or out is null");
+                return GEMPBA_ERR_INVALID_ARG;
+            }
+            *out = buffer_from_packet(s->cpp->get_result());
+            return GEMPBA_OK;
+        GEMPBA_CATCH_RETURN_STATUS
+    }
+
+    void gempba_scheduler_visit_all_results(gempba_scheduler_t s, gempba_result_visitor_fn visitor, void* user_data) {
+        if (!s || !visitor)
+            return;
+        GEMPBA_TRY
+            const auto results = s->cpp->get_all_results();
+            for (size_t i = 0; i < results.size(); ++i) {
+                const gempba::task_packet& pkt = results[i].get_task_packet();
+                gempba_bytes_t bytes{pkt.empty() ? nullptr : reinterpret_cast<const std::uint8_t*>(pkt.data()), pkt.size()};
+                visitor(user_data, i, bytes);
+            }
+        GEMPBA_CATCH_VOID
     }
 
 #else // !GEMPBA_MULTIPROCESSING
@@ -813,30 +789,18 @@ extern "C" {
     void gempba_scheduler_set_goal(gempba_scheduler_t, gempba_goal_t, gempba_score_type_t) { set_last_error(k_mp_disabled_msg); }
     double gempba_scheduler_elapsed_time(gempba_scheduler_t) { return 0.0; }
     void gempba_scheduler_synchronize_stats(gempba_scheduler_t) { set_last_error(k_mp_disabled_msg); }
-    gempba_scheduler_center_t gempba_scheduler_center_view(gempba_scheduler_t) { return nullptr; }
-    gempba_scheduler_worker_t gempba_scheduler_worker_view(gempba_scheduler_t) { return nullptr; }
     void gempba_scheduler_visit_stats(gempba_scheduler_t, gempba_stat_visitor_fn, void*) { set_last_error(k_mp_disabled_msg); }
 
-    void gempba_scheduler_center_barrier(gempba_scheduler_center_t) { set_last_error(k_mp_disabled_msg); }
-    int32_t gempba_scheduler_center_rank_me(gempba_scheduler_center_t) { return -1; }
-    int32_t gempba_scheduler_center_world_size(gempba_scheduler_center_t) { return 0; }
-    gempba_status_t gempba_scheduler_center_run(gempba_scheduler_center_t, gempba_bytes_t, int32_t) {
+    gempba_bool_t gempba_scheduler_is_root(gempba_scheduler_t) { return 0; }
+    gempba_status_t gempba_scheduler_run(gempba_scheduler_t, gempba_node_manager_t, const int32_t*, const gempba_serial_runnable_t*, size_t, const gempba_bytes_t*, int32_t) {
         set_last_error(k_mp_disabled_msg);
         return GEMPBA_ERR_RUNTIME;
     }
-    gempba_status_t gempba_scheduler_center_get_result(gempba_scheduler_center_t, gempba_buffer_t*) {
+    gempba_status_t gempba_scheduler_get_result(gempba_scheduler_t, gempba_buffer_t*) {
         set_last_error(k_mp_disabled_msg);
         return GEMPBA_ERR_RUNTIME;
     }
-    void gempba_scheduler_center_visit_all_results(gempba_scheduler_center_t, gempba_result_visitor_fn, void*) { set_last_error(k_mp_disabled_msg); }
-
-    void gempba_scheduler_worker_barrier(gempba_scheduler_worker_t) { set_last_error(k_mp_disabled_msg); }
-    int32_t gempba_scheduler_worker_rank_me(gempba_scheduler_worker_t) { return -1; }
-    int32_t gempba_scheduler_worker_world_size(gempba_scheduler_worker_t) { return 0; }
-    gempba_status_t gempba_scheduler_worker_run(gempba_scheduler_worker_t, gempba_node_manager_t, const int32_t*, const gempba_serial_runnable_t*, size_t) {
-        set_last_error(k_mp_disabled_msg);
-        return GEMPBA_ERR_RUNTIME;
-    }
+    void gempba_scheduler_visit_all_results(gempba_scheduler_t, gempba_result_visitor_fn, void*) { set_last_error(k_mp_disabled_msg); }
 
 #endif // GEMPBA_MULTIPROCESSING
 
