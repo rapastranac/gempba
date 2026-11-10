@@ -1,5 +1,5 @@
 class GempbaMpi < Formula
-  desc "GemPBA - hybrid parallel C++23 framework (MPI multiprocessing flavor)"
+  desc "GemPBA - hybrid parallel C++23 framework (MPI component)"
   homepage "https://github.com/__OWNER_REPO__"
   url "https://api.github.com/repos/__OWNER_REPO__/tarball/refs/tags/v3.3.0"
   version "4.4.0"
@@ -8,15 +8,12 @@ class GempbaMpi < Formula
   head "https://github.com/__OWNER_REPO__.git", branch: "main"
 
   depends_on "cmake" => :build
+  depends_on "fmt" => :build
+  depends_on "hwloc" => :build
+  depends_on "pkgconf" => :build
   depends_on "spdlog" => :build
-  depends_on "fmt"
-  depends_on "hwloc"
+  depends_on "gempba"
   depends_on "open-mpi"
-  depends_on "pkgconf"
-
-  # Self-contained alternative to gempba: ships the same headers and CMake
-  # config, so the two flavors cannot be linked into one prefix at once.
-  conflicts_with "gempba", because: "both install gempba's headers and CMake config; install one flavor"
 
   resource "BS_thread_pool" do
     url "https://github.com/rapastranac/thread-pool/archive/refs/tags/v5.1.0.3.tar.gz"
@@ -32,9 +29,9 @@ class GempbaMpi < Formula
     bs_thread_pool = buildpath/"deps/bs_thread_pool"
     args = std_cmake_args + [
       "-DGEMPBA_BUILD_TESTS=OFF",
-      "-DGEMPBA_DEV_MODE=OFF",
-      "-DGEMPBA_MULTIPROCESSING=ON",
-      "-DGEMPBA_INSTALL_SHARED_ARTIFACTS=ON",
+      "-DGEMPBA_BUILD_MPI=ON",
+      # libgempba_mpi loads the gempba keg's libgempba.
+      "-DCMAKE_INSTALL_RPATH=#{Formula["gempba"].opt_lib}",
       "-DFETCHCONTENT_SOURCE_DIR_BS_THREAD_POOL=#{bs_thread_pool}",
     ]
 
@@ -43,8 +40,8 @@ class GempbaMpi < Formula
     resource("CPM.cmake").stage { cp "CPM.cmake", buildpath/"build/cmake/CPM.cmake" }
 
     system "cmake", "-S", ".", "-B", "build", *args
-    system "cmake", "--build", "build", "--parallel"
-    system "cmake", "--install", "build"
+    system "cmake", "--build", "build", "--target", "gempba_mpi", "--parallel"
+    system "cmake", "--install", "build", "--component", "mpi"
   end
 
   test do
@@ -56,7 +53,8 @@ class GempbaMpi < Formula
       find_package(gempba REQUIRED COMPONENTS mpi)
     CMAKE
 
+    # The MPI component's CMake targets sit beside the gempba keg's config in the linked prefix.
     system "cmake", "-S", testpath, "-B", testpath/"build",
-           "-DCMAKE_PREFIX_PATH=#{opt_prefix}"
+           "-DCMAKE_PREFIX_PATH=#{HOMEBREW_PREFIX}"
   end
 end
