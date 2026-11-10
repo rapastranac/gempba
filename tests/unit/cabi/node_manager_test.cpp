@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  *
- * Tests for gempba_mt_create_node_manager / gempba_mp_create_node_manager
+ * Tests for gempba_create_node_manager
  * and the full gempba_nm_* property-bag surface bindings drive once they
  * hold a node_manager handle: balancing policy / score / goal / result /
  * submission / wait / probe entry points.
@@ -36,18 +36,10 @@ namespace gempba::cabi_tests {
 
     // ─── Singleton / factory ────────────────────────────────────────────────
 
-    TEST_F(cabi_node_manager_test, mt_create_returns_same_as_singleton) {
-        gempba_load_balancer_t v_lb = gempba_mt_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING);
+    TEST_F(cabi_node_manager_test, create_returns_same_as_singleton) {
+        gempba_load_balancer_t v_lb = gempba_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING, /*scheduler=*/nullptr);
         ASSERT_NE(v_lb, nullptr);
-        gempba_node_manager_t v_nm = gempba_mt_create_node_manager(v_lb);
-        ASSERT_NE(v_nm, nullptr);
-        EXPECT_EQ(v_nm, gempba_get_node_manager());
-    }
-
-    TEST_F(cabi_node_manager_test, mp_create_with_null_worker_succeeds) {
-        gempba_load_balancer_t v_lb = gempba_mp_create_load_balancer(GEMPBA_BALANCING_QUASI_HORIZONTAL, /*scheduler=*/nullptr);
-        ASSERT_NE(v_lb, nullptr);
-        gempba_node_manager_t v_nm = gempba_mp_create_node_manager(v_lb, /*scheduler=*/nullptr);
+        gempba_node_manager_t v_nm = gempba_create_node_manager(v_lb, /*scheduler=*/nullptr);
         ASSERT_NE(v_nm, nullptr);
         EXPECT_EQ(v_nm, gempba_get_node_manager());
     }
@@ -243,9 +235,9 @@ namespace gempba::cabi_tests {
         // Work-stealing's load_balancer::forward runs the node inline when
         // it is UNUSED and should_branch. Hits the happy path of
         // gempba_nm_forward.
-        gempba_load_balancer_t v_lb = gempba_mt_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING);
+        gempba_load_balancer_t v_lb = gempba_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING, /*scheduler=*/nullptr);
         ASSERT_NE(v_lb, nullptr);
-        gempba_node_manager_t v_nm = gempba_mt_create_node_manager(v_lb);
+        gempba_node_manager_t v_nm = gempba_create_node_manager(v_lb, /*scheduler=*/nullptr);
         ASSERT_NE(v_nm, nullptr);
         gempba_nm_set_thread_pool_size(v_nm, 1);
 
@@ -255,7 +247,7 @@ namespace gempba::cabi_tests {
         cb_state v_state;
         const uint8_t v_payload[] = {0x77};
         gempba_node_t v_child = nullptr;
-        ASSERT_EQ(gempba_mt_create_explicit_node(v_lb, v_parent, copy_args_runnable, &v_state, increment_release, gempba_bytes_t{v_payload, sizeof(v_payload)}, &v_child), GEMPBA_OK);
+        ASSERT_EQ(gempba_create_explicit_node(v_lb, v_parent, copy_args_runnable, &v_state, increment_release, gempba_bytes_t{v_payload, sizeof(v_payload)}, &v_child), GEMPBA_OK);
 
         ASSERT_EQ(gempba_nm_forward(v_nm, v_child), GEMPBA_OK);
         ASSERT_EQ(gempba_nm_wait(v_nm), GEMPBA_OK);

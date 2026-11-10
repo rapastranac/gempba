@@ -182,90 +182,24 @@ extern "C" {
         GEMPBA_CATCH_RETURN_STATUS
     }
 
-    /* ── multithreading ─────────────────────────────────────────────────────── */
+    /* ── load balancer, node manager and nodes ──────────────────────────────── */
 
-
-    gempba_load_balancer_t gempba_mt_create_load_balancer(gempba_balancing_policy_t policy) {
-        GEMPBA_TRY
-            auto* lb = gempba::create_load_balancer(static_cast<gempba::balancing_policy>(policy));
-            return reinterpret_cast<gempba_load_balancer_t>(lb);
-        GEMPBA_CATCH_RETURN_NULL
-    }
-
-    gempba_node_manager_t gempba_mt_create_node_manager(gempba_load_balancer_t lb) {
-        GEMPBA_TRY
-            auto* lb_cpp = reinterpret_cast<gempba::load_balancer*>(lb);
-            return reinterpret_cast<gempba_node_manager_t>(&gempba::create_node_manager(lb_cpp));
-        GEMPBA_CATCH_RETURN_NULL
-    }
-
-    gempba_status_t gempba_mt_create_explicit_node(gempba_load_balancer_t lb, gempba_node_t parent, gempba_runnable_fn runnable, void* user_data, gempba_release_fn release_user_data,
-                                                   gempba_bytes_t args, gempba_node_t* out) {
-        GEMPBA_TRY
-            auto holder = safe_make_holder(user_data, release_user_data);
-            if (out == nullptr || runnable == nullptr || parent == nullptr) {
-                set_last_error("out, runnable, or parent is null");
-                return GEMPBA_ERR_INVALID_ARG;
-            }
-            auto* lb_cpp = reinterpret_cast<gempba::load_balancer*>(lb);
-            gempba::node parent_local = parent->cpp;
-
-            auto wrapper = std::make_unique<gempba_node_s>();
-            gempba_node_t self = wrapper.get();
-
-            auto cpp_fn = make_cpp_runnable(holder, runnable, self);
-            gempba::task_packet args_pkt = packet_from_borrowed(args);
-
-            wrapper->cpp = gempba::create_explicit_node<gempba::task_packet, gempba::task_packet>(*lb_cpp, parent_local, std::move(cpp_fn), std::make_tuple(std::move(args_pkt)));
-
-            *out = wrapper.release();
-            return GEMPBA_OK;
-        GEMPBA_CATCH_RETURN_STATUS
-    }
-
-    gempba_status_t gempba_mt_create_lazy_node(gempba_load_balancer_t lb, gempba_node_t parent, gempba_runnable_fn runnable, gempba_lazy_args_fn lazy_args, void* user_data,
-                                               gempba_release_fn release_user_data, gempba_node_t* out) {
-        GEMPBA_TRY
-            auto holder = safe_make_holder(user_data, release_user_data);
-            if (out == nullptr || runnable == nullptr || lazy_args == nullptr || parent == nullptr) {
-                set_last_error("out, runnable, lazy_args, or parent is null");
-                return GEMPBA_ERR_INVALID_ARG;
-            }
-            auto* lb_cpp = reinterpret_cast<gempba::load_balancer*>(lb);
-            gempba::node parent_local = parent->cpp;
-
-            auto wrapper = std::make_unique<gempba_node_s>();
-            gempba_node_t self = wrapper.get();
-
-            auto cpp_fn = make_cpp_runnable(holder, runnable, self);
-            auto cpp_lazy = make_cpp_lazy_args(holder, lazy_args);
-
-            wrapper->cpp = gempba::create_lazy_node<gempba::task_packet, gempba::task_packet>(*lb_cpp, parent_local, std::move(cpp_fn), std::move(cpp_lazy));
-
-            *out = wrapper.release();
-            return GEMPBA_OK;
-        GEMPBA_CATCH_RETURN_STATUS
-    }
-
-
-    /* ── multiprocessing ────────────────────────────────────────────────────── */
-
-    gempba_load_balancer_t gempba_mp_create_load_balancer(gempba_balancing_policy_t policy, gempba_scheduler_t scheduler) {
+    gempba_load_balancer_t gempba_create_load_balancer(gempba_balancing_policy_t policy, gempba_scheduler_t scheduler) {
         GEMPBA_TRY
             auto* lb = gempba::create_load_balancer(static_cast<gempba::balancing_policy>(policy), scheduler ? scheduler->cpp : nullptr);
             return reinterpret_cast<gempba_load_balancer_t>(lb);
         GEMPBA_CATCH_RETURN_NULL
     }
 
-    gempba_node_manager_t gempba_mp_create_node_manager(gempba_load_balancer_t lb, gempba_scheduler_t scheduler) {
+    gempba_node_manager_t gempba_create_node_manager(gempba_load_balancer_t lb, gempba_scheduler_t scheduler) {
         GEMPBA_TRY
             auto* lb_cpp = reinterpret_cast<gempba::load_balancer*>(lb);
             return reinterpret_cast<gempba_node_manager_t>(&gempba::create_node_manager(lb_cpp, scheduler ? scheduler->cpp : nullptr));
         GEMPBA_CATCH_RETURN_NULL
     }
 
-    gempba_status_t gempba_mp_create_explicit_node(gempba_load_balancer_t lb, gempba_node_t parent, gempba_runnable_fn runnable, void* user_data, gempba_release_fn release_user_data,
-                                                   gempba_bytes_t args, gempba_node_t* out) {
+    gempba_status_t gempba_create_explicit_node(gempba_load_balancer_t lb, gempba_node_t parent, gempba_runnable_fn runnable, void* user_data, gempba_release_fn release_user_data,
+                                                gempba_bytes_t args, gempba_node_t* out) {
         GEMPBA_TRY
             auto holder = safe_make_holder(user_data, release_user_data);
             if (out == nullptr || runnable == nullptr || parent == nullptr) {
@@ -289,6 +223,30 @@ extern "C" {
         GEMPBA_CATCH_RETURN_STATUS
     }
 
+    gempba_status_t gempba_create_lazy_node(gempba_load_balancer_t lb, gempba_node_t parent, gempba_runnable_fn runnable, gempba_lazy_args_fn lazy_args, void* user_data,
+                                            gempba_release_fn release_user_data, gempba_node_t* out) {
+        GEMPBA_TRY
+            auto holder = safe_make_holder(user_data, release_user_data);
+            if (out == nullptr || runnable == nullptr || lazy_args == nullptr || parent == nullptr) {
+                set_last_error("out, runnable, lazy_args, or parent is null");
+                return GEMPBA_ERR_INVALID_ARG;
+            }
+            auto* lb_cpp = reinterpret_cast<gempba::load_balancer*>(lb);
+            gempba::node parent_local = parent->cpp;
+
+            auto wrapper = std::make_unique<gempba_node_s>();
+            gempba_node_t self = wrapper.get();
+
+            auto cpp_fn = make_cpp_runnable(holder, runnable, self);
+            auto cpp_lazy = make_cpp_lazy_args(holder, lazy_args);
+
+            wrapper->cpp =
+                    gempba::create_lazy_node<gempba::task_packet, gempba::task_packet>(*lb_cpp, parent_local, std::move(cpp_fn), std::move(cpp_lazy), identity_ser(), identity_deser_value());
+
+            *out = wrapper.release();
+            return GEMPBA_OK;
+        GEMPBA_CATCH_RETURN_STATUS
+    }
 
     /* ── node_manager ──────────────────────────────────────────────────────── */
 
@@ -425,7 +383,7 @@ extern "C" {
         GEMPBA_CATCH_RETURN_STATUS
     }
 
-    /* ── serial_runnable (mp) ──────────────────────────────────────────────── */
+    /* ── serial_runnable ──────────────────────────────────────────────────── */
 
     gempba_status_t gempba_serial_runnable_create(int32_t id, gempba_bool_t returns_value, gempba_runnable_fn runnable, void* user_data, gempba_release_fn release_user_data,
                                                   gempba_serial_runnable_t* out) {

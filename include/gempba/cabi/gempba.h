@@ -285,69 +285,47 @@ extern "C" {
      */
     GEMPBA_API gempba_status_t gempba_node_get_result(gempba_node_t node, gempba_buffer_t* out);
 
-    /* ─── Multithreaded engine (mt) ─────────────────────────────────────────── */
+    /* ─── Load balancer, node manager and nodes ─────────────────────────────── */
 
     /**
-     * Installs the process-wide MT load balancer with the given policy.  Wraps gempba::mt::create_load_balancer.
-     * Returns NULL with last-error set if a load balancer already exists (the C++ factory throws in that case).
+     * Installs the process-wide load balancer with the given policy.  Wraps gempba::create_load_balancer.  `scheduler`
+     * is NULL in a single-process run.  Returns NULL with last-error set if a load balancer already exists (the C++
+     * factory throws in that case).
      */
-    GEMPBA_API gempba_load_balancer_t gempba_mt_create_load_balancer(gempba_balancing_policy_t policy);
+    GEMPBA_API gempba_load_balancer_t gempba_create_load_balancer(gempba_balancing_policy_t policy,
+                                                                  gempba_scheduler_t        scheduler /* nullable */);
 
     /**
-     * Installs the process-wide MT node manager bound to `lb`.  Wraps gempba::mt::create_node_manager.  Returns NULL
-     * with last-error set if a node manager already exists.
+     * Installs the process-wide node manager bound to `lb`.  Wraps gempba::create_node_manager.  `scheduler` is NULL in
+     * a single-process run.  Returns NULL with last-error set if a node manager already exists.
      */
-    GEMPBA_API gempba_node_manager_t gempba_mt_create_node_manager(gempba_load_balancer_t lb);
+    GEMPBA_API gempba_node_manager_t gempba_create_node_manager(gempba_load_balancer_t lb,
+                                                                gempba_scheduler_t     scheduler /* nullable */);
 
     /**
-     * Creates a child node whose runnable is captured at construction time.  Wraps gempba::mt::create_explicit_node.
+     * Creates a child node whose runnable is captured at construction time.  Wraps gempba::create_explicit_node with
+     * identity ser/deser: the args are already serialised on the binding side, so the node can run on another rank.
      *
      * `parent` must not be NULL — substitute gempba_create_dummy_node in the binding when the runnable receives a
      * NULL parent.  user_data lifetime follows gempba_release_fn.
      */
-    GEMPBA_API gempba_status_t gempba_mt_create_explicit_node(gempba_load_balancer_t lb, gempba_node_t parent,
-                                                              gempba_runnable_fn runnable, void* user_data,
-                                                              gempba_release_fn release_user_data, /* nullable */
-                                                              gempba_bytes_t args, gempba_node_t* out);
+    GEMPBA_API gempba_status_t gempba_create_explicit_node(gempba_load_balancer_t lb, gempba_node_t parent,
+                                                           gempba_runnable_fn runnable, void* user_data,
+                                                           gempba_release_fn release_user_data, /* nullable */
+                                                           gempba_bytes_t args, gempba_node_t* out);
 
     /**
-     * Creates a child node whose args are produced lazily.  Wraps gempba::mt::create_lazy_node.
+     * Creates a child node whose args are produced lazily.  Wraps gempba::create_lazy_node with identity ser/deser.
      *
      * The framework calls `lazy_args` immediately before the runnable runs; if it reports `produced = 0` the node is
      * pruned and `runnable` is never invoked.  Both callbacks share the same user_data, so a single release_fn frees
      * it.
      */
-    GEMPBA_API gempba_status_t gempba_mt_create_lazy_node(gempba_load_balancer_t lb, gempba_node_t parent,
-                                                          gempba_runnable_fn runnable, gempba_lazy_args_fn lazy_args,
-                                                          void*             user_data,
-                                                          gempba_release_fn release_user_data, /* nullable */
-                                                          gempba_node_t*    out);
-
-    /* ─── Multiprocess engine (mp) ──────────────────────────────────────────── */
-
-    /**
-     * Installs the MP load balancer.  Wraps gempba::mp::create_load_balancer.  `scheduler` may be NULL when the
-     * binding only intends single-process work.
-     */
-    GEMPBA_API gempba_load_balancer_t gempba_mp_create_load_balancer(gempba_balancing_policy_t policy,
-                                                                     gempba_scheduler_t scheduler /* nullable */);
-
-    /**
-     * Installs the MP node manager.  Wraps gempba::mp::create_node_manager.  `scheduler` may be NULL — see
-     * gempba_mp_create_load_balancer.
-     */
-    GEMPBA_API gempba_node_manager_t gempba_mp_create_node_manager(gempba_load_balancer_t lb,
-                                                                   gempba_scheduler_t     scheduler /* nullable */);
-
-    /**
-     * Creates an MP child node.  Wraps gempba::mp::create_explicit_node with identity ser/deser — args are already
-     * serialised on the binding side, the core just shuffles task_packets through.  See
-     * gempba_mt_create_explicit_node for the parent / user_data / release_fn contract.
-     */
-    GEMPBA_API gempba_status_t gempba_mp_create_explicit_node(gempba_load_balancer_t lb, gempba_node_t parent,
-                                                              gempba_runnable_fn runnable, void* user_data,
-                                                              gempba_release_fn release_user_data, /* nullable */
-                                                              gempba_bytes_t args, gempba_node_t* out);
+    GEMPBA_API gempba_status_t gempba_create_lazy_node(gempba_load_balancer_t lb, gempba_node_t parent,
+                                                       gempba_runnable_fn runnable, gempba_lazy_args_fn lazy_args,
+                                                       void*             user_data,
+                                                       gempba_release_fn release_user_data, /* nullable */
+                                                       gempba_node_t*    out);
 
     /* ─── Node manager ──────────────────────────────────────────────────────── */
 
@@ -437,11 +415,11 @@ extern "C" {
      * the wait raised an exception. */
     GEMPBA_API gempba_status_t gempba_nm_wait(gempba_node_manager_t nm);
 
-    /* ─── Serial runnable (mp) ──────────────────────────────────────────────── */
+    /* ─── Serial runnable ──────────────────────────────────────────────────── */
 
     /**
      * Registers a runnable identified by `id` for cross-rank dispatch.  Wraps either
-     * gempba::mp::runnables::return_none::create<task_packet> (when returns_value == 0) or
+     * gempba::runnables::return_none::create<task_packet> (when returns_value == 0) or
      * return_value::create<task_packet, task_packet>.
      *
      * The C ABI uses identity ser/deser internally — args/results are raw bytes.  user_data + release_user_data follow
@@ -573,14 +551,14 @@ extern "C" {
 
     /**
      * Tear down any running telemetry hub on this process and suppress subsequent auto-installs from
-     * gempba_mp_create_* until gempba_telemetry_enable is called.  Idempotent.  Safe to call before any hub has been
-     * installed.
+     * gempba_create_node_manager and gempba_mpi_create_scheduler until gempba_telemetry_enable is called.  Idempotent.
+     * Safe to call before any hub has been installed.
      */
     GEMPBA_API void gempba_telemetry_disable(void);
 
     /**
-     * Lift a previous gempba_telemetry_disable so subsequent gempba_mp_create_* calls install the telemetry hub again.
-     * Idempotent.  Does not itself install a hub.
+     * Lift a previous gempba_telemetry_disable so subsequent gempba_create_node_manager and gempba_mpi_create_scheduler
+     * calls install the telemetry hub again. Idempotent.  Does not itself install a hub.
      */
     GEMPBA_API void gempba_telemetry_enable(void);
 

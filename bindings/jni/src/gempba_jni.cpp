@@ -439,7 +439,7 @@ extern "C" {
     // ─── gempba::mt ──────────────────────────────────────────────────────────────
 
     JNIEXPORT jlong JNICALL JNI_MT(createLoadBalancer)(JNIEnv* env, jclass, jint policy_ordinal) {
-        auto lb = gempba_mt_create_load_balancer(static_cast<gempba_balancing_policy_t>(policy_ordinal));
+        auto lb = gempba_create_load_balancer(static_cast<gempba_balancing_policy_t>(policy_ordinal), /*scheduler=*/nullptr);
         if (lb == nullptr) {
             throw_from_last_error(env, "native MT.createLoadBalancer failed");
             return 0L;
@@ -448,7 +448,7 @@ extern "C" {
     }
 
     JNIEXPORT jlong JNICALL JNI_MT(createNodeManager)(JNIEnv* env, jclass, jlong lb_handle) {
-        auto nm = gempba_mt_create_node_manager(from_jlong<gempba_load_balancer_t>(lb_handle));
+        auto nm = gempba_create_node_manager(from_jlong<gempba_load_balancer_t>(lb_handle), /*scheduler=*/nullptr);
         if (nm == nullptr) {
             throw_from_last_error(env, "native MT.createNodeManager failed");
             return 0L;
@@ -463,8 +463,8 @@ extern "C" {
 
         auto args_borrow = borrow_jbytearray(env, args_bytes);
         gempba_node_t node = nullptr;
-        if (gempba_mt_create_explicit_node(from_jlong<gempba_load_balancer_t>(lb_handle), from_jlong<gempba_node_t>(parent_handle), java_node_runnable_callback, ud, java_user_data_release,
-                                           args_borrow.bytes, &node) != GEMPBA_OK) {
+        if (gempba_create_explicit_node(from_jlong<gempba_load_balancer_t>(lb_handle), from_jlong<gempba_node_t>(parent_handle), java_node_runnable_callback, ud, java_user_data_release,
+                                        args_borrow.bytes, &node) != GEMPBA_OK) {
             throw_from_last_error(env, "native MT.createExplicitNode failed");
             return 0L;
         }
@@ -477,8 +477,8 @@ extern "C" {
             return 0L;
 
         gempba_node_t node = nullptr;
-        if (gempba_mt_create_lazy_node(from_jlong<gempba_load_balancer_t>(lb_handle), from_jlong<gempba_node_t>(parent_handle), java_node_runnable_callback, java_node_lazy_args_callback, ud,
-                                       java_user_data_release, &node) != GEMPBA_OK) {
+        if (gempba_create_lazy_node(from_jlong<gempba_load_balancer_t>(lb_handle), from_jlong<gempba_node_t>(parent_handle), java_node_runnable_callback, java_node_lazy_args_callback, ud,
+                                    java_user_data_release, &node) != GEMPBA_OK) {
             throw_from_last_error(env, "native MT.createLazyNode failed");
             return 0L;
         }
@@ -494,8 +494,8 @@ extern "C" {
 
         auto args_borrow = borrow_jbytearray(env, args_bytes);
         gempba_node_t node = nullptr;
-        if (gempba_mp_create_explicit_node(from_jlong<gempba_load_balancer_t>(lb_handle), from_jlong<gempba_node_t>(parent_handle), java_node_runnable_callback, ud, java_user_data_release,
-                                           args_borrow.bytes, &node) != GEMPBA_OK) {
+        if (gempba_create_explicit_node(from_jlong<gempba_load_balancer_t>(lb_handle), from_jlong<gempba_node_t>(parent_handle), java_node_runnable_callback, ud, java_user_data_release,
+                                        args_borrow.bytes, &node) != GEMPBA_OK) {
             throw_from_last_error(env, "native MP.createExplicitNode failed");
             return 0L;
         }
@@ -503,7 +503,7 @@ extern "C" {
     }
 
     JNIEXPORT jlong JNICALL JNI_MP(createLoadBalancer)(JNIEnv* env, jclass, jint policy_ordinal, jlong scheduler_handle) {
-        auto lb = gempba_mp_create_load_balancer(static_cast<gempba_balancing_policy_t>(policy_ordinal), scheduler_handle == 0L ? nullptr : from_jlong<gempba_scheduler_t>(scheduler_handle));
+        auto lb = gempba_create_load_balancer(static_cast<gempba_balancing_policy_t>(policy_ordinal), scheduler_handle == 0L ? nullptr : from_jlong<gempba_scheduler_t>(scheduler_handle));
         if (lb == nullptr) {
             throw_from_last_error(env, "native MP.createLoadBalancer failed");
             return 0L;
@@ -512,7 +512,7 @@ extern "C" {
     }
 
     JNIEXPORT jlong JNICALL JNI_MP(createNodeManager)(JNIEnv* env, jclass, jlong lb_handle, jlong scheduler_handle) {
-        auto nm = gempba_mp_create_node_manager(from_jlong<gempba_load_balancer_t>(lb_handle), scheduler_handle == 0L ? nullptr : from_jlong<gempba_scheduler_t>(scheduler_handle));
+        auto nm = gempba_create_node_manager(from_jlong<gempba_load_balancer_t>(lb_handle), scheduler_handle == 0L ? nullptr : from_jlong<gempba_scheduler_t>(scheduler_handle));
         if (nm == nullptr) {
             throw_from_last_error(env, "native MP.createNodeManager failed");
             return 0L;
