@@ -17,11 +17,11 @@ groups workflows by purpose.
 
 ### Reusable building blocks
 - `_build-apt-index.yml` — rebuild the apt repository index after new debs land
-- `_build-deb.yml` — build the gempba `.deb` package
+- `_build-deb.yml` — build the gempba `.deb` packages, the core and the MPI component
 - `_build-msys2.yml` — build the gempba MSYS2 PKGBUILD artefact
 
 ### CI
-- `ci-cpp-ubuntu.yml` — C/C++ test (MP=ON, coverage, MPI integration tests) on Ubuntu 24.04, gempba-examples built against both installed flavors, and the deb + apt-index reusables
+- `ci-cpp-ubuntu.yml` — C/C++ test (with the MPI component, coverage, MPI integration tests) on Ubuntu 24.04, gempba-examples built against an installed gempba, and the deb + apt-index reusables
 - `ci-cpp-windows.yml` — C/C++ test and gempba-examples on Windows Server 2025 via MSYS2 UCRT64, and the MSYS2 package
 - `ci-cpp-macos.yml` — C/C++ test and gempba-examples on macOS 26 with Homebrew toolchain
 - `ci-java.yml` — JNI shared library + Java JAR build + test across Ubuntu / Windows / macOS, MT/MP matrix
