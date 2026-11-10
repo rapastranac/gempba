@@ -56,13 +56,13 @@ namespace gempba::telemetry {
         telemetry_hub& operator=(const telemetry_hub&) = delete;
 
         /**
-         * @brief Bind the hub to a runtime mode and start the transport.
+         * @brief Bind the hub to a single-process run, with an in-process transport.
          *
          * Call once after the runtime is up and the rank / world_size
          * are known. Sets up the transport, populates the topology snapshot,
          * and (on the aggregator) starts the dashboard server.
          *
-         * @param p_mode              Runtime mode driving transport choice.
+         * @param p_mode              Runtime mode the frames report.
          * @param p_rank              This rank (0..world_size-1).
          * @param p_world_size        Total rank count in this run.
          * @param p_start_pump_thread When @c false, the periodic pump thread
@@ -71,6 +71,9 @@ namespace gempba::telemetry {
          *                            then be called manually. Used by tests.
          */
         void on_runtime_ready(runtime_mode p_mode, std::uint32_t p_rank, std::uint32_t p_world_size, bool p_start_pump_thread = true);
+
+        /** @brief Like the overload above, reaching the other ranks through @p p_transport. */
+        void on_runtime_ready(runtime_mode p_mode, std::uint32_t p_rank, std::uint32_t p_world_size, std::unique_ptr<telemetry_transport> p_transport, bool p_start_pump_thread = true);
 
         /// Stop the pump, drain a final frame, and release transport resources.
         void shutdown();

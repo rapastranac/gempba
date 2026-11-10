@@ -9,11 +9,8 @@
 #include <impl/telemetry/process_probe.hpp>
 #include <impl/telemetry/run_id.hpp>
 #include <impl/telemetry/scheduler_clock.hpp>
+#include <impl/telemetry/telemetry_transport.hpp>
 #include <impl/telemetry/topology_builder.hpp>
-
-#if GEMPBA_MULTIPROCESSING
-    #include <impl/telemetry/mpi_transport.hpp>
-#endif
 
 #include <algorithm>
 #include <atomic>
@@ -97,24 +94,18 @@ namespace gempba::telemetry {
     telemetry_hub::~telemetry_hub() { shutdown(); }
 
     void telemetry_hub::on_runtime_ready(const runtime_mode p_mode, const std::uint32_t p_rank, const std::uint32_t p_world_size, const bool p_start_pump_thread) {
+        on_runtime_ready(p_mode, p_rank, p_world_size, std::make_unique<local_transport>(), p_start_pump_thread);
+    }
+
+    void telemetry_hub::on_runtime_ready(const runtime_mode p_mode, const std::uint32_t p_rank, const std::uint32_t p_world_size, std::unique_ptr<telemetry_transport> p_transport,
+                                         const bool p_start_pump_thread) {
         m_mode = p_mode;
         m_rank = p_rank;
         m_world_size = p_world_size;
         m_counters->m_edges_out = std::vector<counters::edge_slot>(p_world_size);
         m_start_ms.store(monotonic_ms(), std::memory_order_release);
 
-        switch (p_mode) {
-            case runtime_mode::MT_ONLY:
-                m_transport = std::make_unique<local_transport>();
-                break;
-            case runtime_mode::MP_MPI:
-#if GEMPBA_MULTIPROCESSING
-                m_transport = std::make_unique<mpi_transport>();
-#else
-                m_transport = std::make_unique<local_transport>();
-#endif
-                break;
-        }
+        m_transport = std::move(p_transport);
 
         if (p_rank == 0) {
             m_run_id = detail::generate_run_id();
@@ -413,11 +404,9 @@ namespace gempba::telemetry {
             p_out.m_spawn_remote_rejected = v_lb->get_spawn_remote_rejected_count();
         }
 
-#if GEMPBA_MULTIPROCESSING
         if (auto* v_sched = gempba::try_get_scheduler()) {
             p_out.m_scheduler_pending_count = static_cast<std::uint32_t>(v_sched->get_pending_request_count());
         }
-#endif
     }
 
     void telemetry_hub::snapshot_node_frame(node_frame& p_out) noexcept {
