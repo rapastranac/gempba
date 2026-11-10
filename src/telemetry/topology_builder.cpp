@@ -1,15 +1,14 @@
 #include <impl/telemetry/topology_builder.hpp>
 
 #include <algorithm>
+#include <cstddef>
 #include <cstring>
 #include <impl/telemetry/hwloc_probe.hpp>
+#include <impl/telemetry/telemetry_transport.hpp>
 #include <map>
+#include <span>
 #include <thread>
 #include <vector>
-
-#if GEMPBA_MULTIPROCESSING
-    #include <mpi.h>
-#endif
 
 #if defined(_WIN32)
     #include <windows.h>
@@ -230,44 +229,34 @@ namespace gempba::telemetry {
             p_node.m_sockets.push_back(std::move(v_socket));
         }
 
-        topology_snapshot build_mt_only_snapshot(std::uint32_t p_rank, rank_role p_role) {
+        topology_snapshot build_single_rank_snapshot(const rank_identity& p_self) {
             topology_snapshot v_snapshot;
-            const rank_identity v_self = build_self_identity(p_rank, p_role);
-            v_snapshot.m_identities.push_back(v_self);
+            v_snapshot.m_identities.push_back(p_self);
 
             topology_node v_node;
-            v_node.m_hostname = v_self.m_hostname;
-            v_node.m_ranks.push_back(p_rank);
-            v_node.m_sentinel_rank = p_rank;
+            v_node.m_hostname = p_self.m_hostname;
+            v_node.m_ranks.push_back(p_self.m_rank);
+            v_node.m_sentinel_rank = p_self.m_rank;
             fill_local_host_fields(v_node);
             v_snapshot.m_nodes.push_back(std::move(v_node));
             return v_snapshot;
         }
 
-#if GEMPBA_MULTIPROCESSING
-        topology_snapshot build_mpi_snapshot(std::uint32_t p_rank, std::uint32_t p_world_size, rank_role p_role) {
+        topology_snapshot build_gathered_snapshot(telemetry_transport& p_transport, const rank_identity& p_self) {
             topology_snapshot v_snapshot;
-            const rank_identity v_self = build_self_identity(p_rank, p_role);
-
-            int v_initialized = 0;
-            MPI_Initialized(&v_initialized);
-            if (!v_initialized || p_world_size <= 1) {
-                v_snapshot.m_identities.push_back(v_self);
-                topology_node v_node;
-                v_node.m_hostname = v_self.m_hostname;
-                v_node.m_ranks.push_back(p_rank);
-                v_node.m_sentinel_rank = p_rank;
-                fill_local_host_fields(v_node);
-                v_snapshot.m_nodes.push_back(std::move(v_node));
-                return v_snapshot;
+            for (const std::vector<std::byte>& v_block: p_transport.all_gather(std::as_bytes(std::span(&p_self, 1)))) {
+                rank_identity v_identity{};
+                if (v_block.size() == sizeof(rank_identity)) {
+                    std::memcpy(&v_identity, v_block.data(), sizeof(rank_identity));
+                    v_snapshot.m_identities.push_back(v_identity);
+                }
+            }
+            if (v_snapshot.m_identities.size() <= 1) {
+                return build_single_rank_snapshot(p_self);
             }
 
-            std::vector<rank_identity> v_all(p_world_size);
-            MPI_Allgather(&v_self, sizeof(rank_identity), MPI_BYTE, v_all.data(), sizeof(rank_identity), MPI_BYTE, MPI_COMM_WORLD);
-            v_snapshot.m_identities = v_all;
-
             std::map<std::string, std::size_t> v_node_index_by_hostname;
-            for (const auto& v_id: v_all) {
+            for (const auto& v_id: v_snapshot.m_identities) {
                 const std::string v_hostname(v_id.m_hostname);
                 auto v_it = v_node_index_by_hostname.find(v_hostname);
                 if (v_it == v_node_index_by_hostname.end()) {
@@ -292,36 +281,22 @@ namespace gempba::telemetry {
             // sockets (e.g. 96-core EPYC) come through intact.
             std::vector<std::uint8_t> v_self_blob;
             {
-                const auto v_self_it = v_node_index_by_hostname.find(std::string(v_self.m_hostname));
-                const bool v_is_sentinel = v_self_it != v_node_index_by_hostname.end() && v_snapshot.m_nodes[v_self_it->second].m_sentinel_rank == p_rank;
+                const auto v_self_it = v_node_index_by_hostname.find(std::string(p_self.m_hostname));
+                const bool v_is_sentinel = v_self_it != v_node_index_by_hostname.end() && v_snapshot.m_nodes[v_self_it->second].m_sentinel_rank == p_self.m_rank;
                 if (v_is_sentinel) {
                     topology_node v_self_node;
-                    v_self_node.m_hostname = v_self.m_hostname;
+                    v_self_node.m_hostname = p_self.m_hostname;
                     fill_local_host_fields(v_self_node);
                     detail::serialize_node_topology(v_self_blob, v_self_node);
                 }
             }
 
-            const int v_self_size = static_cast<int>(v_self_blob.size());
-            std::vector<int> v_sizes(p_world_size);
-            MPI_Allgather(&v_self_size, 1, MPI_INT, v_sizes.data(), 1, MPI_INT, MPI_COMM_WORLD);
-
-            std::vector<int> v_displs(p_world_size);
-            int v_total = 0;
-            for (std::uint32_t v_i = 0; v_i < p_world_size; ++v_i) {
-                v_displs[v_i] = v_total;
-                v_total += v_sizes[v_i];
-            }
-
-            std::vector<std::uint8_t> v_gathered(static_cast<std::size_t>(v_total));
-            MPI_Allgatherv(v_self_blob.data(), v_self_size, MPI_BYTE, v_gathered.data(), v_sizes.data(), v_displs.data(), MPI_BYTE, MPI_COMM_WORLD);
-
-            for (std::uint32_t v_i = 0; v_i < p_world_size; ++v_i) {
-                if (v_sizes[v_i] <= 0) {
+            for (const std::vector<std::byte>& v_block: p_transport.all_gather(std::as_bytes(std::span(v_self_blob)))) {
+                if (v_block.empty()) {
                     continue;
                 }
                 topology_node v_fragment;
-                if (!detail::deserialize_node_topology(v_fragment, v_gathered.data() + v_displs[v_i], static_cast<std::size_t>(v_sizes[v_i]))) {
+                if (!detail::deserialize_node_topology(v_fragment, reinterpret_cast<const std::uint8_t*>(v_block.data()), v_block.size())) {
                     continue;
                 }
                 const auto v_it = v_node_index_by_hostname.find(v_fragment.m_hostname);
@@ -337,7 +312,6 @@ namespace gempba::telemetry {
 
             return v_snapshot;
         }
-#endif // GEMPBA_MULTIPROCESSING
 
     } // namespace
 
@@ -479,19 +453,12 @@ namespace gempba::telemetry {
 
     } // namespace detail
 
-    topology_snapshot build_topology_snapshot(const runtime_mode p_mode, const std::uint32_t p_rank, const std::uint32_t p_world_size, const rank_role p_role) {
-        switch (p_mode) {
-            case runtime_mode::MT_ONLY:
-                return build_mt_only_snapshot(p_rank, p_role);
-#if GEMPBA_MULTIPROCESSING
-            case runtime_mode::MP_MPI:
-                return build_mpi_snapshot(p_rank, p_world_size, p_role);
-#else
-            case runtime_mode::MP_MPI:
-                return build_mt_only_snapshot(p_rank, p_role);
-#endif
+    topology_snapshot build_topology_snapshot(telemetry_transport& p_transport, const std::uint32_t p_rank, const std::uint32_t p_world_size, const rank_role p_role) {
+        const rank_identity v_self = build_self_identity(p_rank, p_role);
+        if (p_world_size <= 1) {
+            return build_single_rank_snapshot(v_self);
         }
-        return build_mt_only_snapshot(p_rank, p_role);
+        return build_gathered_snapshot(p_transport, v_self);
     }
 
 } // namespace gempba::telemetry

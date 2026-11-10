@@ -1,10 +1,13 @@
 #ifndef GEMPBA_TELEMETRY_TELEMETRY_TRANSPORT_HPP
 #define GEMPBA_TELEMETRY_TELEMETRY_TRANSPORT_HPP
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <gempba/telemetry/frames.hpp>
 #include <optional>
+#include <span>
+#include <vector>
 
 namespace gempba::telemetry {
 
@@ -73,6 +76,13 @@ namespace gempba::telemetry {
          * @return The message, or @c std::nullopt when no message is pending.
          */
         virtual std::optional<control_msg> try_recv_control() = 0;
+
+        /**
+         * @brief Gather one block of bytes from every rank, in rank order. Every rank must call it.
+         *
+         * @return Each rank's block; a transport with one rank returns @p p_block alone.
+         */
+        [[nodiscard]] virtual std::vector<std::vector<std::byte>> all_gather(std::span<const std::byte> p_block) = 0;
     };
 
 } // namespace gempba::telemetry

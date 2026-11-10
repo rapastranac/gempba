@@ -31,6 +31,7 @@ namespace gempba::telemetry {
 
         void send_control(std::uint32_t p_dst_rank, const control_msg& p_msg) override;
         std::optional<control_msg> try_recv_control() override;
+        [[nodiscard]] std::vector<std::vector<std::byte>> all_gather(std::span<const std::byte> p_block) override;
 
     private:
         struct impl;

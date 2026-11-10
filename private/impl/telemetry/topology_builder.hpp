@@ -1,7 +1,6 @@
 #ifndef GEMPBA_TELEMETRY_TOPOLOGY_BUILDER_HPP
 #define GEMPBA_TELEMETRY_TOPOLOGY_BUILDER_HPP
 
-#include <gempba/telemetry/runtime_mode.hpp>
 #include <gempba/telemetry/topology.hpp>
 
 #include <cstddef>
@@ -10,15 +9,16 @@
 
 namespace gempba::telemetry {
 
+    class telemetry_transport;
+
     /**
-     * @brief Build the static topology snapshot for the current runtime.
+     * @brief Build the static topology snapshot for this run.
      *
-     * Called once by @ref telemetry_hub::on_runtime_ready. The MT-only path
-     * synthesizes a single-node snapshot; the multi-process path gathers each
-     * host's layout from its sentinel and merges them into one snapshot.
+     * Called once by @ref telemetry_hub::on_runtime_ready. A run of one rank describes its own host. Otherwise every rank
+     * gathers the others' identities through @p p_transport, and each host's sentinel contributes that host's layout.
      * Each rank's identity carries @p p_role, its own scheduler role.
      */
-    topology_snapshot build_topology_snapshot(runtime_mode p_mode, std::uint32_t p_rank, std::uint32_t p_world_size, rank_role p_role = rank_role::WORKER);
+    topology_snapshot build_topology_snapshot(telemetry_transport& p_transport, std::uint32_t p_rank, std::uint32_t p_world_size, rank_role p_role = rank_role::WORKER);
 
     namespace detail {
 

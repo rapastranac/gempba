@@ -130,7 +130,7 @@ namespace gempba::telemetry {
             const std::scoped_lock v_lock(m_run_mtx);
             v_role = m_scheduler_role;
         }
-        m_topology = build_topology_snapshot(p_mode, p_rank, p_world_size, v_role);
+        m_topology = build_topology_snapshot(*m_transport, p_rank, p_world_size, v_role);
         std::vector<rank_role> v_roles;
         for (const rank_identity& v_identity: m_topology.m_identities) {
             if (v_identity.m_rank >= v_roles.size()) {
