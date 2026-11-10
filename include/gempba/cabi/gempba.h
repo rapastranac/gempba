@@ -180,7 +180,8 @@ extern "C" {
      * ─────────────────
      *   gempba_node_t            : caller-owned. Free with gempba_node_destroy.
      *   gempba_serial_runnable_t : caller-owned. Free with gempba_serial_runnable_destroy.
-     *   gempba_scheduler_t       : caller-owned. Free with gempba_scheduler_destroy.
+     *   gempba_scheduler_t       : caller-owned handle. Free with gempba_scheduler_destroy; the scheduler inside
+     *                              is singleton-owned and released by gempba_shutdown.
      *   gempba_load_balancer_t   : singleton-owned. DO NOT free.  Released by gempba_shutdown.
      *   gempba_node_manager_t    : singleton-owned. DO NOT free.  Released by gempba_shutdown.
      *
@@ -447,7 +448,7 @@ extern "C" {
 
     /* gempba_mpi_create_scheduler, in gempba_mpi.h, creates one. */
 
-    /** Tears down the scheduler.  Releases the C++ object held inside the wrapper; MPI itself is unaffected. */
+    /** Frees the handle; gempba_shutdown releases the process-wide scheduler inside it.  MPI is unaffected. */
     GEMPBA_API void gempba_scheduler_destroy(gempba_scheduler_t s);
 
     /** gempba::scheduler::barrier — collective; every rank must reach it. */

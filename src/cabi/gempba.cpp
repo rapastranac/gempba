@@ -450,12 +450,7 @@ extern "C" {
 
     /* ── scheduler ─────────────────────────────────────────────────────────── */
 
-    void gempba_scheduler_destroy(gempba_scheduler_t s) {
-        if (!s)
-            return;
-        delete s->cpp;
-        delete s;
-    }
+    void gempba_scheduler_destroy(gempba_scheduler_t s) { delete s; }
 
     void gempba_scheduler_barrier(gempba_scheduler_t s) {
         GEMPBA_TRY
