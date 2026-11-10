@@ -119,6 +119,7 @@ endif ()
 # 📄 Main source files
 file(GLOB_RECURSE Sources "src/*.cpp")
 if (NOT GEMPBA_MULTIPROCESSING)
+    list(FILTER Sources EXCLUDE REGEX ".*/src/mpi/.*")
     list(FILTER Sources EXCLUDE REGEX ".*/src/schedulers/mpi/.*")
     list(FILTER Sources EXCLUDE REGEX ".*/src/telemetry/mpi_transport\\.cpp$")
 endif ()

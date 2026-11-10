@@ -11,12 +11,6 @@
 #include <utility>
 #include <vector>
 
-#if GEMPBA_MULTIPROCESSING
-    #include <impl/schedulers/mpi_centralized_scheduler.hpp>
-    #include <impl/schedulers/mpi_semi_centralized_scheduler.hpp>
-    #include <impl/telemetry/mpi_transport.hpp>
-#endif
-
 namespace {
     inline std::unique_ptr<gempba::scheduler> g_scheduler;
     inline std::unique_ptr<gempba::load_balancer> g_load_balancer;
@@ -24,8 +18,8 @@ namespace {
     inline gempba::detail::telemetry_transport_factory g_make_transport;
 
     // Install the telemetry hub on first hit of a create_* entry point.
-    // Called from both mp::create_scheduler (every MPI rank reaches it -> MPI_Comm_dup
-    // is collective-symmetric) and mt::create_node_manager (single-process MT_ONLY).
+    // Called from both install_scheduler (every rank reaches it, so the transport's
+    // collective setup is symmetric) and create_node_manager (single-process MT_ONLY).
     void install_telemetry_hub_if_needed() {
         if (!gempba::telemetry::is_enabled()) {
             return;
@@ -128,49 +122,9 @@ gempba::scheduler* gempba::detail::install_scheduler(std::unique_ptr<scheduler> 
     return g_scheduler.get();
 }
 
-#if !GEMPBA_MULTIPROCESSING || GEMPBA_DEV_MODE
+gempba::load_balancer* gempba::create_load_balancer(const balancing_policy& p_policy, scheduler* const p_scheduler) { return build_load_balancer(p_policy, p_scheduler); }
 
-gempba::load_balancer* gempba::multithreading::create_load_balancer(const balancing_policy& p_policy) { return build_load_balancer(p_policy, nullptr); }
-
-gempba::node_manager& gempba::multithreading::create_node_manager(load_balancer* p_load_balancer) { return build_node_manager(p_load_balancer, nullptr); }
-
-#endif // !GEMPBA_MULTIPROCESSING || GEMPBA_DEV_MODE
-
-#if GEMPBA_MULTIPROCESSING
-
-namespace {
-    std::unique_ptr<gempba::telemetry::telemetry_transport> make_mpi_transport() { return std::make_unique<gempba::telemetry::mpi_transport>(); }
-} // namespace
-
-gempba::scheduler* gempba::multiprocessing::create_scheduler(std::unique_ptr<scheduler> p_your_implementation) {
-    return detail::install_scheduler(std::move(p_your_implementation), make_mpi_transport);
-}
-
-gempba::scheduler* gempba::multiprocessing::create_scheduler(const scheduler_topology& p_topology) {
-    if (g_scheduler != nullptr) {
-        throw std::runtime_error("scheduler already exists!");
-    }
-    std::unique_ptr<scheduler> v_scheduler;
-    switch (p_topology) {
-        case SEMI_CENTRALIZED: {
-            v_scheduler = std::make_unique<mpi_semi_centralized_scheduler>();
-            break;
-        }
-        case CENTRALIZED: {
-            v_scheduler = std::make_unique<mpi_centralized_scheduler>();
-            break;
-        }
-    }
-    return detail::install_scheduler(std::move(v_scheduler), make_mpi_transport);
-}
-
-gempba::load_balancer* gempba::multiprocessing::create_load_balancer(const balancing_policy& p_policy, scheduler* const p_scheduler) { return build_load_balancer(p_policy, p_scheduler); }
-
-std::unique_ptr<gempba::default_mpi_stats_visitor> gempba::multiprocessing::get_default_mpi_stats_visitor() { return std::make_unique<default_mpi_stats_visitor>(); }
-
-gempba::node_manager& gempba::multiprocessing::create_node_manager(load_balancer* p_load_balancer, scheduler* p_scheduler) { return build_node_manager(p_load_balancer, p_scheduler); }
-
-#endif // GEMPBA_MULTIPROCESSING
+gempba::node_manager& gempba::create_node_manager(load_balancer* const p_load_balancer, scheduler* const p_scheduler) { return build_node_manager(p_load_balancer, p_scheduler); }
 
 gempba::scheduler* gempba::get_scheduler() {
     if (!g_scheduler) {

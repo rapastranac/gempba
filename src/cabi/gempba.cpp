@@ -36,6 +36,10 @@
 #include <gempba/gempba.hpp>
 #include <gempba/telemetry/telemetry_hub.hpp>
 
+#if GEMPBA_MULTIPROCESSING
+    #include <gempba/mpi.hpp>
+#endif
+
 using gempba::cabi::detail::buffer_from_packet;
 using gempba::cabi::detail::g_last_error;
 using gempba::cabi::detail::holder_ptr;
@@ -229,7 +233,7 @@ extern "C" {
 
     gempba_load_balancer_t gempba_mt_create_load_balancer(gempba_balancing_policy_t policy) {
         GEMPBA_TRY
-            auto* lb = gempba::multithreading::create_load_balancer(static_cast<gempba::balancing_policy>(policy));
+            auto* lb = gempba::create_load_balancer(static_cast<gempba::balancing_policy>(policy));
             return reinterpret_cast<gempba_load_balancer_t>(lb);
         GEMPBA_CATCH_RETURN_NULL
     }
@@ -237,7 +241,7 @@ extern "C" {
     gempba_node_manager_t gempba_mt_create_node_manager(gempba_load_balancer_t lb) {
         GEMPBA_TRY
             auto* lb_cpp = reinterpret_cast<gempba::load_balancer*>(lb);
-            return reinterpret_cast<gempba_node_manager_t>(&gempba::multithreading::create_node_manager(lb_cpp));
+            return reinterpret_cast<gempba_node_manager_t>(&gempba::create_node_manager(lb_cpp));
         GEMPBA_CATCH_RETURN_NULL
     }
 
@@ -258,8 +262,7 @@ extern "C" {
             auto cpp_fn = make_cpp_runnable(holder, runnable, self);
             gempba::task_packet args_pkt = packet_from_borrowed(args);
 
-            wrapper->cpp =
-                    gempba::multithreading::create_explicit_node<gempba::task_packet, gempba::task_packet>(*lb_cpp, parent_local, std::move(cpp_fn), std::make_tuple(std::move(args_pkt)));
+            wrapper->cpp = gempba::create_explicit_node<gempba::task_packet, gempba::task_packet>(*lb_cpp, parent_local, std::move(cpp_fn), std::make_tuple(std::move(args_pkt)));
 
             *out = wrapper.release();
             return GEMPBA_OK;
@@ -283,7 +286,7 @@ extern "C" {
             auto cpp_fn = make_cpp_runnable(holder, runnable, self);
             auto cpp_lazy = make_cpp_lazy_args(holder, lazy_args);
 
-            wrapper->cpp = gempba::multithreading::create_lazy_node<gempba::task_packet, gempba::task_packet>(*lb_cpp, parent_local, std::move(cpp_fn), std::move(cpp_lazy));
+            wrapper->cpp = gempba::create_lazy_node<gempba::task_packet, gempba::task_packet>(*lb_cpp, parent_local, std::move(cpp_fn), std::move(cpp_lazy));
 
             *out = wrapper.release();
             return GEMPBA_OK;
@@ -294,7 +297,7 @@ extern "C" {
 
     gempba_load_balancer_t gempba_mt_create_load_balancer(gempba_balancing_policy_t policy) {
         GEMPBA_TRY
-            auto* lb = gempba::multiprocessing::create_load_balancer(static_cast<gempba::balancing_policy>(policy), nullptr);
+            auto* lb = gempba::create_load_balancer(static_cast<gempba::balancing_policy>(policy), nullptr);
             return reinterpret_cast<gempba_load_balancer_t>(lb);
         GEMPBA_CATCH_RETURN_NULL
     }
@@ -302,7 +305,7 @@ extern "C" {
     gempba_node_manager_t gempba_mt_create_node_manager(gempba_load_balancer_t lb) {
         GEMPBA_TRY
             auto* lb_cpp = reinterpret_cast<gempba::load_balancer*>(lb);
-            return reinterpret_cast<gempba_node_manager_t>(&gempba::multiprocessing::create_node_manager(lb_cpp, nullptr));
+            return reinterpret_cast<gempba_node_manager_t>(&gempba::create_node_manager(lb_cpp, nullptr));
         GEMPBA_CATCH_RETURN_NULL
     }
 
@@ -323,8 +326,8 @@ extern "C" {
             auto cpp_fn = make_cpp_runnable(holder, runnable, self);
             gempba::task_packet args_pkt = packet_from_borrowed(args);
 
-            wrapper->cpp = gempba::multiprocessing::create_explicit_node<gempba::task_packet, gempba::task_packet>(
-                    *lb_cpp, parent_local, std::move(cpp_fn), std::make_tuple(std::move(args_pkt)), identity_ser(), identity_deser_value());
+            wrapper->cpp = gempba::create_explicit_node<gempba::task_packet, gempba::task_packet>(*lb_cpp, parent_local, std::move(cpp_fn), std::make_tuple(std::move(args_pkt)),
+                                                                                                  identity_ser(), identity_deser_value());
 
             *out = wrapper.release();
             return GEMPBA_OK;
@@ -348,8 +351,8 @@ extern "C" {
             auto cpp_fn = make_cpp_runnable(holder, runnable, self);
             auto cpp_lazy = make_cpp_lazy_args(holder, lazy_args);
 
-            wrapper->cpp = gempba::multiprocessing::create_lazy_node<gempba::task_packet, gempba::task_packet>(*lb_cpp, parent_local, std::move(cpp_fn), std::move(cpp_lazy), identity_ser(),
-                                                                                                               identity_deser_value());
+            wrapper->cpp =
+                    gempba::create_lazy_node<gempba::task_packet, gempba::task_packet>(*lb_cpp, parent_local, std::move(cpp_fn), std::move(cpp_lazy), identity_ser(), identity_deser_value());
 
             *out = wrapper.release();
             return GEMPBA_OK;
@@ -364,7 +367,7 @@ extern "C" {
 
     gempba_load_balancer_t gempba_mp_create_load_balancer(gempba_balancing_policy_t policy, gempba_scheduler_t scheduler) {
         GEMPBA_TRY
-            auto* lb = gempba::multiprocessing::create_load_balancer(static_cast<gempba::balancing_policy>(policy), scheduler ? scheduler->cpp : nullptr);
+            auto* lb = gempba::create_load_balancer(static_cast<gempba::balancing_policy>(policy), scheduler ? scheduler->cpp : nullptr);
             return reinterpret_cast<gempba_load_balancer_t>(lb);
         GEMPBA_CATCH_RETURN_NULL
     }
@@ -372,7 +375,7 @@ extern "C" {
     gempba_node_manager_t gempba_mp_create_node_manager(gempba_load_balancer_t lb, gempba_scheduler_t scheduler) {
         GEMPBA_TRY
             auto* lb_cpp = reinterpret_cast<gempba::load_balancer*>(lb);
-            return reinterpret_cast<gempba_node_manager_t>(&gempba::multiprocessing::create_node_manager(lb_cpp, scheduler ? scheduler->cpp : nullptr));
+            return reinterpret_cast<gempba_node_manager_t>(&gempba::create_node_manager(lb_cpp, scheduler ? scheduler->cpp : nullptr));
         GEMPBA_CATCH_RETURN_NULL
     }
 
@@ -393,8 +396,8 @@ extern "C" {
             auto cpp_fn = make_cpp_runnable(holder, runnable, self);
             gempba::task_packet args_pkt = packet_from_borrowed(args);
 
-            wrapper->cpp = gempba::multiprocessing::create_explicit_node<gempba::task_packet, gempba::task_packet>(
-                    *lb_cpp, parent_local, std::move(cpp_fn), std::make_tuple(std::move(args_pkt)), identity_ser(), identity_deser_value());
+            wrapper->cpp = gempba::create_explicit_node<gempba::task_packet, gempba::task_packet>(*lb_cpp, parent_local, std::move(cpp_fn), std::make_tuple(std::move(args_pkt)),
+                                                                                                  identity_ser(), identity_deser_value());
 
             *out = wrapper.release();
             return GEMPBA_OK;
@@ -588,7 +591,7 @@ extern "C" {
                     if (c_out.data)
                         gempba_buffer_free(&c_out);
                 };
-                wrapper->cpp = gempba::multiprocessing::runnables::return_none::create<gempba::task_packet>(static_cast<int>(id), std::move(fn), identity_deser_rvalue());
+                wrapper->cpp = gempba::runnables::return_none::create<gempba::task_packet>(static_cast<int>(id), std::move(fn), identity_deser_rvalue());
             } else {
                 std::function<gempba::task_packet(std::thread::id, gempba::task_packet, gempba::node)> fn = [holder, runnable](std::thread::id tid, gempba::task_packet args,
                                                                                                                                const gempba::node&) -> gempba::task_packet {
@@ -603,8 +606,8 @@ extern "C" {
                     }
                     return packet_from_owned(&c_out);
                 };
-                wrapper->cpp = gempba::multiprocessing::runnables::return_value::create<gempba::task_packet, gempba::task_packet>(static_cast<int>(id), std::move(fn),
-                                                                                                                                  identity_deser_rvalue(), identity_ser());
+                wrapper->cpp =
+                        gempba::runnables::return_value::create<gempba::task_packet, gempba::task_packet>(static_cast<int>(id), std::move(fn), identity_deser_rvalue(), identity_ser());
             }
 
             *out = wrapper.release();
@@ -640,7 +643,7 @@ extern "C" {
                 set_last_error("out is null");
                 return GEMPBA_ERR_INVALID_ARG;
             }
-            auto* sched = gempba::multiprocessing::create_scheduler(static_cast<gempba::multiprocessing::scheduler_topology>(topology));
+            auto* sched = gempba::mpi::create_scheduler(static_cast<gempba::mpi::scheduler_topology>(topology));
             auto wrapper = std::make_unique<gempba_scheduler_s>();
             wrapper->cpp = sched;
             *out = wrapper.release();

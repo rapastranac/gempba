@@ -32,22 +32,6 @@
 #include <gempba/telemetry/telemetry_hub.hpp>
 #include <gempba/utils/gempba_utils.hpp>
 
-#if GEMPBA_MULTIPROCESSING
-    #include <gempba/defaults/default_mpi_stats_visitor.hpp>
-#endif
-
-// In a dependency consumer build (`GEMPBA_DEV_MODE=OFF`) the build flag selects exactly one
-// implementation namespace, which is then made `inline` so consumers can call
-// `gempba::create_*(...)` without typing `multithreading::` / `multiprocessing::`. In a
-// gempba root-project (dev) build we keep both namespaces compilable so changes can't silently
-// rot the off-mode; only `multiprocessing` is inline in that case (it is the superset). In-tree
-// tests and examples always use the explicit form for that reason.
-#if GEMPBA_MULTIPROCESSING
-    #define GEMPBA_INLINE_MT_NAMESPACE
-#else
-    #define GEMPBA_INLINE_MT_NAMESPACE inline
-#endif
-
 namespace gempba {
 
     /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -92,161 +76,117 @@ namespace gempba {
     void check_not_null([[maybe_unused]] const node& p_parent);
 
     /////////////////////////////////////////////////////////////////////////////////////////////////
-    /// LOAD BALANCING (mode-agnostic)
+    /// LOAD BALANCING
     /// /////////////////////////////////////////////////////////////////////////////////////////////
-    /**
-     * @brief Take ownership of a caller-provided `load_balancer` implementation.
-     *
-     * Behaves identically in MT and MP builds; the worker pointer (when relevant) is part of the
-     * caller-provided instance.
-     */
+    /** @brief Take ownership of a caller-provided `load_balancer` implementation. */
     load_balancer* create_load_balancer(std::unique_ptr<load_balancer> p_your_implementation);
 
-#if !GEMPBA_MULTIPROCESSING || GEMPBA_DEV_MODE
-    GEMPBA_INLINE_MT_NAMESPACE namespace multithreading {
-        /////////////////////////////////////////////////////////////////////////////////////////////////
-        /// LOAD BALANCING
-        /// /////////////////////////////////////////////////////////////////////////////////////////////
-        load_balancer* create_load_balancer(const balancing_policy& p_policy);
+    /**
+     * @brief Create the built-in load balancer for @p p_policy.
+     *
+     * @param p_scheduler The scheduler that sends tasks to other ranks, or nullptr in a single-process run.
+     */
+    load_balancer* create_load_balancer(const balancing_policy& p_policy, scheduler* p_scheduler = nullptr);
 
-        /////////////////////////////////////////////////////////////////////////////////////////////////
-        /// BRANCH HANDLING
-        /// /////////////////////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////////////////
+    /// BRANCH HANDLING
+    /// /////////////////////////////////////////////////////////////////////////////////////////////
+    /**
+     * @brief Create the node manager over @p p_load_balancer.
+     *
+     * @param p_scheduler The scheduler that sends tasks to other ranks, or nullptr in a single-process run.
+     */
+    node_manager& create_node_manager(load_balancer* p_load_balancer, scheduler* p_scheduler = nullptr);
 
-        node_manager& create_node_manager(load_balancer * p_load_balancer);
+    /////////////////////////////////////////////////////////////////////////////////////////////////
+    /// SERIAL RUNNABLES
+    /// /////////////////////////////////////////////////////////////////////////////////////////////
 
-        /////////////////////////////////////////////////////////////////////////////////////////////////
-        /// NODES
-        /// /////////////////////////////////////////////////////////////////////////////////////////////
-
-        template<typename Ret, typename... Args>
-        static node create_explicit_node(load_balancer & p_load_balancer, node & p_parent, invokable<Ret, Args...> auto&& p_runnable, std::tuple<Args...>&& p_args) {
-            check_not_null(p_parent);
-
-            const std::function<std::shared_ptr<node_core>(std::shared_ptr<node_core>)> v_factory = [&](std::shared_ptr<node_core> p_core_parent) {
-                auto v_core = node_core_impl<Ret(Args...)>::create_explicit(p_load_balancer, p_core_parent, p_runnable, std::move(p_args));
-                return v_core;
-            };
-            return node::create(p_parent, v_factory);
+    namespace runnables::return_none {
+        template<typename... Args>
+        std::shared_ptr<serial_runnable> create(const int p_id, invokable<void, Args...> auto&& p_invokable,
+                                                const std::function<std::tuple<Args...>(const task_packet&&)>& p_args_deserializer) {
+            return std::make_shared<serial_runnable_void<void(Args...)>>(p_id, p_invokable, p_args_deserializer);
         }
+    } // namespace runnables::return_none
 
-        template<typename Ret, typename... Args>
-        static node create_lazy_node(load_balancer & p_load_balancer, const node& p_parent, invokable<Ret, Args...> auto&& p_runnable,
-                                     std::function<std::optional<std::tuple<Args...>>()> p_args_initializer) {
-            check_not_null(p_parent);
-
-            const std::function<std::shared_ptr<node_core>(std::shared_ptr<node_core>)> v_factory = [&](std::shared_ptr<node_core> p_core_parent) {
-                auto v_node_core = node_core_impl<Ret(Args...)>::create_lazy(p_load_balancer, p_core_parent, p_runnable, p_args_initializer);
-                return v_node_core;
-            };
-
-            return node::create(p_parent, v_factory);
+    namespace runnables::return_value {
+        template<typename R, typename... Args>
+        std::shared_ptr<serial_runnable> create(const int p_id, invokable<R, Args...> auto&& p_invokable, const std::function<std::tuple<Args...>(const task_packet&&)>& p_args_deserializer,
+                                                const std::function<task_packet(R)>& p_result_serializer) {
+            return std::make_shared<serial_runnable_non_void<R(Args...)>>(p_id, p_invokable, p_args_deserializer, p_result_serializer);
         }
+    } // namespace runnables::return_value
 
-    } // namespace multithreading
-#endif // !GEMPBA_MULTIPROCESSING || GEMPBA_DEV_MODE
+    /////////////////////////////////////////////////////////////////////////////////////////////////
+    /// NODES
+    /// /////////////////////////////////////////////////////////////////////////////////////////////
 
-#if GEMPBA_MULTIPROCESSING
-    inline namespace multiprocessing {
+    template<typename Ret, typename... Args>
+    static node create_explicit_node(load_balancer& p_load_balancer, node& p_parent, invokable<Ret, Args...> auto&& p_runnable, std::tuple<Args...>&& p_args) {
+        check_not_null(p_parent);
 
-        /////////////////////////////////////////////////////////////////////////////////////////////////
-        /// SCHEDULING
-        /// /////////////////////////////////////////////////////////////////////////////////////////////
-        enum scheduler_topology {
-            SEMI_CENTRALIZED,
-            CENTRALIZED,
+        const std::function<std::shared_ptr<node_core>(std::shared_ptr<node_core>)> v_factory = [&](std::shared_ptr<node_core> p_core_parent) {
+            auto v_core = node_core_impl<Ret(Args...)>::create_explicit(p_load_balancer, p_core_parent, p_runnable, std::move(p_args));
+            return v_core;
+        };
+        return node::create(p_parent, v_factory);
+    }
+
+    template<typename Ret, typename... Args>
+    static node create_lazy_node(load_balancer& p_load_balancer, const node& p_parent, invokable<Ret, Args...> auto&& p_runnable,
+                                 std::function<std::optional<std::tuple<Args...>>()> p_args_initializer) {
+        check_not_null(p_parent);
+
+        const std::function<std::shared_ptr<node_core>(std::shared_ptr<node_core>)> v_factory = [&](std::shared_ptr<node_core> p_core_parent) {
+            auto v_node_core = node_core_impl<Ret(Args...)>::create_lazy(p_load_balancer, p_core_parent, p_runnable, p_args_initializer);
+            return v_node_core;
         };
 
-        scheduler* create_scheduler(std::unique_ptr<scheduler> p_your_implementation);
+        return node::create(p_parent, v_factory);
+    }
 
-        scheduler* create_scheduler(const scheduler_topology& p_topology);
+    /////////////////////////////////////////////////////////////////////////////////////////////////
+    /// NODES THAT CAN RUN ON OTHER RANKS
+    /// /////////////////////////////////////////////////////////////////////////////////////////////
 
-        /////////////////////////////////////////////////////////////////////////////////////////////////
-        /// LOAD BALANCING
-        /// /////////////////////////////////////////////////////////////////////////////////////////////
+    template<typename Ret, typename... Args>
+    static node create_explicit_node(load_balancer& p_load_balancer, const node& p_parent, invokable<Ret, Args...> auto&& p_runnable, std::tuple<Args...>&& p_args,
+                                     std::function<task_packet(Args...)> p_args_serializer, std::function<std::tuple<Args...>(task_packet)> p_args_deserializer) {
+        check_not_null(p_parent);
 
-        load_balancer* create_load_balancer(const balancing_policy& p_policy, scheduler* p_scheduler);
+        const std::function<std::shared_ptr<node_core>(std::shared_ptr<node_core>)> v_factory = [&](std::shared_ptr<node_core> p_core_parent) {
+            auto v_core = node_core_impl<Ret(Args...)>::create_serializable_explicit(p_load_balancer, p_core_parent, p_runnable, std::move(p_args), p_args_serializer, p_args_deserializer);
+            return v_core;
+        };
+        return node::create(p_parent, v_factory);
+    }
 
-        /////////////////////////////////////////////////////////////////////////////////////////////////
-        /// STATISTICS
-        /// /////////////////////////////////////////////////////////////////////////////////////////////
+    template<typename Ret, typename... Args>
+    static node create_lazy_node(load_balancer& p_load_balancer, const node& p_parent, invokable<Ret, Args...> auto&& p_runnable,
+                                 std::function<std::optional<std::tuple<Args...>>()> p_args_initializer, std::function<task_packet(Args...)> p_args_serializer,
+                                 std::function<std::tuple<Args...>(task_packet)> p_args_deserializer) {
+        check_not_null(p_parent);
+        const std::function<std::shared_ptr<node_core>(std::shared_ptr<node_core>)> v_factory = [&](std::shared_ptr<node_core> p_core_parent) {
+            auto v_node_core = node_core_impl<Ret(Args...)>::create_serializable_lazy(p_load_balancer, p_core_parent, p_runnable, p_args_initializer, p_args_serializer, p_args_deserializer);
+            return v_node_core;
+        };
 
-        std::unique_ptr<default_mpi_stats_visitor> get_default_mpi_stats_visitor();
+        return node::create(p_parent, v_factory);
+    }
 
-        /////////////////////////////////////////////////////////////////////////////////////////////////
-        /// BRANCH HANDLING
-        /// /////////////////////////////////////////////////////////////////////////////////////////////
-        node_manager& create_node_manager(load_balancer* p_load_balancer, scheduler* p_scheduler);
+    template<typename Ret, typename... Args>
+    static node create_from_bytes_node(load_balancer& p_load_balancer, const node& p_parent, invokable<Ret, Args...> auto&& p_f, std::function<task_packet(Args...)> p_args_serializer,
+                                       std::function<std::tuple<Args...>(task_packet)> p_args_deserializer) {
+        check_not_null(p_parent);
 
-        /////////////////////////////////////////////////////////////////////////////////////////////////
-        /// SERIAL RUNNABLES
-        /// /////////////////////////////////////////////////////////////////////////////////////////////
+        const std::function<std::shared_ptr<node_core>(std::shared_ptr<node_core>)> v_factory = [&](std::shared_ptr<node_core> p_core_parent) {
+            auto v_serializable_node_core = node_core_impl<Ret(Args...)>::create_serializable(p_load_balancer, p_core_parent, p_f, p_args_serializer, p_args_deserializer);
+            return v_serializable_node_core;
+        };
+        return node::create(p_parent, v_factory);
+    }
 
-        namespace runnables::return_none {
-            template<typename... Args>
-            std::shared_ptr<serial_runnable> create(const int p_id, invokable<void, Args...> auto&& p_invokable,
-                                                    const std::function<std::tuple<Args...>(const task_packet&&)>& p_args_deserializer) {
-                return std::make_shared<serial_runnable_void<void(Args...)>>(p_id, p_invokable, p_args_deserializer);
-            }
-        } // namespace runnables::return_none
-
-        namespace runnables::return_value {
-            template<typename R, typename... Args>
-            std::shared_ptr<serial_runnable> create(const int p_id, invokable<R, Args...> auto&& p_invokable,
-                                                    const std::function<std::tuple<Args...>(const task_packet&&)>& p_args_deserializer,
-                                                    const std::function<task_packet(R)>& p_result_serializer) {
-                return std::make_shared<serial_runnable_non_void<R(Args...)>>(p_id, p_invokable, p_args_deserializer, p_result_serializer);
-            }
-        } // namespace runnables::return_value
-
-
-        /////////////////////////////////////////////////////////////////////////////////////////////////
-        /// NODES
-        /// /////////////////////////////////////////////////////////////////////////////////////////////
-
-        template<typename Ret, typename... Args>
-        static node create_explicit_node(load_balancer& p_load_balancer, const node& p_parent, invokable<Ret, Args...> auto&& p_runnable, std::tuple<Args...>&& p_args,
-                                         std::function<task_packet(Args...)> p_args_serializer, std::function<std::tuple<Args...>(task_packet)> p_args_deserializer) {
-            check_not_null(p_parent);
-
-            const std::function<std::shared_ptr<node_core>(std::shared_ptr<node_core>)> v_factory = [&](std::shared_ptr<node_core> p_core_parent) {
-                auto v_core =
-                        node_core_impl<Ret(Args...)>::create_serializable_explicit(p_load_balancer, p_core_parent, p_runnable, std::move(p_args), p_args_serializer, p_args_deserializer);
-                return v_core;
-            };
-            return node::create(p_parent, v_factory);
-        }
-
-        template<typename Ret, typename... Args>
-        static node create_lazy_node(load_balancer& p_load_balancer, const node& p_parent, invokable<Ret, Args...> auto&& p_runnable,
-                                     std::function<std::optional<std::tuple<Args...>>()> p_args_initializer, std::function<task_packet(Args...)> p_args_serializer,
-                                     std::function<std::tuple<Args...>(task_packet)> p_args_deserializer) {
-            check_not_null(p_parent);
-            const std::function<std::shared_ptr<node_core>(std::shared_ptr<node_core>)> v_factory = [&](std::shared_ptr<node_core> p_core_parent) {
-                auto v_node_core =
-                        node_core_impl<Ret(Args...)>::create_serializable_lazy(p_load_balancer, p_core_parent, p_runnable, p_args_initializer, p_args_serializer, p_args_deserializer);
-                return v_node_core;
-            };
-
-            return node::create(p_parent, v_factory);
-        }
-
-        template<typename Ret, typename... Args>
-        static node create_from_bytes_node(load_balancer& p_load_balancer, const node& p_parent, invokable<Ret, Args...> auto&& p_f, std::function<task_packet(Args...)> p_args_serializer,
-                                           std::function<std::tuple<Args...>(task_packet)> p_args_deserializer) {
-            check_not_null(p_parent);
-
-            const std::function<std::shared_ptr<node_core>(std::shared_ptr<node_core>)> v_factory = [&](std::shared_ptr<node_core> p_core_parent) {
-                auto v_serializable_node_core = node_core_impl<Ret(Args...)>::create_serializable(p_load_balancer, p_core_parent, p_f, p_args_serializer, p_args_deserializer);
-                return v_serializable_node_core;
-            };
-            return node::create(p_parent, v_factory);
-        }
-
-    } // namespace multiprocessing
-#endif // GEMPBA_MULTIPROCESSING
 } // namespace gempba
-
-#undef GEMPBA_INLINE_MT_NAMESPACE
 
 #endif // GEMPBA_GEMPBA_HPP
