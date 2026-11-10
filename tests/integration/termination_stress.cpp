@@ -48,7 +48,7 @@ int main(const int p_argc, char* p_argv[]) {
     const int v_max_depth = std::stoi(p_argv[1]);
     const std::string_view v_topology_name = p_argv[2];
 
-    gempba::scheduler* v_scheduler = gempba::create_scheduler(leaf_count::parse_topology(v_topology_name));
+    gempba::scheduler* v_scheduler = gempba::mpi::create_scheduler(leaf_count::parse_topology(v_topology_name));
     const int v_rank = v_scheduler->rank_me();
     const auto v_counter = leaf_count::run(*v_scheduler, v_max_depth);
     v_scheduler->barrier();

@@ -1,0 +1,19 @@
+/* What libgempba and libgempba_mpi export on Linux: gempba's own symbols. The std:: template code they instantiate with
+   spdlog's and fmt's types would otherwise be exported too, since libstdc++ gives its templates default visibility. */
+{
+  global:
+    extern "C++" {
+      gempba::*;
+      utils::*;
+      tree::*;
+      "typeinfo for gempba::*";
+      "typeinfo name for gempba::*";
+      "vtable for gempba::*";
+      "VTT for gempba::*";
+      "non-virtual thunk to gempba::*";
+      "virtual thunk to gempba::*";
+    };
+    gempba_*;
+  local:
+    *;
+};

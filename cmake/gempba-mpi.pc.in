@@ -1,0 +1,11 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=${prefix}/@CMAKE_INSTALL_LIBDIR@
+includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+
+Name: gempba-mpi
+Description: GemPBA's MPI component — the schedulers that run a search across MPI ranks
+Version: @PROJECT_VERSION@
+Requires: gempba ompi-cxx
+Libs: -L${libdir} -lgempba_mpi
+Cflags: -I${includedir}

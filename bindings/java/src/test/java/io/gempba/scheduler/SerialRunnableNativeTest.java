@@ -9,7 +9,6 @@ import io.gempba.value.ScoreType;
 
 import io.gempba.internal.GemPBANative;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.nio.ByteBuffer;
@@ -19,7 +18,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * JNI-level tests for {@code gempba::mp::serial_runnable} bindings.
@@ -33,7 +31,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * </ul>
  *
  * <p>Each test creates its own load balancer and node manager via
- * {@link GemPBANative.MT} and tears down with {@link GemPBANative#shutdown()}.
+ * {@link GemPBANative#createLoadBalancer} and tears down with {@link GemPBANative#shutdown()}.
  */
 class SerialRunnableNativeTest {
 
@@ -41,40 +39,6 @@ class SerialRunnableNativeTest {
      * Convenience: 4 bytes encoding the integer 42.
      */
     private static final byte[] BYTES_42 = ByteBuffer.allocate(4).putInt(42).array();
-
-    /**
-     * The multiprocessing JAR can be loaded against an MT-flavored
-     * {@code gempba_jni} (built with {@code GEMPBA_MULTIPROCESSING=OFF}) if a
-     * developer rebuilt the native for one variant and then ran tests under
-     * the other.  In that case every {@code gempba_serial_runnable_*} call
-     * resolves to a stub that throws {@code RuntimeException}.  Probe once
-     * here so the whole class skips with a clear message instead of failing
-     * each method with the same noise.
-     *
-     * <p>The probe uses an unregistered placeholder {@link SerialRunnable}
-     * because the JNI {@code create} shim short-circuits to {@code 0L} on a
-     * null callback (it can't take a global ref), so a null probe would
-     * never reach the C ABI stub at all.
-     */
-    @BeforeAll
-    static void requireMultiprocessingNative() {
-        SerialRunnable probe = new SerialRunnable(-1, 0L, (tid, args) -> null);
-        long handle = 0L;
-        try {
-            handle = GemPBANative.SerialRunnable.create(-1, probe, false);
-        } catch (RuntimeException e) {
-            String msg = e.getMessage();
-            assumeTrue(
-                    msg == null || !msg.contains("GEMPBA_MULTIPROCESSING"),
-                    "Native gempba_jni was built without GEMPBA_MULTIPROCESSING; " +
-                            "rebuild it via scripts/build_jar_<os>.sh MP (or pass " +
-                            "-DGEMPBA_MULTIPROCESSING=ON to cmake) to run these tests.");
-            throw e; // some other RuntimeException — re-raise
-        } finally {
-            if (handle != 0L) GemPBANative.SerialRunnable.destroy(handle);
-            GemPBANative.shutdown();
-        }
-    }
 
     @AfterEach
     void tearDown() {
@@ -246,8 +210,8 @@ class SerialRunnableNativeTest {
     // ─── Helpers ─────────────────────────────────────────────────────────────
 
     private static long createNM() {
-        long lbHandle = GemPBANative.MT.createLoadBalancer(BalancingPolicy.QUASI_HORIZONTAL.ordinal());
-        long nmHandle = GemPBANative.MT.createNodeManager(lbHandle);
+        long lbHandle = GemPBANative.createLoadBalancer(BalancingPolicy.QUASI_HORIZONTAL.ordinal(), 0L);
+        long nmHandle = GemPBANative.createNodeManager(lbHandle, 0L);
         NodeManager nm = new NodeManager(nmHandle);
         nm.setGoal(Goal.MAXIMISE, ScoreType.I32);
         nm.setThreadPoolSize(2);

@@ -5,9 +5,9 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <gempba/export.h>
 #include <gempba/telemetry/frames.hpp>
 #include <gempba/telemetry/runtime_mode.hpp>
-#include <gempba/telemetry/telemetry_transport.hpp>
 #include <gempba/telemetry/topology.hpp>
 #include <gempba/utils/gempba_utils.hpp>
 #include <memory>
@@ -35,6 +35,7 @@ namespace gempba::telemetry {
     class process_probe;
     class node_probe;
     class aggregator_tcp_server;
+    class telemetry_transport;
 
     /**
      * @brief Process-wide runtime-telemetry hub.
@@ -47,7 +48,7 @@ namespace gempba::telemetry {
      * One hub per process. Use the free functions @ref install, @ref get,
      * @ref uninstall to manage the singleton.
      */
-    class telemetry_hub {
+    class GEMPBA_API telemetry_hub {
     public:
         telemetry_hub();
         ~telemetry_hub();
@@ -56,13 +57,13 @@ namespace gempba::telemetry {
         telemetry_hub& operator=(const telemetry_hub&) = delete;
 
         /**
-         * @brief Bind the hub to a runtime mode and start the transport.
+         * @brief Bind the hub to a single-process run, with an in-process transport.
          *
          * Call once after the runtime is up and the rank / world_size
          * are known. Sets up the transport, populates the topology snapshot,
          * and (on the aggregator) starts the dashboard server.
          *
-         * @param p_mode              Runtime mode driving transport choice.
+         * @param p_mode              Runtime mode the frames report.
          * @param p_rank              This rank (0..world_size-1).
          * @param p_world_size        Total rank count in this run.
          * @param p_start_pump_thread When @c false, the periodic pump thread
@@ -71,6 +72,9 @@ namespace gempba::telemetry {
          *                            then be called manually. Used by tests.
          */
         void on_runtime_ready(runtime_mode p_mode, std::uint32_t p_rank, std::uint32_t p_world_size, bool p_start_pump_thread = true);
+
+        /** @brief Like the overload above, reaching the other ranks through @p p_transport. */
+        void on_runtime_ready(runtime_mode p_mode, std::uint32_t p_rank, std::uint32_t p_world_size, std::unique_ptr<telemetry_transport> p_transport, bool p_start_pump_thread = true);
 
         /// Stop the pump, drain a final frame, and release transport resources.
         void shutdown();
@@ -279,7 +283,7 @@ namespace gempba::telemetry {
     };
 
     /// @return The installed hub, or @c nullptr when none is installed.
-    telemetry_hub* get() noexcept;
+    GEMPBA_API telemetry_hub* get() noexcept;
 
     /**
      * @brief Annotate the current run on the installed hub; see @ref telemetry_hub::annotate_run.
@@ -288,7 +292,7 @@ namespace gempba::telemetry {
      *
      * @return whether the pair was kept
      */
-    bool annotate_run(std::string_view p_key, std::string_view p_value);
+    GEMPBA_API bool annotate_run(std::string_view p_key, std::string_view p_value);
 
     /**
      * @brief Record a marker on the installed hub; see @ref telemetry_hub::mark_run.
@@ -297,13 +301,13 @@ namespace gempba::telemetry {
      *
      * @return whether the marker was kept
      */
-    bool mark_run(std::string_view p_label);
+    GEMPBA_API bool mark_run(std::string_view p_label);
 
     /// Install @p p_hub as the process-wide singleton; transfers ownership.
-    void install(std::unique_ptr<telemetry_hub> p_hub) noexcept;
+    GEMPBA_API void install(std::unique_ptr<telemetry_hub> p_hub) noexcept;
 
     /// Tear down and destroy the installed hub. No-op when none is installed.
-    void uninstall() noexcept;
+    GEMPBA_API void uninstall() noexcept;
 
     /**
      * @brief Tear down the installed hub and block subsequent @ref install calls until @ref enable.
@@ -314,13 +318,13 @@ namespace gempba::telemetry {
      * to call @ref disable on every rank before any @c create_* runtime entry
      * point.
      */
-    void disable() noexcept;
+    GEMPBA_API void disable() noexcept;
 
     /// Lift a prior @ref disable; subsequent @ref install calls take effect again.
-    void enable() noexcept;
+    GEMPBA_API void enable() noexcept;
 
     /// @return @c true when the kill switch is in the @ref enable state.
-    [[nodiscard]] bool is_enabled() noexcept;
+    [[nodiscard]] GEMPBA_API bool is_enabled() noexcept;
 
     /**
      * @brief Set the TCP port the aggregator will bind for the dashboard.
@@ -328,7 +332,7 @@ namespace gempba::telemetry {
      * Must be called before the hub is installed (i.e., before the first
      * node_manager / scheduler is created). Default is 9000 if never called.
      */
-    void configure_port(std::uint16_t p_port) noexcept;
+    GEMPBA_API void configure_port(std::uint16_t p_port) noexcept;
 
 } // namespace gempba::telemetry
 

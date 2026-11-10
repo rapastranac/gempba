@@ -62,11 +62,6 @@ namespace gempba::cabi_tests {
 
     // ─── No-handle / null-arg guards ────────────────────────────────────────
 
-    TEST_F(cabi_scheduler_test, create_null_out_returns_invalid_arg) {
-        EXPECT_EQ(gempba_scheduler_create(GEMPBA_TOPOLOGY_CENTRALIZED, /*out=*/nullptr), GEMPBA_ERR_INVALID_ARG);
-        EXPECT_NE(gempba_last_error_message(), nullptr);
-    }
-
     TEST_F(cabi_scheduler_test, destroy_null_is_safe) {
         gempba_scheduler_destroy(nullptr);
         SUCCEED();
@@ -88,6 +83,28 @@ namespace gempba::cabi_tests {
     static gempba_scheduler_t handle_for(scheduler_mock& p_mock, gempba_scheduler_s& p_storage) {
         p_storage.cpp = &p_mock;
         return reinterpret_cast<gempba_scheduler_t>(&p_storage);
+    }
+
+    /** A scheduler that records its destruction, standing in for the one the core's registry owns. */
+    class destruction_witness final : public scheduler_mock {
+    public:
+        explicit destruction_witness(bool& p_destroyed) : m_destroyed(p_destroyed) {}
+        ~destruction_witness() override { m_destroyed = true; }
+
+    private:
+        bool& m_destroyed;
+    };
+
+    TEST_F(cabi_scheduler_test, destroy_frees_the_handle_and_leaves_the_scheduler_to_shutdown) {
+        bool v_destroyed = false;
+        auto* v_scheduler = new destruction_witness(v_destroyed);
+
+        gempba_scheduler_destroy(new gempba_scheduler_s{v_scheduler});
+
+        EXPECT_FALSE(v_destroyed);
+        if (!v_destroyed) {
+            delete v_scheduler;
+        }
     }
 
     TEST_F(cabi_scheduler_test, barrier_dispatches_to_underlying_scheduler) {

@@ -33,28 +33,19 @@ namespace gempba::cabi_tests {
 
     class cabi_load_balancer_test : public cabi_fixture {};
 
-    TEST_F(cabi_load_balancer_test, mt_create_returns_same_as_singleton) {
-        gempba_load_balancer_t v_lb = gempba_mt_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING);
+    TEST_F(cabi_load_balancer_test, create_returns_same_as_singleton) {
+        gempba_load_balancer_t v_lb = gempba_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING, /*scheduler=*/nullptr);
         ASSERT_NE(v_lb, nullptr);
         EXPECT_EQ(v_lb, gempba_get_load_balancer());
     }
 
-    TEST_F(cabi_load_balancer_test, mt_create_twice_returns_null_with_error) {
-        gempba_load_balancer_t v_first = gempba_mt_create_load_balancer(GEMPBA_BALANCING_QUASI_HORIZONTAL);
+    TEST_F(cabi_load_balancer_test, create_twice_returns_null_with_error) {
+        gempba_load_balancer_t v_first = gempba_create_load_balancer(GEMPBA_BALANCING_QUASI_HORIZONTAL, /*scheduler=*/nullptr);
         ASSERT_NE(v_first, nullptr);
 
-        gempba_load_balancer_t v_second = gempba_mt_create_load_balancer(GEMPBA_BALANCING_QUASI_HORIZONTAL);
+        gempba_load_balancer_t v_second = gempba_create_load_balancer(GEMPBA_BALANCING_QUASI_HORIZONTAL, /*scheduler=*/nullptr);
         EXPECT_EQ(v_second, nullptr);
         EXPECT_NE(gempba_last_error_message(), nullptr);
-    }
-
-    TEST_F(cabi_load_balancer_test, mp_create_with_null_worker_succeeds) {
-        // In an MP/DEV build, gempba_mp_create_load_balancer(policy, NULL)
-        // hits the same underlying multiprocessing::create_load_balancer
-        // overload the MT shim uses, but through the MP-side entry point.
-        gempba_load_balancer_t v_lb = gempba_mp_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING, /*scheduler=*/nullptr);
-        ASSERT_NE(v_lb, nullptr);
-        EXPECT_EQ(v_lb, gempba_get_load_balancer());
     }
 
 } // namespace gempba::cabi_tests

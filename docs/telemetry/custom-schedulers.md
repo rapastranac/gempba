@@ -1,6 +1,6 @@
 # Feeding telemetry from a custom scheduler
 
-A scheduler passed to `gempba::multiprocessing::create_scheduler(std::unique_ptr<scheduler>)` gets telemetry the same way the built-in schedulers do. What reaches the dashboard depends on the rules below. The words rank, coordinator, worker, aggregator and sentinel mean what [the wire format's vocabulary](wire-format.md#vocabulary) says.
+A scheduler passed to `gempba::mpi::create_scheduler(std::unique_ptr<scheduler>)` gets telemetry the same way the built-in schedulers do. What reaches the dashboard depends on the rules below. The words rank, coordinator, worker, aggregator and sentinel mean what [the wire format's vocabulary](wire-format.md#vocabulary) says.
 
 ## What your scheduler implements
 

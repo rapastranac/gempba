@@ -31,6 +31,7 @@
 #include <cmath>
 #include <format>
 #include <future>
+#include <gempba/export.h>
 #include <gempba/utils/gempba_utils.hpp>
 #include <gempba/utils/score.hpp>
 #include <gempba/utils/tree.hpp>
@@ -46,10 +47,10 @@
  */
 namespace utils {
     /// Formats @p p_format with @p p_args and writes the result through gempba's logger at debug level, formatting nothing when that level is off.
-    void vlog_debug(std::string_view p_format, std::format_args p_args);
+    GEMPBA_API void vlog_debug(std::string_view p_format, std::format_args p_args);
 
     /// Writes @p p_message through gempba's logger at error level.
-    void log_error(std::string_view p_message);
+    GEMPBA_API void log_error(std::string_view p_message);
 
     /// Writes the message formatted from @p p_format and @p p_args through gempba's logger at debug level, formatting it only when that level is on.
     template<typename... T>

@@ -30,6 +30,9 @@ set(TEST_DIR "${CMAKE_CURRENT_LIST_DIR}")
 # Collect all test source files recursively
 file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS "${TEST_DIR}/*.cpp")
 list(FILTER TEST_SOURCES EXCLUDE REGEX "/integration/")
+if (NOT TARGET gempba_mpi_objects)
+    list(FILTER TEST_SOURCES EXCLUDE REGEX "/unit/mpi/")
+endif ()
 
 # Ensure that source files are found
 if (NOT TEST_SOURCES)
@@ -43,7 +46,8 @@ add_executable(all_tests ${TEST_SOURCES})
 # Link necessary libraries
 target_link_libraries(all_tests
         PRIVATE
-        gempba
+        gempba_objects
+        $<TARGET_NAME_IF_EXISTS:gempba_mpi_objects>
         gempba_logging
         GTest::gtest
         GTest::gmock_main
@@ -76,9 +80,9 @@ gtest_discover_tests(all_tests
 message(STATUS "GTest test discovery enabled for all_tests executable")
 
 option(GEMPBA_MPI_INTEGRATION_TESTS "Register multi-rank MPI tests with CTest (runs mpiexec)" OFF)
-if (GEMPBA_MPI_INTEGRATION_TESTS)
+if (GEMPBA_MPI_INTEGRATION_TESTS AND TARGET gempba_mpi)
     add_executable(termination_stress integration/termination_stress.cpp)
-    target_link_libraries(termination_stress PRIVATE gempba)
+    target_link_libraries(termination_stress PRIVATE gempba_mpi)
     foreach (v_topology semi_centralized centralized)
         foreach (v_ranks 2 4 8)
             set(v_test_name mpi_termination_stress_${v_topology}_${v_ranks})
@@ -89,7 +93,7 @@ if (GEMPBA_MPI_INTEGRATION_TESTS)
     endforeach ()
 
     add_executable(telemetry_stress integration/telemetry_stress.cpp)
-    target_link_libraries(telemetry_stress PRIVATE gempba)
+    target_link_libraries(telemetry_stress PRIVATE gempba_mpi)
     if (WIN32)
         target_link_libraries(telemetry_stress PRIVATE ws2_32)
     endif ()

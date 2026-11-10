@@ -1,10 +1,12 @@
 #include <impl/telemetry/mpi_transport.hpp>
 #include <impl/telemetry/rank_frame_codec.hpp>
 
+#include <cstddef>
 #include <cstring>
 #include <deque>
 #include <mpi.h>
 #include <mutex>
+#include <span>
 #include <utility>
 #include <vector>
 
@@ -157,6 +159,34 @@ namespace gempba::telemetry {
     }
 
     std::uint32_t mpi_transport::final_frames_received() const { return m_impl->m_final_frames_received; }
+
+    std::vector<std::vector<std::byte>> mpi_transport::all_gather(const std::span<const std::byte> p_block) {
+        if (m_impl->m_comm == MPI_COMM_NULL) {
+            return {std::vector<std::byte>(p_block.begin(), p_block.end())};
+        }
+
+        const int v_size = static_cast<int>(p_block.size());
+        std::vector<int> v_sizes(static_cast<std::size_t>(m_impl->m_world_size));
+        MPI_Allgather(&v_size, 1, MPI_INT, v_sizes.data(), 1, MPI_INT, m_impl->m_comm);
+
+        std::vector<int> v_displacements(v_sizes.size());
+        int v_total = 0;
+        for (std::size_t v_i = 0; v_i < v_sizes.size(); ++v_i) {
+            v_displacements[v_i] = v_total;
+            v_total += v_sizes[v_i];
+        }
+
+        std::vector<std::byte> v_gathered(static_cast<std::size_t>(v_total));
+        MPI_Allgatherv(p_block.data(), v_size, MPI_BYTE, v_gathered.data(), v_sizes.data(), v_displacements.data(), MPI_BYTE, m_impl->m_comm);
+
+        std::vector<std::vector<std::byte>> v_blocks;
+        v_blocks.reserve(v_sizes.size());
+        for (std::size_t v_i = 0; v_i < v_sizes.size(); ++v_i) {
+            const auto v_begin = v_gathered.begin() + v_displacements[v_i];
+            v_blocks.emplace_back(v_begin, v_begin + v_sizes[v_i]);
+        }
+        return v_blocks;
+    }
 
     void mpi_transport::publish_node(const node_frame& p_frame) {
         if (m_impl->m_comm == MPI_COMM_NULL)

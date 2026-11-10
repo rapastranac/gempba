@@ -1,9 +1,20 @@
+#include <cstddef>
 #include <gempba/telemetry/frames.hpp>
 #include <gtest/gtest.h>
 #include <impl/telemetry/local_transport.hpp>
 #include <vector>
 
 namespace {
+
+    TEST(local_transport_test, all_gather_returns_this_ranks_block_alone) {
+        gempba::telemetry::local_transport v_transport;
+        const std::vector<std::byte> v_block{std::byte{1}, std::byte{2}, std::byte{3}};
+
+        const auto v_gathered = v_transport.all_gather(v_block);
+
+        ASSERT_EQ(1u, v_gathered.size());
+        EXPECT_EQ(v_block, v_gathered.front());
+    }
 
     TEST(local_transport_test, publish_then_poll_delivers_rank_frame) {
         gempba::telemetry::local_transport v_transport;

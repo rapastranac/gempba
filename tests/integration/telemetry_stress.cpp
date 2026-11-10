@@ -34,8 +34,8 @@
 
 #include "leaf_count.hpp"
 
-#include <gempba/defaults/default_mpi_stats_visitor.hpp>
 #include <gempba/gempba.hpp>
+#include <gempba/mpi/default_mpi_stats_visitor.hpp>
 #include <gempba/telemetry/frames.hpp>
 #include <gempba/telemetry/telemetry_hub.hpp>
 #include <mpi.h>
@@ -217,7 +217,7 @@ int main(const int p_argc, char* p_argv[]) {
     const std::uint16_t v_port = free_loopback_port();
     gempba::telemetry::configure_port(v_port);
 
-    gempba::scheduler* v_scheduler = gempba::create_scheduler(leaf_count::parse_topology(v_topology_name));
+    gempba::scheduler* v_scheduler = gempba::mpi::create_scheduler(leaf_count::parse_topology(v_topology_name));
     const int v_rank = v_scheduler->rank_me();
     const int v_world_size = v_scheduler->world_size();
     checks v_checks(v_rank);

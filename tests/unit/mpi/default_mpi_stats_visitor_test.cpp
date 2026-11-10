@@ -1,4 +1,4 @@
-#include <gempba/defaults/default_mpi_stats_visitor.hpp>
+#include <gempba/mpi/default_mpi_stats_visitor.hpp>
 #include <gtest/gtest.h>
 #include <impl/schedulers/default_mpi_stats.hpp>
 

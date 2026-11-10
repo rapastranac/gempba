@@ -1,13 +1,67 @@
+#include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <gempba/telemetry/runtime_mode.hpp>
 #include <gempba/telemetry/telemetry_hub.hpp>
 #include <gtest/gtest.h>
+#include <impl/telemetry/local_transport.hpp>
+#include <impl/telemetry/telemetry_transport.hpp>
 #include <impl/telemetry/topology_builder.hpp>
+#include <optional>
+#include <span>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace {
 
+    gempba::telemetry::topology_snapshot one_rank_snapshot(const std::uint32_t p_rank, const gempba::rank_role p_role = gempba::rank_role::WORKER) {
+        gempba::telemetry::local_transport v_transport;
+        return gempba::telemetry::build_topology_snapshot(v_transport, p_rank, 1, p_role);
+    }
+
+    /** @brief A transport whose all_gather calls return prepared replies in order, recording each block this rank sent. */
+    class scripted_transport final : public gempba::telemetry::telemetry_transport {
+    public:
+        explicit scripted_transport(std::vector<std::vector<std::vector<std::byte>>> p_replies) : m_replies(std::move(p_replies)) {}
+
+        void publish_rank(const gempba::telemetry::rank_frame&) override {}
+        void publish_node(const gempba::telemetry::node_frame&) override {}
+        void poll(const gempba::telemetry::rank_frame_sink&, const gempba::telemetry::node_frame_sink&) override {}
+        void send_control(std::uint32_t, const gempba::telemetry::control_msg&) override {}
+        std::optional<gempba::telemetry::control_msg> try_recv_control() override { return std::nullopt; }
+
+        std::vector<std::vector<std::byte>> all_gather(const std::span<const std::byte> p_block) override {
+            m_sent.emplace_back(p_block.begin(), p_block.end());
+            return m_replies.at(m_sent.size() - 1);
+        }
+
+        std::vector<std::vector<std::byte>> m_sent;
+
+    private:
+        std::vector<std::vector<std::vector<std::byte>>> m_replies;
+    };
+
+    std::vector<std::byte> identity_block(const std::uint32_t p_rank, const std::string& p_hostname) {
+        gempba::telemetry::rank_identity v_identity{};
+        v_identity.m_rank = p_rank;
+        std::strncpy(v_identity.m_hostname, p_hostname.c_str(), sizeof(v_identity.m_hostname) - 1);
+        const auto v_bytes = std::as_bytes(std::span(&v_identity, 1));
+        return {v_bytes.begin(), v_bytes.end()};
+    }
+
+    std::vector<std::byte> layout_block(const std::string& p_hostname, const std::uint16_t p_logical_cores) {
+        gempba::telemetry::topology_node v_node;
+        v_node.m_hostname = p_hostname;
+        v_node.m_total_logical_cores = p_logical_cores;
+        std::vector<std::uint8_t> v_bytes;
+        gempba::telemetry::detail::serialize_node_topology(v_bytes, v_node);
+        const auto v_view = std::as_bytes(std::span(v_bytes));
+        return {v_view.begin(), v_view.end()};
+    }
+
     TEST(topology_builder_test, mt_only_self_registers_one_node_one_rank) {
-        const auto v_snap = gempba::telemetry::build_topology_snapshot(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1);
+        const auto v_snap = one_rank_snapshot(0);
 
         ASSERT_EQ(1u, v_snap.m_identities.size());
         ASSERT_EQ(1u, v_snap.m_nodes.size());
@@ -21,27 +75,70 @@ namespace {
     }
 
     TEST(topology_builder_test, hostname_field_is_non_empty) {
-        const auto v_snap = gempba::telemetry::build_topology_snapshot(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1);
+        const auto v_snap = one_rank_snapshot(0);
         ASSERT_FALSE(v_snap.m_nodes.empty());
         EXPECT_FALSE(v_snap.m_nodes.front().m_hostname.empty());
         EXPECT_GT(std::strlen(v_snap.m_identities.front().m_hostname), 0u);
     }
 
     TEST(topology_builder_test, custom_rank_carried_through) {
-        const auto v_snap = gempba::telemetry::build_topology_snapshot(gempba::telemetry::runtime_mode::MT_ONLY, 7, 1);
+        const auto v_snap = one_rank_snapshot(7);
         ASSERT_FALSE(v_snap.m_identities.empty());
         EXPECT_EQ(7u, v_snap.m_identities.front().m_rank);
         EXPECT_EQ(7u, v_snap.m_nodes.front().m_sentinel_rank);
     }
 
     TEST(topology_builder_test, the_identity_carries_the_ranks_own_role) {
-        const auto v_worker = gempba::telemetry::build_topology_snapshot(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1);
+        const auto v_worker = one_rank_snapshot(0);
         ASSERT_FALSE(v_worker.m_identities.empty());
         EXPECT_EQ(gempba::rank_role::WORKER, v_worker.m_identities.front().m_role);
 
-        const auto v_coordinator = gempba::telemetry::build_topology_snapshot(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, gempba::rank_role::COORDINATOR);
+        const auto v_coordinator = one_rank_snapshot(0, gempba::rank_role::COORDINATOR);
         ASSERT_FALSE(v_coordinator.m_identities.empty());
         EXPECT_EQ(gempba::rank_role::COORDINATOR, v_coordinator.m_identities.front().m_role);
+    }
+
+    TEST(topology_builder_test, gathered_ranks_group_by_host_under_their_lowest_rank) {
+        scripted_transport v_transport({
+                {identity_block(0, "alpha"), identity_block(1, "beta"), identity_block(2, "alpha")},
+                {layout_block("alpha", 8), layout_block("beta", 4), {}},
+        });
+        const auto v_snap = gempba::telemetry::build_topology_snapshot(v_transport, 1, 3);
+
+        ASSERT_EQ(3u, v_snap.m_identities.size());
+        ASSERT_EQ(2u, v_snap.m_nodes.size());
+        EXPECT_EQ("alpha", v_snap.m_nodes[0].m_hostname);
+        EXPECT_EQ((std::vector<std::uint32_t>{0, 2}), v_snap.m_nodes[0].m_ranks);
+        EXPECT_EQ(0u, v_snap.m_nodes[0].m_sentinel_rank);
+        EXPECT_EQ(8u, v_snap.m_nodes[0].m_total_logical_cores);
+        EXPECT_EQ("beta", v_snap.m_nodes[1].m_hostname);
+        EXPECT_EQ(1u, v_snap.m_nodes[1].m_sentinel_rank);
+        EXPECT_EQ(4u, v_snap.m_nodes[1].m_total_logical_cores);
+    }
+
+    TEST(topology_builder_test, only_each_hosts_sentinel_sends_its_layout) {
+        const std::string v_host = one_rank_snapshot(0).m_nodes.front().m_hostname;
+        const std::vector<std::vector<std::vector<std::byte>>> v_replies{{identity_block(0, v_host), identity_block(1, v_host)}, {{}, {}}};
+        scripted_transport v_sentinel(v_replies);
+        scripted_transport v_other(v_replies);
+
+        gempba::telemetry::build_topology_snapshot(v_sentinel, 0, 2);
+        gempba::telemetry::build_topology_snapshot(v_other, 1, 2);
+
+        ASSERT_EQ(2u, v_sentinel.m_sent.size());
+        ASSERT_EQ(2u, v_other.m_sent.size());
+        EXPECT_EQ(sizeof(gempba::telemetry::rank_identity), v_sentinel.m_sent[0].size());
+        EXPECT_FALSE(v_sentinel.m_sent[1].empty());
+        EXPECT_TRUE(v_other.m_sent[1].empty());
+    }
+
+    TEST(topology_builder_test, one_gathered_rank_describes_its_own_host) {
+        scripted_transport v_transport({{identity_block(0, "alpha")}});
+        const auto v_snap = gempba::telemetry::build_topology_snapshot(v_transport, 0, 2);
+
+        ASSERT_EQ(1u, v_transport.m_sent.size());
+        ASSERT_EQ(1u, v_snap.m_nodes.size());
+        EXPECT_GE(v_snap.m_nodes.front().m_total_logical_cores, 1u);
     }
 
     TEST(topology_builder_test, hub_exposes_topology_after_runtime_ready) {
@@ -53,14 +150,14 @@ namespace {
     }
 
     TEST(topology_builder_test, node_carries_logical_cores_and_memory) {
-        const auto v_snap = gempba::telemetry::build_topology_snapshot(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1);
+        const auto v_snap = one_rank_snapshot(0);
         const auto& v_node = v_snap.m_nodes.front();
         EXPECT_GE(v_node.m_total_logical_cores, 1u);
         EXPECT_GT(v_node.m_mem_total_bytes, 0u);
     }
 
     TEST(topology_builder_test, node_has_one_synthetic_socket_with_cpu_ids) {
-        const auto v_snap = gempba::telemetry::build_topology_snapshot(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1);
+        const auto v_snap = one_rank_snapshot(0);
         const auto& v_node = v_snap.m_nodes.front();
         ASSERT_EQ(1u, v_node.m_sockets.size());
         const auto& v_sock = v_node.m_sockets.front();
@@ -73,7 +170,7 @@ namespace {
     }
 
     TEST(topology_builder_test, identity_affinity_mask_has_at_least_one_bit_set) {
-        const auto v_snap = gempba::telemetry::build_topology_snapshot(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1);
+        const auto v_snap = one_rank_snapshot(0);
         const auto& v_mask = v_snap.m_identities.front().m_allowed_cpu_mask;
         std::uint64_t v_any = 0;
         for (const std::uint64_t v_word: v_mask) {

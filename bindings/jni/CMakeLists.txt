@@ -27,10 +27,13 @@ target_include_directories(gempba_jni PRIVATE
 )
 
 # ─── Link ─────────────────────────────────────────────────────────────────────
-# gempba is a STATIC library; linking it into a SHARED lib embeds all its
-# symbols, so Java users only need the single .so / .dll artifact.
-# The JVM already provides every JNI function, so the library links no JVM library.
-target_link_libraries(gempba_jni PRIVATE gempba)
+# gempba's objects go into the library, the MPI component's too when it is built, so Java users only need the single
+# .so / .dll artifact. The JVM already provides every JNI function, so the library links no JVM library.
+target_link_libraries(gempba_jni PRIVATE gempba_objects)
+if (TARGET gempba_mpi_objects)
+    target_link_libraries(gempba_jni PRIVATE gempba_mpi_objects)
+    target_compile_definitions(gempba_jni PRIVATE GEMPBA_JNI_MPI=1)
+endif ()
 
 # The C++ runtime goes in too, so the library needs only the OS, the JVM and, for mp-mpi, MPI.
 if (MINGW)

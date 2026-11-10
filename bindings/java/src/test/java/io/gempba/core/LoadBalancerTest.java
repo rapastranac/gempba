@@ -30,14 +30,14 @@ class LoadBalancerTest {
 
     @Test
     void create_quasi_horizontal_load_balancer_returns_valid_handle() {
-        lbHandle = GemPBANative.MT.createLoadBalancer(BalancingPolicy.QUASI_HORIZONTAL.ordinal());
+        lbHandle = GemPBANative.createLoadBalancer(BalancingPolicy.QUASI_HORIZONTAL.ordinal(), 0L);
         assertNotEquals(0L, lbHandle,
                 "MT.createLoadBalancer(QUASI_HORIZONTAL) must return a non-zero handle");
     }
 
     @Test
     void create_work_stealing_load_balancer_returns_valid_handle() {
-        lbHandle = GemPBANative.MT.createLoadBalancer(BalancingPolicy.WORK_STEALING.ordinal());
+        lbHandle = GemPBANative.createLoadBalancer(BalancingPolicy.WORK_STEALING.ordinal(), 0L);
         assertNotEquals(0L, lbHandle,
                 "MT.createLoadBalancer(WORK_STEALING) must return a non-zero handle");
     }

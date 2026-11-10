@@ -2,6 +2,7 @@
 #define GEMPBA_TESTS_INTEGRATION_LEAF_COUNT_HPP
 
 #include <gempba/gempba.hpp>
+#include <gempba/mpi.hpp>
 
 #include <atomic>
 #include <cstring>
@@ -64,8 +65,8 @@ namespace leaf_count {
         std::function<std::tuple<int, int>(gempba::task_packet)> m_deserializer = [](const gempba::task_packet& p_packet) { return deserialize(p_packet); };
     };
 
-    inline gempba::scheduler_topology parse_topology(const std::string_view p_name) {
-        return p_name == "centralized" ? gempba::scheduler_topology::CENTRALIZED : gempba::scheduler_topology::SEMI_CENTRALIZED;
+    inline gempba::mpi::scheduler_topology parse_topology(const std::string_view p_name) {
+        return p_name == "centralized" ? gempba::mpi::scheduler_topology::CENTRALIZED : gempba::mpi::scheduler_topology::SEMI_CENTRALIZED;
     }
 
     /**

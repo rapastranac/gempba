@@ -65,9 +65,8 @@ PKG_CONFIG_PATH="$deps_prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}
     -Dfmt_DIR="$deps_prefix/lib/cmake/fmt" \
     -DGEMPBA_BUILD_JAVA_BINDING=ON \
     -DGEMPBA_JNI_CLASSIFIER="$classifier" \
-    -DGEMPBA_MULTIPROCESSING="$mp_flag" \
+    -DGEMPBA_BUILD_MPI="$mp_flag" \
     -DGEMPBA_HWLOC=ON \
-    -DGEMPBA_DEV_MODE=OFF \
     -DGEMPBA_BUILD_TESTS=OFF \
     -DGEMPBA_DEBUG_COMMENTS=OFF
 

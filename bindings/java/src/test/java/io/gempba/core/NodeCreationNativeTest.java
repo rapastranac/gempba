@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * <p>Uses {@link GemPBANative} directly without depending on {@link GemPBA}.
  */
-class MTNodeCreationNativeTest {
+class NodeCreationNativeTest {
 
     private static final byte[] INT_42 = ByteBuffer.allocate(4).putInt(42).array();
 
@@ -30,8 +30,8 @@ class MTNodeCreationNativeTest {
 
     @Test
     void createExplicitNode_returns_valid_handle() throws InterruptedException {
-        long lbHandle = GemPBANative.MT.createLoadBalancer(BalancingPolicy.QUASI_HORIZONTAL.ordinal());
-        long nmHandle = GemPBANative.MT.createNodeManager(lbHandle);
+        long lbHandle = GemPBANative.createLoadBalancer(BalancingPolicy.QUASI_HORIZONTAL.ordinal(), 0L);
+        long nmHandle = GemPBANative.createNodeManager(lbHandle, 0L);
         NodeManager nm = new NodeManager(nmHandle);
         nm.setGoal(Goal.MAXIMISE, ScoreType.I32);
         nm.setThreadPoolSize(1);
@@ -44,7 +44,7 @@ class MTNodeCreationNativeTest {
             nm.tryUpdateResult(42, Score.make(42));
             return null;
         });
-        child.state.handle = GemPBANative.MT.createExplicitNode(lbHandle, dummy.state.handle, child, null);
+        child.state.handle = GemPBANative.createExplicitNode(lbHandle, dummy.state.handle, child, null);
         assertNotEquals(0L, child.state.handle, "createExplicitNode must return a non-zero handle");
 
         assertTrue(nm.tryLocalSubmit(child));
@@ -58,8 +58,8 @@ class MTNodeCreationNativeTest {
 
     @Test
     void createLazyNode_executes_when_gate_passes() throws InterruptedException {
-        long lbHandle = GemPBANative.MT.createLoadBalancer(BalancingPolicy.QUASI_HORIZONTAL.ordinal());
-        NodeManager nm = new NodeManager(GemPBANative.MT.createNodeManager(lbHandle));
+        long lbHandle = GemPBANative.createLoadBalancer(BalancingPolicy.QUASI_HORIZONTAL.ordinal(), 0L);
+        NodeManager nm = new NodeManager(GemPBANative.createNodeManager(lbHandle, 0L));
         nm.setGoal(Goal.MAXIMISE, ScoreType.I32);
         nm.setThreadPoolSize(1);
         nm.setScore(Score.make(Integer.MIN_VALUE));
@@ -74,7 +74,7 @@ class MTNodeCreationNativeTest {
                     return null;
                 },
                 () -> Node.EMPTY_BYTES);   // non-null → proceed
-        lazy.state.handle = GemPBANative.MT.createLazyNode(lbHandle, dummy.state.handle, lazy, null);
+        lazy.state.handle = GemPBANative.createLazyNode(lbHandle, dummy.state.handle, lazy, null);
         assertNotEquals(0L, lazy.state.handle);
 
         assertTrue(nm.tryLocalSubmit(lazy));
@@ -87,8 +87,8 @@ class MTNodeCreationNativeTest {
 
     @Test
     void createLazyNode_pruned_when_gate_returns_null() throws InterruptedException {
-        long lbHandle = GemPBANative.MT.createLoadBalancer(BalancingPolicy.QUASI_HORIZONTAL.ordinal());
-        NodeManager nm = new NodeManager(GemPBANative.MT.createNodeManager(lbHandle));
+        long lbHandle = GemPBANative.createLoadBalancer(BalancingPolicy.QUASI_HORIZONTAL.ordinal(), 0L);
+        NodeManager nm = new NodeManager(GemPBANative.createNodeManager(lbHandle, 0L));
         nm.setGoal(Goal.MAXIMISE, ScoreType.I32);
         nm.setThreadPoolSize(1);
         nm.setScore(Score.make(0));   // sentinel: the pruned task would set 99 if it ran
@@ -103,7 +103,7 @@ class MTNodeCreationNativeTest {
                     return null;
                 },
                 () -> null);   // null → prune
-        lazy.state.handle = GemPBANative.MT.createLazyNode(lbHandle, dummy.state.handle, lazy, null);
+        lazy.state.handle = GemPBANative.createLazyNode(lbHandle, dummy.state.handle, lazy, null);
 
         assertTrue(nm.tryLocalSubmit(lazy));
         nm.waitForCompletion();

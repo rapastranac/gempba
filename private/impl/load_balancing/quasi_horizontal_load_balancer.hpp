@@ -150,7 +150,7 @@ namespace gempba {
 
         [[nodiscard]] std::size_t get_spawn_remote_rejected_count() const override { return m_spawn_remote_rejected_count.load(std::memory_order_relaxed); }
 
-#if GEMPBA_DEV_MODE && GEMPBA_BUILD_TESTS
+#if GEMPBA_BUILD_TESTS
 
     public:
 #else

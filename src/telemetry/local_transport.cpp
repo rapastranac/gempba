@@ -1,9 +1,12 @@
 #include <impl/telemetry/local_transport.hpp>
 
 #include <array>
+#include <cstddef>
 #include <deque>
 #include <mutex>
+#include <span>
 #include <utility>
+#include <vector>
 
 namespace gempba::telemetry {
 
@@ -88,6 +91,8 @@ namespace gempba::telemetry {
         const std::scoped_lock v_lock(m_impl->m_control_mtx);
         m_impl->m_control_queue.emplace_back(p_dst_rank, p_msg);
     }
+
+    std::vector<std::vector<std::byte>> local_transport::all_gather(const std::span<const std::byte> p_block) { return {std::vector<std::byte>(p_block.begin(), p_block.end())}; }
 
     std::optional<control_msg> local_transport::try_recv_control() {
         const std::scoped_lock v_lock(m_impl->m_control_mtx);
