@@ -172,10 +172,12 @@ jobs:
           SRC="$RUNNER_TEMP/gempba-src.tar.gz"
           git archive --format=tar.gz --prefix=gempba/ -o "$SRC" HEAD
           SHA=$(shasum -a 256 "$SRC" | awk '{print $1}')
-          f="out/Formula/${FLAVOR}.rb"
-          sed -i '' -E "s|^([[:space:]]*url[[:space:]]+\")https://api\.github\.com/repos/.*(\")|\1file://${SRC}\2|" "$f"
-          # Range exclusion skips the resource blocks so only the package sha is rewritten.
-          sed -i '' -E "/^[[:space:]]*resource /,/^[[:space:]]*end$/!s|^([[:space:]]*sha256[[:space:]]+\")[0-9a-fA-F]{64}(\")|\1${SHA}\2|" "$f"
+          # Both formulas point at it: gempba-mpi depends on gempba.
+          for f in out/Formula/*.rb; do
+            sed -i '' -E "s|^([[:space:]]*url[[:space:]]+\")https://api\.github\.com/repos/.*(\")|\1file://${SRC}\2|" "$f"
+            # Range exclusion skips the resource blocks so only the package sha is rewritten.
+            sed -i '' -E "/^[[:space:]]*resource /,/^[[:space:]]*end$/!s|^([[:space:]]*sha256[[:space:]]+\")[0-9a-fA-F]{64}(\")|\1${SHA}\2|" "$f"
+          done
 
           # Persistent runner: hard-reset the tap namespace so a leftover tap
           # dir from an interrupted run cannot collide.
@@ -184,7 +186,7 @@ jobs:
           brew tap-new gempba/citest --no-git
           TAP="$(brew --repository)/Library/Taps/gempba/homebrew-citest/Formula"
           mkdir -p "$TAP"
-          cp "out/Formula/${FLAVOR}.rb" "$TAP"/
+          cp out/Formula/*.rb "$TAP"/
 
           brew install --build-from-source "gempba/citest/${FLAVOR}"
           brew test                        "gempba/citest/${FLAVOR}"

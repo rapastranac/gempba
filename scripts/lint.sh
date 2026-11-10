@@ -185,7 +185,7 @@ if [[ $DO_TIDY -eq 1 ]]; then
             -DCMAKE_BUILD_TYPE=Debug \
             -DCMAKE_CXX_SCAN_FOR_MODULES=OFF \
             -DGEMPBA_BUILD_TESTS=ON \
-            -DGEMPBA_MULTIPROCESSING=ON \
+            -DGEMPBA_BUILD_MPI=ON \
             >/dev/null
     fi
 
