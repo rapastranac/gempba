@@ -7,7 +7,6 @@
 #include <cstdint>
 #include <gempba/telemetry/frames.hpp>
 #include <gempba/telemetry/runtime_mode.hpp>
-#include <gempba/telemetry/telemetry_transport.hpp>
 #include <gempba/telemetry/topology.hpp>
 #include <gempba/utils/gempba_utils.hpp>
 #include <memory>
@@ -35,6 +34,7 @@ namespace gempba::telemetry {
     class process_probe;
     class node_probe;
     class aggregator_tcp_server;
+    class telemetry_transport;
 
     /**
      * @brief Process-wide runtime-telemetry hub.

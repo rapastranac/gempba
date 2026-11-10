@@ -1,7 +1,7 @@
 #ifndef GEMPBA_TELEMETRY_MPI_TRANSPORT_HPP
 #define GEMPBA_TELEMETRY_MPI_TRANSPORT_HPP
 
-#include <gempba/telemetry/telemetry_transport.hpp>
+#include <impl/telemetry/telemetry_transport.hpp>
 #include <memory>
 
 namespace gempba::telemetry {
