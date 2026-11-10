@@ -8,11 +8,11 @@
 #include <chrono>
 #include <climits>
 #include <cstdlib> /* srand, rand */
+#include <format>
 #include <memory>
 #include <mpi.h>
 #include <optional>
 #include <random>
-#include <spdlog/spdlog.h>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -57,7 +57,7 @@ namespace gempba {
         ~mpi_semi_centralized_scheduler() override {
             // MPI specific finalization
             finalize();
-            spdlog::debug("Goodbye from MPI Semi Centralized Scheduler");
+            utils::log_debug("Goodbye from MPI Semi Centralized Scheduler");
         }
 
         mpi_semi_centralized_scheduler() {
@@ -66,7 +66,7 @@ namespace gempba {
             m_stats = default_mpi_stats(m_world_rank);
             m_stats_vector.reserve(m_world_size);
 
-            spdlog::debug("MPI Scheduler, instantiated!\n");
+            utils::log_debug("MPI Scheduler, instantiated!\n");
         }
 
         [[nodiscard]] int rank_me() const override { return m_world_rank; }
@@ -109,7 +109,7 @@ namespace gempba {
                     MPI_Status v_status;
                     const int v_probe_err = MPI_Probe(v_src_rank, DUMMY_TAG, m_world_communicator, &v_status);
                     if (v_probe_err != MPI_SUCCESS) {
-                        spdlog::error("rank {} failed to probe message from rank {}\n", m_world_rank, v_src_rank);
+                        utils::log_error(std::format("rank {} failed to probe message from rank {}\n", m_world_rank, v_src_rank));
                         continue;
                     }
 
@@ -118,7 +118,7 @@ namespace gempba {
                     task_packet v_rank_packet(v_count);
                     const int v_recv_err = MPI_Recv(v_rank_packet.data(), v_count, MPI_BYTE, v_src_rank, DUMMY_TAG, m_world_communicator, &v_status);
                     if (v_recv_err != MPI_SUCCESS) {
-                        spdlog::error("rank {} failed to receive stats from rank {}\n", m_world_rank, v_src_rank);
+                        utils::log_error(std::format("rank {} failed to receive stats from rank {}\n", m_world_rank, v_src_rank));
                         continue;
                     }
                     default_mpi_stats v_rank_stats = default_mpi_stats::from_packet(v_rank_packet);
@@ -128,7 +128,7 @@ namespace gempba {
                 auto v_bytes = m_stats.serialize();
                 const int v_err = MPI_Ssend(v_bytes.data(), static_cast<int>(v_bytes.size()), MPI_BYTE, CENTER_NODE, DUMMY_TAG, m_world_communicator);
                 if (v_err != MPI_SUCCESS) {
-                    spdlog::error("rank {} failed to send stats to rank 0\n", m_world_rank);
+                    utils::log_error(std::format("rank {} failed to send stats to rank 0\n", m_world_rank));
                 }
             }
             barrier();
@@ -198,7 +198,7 @@ namespace gempba {
                         process_termination(v_status);
                         collect_stats_data(p_node_manager);
                         v_is_terminated = true; // temporary, it should always happen
-                        spdlog::debug("rank {} received termination", m_world_rank);
+                        utils::log_debug("rank {} received termination", m_world_rank);
                         break;
                     }
                     case SCORE_UPDATE: {
@@ -247,7 +247,7 @@ namespace gempba {
 
         unsigned int force_push(task_packet&& p_task_packet, const int p_function_id) override {
             if (p_task_packet.empty()) {
-                throw std::runtime_error(fmt::format("rank {}, attempted to send empty buffer \n", m_world_rank));
+                throw std::runtime_error(std::format("rank {}, attempted to send empty buffer \n", m_world_rank));
             }
 
             m_transmitting = true;
@@ -310,7 +310,7 @@ namespace gempba {
             }
             drain_center_messages(v_sent_counts[0], v_sent_counts[1]);
 
-            spdlog::debug("rank {} exited\n", m_world_rank);
+            utils::log_debug("rank {} exited\n", m_world_rank);
             MPI_Barrier(m_world_communicator);
         }
 
@@ -331,7 +331,7 @@ namespace gempba {
                 utils::log_and_throw("rank {} received more center messages than the center sent: score updates {}/{}, next processes {}/{}", m_world_rank, m_score_updates_received,
                                      p_score_updates_sent, m_next_processes_received, p_next_processes_sent);
             }
-            spdlog::debug("rank {} drained {} score updates and {} next-process messages at termination", m_world_rank, v_pending_score_updates, v_pending_next_processes);
+            utils::log_debug("rank {} drained {} score updates and {} next-process messages at termination", m_world_rank, v_pending_score_updates, v_pending_next_processes);
         }
 
         void process_task_received_ack(MPI_Status p_status) {
@@ -735,7 +735,7 @@ namespace gempba {
             if (!v_should_broadcast) {
                 static int failures = 0;
                 failures++;
-                spdlog::debug("FAILED updates : {}, m_global_score : {} by rank {}\n", failures, m_global_score.to_string(), p_status.MPI_SOURCE);
+                utils::log_debug("FAILED updates : {}, m_global_score : {} by rank {}\n", failures, m_global_score.to_string(), p_status.MPI_SOURCE);
                 return;
             }
 
@@ -752,7 +752,7 @@ namespace gempba {
 
             static int success = 0;
             success++;
-            spdlog::debug("SUCCESSFUL updates: {}, m_global_score updated to : {} by rank {}\n", success, m_global_score.to_string(), p_status.MPI_SOURCE);
+            utils::log_debug("SUCCESSFUL updates: {}, m_global_score updated to : {} by rank {}\n", success, m_global_score.to_string(), p_status.MPI_SOURCE);
             m_total_requests_number++;
         }
 
@@ -833,13 +833,13 @@ namespace gempba {
                         MPI_Recv(&v_score, sizeof(score), MPI_BYTE, p_rank, HAS_RESULT, m_world_communicator, &v_status);
 
                         m_best_results[p_rank] = result{v_score, v_task_packet};
-                        spdlog::debug("solution received from rank {}, count : {}, global score {} \n", p_rank, v_count, v_score.to_string());
+                        utils::log_debug("solution received from rank {}, count : {}, global score {} \n", p_rank, v_count, v_score.to_string());
                         return;
                     }
                     case NO_RESULT: {
                         // consumes the empty message
                         MPI_Recv(nullptr, 0, MPI_BYTE, p_rank, NO_RESULT, m_world_communicator, &v_status);
-                        spdlog::debug("solution NOT received from rank {}\n", p_rank);
+                        utils::log_debug("solution NOT received from rank {}\n", p_rank);
                         return;
                     }
                     default: {
@@ -860,16 +860,16 @@ namespace gempba {
             const auto v_send_start = std::chrono::steady_clock::now();
             const int v_err1 = MPI_Ssend(p_packet.data(), static_cast<int>(p_packet.size()), MPI_BYTE, DEST, TASK, m_world_communicator); // send buffer
             if (v_err1 != MPI_SUCCESS) {
-                spdlog::debug("buffer failed to send! \n");
+                utils::log_debug("buffer failed to send! \n");
             }
 
             const int v_err2 = MPI_Ssend(&p_runnable_id, 1, MPI_INT, DEST, RUNNABLE_ID, m_world_communicator);
             if (v_err2 != MPI_SUCCESS) {
-                spdlog::debug("runnable id failed to send! \n");
+                utils::log_debug("runnable id failed to send! \n");
             }
             const auto v_send_elapsed = std::chrono::steady_clock::now() - v_send_start;
 
-            spdlog::debug("Seed sent \n");
+            utils::log_debug("Seed sent \n");
             m_sent_tasks++;
             m_total_requests_number++;
             m_stats.m_sent_task_count++;
@@ -935,7 +935,7 @@ namespace gempba {
 
             int v_name_length;
             MPI_Get_processor_name(m_processor_name, &v_name_length);
-            spdlog::debug("Process {} of {} is on {}\n", m_world_rank, m_world_size, m_processor_name);
+            utils::log_debug("Process {} of {} is on {}\n", m_world_rank, m_world_size, m_processor_name);
         }
 
         void set_thread_support_level() {
@@ -946,7 +946,7 @@ namespace gempba {
             MPI_Init_thread(v_argc, &v_argv, MPI_THREAD_FUNNELED, &v_provided);
 
             if (v_provided < MPI_THREAD_FUNNELED) {
-                spdlog::debug("The threading support level is lesser than that demanded.\n");
+                utils::log_debug("The threading support level is lesser than that demanded.\n");
                 MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
             }
         }
@@ -962,7 +962,7 @@ namespace gempba {
 
 #if !GEMPBA_DEV_MODE
             if (m_world_size < 2) {
-                spdlog::debug("At least two processes required !!\n");
+                utils::log_debug("At least two processes required !!\n");
                 MPI_Abort(m_world_communicator, EXIT_FAILURE);
             }
 #endif
