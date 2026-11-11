@@ -109,7 +109,7 @@ brew install open-mpi     # or mpich: the MPI your build compiles it against
 
 ### Maven dependency (Java)
 
-The JARs are on Maven Central as two artifacts that share one API: `gempba`, whose native library has no MPI, and `gempba-mpi`, which adds the `io.gempba.mpi` package for creating an MPI scheduler and requires an MPI runtime on the host. A program uses one or the other. Each JAR carries every supported OS's native binary, and the loader picks the right one at runtime. The JAR needs Java 25 or newer, and its natives need nothing beyond the OS (Linux with glibc 2.28 or newer, such as RHEL 8; Windows 10 or newer; macOS 14 or newer) and, for `gempba-mpi`, the MPI runtime. A JAR has to carry its native library compiled, so unlike the C++ packages, `gempba-mpi` is built against one MPI per OS: Open MPI on Linux and macOS, MS-MPI on Windows, and runs only with that one.
+The JARs are on Maven Central as two artifacts that share one API: `gempba`, whose native library has no MPI, and `gempba-mpi`, which adds the `io.gempba.mpi` package for creating an MPI scheduler and requires an MPI runtime on the host. A program uses one or the other. Each JAR carries every supported OS's native binary, and the loader picks the right one at runtime. The JAR needs Java 25 or newer, and its natives need nothing beyond the OS (Linux with glibc 2.28 or newer, such as RHEL 8; Windows 10 or newer; macOS 14 or newer) and, for `gempba-mpi`, the MPI runtime ([which MPI](#which-mpi)).
 
 No repository or token to configure:
 
@@ -122,6 +122,24 @@ No repository or token to configure:
 ```
 
 **Available versions: `v5.0.0` and later.** `v4.1.0` to `v4.4.0` are on [GitHub Packages](https://maven.pkg.github.com/rapastranac/gempba) as `io.gempba:gempba` with the `mt` and `mp-mpi` classifiers, which needs a token with the `read:packages` scope.
+
+#### Which MPI
+
+A JAR has to carry its native library compiled, so unlike the C++ packages, `gempba-mpi` is built against one MPI per OS: Open MPI on Linux and macOS, MS-MPI on Windows. With another MPI only, such as MPICH, Intel MPI or Cray MPICH, its native library fails to load, and the error names the MPI it needs.
+
+To use another MPI, build the native library against it, from the tag of your `gempba-mpi` version so it matches the JAR's classes. It needs a C++23 compiler, CMake, curl, a JDK and your MPI's headers; `build_deps.sh` builds the static hwloc, fmt and spdlog it links. Then pass the file with the `gempba.native.path` system property, which replaces the bundled library:
+
+```bash
+git clone --branch vVERSION https://github.com/rapastranac/gempba.git && cd gempba
+bash bindings/jni/build_deps.sh $PWD/jni-deps
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$PWD/jni-deps -DGEMPBA_BUILD_TESTS=OFF -DGEMPBA_BUILD_JAVA_BINDING=ON -DGEMPBA_BUILD_MPI=ON -DGEMPBA_JNI_CLASSIFIER=linux-x86_64
+cmake --build build --target gempba_jni
+mpiexec -n 4 java -Dgempba.native.path=$PWD/bindings/java/src/main/resources/natives/linux-x86_64/gempba_jni.so -cp <classpath> <main class>
+```
+
+If your MPI runs over UCX, as Debian's MPICH does, give the ranks an empty `UCX_ERROR_SIGNALS`, such as `UCX_ERROR_SIGNALS= mpiexec ...`. Otherwise UCX takes the signals the JVM handles itself and kills it.
+
+On macOS, use `osx-aarch64` and `gempba_jni.dylib`. On Windows, build it in MSYS2's UCRT64 shell as `scripts/build_jar_windows.sh` does, and pass `gempba_jni.dll`.
 
 Worked example: **[gempba-java-examples](https://github.com/rapastranac/gempba-java-examples)**. Full reference in the [docs site](https://rapastranac.github.io/gempba-docs/).
 
