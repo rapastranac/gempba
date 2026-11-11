@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.function.Consumer;
 
 /**
  * Extracts and loads a platform-native shared library bundled inside the JAR.
@@ -24,8 +25,17 @@ import java.nio.file.Path;
  * <p>On the first {@link #load} call the appropriate binary is copied to a
  * temporary file and loaded via {@link System#load}. Subsequent calls for the
  * same library name are no-ops (the JVM caches loaded libraries by name).
+ *
+ * <p>The {@value #NATIVE_PATH_PROPERTY} system property names a library file to
+ * load instead of the bundled one, such as a {@code gempba_jni} built against
+ * another MPI than the one {@code gempba-mpi} is built for.
  */
 final class NativeLoader {
+
+    /**
+     * System property naming a native library file that replaces the bundled one.
+     */
+    static final String NATIVE_PATH_PROPERTY = "gempba.native.path";
 
     private NativeLoader() {
     }
@@ -33,7 +43,8 @@ final class NativeLoader {
     /**
      * Loads the native library with the given base name.
      *
-     * <p>Tries the classpath-extracted approach first; falls back to
+     * <p>Loads the file {@value #NATIVE_PATH_PROPERTY} names when it is set.
+     * Otherwise tries the classpath-extracted approach first; falls back to
      * {@link System#loadLibrary} so that a locally installed library (e.g.
      * during development when the .so is on {@code LD_LIBRARY_PATH}) is still
      * picked up.
@@ -42,6 +53,19 @@ final class NativeLoader {
      * @throws UnsatisfiedLinkError if the library cannot be found or loaded
      */
     static void load(String libName) {
+        load(libName, System::load);
+    }
+
+    /**
+     * {@link #load(String)}, with {@code systemLoad} in place of {@link System#load}.
+     */
+    static void load(String libName, Consumer<String> systemLoad) {
+        String override = System.getProperty(NATIVE_PATH_PROPERTY);
+        if (override != null && !override.isBlank()) {
+            loadFile(Path.of(override).toAbsolutePath(), systemLoad);
+            return;
+        }
+
         String classifier = classifier();
         // CMake sets PREFIX "" on the JNI target so the artifact is e.g.
         // "gempba_jni.so" rather than "libgempba_jni.so".  System.mapLibraryName
@@ -61,11 +85,18 @@ final class NativeLoader {
             try (OutputStream out = Files.newOutputStream(tmp)) {
                 in.transferTo(out);
             }
-            System.load(tmp.toAbsolutePath().toString());
+            systemLoad.accept(tmp.toAbsolutePath().toString());
         } catch (IOException e) {
             throw new UnsatisfiedLinkError(
                     "Failed to extract native library '" + resourcePath + "': " + e.getMessage());
         }
+    }
+
+    private static void loadFile(Path path, Consumer<String> systemLoad) {
+        if (!Files.isRegularFile(path)) {
+            throw new UnsatisfiedLinkError(NATIVE_PATH_PROPERTY + " names " + path + ", which is not a file");
+        }
+        systemLoad.accept(path.toString());
     }
 
     // ─── Platform detection ───────────────────────────────────────────────────
