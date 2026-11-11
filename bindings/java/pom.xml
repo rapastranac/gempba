@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>io.gempba</groupId>
+    <groupId>io.github.rapastranac</groupId>
     <artifactId>gempba</artifactId>
     <version>4.4.0</version>
     <packaging>jar</packaging>
@@ -19,6 +19,20 @@
             <url>https://opensource.org/licenses/MIT</url>
         </license>
     </licenses>
+
+    <developers>
+        <developer>
+            <id>rapastranac</id>
+            <name>Andres Pastrana</name>
+            <url>https://github.com/rapastranac</url>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:https://github.com/rapastranac/gempba.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/rapastranac/gempba.git</developerConnection>
+        <url>https://github.com/rapastranac/gempba</url>
+    </scm>
 
     <properties>
         <maven.compiler.source>25</maven.compiler.source>
@@ -144,10 +158,9 @@
               gempba.variant=multiprocessing, ipc.backend=mpi     → mp-mpi
               gempba.variant=multiprocessing, ipc.backend=<other> → mp-<other>
 
-            Consumers MUST specify a classifier in their dependency block — there is no
-            unclassified default.  This mirrors the convention used by every other
-            JVM-native-binding library (JBLAS, OpenCV-Java, native-Netty, LWJGL, JavaCPP,
-            …) and makes the runtime native dependency explicit at compile time.
+            The classifier names the variant's JAR in target/.  Each variant is published as
+            its own artifact (#410): mt as io.github.rapastranac:gempba, mp-mpi as
+            io.github.rapastranac:gempba-mpi; scripts/_java_artifact.sh maps one to the other.
         -->
         <profile>
             <id>classifier-mt</id>
@@ -273,6 +286,45 @@
                                         </artifact>
                                     </artifacts>
                                 </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!--
+            The sources and javadoc JARs Maven Central requires, built with the variant's JAR:
+              mvn package -DskipTests -Dgempba.variant=<variant> -Ppublish
+            scripts/central_bundle.sh runs it for both variants.
+        -->
+        <profile>
+            <id>publish</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <version>3.3.1</version>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <goals>
+                                    <goal>jar-no-fork</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <version>3.11.2</version>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
                             </execution>
                         </executions>
                     </plugin>
