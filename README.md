@@ -127,17 +127,15 @@ No repository or token to configure:
 
 A JAR has to carry its native library compiled, so unlike the C++ packages, `gempba-mpi` is built against one MPI per OS: Open MPI on Linux and macOS, MS-MPI on Windows. With another MPI only, such as MPICH, Intel MPI or Cray MPICH, its native library fails to load, and the error names the MPI it needs.
 
-To use another MPI, build the native library against it, from the tag of your `gempba-mpi` version so it matches the JAR's classes. It needs a C++23 compiler, CMake, curl, a JDK and your MPI's headers; `build_deps.sh` builds the static hwloc, fmt and spdlog it links. Then pass the file with the `gempba.native.path` system property, which replaces the bundled library:
+To use another MPI, build the native library against it on Linux, from the tag of your `gempba-mpi` version so it matches the JAR's classes. It needs a C++23 compiler, CMake, curl, Maven, a JDK and your MPI on `PATH`; on a cluster, load their modules first. `build_jar_host_linux.sh` builds the static hwloc, fmt and spdlog the library links, builds it against that MPI, names the MPI it found, and installs the JAR into `~/.m2`. Then pass the library with the `gempba.native.path` system property, which replaces the bundled one:
 
 ```bash
 git clone --branch vVERSION https://github.com/rapastranac/gempba.git && cd gempba
-bash bindings/jni/build_deps.sh $PWD/jni-deps
-cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$PWD/jni-deps -DGEMPBA_BUILD_TESTS=OFF -DGEMPBA_BUILD_JAVA_BINDING=ON -DGEMPBA_BUILD_MPI=ON -DGEMPBA_JNI_CLASSIFIER=linux-x86_64
-cmake --build build --target gempba_jni
+bash scripts/build_jar_host_linux.sh MP
 mpiexec -n 4 java -Dgempba.native.path=$PWD/bindings/java/src/main/resources/natives/linux-x86_64/gempba_jni.so -cp <classpath> <main class>
 ```
 
-On macOS, use `osx-aarch64` and `gempba_jni.dylib`. On Windows, build it in MSYS2's UCRT64 shell as `scripts/build_jar_windows.sh` does, and pass `gempba_jni.dll`.
+On macOS and Windows, `scripts/build_jar_macos.sh MP` and, in MSYS2's UCRT64 shell, `scripts/build_jar_windows.sh MP` build it against the MPI CMake finds; pass `natives/osx-aarch64/gempba_jni.dylib` or `natives/win-x86_64/gempba_jni.dll`.
 
 Worked example: **[gempba-java-examples](https://github.com/rapastranac/gempba-java-examples)**. Full reference in the [docs site](https://rapastranac.github.io/gempba-docs/).
 
