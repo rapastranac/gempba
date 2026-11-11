@@ -12,7 +12,7 @@ class GempbaMpi < Formula
   depends_on "hwloc" => :build
   depends_on "pkgconf" => :build
   depends_on "spdlog" => :build
-  depends_on "gempba"
+  depends_on "__TAP__/gempba"
   depends_on "open-mpi" => :test
 
   resource "BS_thread_pool" do
