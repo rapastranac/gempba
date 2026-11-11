@@ -58,7 +58,7 @@ Other architectures work via source build.
 GemPBA is one library with multithreading built in, plus an optional **MPI component**:
 
 - **The core** (`gempba`) uses all the cores of a **single machine**. No MPI to install, nothing to configure; if you're unsure, start here.
-- **The MPI component** (`gempba-mpi`; the Java artifact calls it `mp-mpi`) adds the schedulers that distribute work across **multiple machines/nodes** over MPI. Install it on top of the core when one machine isn't enough. It installs as source: your build compiles it against the MPI on your machine (Open MPI, MPICH or MS-MPI), so one installation works with any of them.
+- **The MPI component** (`gempba-mpi`, the same name in C++ and Java) adds the schedulers that distribute work across **multiple machines/nodes** over MPI. Install it on top of the core when one machine isn't enough. It installs as source: your build compiles it against the MPI on your machine (Open MPI, MPICH or MS-MPI), so one installation works with any of them.
 
 A program uses the MPI component only when it asks for it (see [Using gempba](#using-gempba)), so multithreading and MPI programs build side by side from the same installation.
 
@@ -109,43 +109,19 @@ brew install open-mpi     # or mpich: the MPI your build compiles it against
 
 ### Maven dependency (Java)
 
-JARs are published to [GitHub Packages](https://maven.pkg.github.com/rapastranac/gempba) with two classifiers that share one API: `mt`, whose native library has no MPI, and `mp-mpi`, which adds the `io.gempba.mpi` package for creating an MPI scheduler and requires an MPI runtime on the host. One fat JAR per classifier carries every supported OS's native binary; the loader picks the right one at runtime. The JAR needs Java 25 or newer, and its natives need nothing beyond the OS (Linux with glibc 2.28 or newer, such as RHEL 8; Windows 10 or newer; macOS 14 or newer) and, for `mp-mpi`, the MPI runtime. A JAR has to carry its native library compiled, so unlike the C++ packages, `mp-mpi` is built against one MPI per OS: Open MPI on Linux and macOS, MS-MPI on Windows, and runs only with that one.
+The JARs are on Maven Central as two artifacts that share one API: `gempba`, whose native library has no MPI, and `gempba-mpi`, which adds the `io.gempba.mpi` package for creating an MPI scheduler and requires an MPI runtime on the host. A program uses one or the other. Each JAR carries every supported OS's native binary, and the loader picks the right one at runtime. The JAR needs Java 25 or newer, and its natives need nothing beyond the OS (Linux with glibc 2.28 or newer, such as RHEL 8; Windows 10 or newer; macOS 14 or newer) and, for `gempba-mpi`, the MPI runtime. A JAR has to carry its native library compiled, so unlike the C++ packages, `gempba-mpi` is built against one MPI per OS: Open MPI on Linux and macOS, MS-MPI on Windows, and runs only with that one.
 
-**Available versions: `v4.1.0` and later.** Earlier tags predate the publish flow and have no artifact on the registry.
-
-Add the registry to your `pom.xml`:
-
-```xml
-<repositories>
-  <repository>
-    <id>github-gempba</id>
-    <url>https://maven.pkg.github.com/rapastranac/gempba</url>
-  </repository>
-</repositories>
-```
-
-GitHub Packages requires a token even for public packages. Create a PAT at [github.com/settings/tokens](https://github.com/settings/tokens) with the `read:packages` scope and add it to `~/.m2/settings.xml`:
-
-```xml
-<servers>
-  <server>
-    <id>github-gempba</id>
-    <username>YOUR_GITHUB_USERNAME</username>
-    <password>YOUR_PAT</password>
-  </server>
-</servers>
-```
-
-Declare the dependency with the variant classifier:
+No repository or token to configure:
 
 ```xml
 <dependency>
-  <groupId>io.gempba</groupId>
-  <artifactId>gempba</artifactId>
+  <groupId>io.github.rapastranac</groupId>
+  <artifactId>gempba</artifactId>        <!-- or gempba-mpi -->
   <version>VERSION</version>
-  <classifier>mt</classifier>          <!-- or mp-mpi -->
 </dependency>
 ```
+
+**Available versions: `v5.0.0` and later.** `v4.1.0` to `v4.4.0` are on [GitHub Packages](https://maven.pkg.github.com/rapastranac/gempba) as `io.gempba:gempba` with the `mt` and `mp-mpi` classifiers, which needs a token with the `read:packages` scope.
 
 Worked example: **[gempba-java-examples](https://github.com/rapastranac/gempba-java-examples)**. Full reference in the [docs site](https://rapastranac.github.io/gempba-docs/).
 
