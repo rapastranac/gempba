@@ -6,12 +6,14 @@ include(CMakeFindDependencyMacro)
 find_dependency(Threads REQUIRED)
 include("${CMAKE_CURRENT_LIST_DIR}/gempba-targets.cmake")
 
-# gempba::mpi, the MPI component, from find_package(gempba COMPONENTS mpi). Its package installs the targets file.
+# gempba::mpi, the MPI component, from find_package(gempba COMPONENTS mpi). Its package installs it as source, which
+# gempba-mpi.cmake compiles here against the MPI this project finds.
 foreach (_gempba_comp IN LISTS gempba_FIND_COMPONENTS)
-    if (_gempba_comp STREQUAL "mpi" AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/gempba-mpi-targets.cmake")
+    if (_gempba_comp STREQUAL "mpi" AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/gempba-mpi.cmake")
         set(MPI_CXX_SKIP_MPICXX ON)
         find_dependency(MPI REQUIRED)
-        include("${CMAKE_CURRENT_LIST_DIR}/gempba-mpi-targets.cmake")
+        set_and_check(GEMPBA_MPI_SOURCE_DIR "@PACKAGE_GEMPBA_INSTALL_MPI_SOURCEDIR@")
+        include("${CMAKE_CURRENT_LIST_DIR}/gempba-mpi.cmake")
         set(gempba_mpi_FOUND TRUE)
     else ()
         set(gempba_${_gempba_comp}_FOUND FALSE)
