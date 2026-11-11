@@ -101,8 +101,8 @@ cmake -B "$build_dir" -S "$WORKSPACE" \
 cmake --build "$build_dir" --target gempba_jni -j"$(nproc)"
 bash "$WORKSPACE/scripts/check_jni_deps.sh" "$native_lib" "$flavor"
 
-cd "$WORKSPACE/bindings/java"
-# `install` (not `package`) so the produced JAR also lands in
-# ~/.m2/repository/io/gempba/gempba/<version>/ — that's what a
-# downstream <dependency> on this artifact resolves against.
-mvn install -DskipTests -Dgempba.variant="$variant"
+# Install the JAR into ~/.m2 under its published coordinates, io.github.rapastranac:gempba or gempba-mpi (#410), where a
+# downstream <dependency> resolves it.
+# shellcheck source=_java_artifact.sh
+source "$WORKSPACE/scripts/_java_artifact.sh"
+gempba_java_install "$WORKSPACE" "$variant" "$flavor"
