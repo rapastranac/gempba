@@ -38,6 +38,7 @@ jobs:
       tag: ${{ steps.tag.outputs.tag }}
     env:
       PUBLIC_REPO: ${{ vars.GEMPBA_PUBLIC_REPO || github.repository }}
+      TAP_REPO: ${{ vars.HOMEBREW_TAP_REPO || format('{0}/homebrew-gempba', github.repository_owner) }}
 
     steps:
       - name: Checkout gempba
@@ -96,6 +97,8 @@ jobs:
           for name in gempba gempba-mpi; do
             cp "packaging/homebrew/${name}.rb.in" "out/Formula/${name}.rb"
             sed -i "s|__OWNER_REPO__|${PUBLIC_REPO}|g" "out/Formula/${name}.rb"
+            # gempba-mpi names the tap it depends on gempba from, so another tap with a gempba formula can't make it ambiguous.
+            sed -i "s|__TAP__|${TAP_REPO/\/homebrew-//}|g" "out/Formula/${name}.rb"
           done
 
           if [ "${{ github.event_name }}" != "pull_request" ]; then
@@ -187,6 +190,9 @@ jobs:
           TAP="$(brew --repository)/Library/Taps/gempba/homebrew-citest/Formula"
           mkdir -p "$TAP"
           cp out/Formula/*.rb "$TAP"/
+          # gempba-mpi depends on gempba from the tap it publishes to; here that's this test tap.
+          sed -i '' -E 's|^([[:space:]]*depends_on[[:space:]]+")[^"/]+/[^"/]+/gempba"|\1gempba/citest/gempba"|' "$TAP"/gempba-mpi.rb
+          brew trust gempba/citest
 
           brew install --build-from-source "gempba/citest/${FLAVOR}"
           brew test                        "gempba/citest/${FLAVOR}"
