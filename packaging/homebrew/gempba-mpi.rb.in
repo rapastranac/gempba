@@ -1,5 +1,5 @@
 class GempbaMpi < Formula
-  desc "GemPBA - hybrid parallel C++23 framework (MPI component)"
+  desc "GemPBA - hybrid parallel C++23 framework (MPI component, as source)"
   homepage "https://github.com/__OWNER_REPO__"
   url "https://api.github.com/repos/__OWNER_REPO__/tarball/refs/tags/v3.3.0"
   version "4.4.0"
@@ -13,7 +13,7 @@ class GempbaMpi < Formula
   depends_on "pkgconf" => :build
   depends_on "spdlog" => :build
   depends_on "gempba"
-  depends_on "open-mpi"
+  depends_on "open-mpi" => :test
 
   resource "BS_thread_pool" do
     url "https://github.com/rapastranac/thread-pool/archive/refs/tags/v5.1.0.3.tar.gz"
@@ -29,9 +29,7 @@ class GempbaMpi < Formula
     bs_thread_pool = buildpath/"deps/bs_thread_pool"
     args = std_cmake_args + [
       "-DGEMPBA_BUILD_TESTS=OFF",
-      "-DGEMPBA_BUILD_MPI=ON",
-      # libgempba_mpi loads the gempba keg's libgempba.
-      "-DCMAKE_INSTALL_RPATH=#{Formula["gempba"].opt_lib}",
+      "-DGEMPBA_BUILD_MPI=OFF",
       "-DFETCHCONTENT_SOURCE_DIR_BS_THREAD_POOL=#{bs_thread_pool}",
     ]
 
@@ -40,8 +38,15 @@ class GempbaMpi < Formula
     resource("CPM.cmake").stage { cp "CPM.cmake", buildpath/"build/cmake/CPM.cmake" }
 
     system "cmake", "-S", ".", "-B", "build", *args
-    system "cmake", "--build", "build", "--target", "gempba_mpi", "--parallel"
     system "cmake", "--install", "build", "--component", "mpi"
+  end
+
+  def caveats
+    <<~EOS
+      gempba-mpi installs the MPI component as source. find_package(gempba COMPONENTS mpi)
+      compiles it in your build against the MPI that CMake finds there, so install one:
+        brew install open-mpi    # or: brew install mpich
+    EOS
   end
 
   test do
@@ -51,10 +56,24 @@ class GempbaMpi < Formula
       set(CMAKE_CXX_STANDARD 23)
       set(CMAKE_CXX_STANDARD_REQUIRED ON)
       find_package(gempba REQUIRED COMPONENTS mpi)
+      add_executable(smoke smoke.cpp)
+      target_link_libraries(smoke PRIVATE gempba::mpi)
     CMAKE
 
-    # The MPI component's CMake targets sit beside the gempba keg's config in the linked prefix.
+    (testpath/"smoke.cpp").write <<~CPP
+      #include <gempba/mpi.hpp>
+      int main(int argc, char**) {
+          if (argc > 1) {
+              gempba::mpi::create_scheduler(gempba::mpi::scheduler_topology::SEMI_CENTRALIZED);
+          }
+          return 0;
+      }
+    CPP
+
+    # The MPI component's sources and CMake code sit beside the gempba keg's config in the linked prefix.
     system "cmake", "-S", testpath, "-B", testpath/"build",
            "-DCMAKE_PREFIX_PATH=#{HOMEBREW_PREFIX}"
+    system "cmake", "--build", testpath/"build"
+    system testpath/"build/smoke"
   end
 end

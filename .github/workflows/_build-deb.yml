@@ -23,7 +23,7 @@ jobs:
       - name: Setup Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake gcc-14 g++-14 make libspdlog-dev libfmt-dev libhwloc-dev pkg-config libopenmpi-dev
+          sudo apt-get install -y build-essential cmake gcc-14 g++-14 make libspdlog-dev libfmt-dev libhwloc-dev pkg-config
 
       - name: Configure (Release)
         run: |
@@ -31,14 +31,19 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=/usr \
             -DGEMPBA_BUILD_TESTS=OFF \
-            -DGEMPBA_BUILD_MPI=ON
+            -DGEMPBA_BUILD_MPI=OFF
 
       - name: Build
         run: cmake --build build --parallel $(nproc)
 
-      # One package per install component: libgempba-dev and libgempba-mpi-dev.
+      # One package per install component: libgempba-dev, and libgempba-mpi-dev, which holds source only.
       - name: Package .deb
-        run: cd build && cpack -G DEB
+        run: |
+          cd build && cpack -G DEB
+          if dpkg-deb -c libgempba-mpi-dev_*.deb | awk '{print $6}' | grep -E '\.(so|a)(\.[0-9]+)*$'; then
+            echo "::error::libgempba-mpi-dev holds compiled code"
+            exit 1
+          fi
 
       # Downstream consumers download with the `deb-package-*` glob.
       - name: Upload .deb as workflow artifact

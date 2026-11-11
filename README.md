@@ -58,7 +58,7 @@ Other architectures work via source build.
 GemPBA is one library with multithreading built in, plus an optional **MPI component**:
 
 - **The core** (`gempba`) uses all the cores of a **single machine**. No MPI to install, nothing to configure; if you're unsure, start here.
-- **The MPI component** (`gempba-mpi`; the Java artifact calls it `mp-mpi`) adds the schedulers that distribute work across **multiple machines/nodes** over MPI. Install it on top of the core when one machine isn't enough.
+- **The MPI component** (`gempba-mpi`; the Java artifact calls it `mp-mpi`) adds the schedulers that distribute work across **multiple machines/nodes** over MPI. Install it on top of the core when one machine isn't enough. It installs as source: your build compiles it against the MPI on your machine (Open MPI, MPICH or MS-MPI), so one installation works with any of them.
 
 A program uses the MPI component only when it asks for it (see [Using gempba](#using-gempba)), so multithreading and MPI programs build side by side from the same installation.
 
@@ -79,14 +79,16 @@ sudo apt update
 
 # 3. Install
 sudo apt install libgempba-dev          # the core
-sudo apt install libgempba-mpi-dev      # the MPI component; depends on libgempba-dev
+sudo apt install libgempba-mpi-dev      # the MPI component, as source; with libopenmpi-dev or libmpich-dev
 ```
+
+Ubuntu 24.04's MPICH package starts every rank of a job alone ([Launchpad bug 2072338](https://bugs.launchpad.net/ubuntu/+source/mpich/+bug/2072338)), so use Open MPI there.
 
 **MSYS2 (UCRT64)** — packages are attached to each GitHub Release rather than served from a custom pacman repo. Download the two `.pkg.tar.zst` assets — their names carry the version (e.g. `mingw-w64-ucrt-x86_64-gempba-4.4.0-1-any.pkg.tar.zst`) — from the [latest release](https://github.com/rapastranac/gempba/releases/latest), then install them from an MSYS2 UCRT64 shell:
 
 ```bash
 pacman -U mingw-w64-ucrt-x86_64-gempba-<version>-any.pkg.tar.zst       # the core
-pacman -U mingw-w64-ucrt-x86_64-gempba-mpi-<version>-any.pkg.tar.zst   # the MPI component; depends on the core package above
+pacman -U mingw-w64-ucrt-x86_64-gempba-mpi-<version>-any.pkg.tar.zst   # the MPI component, as source; depends on the core and MS-MPI
 ```
 
 If you'd rather build from `PKGBUILD`, in the same shell:
@@ -101,12 +103,13 @@ MINGW_ARCH=ucrt64 makepkg-mingw -si
 ```bash
 brew tap rapastranac/gempba
 brew install gempba       # the core
-brew install gempba-mpi   # the MPI component; installs gempba too
+brew install gempba-mpi   # the MPI component, as source; installs gempba too
+brew install open-mpi     # or mpich: the MPI your build compiles it against
 ```
 
 ### Maven dependency (Java)
 
-JARs are published to [GitHub Packages](https://maven.pkg.github.com/rapastranac/gempba) with two classifiers that share one API: `mt`, whose native library has no MPI, and `mp-mpi`, which adds the `io.gempba.mpi` package for creating an MPI scheduler and requires an MPI runtime on the host. One fat JAR per classifier carries every supported OS's native binary; the loader picks the right one at runtime. The JAR needs Java 25 or newer, and its natives need nothing beyond the OS (Linux with glibc 2.28 or newer, such as RHEL 8; Windows 10 or newer; macOS 14 or newer) and, for `mp-mpi`, the MPI runtime.
+JARs are published to [GitHub Packages](https://maven.pkg.github.com/rapastranac/gempba) with two classifiers that share one API: `mt`, whose native library has no MPI, and `mp-mpi`, which adds the `io.gempba.mpi` package for creating an MPI scheduler and requires an MPI runtime on the host. One fat JAR per classifier carries every supported OS's native binary; the loader picks the right one at runtime. The JAR needs Java 25 or newer, and its natives need nothing beyond the OS (Linux with glibc 2.28 or newer, such as RHEL 8; Windows 10 or newer; macOS 14 or newer) and, for `mp-mpi`, the MPI runtime. A JAR has to carry its native library compiled, so unlike the C++ packages, `mp-mpi` is built against one MPI per OS: Open MPI on Linux and macOS, MS-MPI on Windows, and runs only with that one.
 
 **Available versions: `v4.1.0` and later.** Earlier tags predate the publish flow and have no artifact on the registry.
 
@@ -151,8 +154,8 @@ Worked example: **[gempba-java-examples](https://github.com/rapastranac/gempba-j
 When pre-built packages aren't an option (custom configure flags, unsupported distro, contributing back), build the C++ library with CMake and install it:
 
 ```bash
-cmake -B build                          # the core and the MPI component
-cmake -B build -DGEMPBA_BUILD_MPI=OFF   # the core alone, without MPI
+cmake -B build                          # also compiles the MPI component, for gempba's own tests
+cmake -B build -DGEMPBA_BUILD_MPI=OFF   # needs no MPI; either way, the MPI component installs as source
 cmake --build build --parallel
 sudo cmake --install build
 ```
@@ -163,13 +166,13 @@ Ask for the core, and for the MPI component when a program uses MPI:
 
 ```cmake
 find_package(gempba REQUIRED)                  # gempba::gempba, the core
-find_package(gempba REQUIRED COMPONENTS mpi)   # adds gempba::mpi (requires the MPI component installed)
+find_package(gempba REQUIRED COMPONENTS mpi)   # adds gempba::mpi, compiled here against the MPI CMake finds
 
 target_link_libraries(my_app PRIVATE gempba::gempba)
 target_link_libraries(my_mpi_app PRIVATE gempba::mpi)   # brings gempba::gempba and MPI with it
 ```
 
-libgempba is a shared library that keeps its own dependencies (spdlog, fmt, hwloc) inside, so a consumer needs only the C++ standard library, plus MPI for `gempba::mpi`.
+libgempba is a shared library that keeps its own dependencies (spdlog, fmt, hwloc) inside, so a consumer needs only the C++ standard library, plus MPI for `gempba::mpi`. `gempba::mpi` is compiled in your build with your compiler, which must be compatible with the one that built libgempba, as for any C++ code that uses it. Each build directory compiles it against the MPI CMake finds there, so switching between MPIs takes another build directory, not a reinstall.
 
 The API is the same for every program. An MPI program creates its scheduler from `<gempba/mpi.hpp>` and passes it to the load balancer and the node manager:
 
@@ -198,7 +201,7 @@ Working example programs live in the sibling repo **[gempba-examples](https://gi
 | spdlog | ≥ 1.12 | Build only; compiled into the library |
 | hwloc | ≥ 2.10 | Hardware topology; `GEMPBA_HWLOC`, on by default |
 | pkg-config | any recent | Finds hwloc in the build |
-| OpenMPI | ≥ 4.0 | The MPI component only; MS-MPI on Windows |
+| MPI | Open MPI ≥ 4.0, MPICH, or MS-MPI on Windows | The MPI component only, compiled against it in your build |
 | Boost | any recent | Tests only |
 | GoogleTest | any recent | Tests only |
 

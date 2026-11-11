@@ -21,13 +21,12 @@ makedepends=(
     "${MINGW_PACKAGE_PREFIX}-spdlog"
     "${MINGW_PACKAGE_PREFIX}-fmt"
     "${MINGW_PACKAGE_PREFIX}-hwloc"
-    "${MINGW_PACKAGE_PREFIX}-msmpi"
 )
 source=("${_realname}-${pkgver}.tar.gz::https://github.com/rapastranac/gempba/archive/refs/tags/v${pkgver}.tar.gz")
 sha256sums=('965325d5fab633df4a3f722be69e607388760088d1aee8507f683fa7bfc5feb5')
 
 build() {
-    # One build of the core and the MPI component; each package installs its own component.
+    # One build of the core; the MPI component installs as source, which the consumer's build compiles.
     mkdir -p "${srcdir}/build-${MSYSTEM}"
     cd "${srcdir}/build-${MSYSTEM}"
 
@@ -37,7 +36,7 @@ build() {
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX="${MINGW_PREFIX}" \
         -DGEMPBA_BUILD_TESTS=OFF \
-        -DGEMPBA_BUILD_MPI=ON \
+        -DGEMPBA_BUILD_MPI=OFF \
         "../${_realname}-${pkgver}"
 
     ${MINGW_PREFIX}/bin/cmake --build . --parallel
@@ -58,7 +57,7 @@ package_gempba() {
 }
 
 package_gempba-mpi() {
-    pkgdesc="GemPBA — the MPI component (development files, mingw-w64)"
+    pkgdesc="GemPBA — the MPI component, as source compiled against MS-MPI in the consumer's build (mingw-w64)"
     depends=(
         "${MINGW_PACKAGE_PREFIX}-${_realname}=${pkgver}-${pkgrel}"
         "${MINGW_PACKAGE_PREFIX}-msmpi"

@@ -20,7 +20,7 @@ if (CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
     message(STATUS "GemPBA detected as root project. Defaulting to build tests.")
 
     option(GEMPBA_BUILD_TESTS      "Build gempba unit tests"              ON)
-    option(GEMPBA_BUILD_MPI        "Build the MPI component, gempba::mpi" ON)
+    option(GEMPBA_BUILD_MPI        "Compile the MPI component, gempba::mpi, in this build; installs ship its source" ON)
     option(GEMPBA_HWLOC            "Use hwloc for hardware topology"      ON)
     option(GEMPBA_DEBUG_COMMENTS   "Enable debug comments in gempba"      OFF)
 
@@ -38,7 +38,7 @@ else ()
     message(STATUS "GemPBA detected as a subproject. Defaulting to not build tests.")
 
     option(GEMPBA_BUILD_TESTS      "Build gempba unit tests"              OFF)
-    option(GEMPBA_BUILD_MPI        "Build the MPI component, gempba::mpi" OFF)
+    option(GEMPBA_BUILD_MPI        "Compile the MPI component, gempba::mpi, in this build; installs ship its source" OFF)
     option(GEMPBA_HWLOC            "Use hwloc for hardware topology"      OFF)
     option(GEMPBA_DEBUG_COMMENTS   "Enable debug comments in gempba"      OFF)
 
@@ -151,6 +151,19 @@ target_link_libraries(gempba_logging INTERFACE fmt::fmt-header-only)
 file(GLOB_RECURSE GEMPBA_CORE_SOURCES "src/*.cpp")
 list(FILTER GEMPBA_CORE_SOURCES EXCLUDE REGEX ".*/src/mpi/.*")
 file(GLOB_RECURSE GEMPBA_MPI_SOURCES "src/mpi/*.cpp")
+# The private headers the MPI component's sources include. They install with those sources (#415).
+set(GEMPBA_MPI_PRIVATE_HEADERS
+        cabi/internals.hpp
+        impl/install_scheduler.hpp
+        impl/schedulers/centralized_utils.hpp
+        impl/schedulers/default_mpi_stats.hpp
+        impl/schedulers/mpi_centralized_scheduler.hpp
+        impl/schedulers/mpi_semi_centralized_scheduler.hpp
+        impl/schedulers/termination_detector.hpp
+        impl/telemetry/mpi_transport.hpp
+        impl/telemetry/rank_frame_codec.hpp
+        impl/telemetry/telemetry_transport.hpp
+)
 
 # 🛠️ The core's objects, compiled once. libgempba is built from them, and the tests and the JNI library link them
 # directly, so they reach the internals libgempba hides.
@@ -281,10 +294,12 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/gempba/config.h
         COMPONENT core
 )
 
+set(GEMPBA_INSTALL_MPI_SOURCEDIR ${CMAKE_INSTALL_DATADIR}/gempba/mpi)
 configure_package_config_file(
         cmake/gempbaConfig.cmake.in
         ${CMAKE_CURRENT_BINARY_DIR}/gempbaConfig.cmake
         INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/gempba
+        PATH_VARS GEMPBA_INSTALL_MPI_SOURCEDIR
 )
 
 write_basic_package_version_file(
@@ -313,42 +328,40 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/gempba.pc
         COMPONENT core
 )
 
-# ─── Install: the MPI component ──────────────────────────────────────────────
-if (GEMPBA_BUILD_MPI)
-    install(TARGETS gempba_mpi
-            EXPORT gempba_mpi_targets
-            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT mpi
-            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT mpi
-            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT mpi
-            INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-    )
+# ─── Install: the MPI component, as source ───────────────────────────────────
+# A consumer's build compiles it against the consumer's MPI (#415), so installing it needs no MPI.
+install(FILES include/gempba/mpi.hpp
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gempba
+        COMPONENT mpi
+)
+install(DIRECTORY include/gempba/mpi
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gempba
+        COMPONENT mpi
+)
+install(FILES include/gempba/cabi/gempba_mpi.h
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gempba/cabi
+        COMPONENT mpi
+)
 
-    install(FILES include/gempba/mpi.hpp
-            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gempba
+install(DIRECTORY src/mpi/
+        DESTINATION ${GEMPBA_INSTALL_MPI_SOURCEDIR}/src
+        COMPONENT mpi
+        FILES_MATCHING PATTERN "*.cpp"
+)
+foreach (_gempba_header IN LISTS GEMPBA_MPI_PRIVATE_HEADERS)
+    cmake_path(GET _gempba_header PARENT_PATH _gempba_header_dir)
+    install(FILES private/${_gempba_header}
+            DESTINATION ${GEMPBA_INSTALL_MPI_SOURCEDIR}/private/${_gempba_header_dir}
             COMPONENT mpi
     )
-    install(DIRECTORY include/gempba/mpi
-            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gempba
-            COMPONENT mpi
-    )
-    install(FILES include/gempba/cabi/gempba_mpi.h
-            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gempba/cabi
-            COMPONENT mpi
-    )
+endforeach ()
+unset(_gempba_header)
+unset(_gempba_header_dir)
 
-    install(EXPORT gempba_mpi_targets
-            FILE gempba-mpi-targets.cmake
-            NAMESPACE gempba::
-            DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/gempba
-            COMPONENT mpi
-    )
-
-    configure_file(cmake/gempba-mpi.pc.in gempba-mpi.pc @ONLY)
-    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/gempba-mpi.pc
-            DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
-            COMPONENT mpi
-    )
-endif ()
+install(FILES cmake/gempba-mpi.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/gempba
+        COMPONENT mpi
+)
 
 # ─── CPack packaging ─────────────────────────────────────────────────────────
 include(cmake/CPackConfig.cmake)
