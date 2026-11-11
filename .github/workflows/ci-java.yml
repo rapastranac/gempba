@@ -27,6 +27,37 @@ jobs:
     with:
       assemble: ${{ github.event_name == 'push' || contains(fromJSON('["main","release"]'), github.base_ref) }}
 
+  # The Maven Central bundle release-java.yml uploads, assembled from this run's Ubuntu JARs and signed with a throwaway
+  # key, so a missing file shows up here rather than at release time. Nothing is uploaded.
+  central-bundle:
+    needs: [ build ]
+    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.ref }}
+
+      - name: Setup JDK 25
+        uses: ./.github/actions/setup-java-jdk
+
+      - name: Download the Ubuntu variant JARs
+        uses: actions/download-artifact@v8
+        with:
+          pattern: jar-ubuntu-*
+          merge-multiple: true
+          path: jars/
+
+      - name: Assemble and check the bundle with a throwaway key
+        shell: bash
+        run: |
+          export GNUPGHOME=$(mktemp -d)
+          gpg --batch --passphrase '' --quick-gen-key 'gempba CI <ci@invalid>' default default never
+          bash scripts/central_bundle.sh jars central
+
   publish-test-results:
     needs: [ build ]
     runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
