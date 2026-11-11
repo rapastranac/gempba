@@ -109,7 +109,7 @@ readability-identifier-naming,
 readability-container-size-empty'
 
 FormatStyle: file
-HeaderFilterRegex: '.*/(include|public|private|tests)/.*'
+HeaderFilterRegex: '.*/(include|public|private|component|tests)/.*'
 
 CheckOptions:
   # Naming rules for different elements

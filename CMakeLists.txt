@@ -77,7 +77,7 @@ endif ()
 
 # 📂 Includes
 include_directories(include)
-include_directories(private)
+include_directories(src/core/private src/core/component src/mpi/private)
 
 # 📦 Subprojects
 add_subdirectory(external)
@@ -147,23 +147,9 @@ target_include_directories(gempba_logging INTERFACE ${_spdlog_includes})
 target_compile_definitions(gempba_logging INTERFACE SPDLOG_HEADER_ONLY ${_spdlog_definitions})
 target_link_libraries(gempba_logging INTERFACE fmt::fmt-header-only)
 
-# 📄 Sources: src/mpi/ is the MPI component, the rest of src/ the core.
-file(GLOB_RECURSE GEMPBA_CORE_SOURCES "src/*.cpp")
-list(FILTER GEMPBA_CORE_SOURCES EXCLUDE REGEX ".*/src/mpi/.*")
+# 📄 Sources: src/core/ is the core, src/mpi/ the MPI component.
+file(GLOB_RECURSE GEMPBA_CORE_SOURCES "src/core/*.cpp")
 file(GLOB_RECURSE GEMPBA_MPI_SOURCES "src/mpi/*.cpp")
-# The private headers the MPI component's sources include. They install with those sources (#415).
-set(GEMPBA_MPI_PRIVATE_HEADERS
-        cabi/internals.hpp
-        impl/install_scheduler.hpp
-        impl/schedulers/centralized_utils.hpp
-        impl/schedulers/default_mpi_stats.hpp
-        impl/schedulers/mpi_centralized_scheduler.hpp
-        impl/schedulers/mpi_semi_centralized_scheduler.hpp
-        impl/schedulers/termination_detector.hpp
-        impl/telemetry/mpi_transport.hpp
-        impl/telemetry/rank_frame_codec.hpp
-        impl/telemetry/telemetry_transport.hpp
-)
 
 # 🛠️ The core's objects, compiled once. libgempba is built from them, and the tests and the JNI library link them
 # directly, so they reach the internals libgempba hides.
@@ -347,16 +333,13 @@ install(DIRECTORY src/mpi/
         DESTINATION ${GEMPBA_INSTALL_MPI_SOURCEDIR}/src
         COMPONENT mpi
         FILES_MATCHING PATTERN "*.cpp"
+        PATTERN "private" EXCLUDE
 )
-foreach (_gempba_header IN LISTS GEMPBA_MPI_PRIVATE_HEADERS)
-    cmake_path(GET _gempba_header PARENT_PATH _gempba_header_dir)
-    install(FILES private/${_gempba_header}
-            DESTINATION ${GEMPBA_INSTALL_MPI_SOURCEDIR}/private/${_gempba_header_dir}
-            COMPONENT mpi
-    )
-endforeach ()
-unset(_gempba_header)
-unset(_gempba_header_dir)
+# Its own private headers, and the core's headers a component may use.
+install(DIRECTORY src/mpi/private/ src/core/component/
+        DESTINATION ${GEMPBA_INSTALL_MPI_SOURCEDIR}/private
+        COMPONENT mpi
+)
 
 install(FILES cmake/gempba-mpi.cmake
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/gempba

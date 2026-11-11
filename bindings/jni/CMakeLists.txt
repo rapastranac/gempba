@@ -23,7 +23,6 @@ set_target_properties(gempba_jni PROPERTIES
 target_include_directories(gempba_jni PRIVATE
     ${JNI_INCLUDE_DIRS}             # jni.h, jni_md.h
     ${CMAKE_SOURCE_DIR}/include     # gempba public headers
-    ${CMAKE_SOURCE_DIR}/private     # gempba private headers
 )
 
 # ─── Link ─────────────────────────────────────────────────────────────────────
