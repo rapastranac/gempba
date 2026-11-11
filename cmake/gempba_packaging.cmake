@@ -11,9 +11,9 @@ if (EXISTS "${CMAKE_SOURCE_DIR}/LICENSE")
     set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE")
 endif ()
 
-# ─── One package per install component: the core, and the MPI component on top ──
+# ─── One package per component that gempba_add_component() declared ─────────
 set(CPACK_DEB_COMPONENT_INSTALL ON)
-set(CPACK_COMPONENTS_ALL core mpi)
+get_property(CPACK_COMPONENTS_ALL GLOBAL PROPERTY GEMPBA_COMPONENTS)
 set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
 
 set(CPACK_DEBIAN_CORE_PACKAGE_NAME "libgempba-dev")
