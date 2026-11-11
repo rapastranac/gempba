@@ -13,7 +13,6 @@ package io.gempba.internal;
  *   <li>Top-level methods → {@code gempba::} global free functions</li>
  *   <li>{@link Node} → {@code gempba::node} destructor</li>
  *   <li>{@link LoadBalancer} → {@code gempba::load_balancer}</li>
- *   <li>{@link MT} → {@code gempba::mt} factory functions (load balancer)</li>
  * </ul>
  *
  * <h2>JNI naming</h2>
