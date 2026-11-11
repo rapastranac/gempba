@@ -6,17 +6,33 @@ include(CMakeFindDependencyMacro)
 find_dependency(Threads REQUIRED)
 include("${CMAKE_CURRENT_LIST_DIR}/gempba-targets.cmake")
 
-# gempba::mpi, the MPI component, from find_package(gempba COMPONENTS mpi). Its package installs it as source, which
-# gempba-mpi.cmake compiles here against the MPI this project finds.
+set(_gempba_component_source_dir "@PACKAGE_GEMPBA_INSTALL_COMPONENT_SOURCEDIR@")
+
+# Compiles the component p_name, installed as source, into a static gempba::<p_name> in this project, linked to the core
+# and to the remaining arguments. Its gempba-<p_name>.cmake calls this after finding those dependencies.
+function(_gempba_compile_component p_name)
+    if (TARGET gempba::${p_name})
+        return()
+    endif ()
+    set(v_root "${_gempba_component_source_dir}/${p_name}")
+    file(GLOB_RECURSE v_sources "${v_root}/src/*.cpp")
+    add_library(gempba_${p_name} STATIC ${v_sources})
+    target_include_directories(gempba_${p_name} PRIVATE "${v_root}/private")
+    target_link_libraries(gempba_${p_name} PUBLIC gempba::gempba ${ARGN})
+    target_compile_features(gempba_${p_name} PUBLIC cxx_std_23)
+    set_target_properties(gempba_${p_name} PROPERTIES
+            POSITION_INDEPENDENT_CODE ON
+            CXX_SCAN_FOR_MODULES OFF
+    )
+    add_library(gempba::${p_name} ALIAS gempba_${p_name})
+endfunction()
+
+# Each requested component loads through its gempba-<component>.cmake, which its package installs. That file finds the
+# component's dependencies and sets gempba_<component>_FOUND.
 foreach (_gempba_comp IN LISTS gempba_FIND_COMPONENTS)
-    if (_gempba_comp STREQUAL "mpi" AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/gempba-mpi.cmake")
-        set(MPI_CXX_SKIP_MPICXX ON)
-        find_dependency(MPI REQUIRED)
-        set_and_check(GEMPBA_MPI_SOURCE_DIR "@PACKAGE_GEMPBA_INSTALL_MPI_SOURCEDIR@")
-        include("${CMAKE_CURRENT_LIST_DIR}/gempba-mpi.cmake")
-        set(gempba_mpi_FOUND TRUE)
-    else ()
-        set(gempba_${_gempba_comp}_FOUND FALSE)
+    set(gempba_${_gempba_comp}_FOUND FALSE)
+    if (EXISTS "${CMAKE_CURRENT_LIST_DIR}/gempba-${_gempba_comp}.cmake")
+        include("${CMAKE_CURRENT_LIST_DIR}/gempba-${_gempba_comp}.cmake")
     endif ()
 endforeach ()
 unset(_gempba_comp)

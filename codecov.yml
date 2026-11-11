@@ -20,6 +20,6 @@ ignore:
   # not unit tests; coverage figures here are misleading.
   - "include/gempba/core/scheduler.hpp"
   - "include/gempba/core/scheduler_traits.hpp"
-  - "private/impl/schedulers/mpi_centralized_scheduler.hpp"
-  - "private/impl/schedulers/mpi_semi_centralized_scheduler.hpp"
-  - "src/schedulers/mpi/**"
+  - "src/mpi/private/impl/schedulers/mpi_centralized_scheduler.hpp"
+  - "src/mpi/private/impl/schedulers/mpi_semi_centralized_scheduler.hpp"
+  - "src/mpi/schedulers/**"
