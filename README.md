@@ -137,8 +137,6 @@ cmake --build build --target gempba_jni
 mpiexec -n 4 java -Dgempba.native.path=$PWD/bindings/java/src/main/resources/natives/linux-x86_64/gempba_jni.so -cp <classpath> <main class>
 ```
 
-If your MPI runs over UCX, as Debian's MPICH does, give the ranks an empty `UCX_ERROR_SIGNALS`, such as `UCX_ERROR_SIGNALS= mpiexec ...`. Otherwise UCX takes the signals the JVM handles itself and kills it.
-
 On macOS, use `osx-aarch64` and `gempba_jni.dylib`. On Windows, build it in MSYS2's UCRT64 shell as `scripts/build_jar_windows.sh` does, and pass `gempba_jni.dll`.
 
 Worked example: **[gempba-java-examples](https://github.com/rapastranac/gempba-java-examples)**. Full reference in the [docs site](https://rapastranac.github.io/gempba-docs/).
