@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Properties;
 import java.util.function.Consumer;
 
 /**
@@ -37,6 +38,8 @@ final class NativeLoader {
      */
     static final String NATIVE_PATH_PROPERTY = "gempba.native.path";
 
+    private static final String WHICH_MPI_URL = "https://github.com/rapastranac/gempba#which-mpi";
+
     private NativeLoader() {
     }
 
@@ -48,6 +51,9 @@ final class NativeLoader {
      * {@link System#loadLibrary} so that a locally installed library (e.g.
      * during development when the .so is on {@code LD_LIBRARY_PATH}) is still
      * picked up.
+     *
+     * <p>When a bundled library built against an MPI fails to load, the error
+     * names that MPI and {@value #NATIVE_PATH_PROPERTY}.
      *
      * @param libName base name without prefix or extension (e.g. {@code "gempba_jni"})
      * @throws UnsatisfiedLinkError if the library cannot be found or loaded
@@ -72,7 +78,8 @@ final class NativeLoader {
         // would re-add the "lib" prefix on Linux/macOS, so strip it before
         // looking up the resource.
         String filename = stripLibPrefix(System.mapLibraryName(libName));
-        String resourcePath = "/natives/" + classifier + "/" + filename;
+        String resourceDir = "/natives/" + classifier + "/";
+        String resourcePath = resourceDir + filename;
 
         try (InputStream in = NativeLoader.class.getResourceAsStream(resourcePath)) {
             if (in == null) {
@@ -85,10 +92,45 @@ final class NativeLoader {
             try (OutputStream out = Files.newOutputStream(tmp)) {
                 in.transferTo(out);
             }
-            systemLoad.accept(tmp.toAbsolutePath().toString());
+            try {
+                systemLoad.accept(tmp.toAbsolutePath().toString());
+            } catch (UnsatisfiedLinkError e) {
+                String mpi = bundledMpi(resourceDir + libName + ".properties");
+                throw mpi == null ? e : mpiLoadFailure(mpi, e);
+            }
         } catch (IOException e) {
             throw new UnsatisfiedLinkError(
                     "Failed to extract native library '" + resourcePath + "': " + e.getMessage());
+        }
+    }
+
+    /**
+     * The error for a bundled library, built against {@code mpi}, that failed to load: it keeps the OS's reason and
+     * points at {@value #NATIVE_PATH_PROPERTY}.
+     */
+    static UnsatisfiedLinkError mpiLoadFailure(String mpi, UnsatisfiedLinkError cause) {
+        UnsatisfiedLinkError error = new UnsatisfiedLinkError(
+                "gempba-mpi's native library could not be loaded: " + cause.getMessage()
+                + ". It is built against " + mpi + ". To use another MPI, build gempba_jni against it and pass the"
+                + " file with -D" + NATIVE_PATH_PROPERTY + "=<file>; see " + WHICH_MPI_URL);
+        error.initCause(cause);
+        return error;
+    }
+
+    /**
+     * The {@code mpi} entry of the properties file the JNI build writes next to a library with the MPI component,
+     * or {@code null} without one.
+     */
+    private static String bundledMpi(String resourcePath) {
+        try (InputStream in = NativeLoader.class.getResourceAsStream(resourcePath)) {
+            if (in == null) {
+                return null;
+            }
+            Properties properties = new Properties();
+            properties.load(in);
+            return properties.getProperty("mpi");
+        } catch (IOException e) {
+            return null;
         }
     }
 

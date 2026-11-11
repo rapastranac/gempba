@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -47,5 +48,18 @@ class NativeLoaderTest {
         assertTrue(loaded.isEmpty());
         assertTrue(error.getMessage().contains(NativeLoader.NATIVE_PATH_PROPERTY), error.getMessage());
         assertTrue(error.getMessage().contains(missing.toString()), error.getMessage());
+    }
+
+    @Test
+    void mpi_load_failure_names_the_mpi_the_os_reason_and_native_path() {
+        UnsatisfiedLinkError cause = new UnsatisfiedLinkError(
+                "/tmp/gempba_1_gempba_jni.so: libmpi.so.40: cannot open shared object file: No such file or directory");
+
+        UnsatisfiedLinkError error = NativeLoader.mpiLoadFailure("Open MPI", cause);
+
+        assertTrue(error.getMessage().contains("built against Open MPI"), error.getMessage());
+        assertTrue(error.getMessage().contains(cause.getMessage()), error.getMessage());
+        assertTrue(error.getMessage().contains("-D" + NativeLoader.NATIVE_PATH_PROPERTY + "="), error.getMessage());
+        assertSame(cause, error.getCause());
     }
 }
