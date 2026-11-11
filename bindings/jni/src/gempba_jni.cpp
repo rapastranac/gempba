@@ -55,6 +55,9 @@
 
 #if GEMPBA_JNI_MPI
     #include <gempba/cabi/gempba_mpi.h>
+    #if defined(__linux__)
+        #include <dlfcn.h>
+    #endif
 #endif
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
@@ -66,6 +69,28 @@ namespace {
     jmethodID g_node_execute_mid = nullptr;
     jmethodID g_node_lazyinit_mid = nullptr;
     jmethodID g_sr_execute_mid = nullptr;
+
+#if GEMPBA_JNI_MPI
+    /**
+     * @brief Gives the JVM back the signal handlers UCX took, when UCX is in the process.
+     *
+     * UCX installs its own SIGILL, SIGSEGV, SIGBUS and SIGFPE handlers as soon as it loads, in front of the JVM's, and
+     * takes the SIGSEGV the JVM raises on purpose for a crash. UCX keeps the handlers it replaced, and
+     * ucs_debug_disable_signals() puts them back (#443).
+     */
+    void restore_jvm_signal_handlers() {
+    #if defined(__linux__)
+        void* ucs = dlopen("libucs.so.0", RTLD_LAZY | RTLD_NOLOAD);
+        if (ucs == nullptr) {
+            return;
+        }
+        if (auto disable_signals = reinterpret_cast<void (*)()>(dlsym(ucs, "ucs_debug_disable_signals"))) {
+            disable_signals();
+        }
+        dlclose(ucs);
+    #endif
+    }
+#endif
 
     JNIEnv* get_env() {
         JNIEnv* env = nullptr;
@@ -345,6 +370,9 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /*reserved*/) {
         env->ExceptionClear();
     }
 
+#if GEMPBA_JNI_MPI
+    restore_jvm_signal_handlers();
+#endif
     return JNI_VERSION_24;
 }
 
@@ -791,6 +819,7 @@ extern "C" {
             throw_from_last_error(env, "native Mpi.createScheduler failed");
             return 0L;
         }
+        restore_jvm_signal_handlers();
         return to_jlong(sched);
     }
 #endif

@@ -30,7 +30,7 @@ target_include_directories(gempba_jni PRIVATE
 # .so / .dll artifact. The JVM already provides every JNI function, so the library links no JVM library.
 target_link_libraries(gempba_jni PRIVATE gempba_objects)
 if (TARGET gempba_mpi_objects)
-    target_link_libraries(gempba_jni PRIVATE gempba_mpi_objects)
+    target_link_libraries(gempba_jni PRIVATE gempba_mpi_objects ${CMAKE_DL_LIBS})
     target_compile_definitions(gempba_jni PRIVATE GEMPBA_JNI_MPI=1)
 endif ()
 
