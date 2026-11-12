@@ -770,7 +770,7 @@ TEST_F(quasi_horizontal_load_balancer_test, reproduce_segfault_scenario_with_vir
     EXPECT_LE(v_virtual_root->get_children_count(), 1) << "Virtual root should have been corrected during tree manipulation";
 }
 
-TEST_F(quasi_horizontal_load_balancer_test, FLAKY_stress_test_root_correction_under_rapid_parallel_calls) {
+TEST_F(quasi_horizontal_load_balancer_test, stress_test_root_correction_under_rapid_parallel_calls) {
     const auto v_balancer = new gempba::quasi_horizontal_load_balancer();
 
     std::atomic v_execution_count{0};
@@ -820,7 +820,9 @@ TEST_F(quasi_horizontal_load_balancer_test, FLAKY_stress_test_root_correction_un
         v_t.join();
     }
 
-    v_balancer->set_thread_pool_size(4);
+    // Each accepted submission dispatches two tasks, the leaf and the pending right sibling at the root level, so the pool
+    // holds them all and never reports full, whatever the pace of its threads.
+    v_balancer->set_thread_pool_size(2 * SIZE);
     v_balancer->wait(); // give time for threads to reach the condition_variable
 
     // Rapidly submit all left leaves - this should trigger multiple root corrections
