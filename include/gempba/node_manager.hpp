@@ -199,10 +199,25 @@ namespace gempba {
 
         std::future<std::any> force_local_submit(std::function<std::any()>&& p_function) const { return m_balancer->force_local_submit(std::move(p_function)); }
 
+        /**
+         * @brief Runs @p p_node in the calling thread, unless it was already dispatched.
+         *
+         * Children of one parent may be forwarded and submitted in any order. While a branch runs, the balancer may
+         * hand any of its UNUSED siblings to another thread; forwarding or submitting such a sibling afterwards is
+         * a no-op. A node created under a parent is eligible for this even if it is never forwarded or submitted.
+         */
         void forward(node& p_node) const { m_balancer->forward(p_node); }
 
+        /**
+         * @brief Hands @p p_node to a pool thread, or runs it in the calling thread when the pool is busy.
+         * @return true when @p p_node was handed off or discarded, including earlier by the balancer; false when it ran here
+         */
         bool try_local_submit(node& p_node) const { return m_balancer->try_local_submit(p_node); }
 
+        /**
+         * @brief Sends @p p_node to another process, falling back to try_local_submit when no process is free.
+         * @return true when @p p_node was sent or discarded, or had already been dispatched by the balancer; false after the fallback
+         */
         bool try_remote_submit(node& p_node, const int p_runnable_id) const { return m_balancer->try_remote_submit(p_node, p_runnable_id); }
 
         [[nodiscard]] double get_idle_time() const { return m_balancer->get_idle_time(); }
