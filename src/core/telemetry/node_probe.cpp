@@ -172,7 +172,7 @@ namespace gempba::telemetry {
         fill_memory(p_out.m_mem_total_bytes, p_out.m_mem_avail_bytes);
         fill_cgroup_memory(p_out.m_mem_total_bytes, p_out.m_cgroup_mem_used_bytes, p_out.m_cgroup_mem_limit_bytes);
 
-        if (!fill_runtime_via_hwloc(p_out)) {
+        if (!m_host_topology.fill_runtime(p_out)) {
             p_out.m_socket_count = 1;
             p_out.m_sockets[0].m_socket_id = 0;
             p_out.m_sockets[0].m_cpu_pct = 0.0f;

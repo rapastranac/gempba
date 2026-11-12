@@ -3,6 +3,7 @@
 #if GEMPBA_HWLOC
 
     #include <algorithm>
+    #include <atomic>
     #include <hwloc.h>
     #include <impl/telemetry/hwloc_probe_detail.hpp>
     #include <utility>
@@ -11,22 +12,26 @@ namespace gempba::telemetry {
 
     namespace {
 
+        std::atomic<std::uint64_t> g_host_topology_loads{0};
+
+        hwloc_topology_t load_host_topology() noexcept {
+            g_host_topology_loads.fetch_add(1, std::memory_order_relaxed);
+            hwloc_topology_t v_topology = nullptr;
+            if (hwloc_topology_init(&v_topology) != 0) {
+                return nullptr; // LCOV_EXCL_LINE
+            }
+            if (hwloc_topology_load(v_topology) != 0) {
+                hwloc_topology_destroy(v_topology); // LCOV_EXCL_LINE
+                return nullptr; // LCOV_EXCL_LINE
+            }
+            return v_topology;
+        }
+
         struct topology_handle {
             hwloc_topology_t m_topology = nullptr;
             bool m_loaded = false;
 
-            topology_handle() noexcept {
-                if (hwloc_topology_init(&m_topology) != 0) {
-                    m_topology = nullptr;
-                    return;
-                }
-                if (hwloc_topology_load(m_topology) != 0) {
-                    hwloc_topology_destroy(m_topology);
-                    m_topology = nullptr;
-                    return;
-                }
-                m_loaded = true;
-            }
+            topology_handle() noexcept : m_topology(load_host_topology()), m_loaded(m_topology != nullptr) {}
 
             ~topology_handle() {
                 if (m_topology) {
@@ -132,6 +137,8 @@ namespace gempba::telemetry {
             return true;
         }
 
+        std::uint64_t host_topology_loads() noexcept { return g_host_topology_loads.load(std::memory_order_relaxed); }
+
     } // namespace detail
 
     bool fill_static_topology_via_hwloc(topology_node& p_node) noexcept {
@@ -142,12 +149,21 @@ namespace gempba::telemetry {
         return detail::fill_static_topology_from_topology(p_node, v_handle.m_topology);
     }
 
-    bool fill_runtime_via_hwloc(node_frame& p_out) noexcept {
-        topology_handle v_handle;
-        if (!v_handle.m_loaded) {
+    host_topology::~host_topology() {
+        if (m_topology) {
+            hwloc_topology_destroy(m_topology);
+        }
+    }
+
+    bool host_topology::fill_runtime(node_frame& p_out) noexcept {
+        if (!m_load_attempted) {
+            m_load_attempted = true;
+            m_topology = load_host_topology();
+        }
+        if (!m_topology) {
             return false; // LCOV_EXCL_LINE
         }
-        return detail::fill_runtime_from_topology(p_out, v_handle.m_topology);
+        return detail::fill_runtime_from_topology(p_out, m_topology);
     }
 
     int socket_of_cpu_via_hwloc(unsigned p_cpu) noexcept {
@@ -173,8 +189,10 @@ namespace gempba::telemetry {
 namespace gempba::telemetry {
 
     bool fill_static_topology_via_hwloc(topology_node& /*p_node*/) noexcept { return false; }
-    bool fill_runtime_via_hwloc(node_frame& /*p_out*/) noexcept { return false; }
     int socket_of_cpu_via_hwloc(unsigned /*p_cpu*/) noexcept { return -1; }
+
+    host_topology::~host_topology() = default;
+    bool host_topology::fill_runtime(node_frame& /*p_out*/) noexcept { return false; }
 
 } // namespace gempba::telemetry
 

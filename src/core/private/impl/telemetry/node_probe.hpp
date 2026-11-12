@@ -2,6 +2,7 @@
 #define GEMPBA_TELEMETRY_NODE_PROBE_HPP
 
 #include <gempba/telemetry/frames.hpp>
+#include <impl/telemetry/hwloc_probe.hpp>
 
 #include <cstdint>
 
@@ -23,6 +24,9 @@ namespace gempba::telemetry {
         node_probe& operator=(const node_probe&) = delete;
 
         void sample(node_frame& p_out) noexcept;
+
+    private:
+        host_topology m_host_topology;
     };
 
 } // namespace gempba::telemetry
