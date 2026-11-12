@@ -78,6 +78,12 @@ namespace gempba::telemetry {
             }
             return std::nullopt;
         }
+        int last_socket_error() noexcept { return ::WSAGetLastError(); }
+        /// @brief Makes a bind fail while another socket listens on the port; Windows' @c SO_REUSEADDR would let both bind it.
+        void claim_listen_port(socket_t p_s) noexcept {
+            const BOOL v_on = TRUE;
+            ::setsockopt(p_s, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, reinterpret_cast<const char*>(&v_on), sizeof(v_on));
+        }
 #else
         using socket_t = int;
         constexpr socket_t k_invalid_socket = -1;
@@ -107,7 +113,18 @@ namespace gempba::telemetry {
             }
             return std::nullopt;
         }
+        int last_socket_error() noexcept { return errno; }
+        /// @brief Lets a new run rebind a port a finished run left in @c TIME_WAIT; a port another socket listens on stays refused.
+        void claim_listen_port(socket_t p_s) noexcept {
+            const int v_on = 1;
+            ::setsockopt(p_s, SOL_SOCKET, SO_REUSEADDR, &v_on, sizeof(v_on));
+        }
 #endif
+
+        void warn_cannot_listen(const std::uint16_t p_port, const int p_error) {
+            spdlog::warn("telemetry can't listen on 127.0.0.1:{} ({}); this run has no telemetry stream. Pick another port with gempba::telemetry::configure_port.", p_port,
+                         std::system_category().message(p_error));
+        }
 
         constexpr std::chrono::milliseconds k_min_broadcast_interval{50};
         constexpr std::chrono::milliseconds k_control_poll_interval{500};
@@ -404,25 +421,23 @@ namespace gempba::telemetry {
         (void) winsock_keep_alive();
 
         m_impl->m_listen_sock = ::socket(AF_INET, SOCK_STREAM, 0);
-        if (m_impl->m_listen_sock == k_invalid_socket)
-            return false;
+        if (m_impl->m_listen_sock == k_invalid_socket) { // LCOV_EXCL_BR_LINE
+            warn_cannot_listen(m_impl->m_requested_port, last_socket_error()); // LCOV_EXCL_LINE
+            return false; // LCOV_EXCL_LINE
+        }
 
-        int v_yes = 1;
-        ::setsockopt(m_impl->m_listen_sock, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&v_yes), sizeof(v_yes));
+        claim_listen_port(m_impl->m_listen_sock);
 
         sockaddr_in v_addr{};
         v_addr.sin_family = AF_INET;
         v_addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
         v_addr.sin_port = htons(m_impl->m_requested_port);
 
-        if (::bind(m_impl->m_listen_sock, reinterpret_cast<sockaddr*>(&v_addr), sizeof(v_addr)) != 0) {
+        if (::bind(m_impl->m_listen_sock, reinterpret_cast<sockaddr*>(&v_addr), sizeof(v_addr)) != 0 || ::listen(m_impl->m_listen_sock, 8) != 0) { // LCOV_EXCL_BR_LINE
+            const int v_error = last_socket_error();
             close_socket(m_impl->m_listen_sock);
             m_impl->m_listen_sock = k_invalid_socket;
-            return false;
-        }
-        if (::listen(m_impl->m_listen_sock, 8) != 0) {
-            close_socket(m_impl->m_listen_sock);
-            m_impl->m_listen_sock = k_invalid_socket;
+            warn_cannot_listen(m_impl->m_requested_port, v_error);
             return false;
         }
 
