@@ -388,6 +388,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /*reserved*/) {
 #define JNI_SR(n) CAT(_JNI_BASE, _00024SerialRunnable_##n)
 #define JNI_SCHED(n) CAT(_JNI_BASE, _00024Scheduler_##n)
 #define JNI_TELEM(n) CAT(_JNI_BASE, _00024Telemetry_##n)
+#define JNI_STOP(n) CAT(_JNI_BASE, _00024Stop_##n)
 #define JNI_MPI(n) CAT(Java_io_gempba_mpi_Mpi, _##n)
 
 extern "C" {
@@ -749,7 +750,7 @@ extern "C" {
 
     JNIEXPORT jboolean JNICALL JNI_SCHED(isRoot)(JNIEnv*, jclass, jlong handle) { return gempba_scheduler_is_root(from_jlong<gempba_scheduler_t>(handle)) ? JNI_TRUE : JNI_FALSE; }
 
-    JNIEXPORT void JNICALL JNI_SCHED(run)(JNIEnv* env, jclass, jlong handle, jlong nm_handle, jintArray ids, jlongArray sr_handles, jbyteArray seed, jint seed_runnable_id) {
+    JNIEXPORT jintArray JNICALL JNI_SCHED(run)(JNIEnv* env, jclass, jlong handle, jlong nm_handle, jintArray ids, jlongArray sr_handles, jbyteArray seed, jint seed_runnable_id) {
         const jsize n = env->GetArrayLength(ids);
         jint* id_elems = env->GetIntArrayElements(ids, nullptr);
         jlong* sr_elems = env->GetLongArrayElements(sr_handles, nullptr);
@@ -766,10 +767,18 @@ extern "C" {
 
         auto seed_borrow = borrow_jbytearray(env, seed);
         const gempba_bytes_t* seed_bytes = seed != nullptr ? &seed_borrow.bytes : nullptr;
+        gempba_run_outcome_t outcome{};
         if (gempba_scheduler_run(from_jlong<gempba_scheduler_t>(handle), from_jlong<gempba_node_manager_t>(nm_handle), c_ids.data(), c_sr.data(), static_cast<size_t>(n), seed_bytes,
-                                 static_cast<int32_t>(seed_runnable_id), nullptr) != GEMPBA_OK) {
+                                 static_cast<int32_t>(seed_runnable_id), &outcome) != GEMPBA_OK) {
             throw_from_last_error(env, "native Scheduler.run failed");
+            return nullptr;
         }
+        const jint ordinals[] = {static_cast<jint>(outcome.reason), static_cast<jint>(outcome.trigger), static_cast<jint>(outcome.signal)};
+        jintArray result = env->NewIntArray(3);
+        if (result != nullptr) {
+            env->SetIntArrayRegion(result, 0, 3, ordinals);
+        }
+        return result;
     }
 
     JNIEXPORT jbyteArray JNICALL JNI_SCHED(getResult)(JNIEnv* env, jclass, jlong handle) {
@@ -801,6 +810,14 @@ extern "C" {
     }
 
     // ─── gempba::telemetry (process-wide flag) ───────────────────────────────────
+
+    JNIEXPORT void JNICALL JNI_STOP(requestStop)(JNIEnv*, jclass) { gempba_request_stop(); }
+
+    JNIEXPORT void JNICALL JNI_STOP(requestStopOnSignal)(JNIEnv*, jclass, jint signal) { gempba_request_stop_on_signal(static_cast<int32_t>(signal)); }
+
+    JNIEXPORT jboolean JNICALL JNI_STOP(isStopRequested)(JNIEnv*, jclass) { return gempba_stop_requested() ? JNI_TRUE : JNI_FALSE; }
+
+    JNIEXPORT void JNICALL JNI_STOP(stopOnSignals)(JNIEnv*, jclass, jboolean enabled) { gempba_stop_on_signals(enabled == JNI_TRUE ? 1 : 0); }
 
     JNIEXPORT void JNICALL JNI_TELEM(enable)(JNIEnv*, jclass) { gempba_telemetry_enable(); }
 

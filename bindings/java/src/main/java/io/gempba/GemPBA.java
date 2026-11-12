@@ -86,6 +86,26 @@ public final class GemPBA {
     }
 
     /**
+     * Asks the run to stop.  Returns at once and is safe from any thread.  Nodes that haven't started are pruned from
+     * then on, and the run returns its best result so far; under MPI every rank stops.
+     *
+     * <p>Equivalent to {@code gempba::request_stop()} in C++.
+     */
+    public static void requestStop() {
+        GemPBANative.Stop.requestStop();
+    }
+
+    /**
+     * Returns whether a stop was requested since the last {@link #shutdown}, by any trigger.  Long work inside one node
+     * can poll it to return early.
+     *
+     * <p>Equivalent to {@code gempba::stop_requested()} in C++.
+     */
+    public static boolean isStopRequested() {
+        return GemPBANative.Stop.isStopRequested();
+    }
+
+    /**
      * Creates a placeholder node with no runnable.
      *
      * <p>Equivalent to {@code gempba::create_dummy_node(lb)} in C++.  Use as

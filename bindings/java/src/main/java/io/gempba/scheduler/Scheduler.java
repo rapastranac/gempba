@@ -5,6 +5,7 @@ import io.gempba.core.NodeManager;
 import io.gempba.stats.RankStats;
 import io.gempba.value.BalancingPolicy;
 import io.gempba.value.Goal;
+import io.gempba.value.RunOutcome;
 import io.gempba.value.Score;
 import io.gempba.value.ScoreType;
 
@@ -165,9 +166,10 @@ public final class Scheduler {
      *
      * @param nm        the local node manager that owns the thread pool
      * @param runnables map from integer ID to the corresponding {@link SerialRunnable}, the same on every rank
+     * @return how the run ended, the same on every rank
      */
-    public void run(NodeManager nm, Map<Integer, SerialRunnable> runnables) {
-        run(nm, runnables, null, 0);
+    public RunOutcome run(NodeManager nm, Map<Integer, SerialRunnable> runnables) {
+        return run(nm, runnables, null, 0);
     }
 
     /**
@@ -180,8 +182,9 @@ public final class Scheduler {
      * @param runnables      map from integer ID to the corresponding {@link SerialRunnable}, the same on every rank
      * @param seed           the root's first task, serialised; {@code null} on every other rank
      * @param seedRunnableId ID of the {@link SerialRunnable} that runs the seed; ignored when {@code seed} is {@code null}
+     * @return how the run ended, the same on every rank
      */
-    public void run(NodeManager nm, Map<Integer, SerialRunnable> runnables, byte[] seed, int seedRunnableId) {
+    public RunOutcome run(NodeManager nm, Map<Integer, SerialRunnable> runnables, byte[] seed, int seedRunnableId) {
         int n = runnables.size();
         int[] ids = new int[n];
         long[] handles = new long[n];
@@ -191,7 +194,7 @@ public final class Scheduler {
             handles[i] = e.getValue().handle;
             i++;
         }
-        GemPBANative.Scheduler.run(handle, nm.handle, ids, handles, seed, seedRunnableId);
+        return RunOutcome.fromOrdinals(GemPBANative.Scheduler.run(handle, nm.handle, ids, handles, seed, seedRunnableId));
     }
 
     /**

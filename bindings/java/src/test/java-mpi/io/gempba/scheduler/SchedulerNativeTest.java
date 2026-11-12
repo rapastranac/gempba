@@ -4,7 +4,9 @@ import io.gempba.core.LoadBalancer;
 import io.gempba.core.NodeManager;
 import io.gempba.stats.RankStats;
 import io.gempba.value.BalancingPolicy;
+import io.gempba.value.EndReason;
 import io.gempba.value.Goal;
+import io.gempba.value.RunOutcome;
 import io.gempba.value.Score;
 import io.gempba.value.ScoreType;
 
@@ -48,6 +50,7 @@ class SchedulerNativeTest {
     private int worldSize;
     private byte[] rootResult;          // rank 0 only
     private byte[][] allResults;        // rank 0 only
+    private RunOutcome outcome;
     private java.util.List<RankStats> stats; // rank 0 only, captured after synchronizeStats
 
     // ── Setup ─────────────────────────────────────────────────────────────────
@@ -91,7 +94,7 @@ class SchedulerNativeTest {
         sr.handle = GemPBANative.SerialRunnable.create(RUNNABLE_ID, sr, false);
 
         byte[] seed = root ? "Marco!".getBytes(StandardCharsets.UTF_8) : null;
-        GemPBANative.Scheduler.run(schedHandle, nmHandle, new int[]{RUNNABLE_ID}, new long[]{sr.handle}, seed, RUNNABLE_ID);
+        outcome = RunOutcome.fromOrdinals(GemPBANative.Scheduler.run(schedHandle, nmHandle, new int[]{RUNNABLE_ID}, new long[]{sr.handle}, seed, RUNNABLE_ID));
         sr.close();
 
         if (root) {
@@ -120,6 +123,12 @@ class SchedulerNativeTest {
         assertTrue(rank >= 0, "rank must be non-negative");
         assertTrue(rank < worldSize, "rank must be less than world size");
         assertTrue(worldSize >= 2, "world size must be at least 2 for MP tests");
+    }
+
+    @Test
+    void every_rank_returns_a_completed_run() {
+        assertEquals(EndReason.COMPLETED, outcome.reason());
+        assertFalse(outcome.isInterrupted());
     }
 
     @Test
