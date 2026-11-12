@@ -906,6 +906,28 @@ TEST_F(quasi_horizontal_load_balancer_test, forward_lazy_node_with_nullopt_initi
     EXPECT_EQ(0, v_parent->get_children_count());
 }
 
+TEST_F(quasi_horizontal_load_balancer_test, try_local_submit_prunes_a_root_that_has_children) {
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
+    v_balancer.set_thread_pool_size(1);
+
+    std::atomic<int> v_runs{0};
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [&](std::thread::id, int, const gempba::node&) { ++v_runs; };
+
+    std::shared_ptr<gempba::node_core> v_no_parent;
+    auto v_root = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_no_parent, v_fn, std::make_tuple(0));
+    auto v_child = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_root, v_fn, std::make_tuple(0));
+    ASSERT_EQ(v_root, v_root->get_root());
+    ASSERT_EQ(v_root, v_child->get_parent());
+
+    gempba::node v_node(v_root);
+    EXPECT_TRUE(v_balancer.try_local_submit(v_node));
+    v_balancer.wait();
+
+    EXPECT_EQ(1, v_runs.load());
+    EXPECT_EQ(gempba::PUSHED, v_root->get_state());
+    EXPECT_EQ(0, v_root->get_children_count());
+}
+
 TEST_F(quasi_horizontal_load_balancer_test, force_local_submit_records_the_task_when_telemetry_is_on) {
     gempba::telemetry::enable();
     auto v_hub = std::make_unique<gempba::telemetry::telemetry_hub>();

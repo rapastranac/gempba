@@ -198,6 +198,9 @@ namespace gempba {
              * Root correction is done only when the root ends up with a single child after pruning.
              **/
 
+            if (v_parent == nullptr) {
+                return;
+            }
             try_correct_root(v_parent);
         }
 
