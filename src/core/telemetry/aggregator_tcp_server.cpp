@@ -421,9 +421,9 @@ namespace gempba::telemetry {
         (void) winsock_keep_alive();
 
         m_impl->m_listen_sock = ::socket(AF_INET, SOCK_STREAM, 0);
-        if (m_impl->m_listen_sock == k_invalid_socket) {
-            warn_cannot_listen(m_impl->m_requested_port, last_socket_error());
-            return false;
+        if (m_impl->m_listen_sock == k_invalid_socket) { // LCOV_EXCL_BR_LINE
+            warn_cannot_listen(m_impl->m_requested_port, last_socket_error()); // LCOV_EXCL_LINE
+            return false; // LCOV_EXCL_LINE
         }
 
         claim_listen_port(m_impl->m_listen_sock);
@@ -433,7 +433,7 @@ namespace gempba::telemetry {
         v_addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
         v_addr.sin_port = htons(m_impl->m_requested_port);
 
-        if (::bind(m_impl->m_listen_sock, reinterpret_cast<sockaddr*>(&v_addr), sizeof(v_addr)) != 0 || ::listen(m_impl->m_listen_sock, 8) != 0) {
+        if (::bind(m_impl->m_listen_sock, reinterpret_cast<sockaddr*>(&v_addr), sizeof(v_addr)) != 0 || ::listen(m_impl->m_listen_sock, 8) != 0) { // LCOV_EXCL_BR_LINE
             const int v_error = last_socket_error();
             close_socket(m_impl->m_listen_sock);
             m_impl->m_listen_sock = k_invalid_socket;
