@@ -624,24 +624,11 @@ TEST_F(quasi_horizontal_load_balancer_test, missing_root_correction_after_prunin
     };
     int v_dummy_value = 7;
 
-    // Create structure with virtual root and two children
-    // This mimics the initial branching scenario
     auto v_virtual_root = gempba::node_core_impl<void()>::create_dummy(*v_balancer);
     auto v_left_child = gempba::node_core_impl<void(int)>::create_explicit(*v_balancer, v_virtual_root, v_dummy_function, std::make_tuple(v_dummy_value));
     auto v_right_child = gempba::node_core_impl<void(int)>::create_explicit(*v_balancer, v_virtual_root, v_dummy_function, std::make_tuple(v_dummy_value));
-
-    // Create deeper tree under right_child (simulating sequential execution)
     auto v_grandchild_a = gempba::node_core_impl<void(int)>::create_explicit(*v_balancer, v_left_child, v_dummy_function, std::make_tuple(v_dummy_value));
     auto v_grandchild_b = gempba::node_core_impl<void(int)>::create_explicit(*v_balancer, v_left_child, v_dummy_function, std::make_tuple(v_dummy_value));
-
-    /**
-     * Structure:
-     *     virtual_root (dummy)
-     *          /               \
-     *     left_child        right_child (executing)
-     *     /         \
-     * grandchild_A  grandchild_B
-     */
 
     ASSERT_EQ(2, v_virtual_root->get_children_count());
     ASSERT_EQ(v_virtual_root, v_left_child->get_root());
@@ -649,62 +636,29 @@ TEST_F(quasi_horizontal_load_balancer_test, missing_root_correction_after_prunin
     ASSERT_EQ(v_virtual_root, v_grandchild_a->get_root());
 
     v_balancer->set_thread_pool_size(4);
-    v_balancer->wait(); // give time for threads to reach the condition_variable
-
-    v_left_child->set_state(gempba::FORWARDED); // Emulate that right_child is executing sequentially
-
-    // Now attempt to push grandchild_A
-    // This should:
-    // 1. get_root_level_pending_node(grandchild_A) returns right_child (top node at root level)
-    // 2. right_child gets pushed
-    // 3. right_child is pruned from virtual_root
-    // 4. virtual_root now has only 1 child (right_child)
-    // 5. WITHOUT THE FIX: virtual_root stays as root with 1 child
-    // 6. WITH THE FIX: Root should be corrected
+    v_left_child->set_state(gempba::RUNNING);
 
     gempba::node v_wrapper_a(v_grandchild_a);
-    bool v_submitted_a = v_balancer->try_local_submit(v_wrapper_a);
-
+    ASSERT_TRUE(v_balancer->try_local_submit(v_wrapper_a));
     v_balancer->wait();
 
-    // After the submission, right_child should be pruned
+    EXPECT_EQ(gempba::PUSHED, v_right_child->get_state());
     EXPECT_EQ(nullptr, v_right_child->get_parent());
     EXPECT_EQ(nullptr, v_right_child->get_root());
+    EXPECT_EQ(0, v_virtual_root->get_children_count());
 
-    // The critical check: virtual_root should now have been corrected
-    // It should either have 0 children (if right_child became new root)
-    // OR right_child should be the new root
+    EXPECT_EQ(gempba::RUNNING, v_left_child->get_state());
+    EXPECT_EQ(nullptr, v_left_child->get_parent());
+    EXPECT_EQ(0, v_left_child->get_children_count());
 
-    if (v_submitted_a) {
-        // Check that the root was corrected
-        int v_virtual_root_children = v_virtual_root->get_children_count();
+    EXPECT_EQ(gempba::PUSHED, v_grandchild_a->get_state());
+    EXPECT_EQ(nullptr, v_grandchild_a->get_parent());
+    EXPECT_EQ(gempba::UNUSED, v_grandchild_b->get_state());
+    EXPECT_EQ(nullptr, v_grandchild_b->get_parent());
+    EXPECT_EQ(v_grandchild_b, v_grandchild_b->get_root());
 
-        // WITHOUT FIX: This would be 1 (only left_child remains)
-        // WITH FIX: This should be 0 (left_child became new root and was removed)
-        EXPECT_EQ(0, v_virtual_root_children) << "Root should have been corrected after pruning left_child";
-
-        // Verify right_grandchild became the new root
-        EXPECT_EQ(gempba::PUSHED, v_right_child->get_state());
-        EXPECT_EQ(gempba::FORWARDED, v_left_child->get_state());
-        EXPECT_EQ(gempba::PUSHED, v_grandchild_a->get_state());
-        EXPECT_EQ(gempba::UNUSED, v_grandchild_b->get_state());
-
-        EXPECT_EQ(nullptr, v_left_child->get_parent());
-        EXPECT_EQ(0, v_left_child->get_children_count());
-        EXPECT_EQ(nullptr, v_grandchild_a->get_parent());
-        EXPECT_EQ(nullptr, v_grandchild_b->get_parent());
-        EXPECT_EQ(v_grandchild_b, v_grandchild_b->get_root());
-    }
-
-    // Now try to push grandchild_B - this is where the bug manifests
-    // get_root_level_pending_node(grandchild_B) would try to access virtual_root
-    // which now has < 2 children and would hit the error
     gempba::node v_wrapper_b(v_grandchild_b);
-
-    // WITHOUT FIX: This would throw the error about virtual root with 1 child
-    // WITH FIX: This should work correctly
     EXPECT_NO_THROW({ v_balancer->try_local_submit(v_wrapper_b); });
-
     v_balancer->wait();
 
     delete v_balancer;
@@ -720,55 +674,36 @@ TEST_F(quasi_horizontal_load_balancer_test, reproduce_segfault_scenario_with_vir
     };
     int v_dummy_value = 7;
 
-    // Simulate the exact scenario from the crash log:
-    // - Virtual root (dummy)
-    // - Deep tree with multiple levels
-    // - Rapid parallel submissions that cause root children to be pruned
-
     auto v_virtual_root = gempba::node_core_impl<void()>::create_dummy(v_balancer);
     auto v_node_l1 = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_virtual_root, v_dummy_function, std::make_tuple(v_dummy_value));
     auto v_node_r1 = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_virtual_root, v_dummy_function, std::make_tuple(v_dummy_value));
-
-    // Build deeper tree under R1
     auto v_node_l2 = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_node_r1, v_dummy_function, std::make_tuple(v_dummy_value));
     auto v_node_r2 = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_node_r1, v_dummy_function, std::make_tuple(v_dummy_value));
-
-    // Even deeper
     auto v_node_l3 = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_node_l2, v_dummy_function, std::make_tuple(v_dummy_value));
     auto v_node_r3 = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_node_l2, v_dummy_function, std::make_tuple(v_dummy_value));
-
-    /**
-     * Structure:
-     *         virtual_root (dummy)
-     *              /      \
-     *          node_L1   node_R1
-     *          /      \
-     *      node_L2   node_R2
-     *     /      \
-     *  node_L3   node_R3
-     */
+    v_node_r1->set_state(gempba::RUNNING);
+    v_node_l2->set_state(gempba::RUNNING);
 
     ASSERT_EQ(v_virtual_root, v_node_l3->get_root());
     ASSERT_TRUE(v_virtual_root->is_dummy());
 
-    v_balancer.set_thread_pool_size(3);
+    v_balancer.set_thread_pool_size(4);
 
-    // Push from deep level - this triggers get_root_level_pending_node traversal
     gempba::node v_wrapper_l3(v_node_l3);
-    bool v_result_1 = v_balancer.try_local_submit(v_wrapper_l3);
+    ASSERT_TRUE(v_balancer.try_local_submit(v_wrapper_l3));
 
-    // Push another from same level
+    EXPECT_EQ(gempba::PUSHED, v_node_l1->get_state());
+    EXPECT_EQ(gempba::PUSHED, v_node_r2->get_state());
+    EXPECT_EQ(gempba::PUSHED, v_node_l3->get_state());
+    EXPECT_EQ(v_node_r3, v_node_r3->get_root());
+    EXPECT_EQ(0, v_virtual_root->get_children_count());
+
     gempba::node v_wrapper_r3(v_node_r3);
-
-    // WITHOUT FIX: Second call would hit virtual_root with 1 child
-    // The error would be: "fw_count: 0, ph_count: 0, isVirtual: true, isDiscarded: false"
-    EXPECT_NO_THROW({ bool v_result_2 = v_balancer.try_local_submit(v_wrapper_r3); });
-
+    EXPECT_NO_THROW({ EXPECT_TRUE(v_balancer.try_local_submit(v_wrapper_r3)); });
     v_balancer.wait();
 
-    // Verify root was properly maintained throughout
-    // Virtual root should either be empty or replaced
-    EXPECT_LE(v_virtual_root->get_children_count(), 1) << "Virtual root should have been corrected during tree manipulation";
+    EXPECT_EQ(gempba::PUSHED, v_node_r3->get_state());
+    EXPECT_EQ(4, v_execution_count.load());
 }
 
 TEST_F(quasi_horizontal_load_balancer_test, stress_test_root_correction_under_rapid_parallel_calls) {
