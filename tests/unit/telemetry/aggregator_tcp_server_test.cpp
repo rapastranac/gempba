@@ -4,6 +4,7 @@
 #include <gempba/telemetry/telemetry_hub.hpp>
 #include <gtest/gtest.h>
 #include <impl/telemetry/aggregator_tcp_server.hpp>
+#include <log_capture.hpp>
 #include <string>
 #include <thread>
 #include <vector>
@@ -681,6 +682,53 @@ namespace {
 
         close_sock(v_client);
         v_server.stop();
+    }
+
+    socket_t listen_loopback() {
+        const socket_t v_s = ::socket(AF_INET, SOCK_STREAM, 0);
+        sockaddr_in v_addr{};
+        v_addr.sin_family = AF_INET;
+        v_addr.sin_port = 0;
+        v_addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        if (::bind(v_s, reinterpret_cast<sockaddr*>(&v_addr), sizeof(v_addr)) != 0 || ::listen(v_s, 1) != 0) {
+            close_sock(v_s);
+            return k_invalid;
+        }
+        return v_s;
+    }
+
+    std::uint16_t local_port(const socket_t p_s) {
+        sockaddr_in v_addr{};
+#if defined(_WIN32)
+        int v_len = sizeof(v_addr);
+#else
+        socklen_t v_len = sizeof(v_addr);
+#endif
+        ::getsockname(p_s, reinterpret_cast<sockaddr*>(&v_addr), &v_len);
+        return ntohs(v_addr.sin_port);
+    }
+
+    TEST_F(tcp_server_test, start_warns_when_another_socket_listens_on_the_port) {
+        const socket_t v_holder = listen_loopback();
+        ASSERT_NE(k_invalid, v_holder);
+        const std::uint16_t v_port = local_port(v_holder);
+
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+        gempba::telemetry::aggregator_tcp_server v_server(v_port, v_hub);
+
+        bool v_started = true;
+        std::string v_log;
+        {
+            const log_capture v_capture;
+            v_started = v_server.start();
+            v_log = v_capture.text();
+        }
+        close_sock(v_holder);
+
+        EXPECT_FALSE(v_started);
+        EXPECT_NE(std::string::npos, v_log.find("[warning] telemetry can't listen on 127.0.0.1:" + std::to_string(v_port) + " (")) << v_log;
+        EXPECT_NE(std::string::npos, v_log.find("gempba::telemetry::configure_port")) << v_log;
     }
 
 } // namespace
