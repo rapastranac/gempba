@@ -139,9 +139,10 @@ namespace {
         EXPECT_TRUE(v_node.m_sockets.empty());
     }
 
-    TEST(hwloc_probe_off_stub_test, fill_runtime_returns_false) {
+    TEST(hwloc_probe_off_stub_test, host_topology_fill_runtime_returns_false) {
+        gempba::telemetry::host_topology v_topology;
         gempba::telemetry::node_frame v_frame{};
-        EXPECT_FALSE(gempba::telemetry::fill_runtime_via_hwloc(v_frame));
+        EXPECT_FALSE(v_topology.fill_runtime(v_frame));
         EXPECT_EQ(0u, v_frame.m_socket_count);
     }
 
