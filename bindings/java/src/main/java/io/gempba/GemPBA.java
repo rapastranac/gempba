@@ -18,6 +18,7 @@ import io.gempba.value.ScoreType;
 
 import io.gempba.internal.GemPBANative;
 
+import java.lang.ref.Reference;
 import java.util.function.BooleanSupplier;
 
 /**
@@ -264,7 +265,11 @@ public final class GemPBA {
             task.run(tid, ctx);
             return null;
         });
-        child.state.handle = GemPBANative.createExplicitNode(lb.handle, parent.state.handle, child, null);
+        try {
+            child.state.handle = GemPBANative.createExplicitNode(lb.handle, parent.state.handle, child, null);
+        } finally {
+            Reference.reachabilityFence(parent);
+        }
         return child;
     }
 
@@ -296,8 +301,12 @@ public final class GemPBA {
             task.execute(tid, a, ctx);
             return null;
         });
-        child.state.handle = GemPBANative.createExplicitNode(
-                lb.handle, parent.state.handle, child, serializer.serialize(args));
+        try {
+            child.state.handle = GemPBANative.createExplicitNode(
+                    lb.handle, parent.state.handle, child, serializer.serialize(args));
+        } finally {
+            Reference.reachabilityFence(parent);
+        }
         return child;
     }
 
@@ -324,7 +333,11 @@ public final class GemPBA {
                     return null;
                 },
                 () -> gate.getAsBoolean() ? Node.EMPTY_BYTES : null);
-        child.state.handle = GemPBANative.createLazyNode(lb.handle, parent.state.handle, child, null);
+        try {
+            child.state.handle = GemPBANative.createLazyNode(lb.handle, parent.state.handle, child, null);
+        } finally {
+            Reference.reachabilityFence(parent);
+        }
         return child;
     }
 
@@ -355,7 +368,11 @@ public final class GemPBA {
             R result = task.run(tid, ctx);
             return result == null ? null : resultSerializer.serialize(result);
         });
-        child.state.handle = GemPBANative.createExplicitNode(lb.handle, parent.state.handle, child, null);
+        try {
+            child.state.handle = GemPBANative.createExplicitNode(lb.handle, parent.state.handle, child, null);
+        } finally {
+            Reference.reachabilityFence(parent);
+        }
         return child;
     }
 
@@ -388,8 +405,12 @@ public final class GemPBA {
             R result = task.execute(tid, a, ctx);
             return result == null ? null : resultSerializer.serialize(result);
         });
-        child.state.handle = GemPBANative.createExplicitNode(
-                lb.handle, parent.state.handle, child, argsSerializer.serialize(args));
+        try {
+            child.state.handle = GemPBANative.createExplicitNode(
+                    lb.handle, parent.state.handle, child, argsSerializer.serialize(args));
+        } finally {
+            Reference.reachabilityFence(parent);
+        }
         return child;
     }
 
@@ -422,7 +443,11 @@ public final class GemPBA {
                     return result == null ? null : resultSerializer.serialize(result);
                 },
                 () -> gate.getAsBoolean() ? Node.EMPTY_BYTES : null);
-        child.state.handle = GemPBANative.createLazyNode(lb.handle, parent.state.handle, child, null);
+        try {
+            child.state.handle = GemPBANative.createLazyNode(lb.handle, parent.state.handle, child, null);
+        } finally {
+            Reference.reachabilityFence(parent);
+        }
         return child;
     }
 
