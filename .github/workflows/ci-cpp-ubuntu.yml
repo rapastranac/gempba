@@ -71,7 +71,7 @@ jobs:
             -DMPIEXEC_PREFLAGS=--oversubscribe \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_FLAGS="--coverage" \
+            -DCMAKE_CXX_FLAGS="--coverage -fprofile-update=atomic" \
             -DCMAKE_EXE_LINKER_FLAGS="--coverage"
           cmake --build build --parallel $(nproc)
 
@@ -82,14 +82,28 @@ jobs:
 
           ctest --output-on-failure --output-junit test_results_main.xml
 
-      # 7️⃣ Upload coverage to Codecov
+      # 7️⃣ Report coverage with gcovr, leaving out branches only an exception or unreachable code would take
+      - name: Generate coverage report
+        run: |
+          sudo apt-get install -y gcovr
+          gcovr --version | head -1
+          gcovr -r . build -j "$(nproc)" \
+            --gcov-executable gcov-14 \
+            --filter 'src/' --filter 'include/' \
+            --exclude-throw-branches --exclude-unreachable-branches \
+            --cobertura coverage.xml --txt-summary
+
+      # 8️⃣ Upload coverage to Codecov
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          disable_search: true
+          plugins: noop
           fail_ci_if_error: true
 
-      # 8️⃣ Upload test results as artifacts
+      # 9️⃣ Upload test results as artifacts
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v7
@@ -98,7 +112,7 @@ jobs:
           path: ${{ github.workspace }}/build/test_results_*.xml
           retention-days: 30
 
-      # 9️⃣ Publish test results as a check
+      # 🔟 Publish test results as a check
       - name: Publish Test Report
         if: ${{ !cancelled() }}
         uses: mikepenz/action-junit-report@v4
