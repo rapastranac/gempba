@@ -339,7 +339,7 @@ namespace gempba::cabi_tests {
         std::map<int, std::shared_ptr<gempba::serial_runnable>> v_captured;
         std::optional<gempba::task_bundle> v_seed = gempba::task_bundle(gempba::task_packet::EMPTY, -1);
         EXPECT_CALL(v_mock, rank_me()).WillRepeatedly(Return(2));
-        EXPECT_CALL(v_mock, do_run(_, SizeIs(2), _)).WillOnce(::testing::DoAll(::testing::SaveArg<1>(&v_captured), ::testing::SaveArg<2>(&v_seed)));
+        EXPECT_CALL(v_mock, do_run(_, SizeIs(2), _)).WillOnce(::testing::DoAll(::testing::SaveArg<1>(&v_captured), ::testing::SaveArg<2>(&v_seed), Return(gempba::run_outcome{})));
 
         EXPECT_EQ(gempba_scheduler_run(handle_for(v_mock, v_s), v_nm, v_ids, v_handles, 2, nullptr, 0), GEMPBA_OK);
         EXPECT_TRUE(v_captured.count(10) == 1);
@@ -360,7 +360,7 @@ namespace gempba::cabi_tests {
 
         std::optional<gempba::task_bundle> v_seed;
         EXPECT_CALL(v_mock, rank_me()).WillRepeatedly(Return(0));
-        EXPECT_CALL(v_mock, do_run(_, _, _)).WillOnce(::testing::SaveArg<2>(&v_seed));
+        EXPECT_CALL(v_mock, do_run(_, _, _)).WillOnce(::testing::DoAll(::testing::SaveArg<2>(&v_seed), Return(gempba::run_outcome{})));
 
         EXPECT_EQ(gempba_scheduler_run(handle_for(v_mock, v_s), v_nm, v_ids, v_handles, 1, &v_seed_bytes, 5), GEMPBA_OK);
         ASSERT_TRUE(v_seed.has_value());

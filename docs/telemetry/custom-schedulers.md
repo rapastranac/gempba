@@ -5,7 +5,7 @@ A scheduler passed to `gempba::mpi::create_scheduler(std::unique_ptr<scheduler>)
 ## What your scheduler implements
 
 Every rank calls `scheduler::run(node_manager, runnables, seed)`, and only the root, rank 0, passes the seed. `run`, `get_result()` and `get_all_results()` check that rule and the root before they reach your scheduler (#394). Your scheduler implements:
-- `do_run(node_manager&, runnables, std::optional<task_bundle> seed)`: this rank's part of the run, returning once the whole run has ended. The seed is set exactly on the root. Whether the root also runs tasks is up to your scheduler; the built-in ones keep it as their coordinator.
+- `do_run(node_manager&, runnables, std::optional<task_bundle> seed)`: this rank's part of the run, returning how it ended once the whole run has ended. The seed is set exactly on the root. Whether the root also runs tasks is up to your scheduler; the built-in ones keep it as their coordinator.
 - `do_get_result()` and `do_get_all_results()`: the best result, and each rank's, which the root reads after `run`.
 - `force_push(task, runnable_id)` and `try_open_transmission_channel()`: how the load balancer hands a task to another rank.
 - The rest of `scheduler`: `barrier()`, `rank_me()`, `world_size()`, the stats calls, `set_goal()` and `set_custom_initial_topology()`.

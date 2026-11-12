@@ -6,6 +6,7 @@
 #include <gempba/core/rank_role.hpp>
 #include <gempba/core/scheduler_traits.hpp>
 #include <gempba/core/serial_runnable.hpp>
+#include <gempba/core/stop.hpp>
 #include <gempba/utils/gempba_utils.hpp>
 #include <gempba/utils/result.hpp>
 #include <gempba/utils/score.hpp>
@@ -88,13 +89,14 @@ namespace gempba {
          * @param p_node_manager this rank's node manager
          * @param p_runnables the runnables by id, the same on every rank
          * @param p_seed the root's first task; absent on every other rank
+         * @return how the run ended, the same on every rank
          * @throws std::invalid_argument if the root passes no seed or another rank passes one
          */
-        void run(node_manager& p_node_manager, std::map<int, std::shared_ptr<serial_runnable>> p_runnables, std::optional<task_bundle> p_seed = std::nullopt) {
+        run_outcome run(node_manager& p_node_manager, std::map<int, std::shared_ptr<serial_runnable>> p_runnables, std::optional<task_bundle> p_seed = std::nullopt) {
             if (is_root() != p_seed.has_value()) {
                 throw std::invalid_argument(is_root() ? "the root must pass a seed to scheduler::run" : "only the root passes a seed to scheduler::run");
             }
-            do_run(p_node_manager, std::move(p_runnables), std::move(p_seed));
+            return do_run(p_node_manager, std::move(p_runnables), std::move(p_seed));
         }
 
         /**
@@ -136,8 +138,11 @@ namespace gempba {
         virtual std::optional<transmission_guard> try_open_transmission_channel() = 0;
 
     protected:
-        /// @brief This rank's part of @ref run; @p p_seed is set exactly when this rank is the root.
-        virtual void do_run(node_manager& p_node_manager, std::map<int, std::shared_ptr<serial_runnable>> p_runnables, std::optional<task_bundle> p_seed) = 0;
+        /**
+         * @brief This rank's part of @ref run; @p p_seed is set exactly when this rank is the root.
+         * @return how the run ended, the same on every rank: @ref end_reason::INTERRUPTED once a stop was requested on any rank
+         */
+        virtual run_outcome do_run(node_manager& p_node_manager, std::map<int, std::shared_ptr<serial_runnable>> p_runnables, std::optional<task_bundle> p_seed) = 0;
 
         /// @brief @ref get_result on the root.
         virtual task_packet do_get_result() = 0;

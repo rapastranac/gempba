@@ -28,6 +28,7 @@
 #include <gempba/utils/utils.hpp>
 #include <impl/schedulers/default_mpi_stats.hpp>
 #include <impl/schedulers/termination_detector.hpp>
+#include <impl/stop_state.hpp>
 
 namespace gempba {
 
@@ -1012,12 +1013,13 @@ namespace gempba {
 
 
     protected:
-        void do_run(node_manager& p_node_manager, std::map<int, std::shared_ptr<serial_runnable>> p_runnables, std::optional<task_bundle> p_seed) override {
+        run_outcome do_run(node_manager& p_node_manager, std::map<int, std::shared_ptr<serial_runnable>> p_runnables, std::optional<task_bundle> p_seed) override {
             if (p_seed) {
                 run_coordinator(p_seed->get_task_packet(), p_seed->get_runnable_id());
             } else {
                 run_worker(p_node_manager, std::move(p_runnables));
             }
+            return detail::requested_stop();
         }
 
         task_packet do_get_result() override { return fetch_solution(); }

@@ -49,6 +49,13 @@ namespace {
         m_scheduler.run(m_node_manager, runnable_map{});
     }
 
+    TEST_F(scheduler_test, run_returns_how_the_run_ended) {
+        on_rank(1);
+        const gempba::run_outcome v_interrupted{gempba::end_reason::INTERRUPTED, gempba::stop_trigger::CONTROL, 0};
+        EXPECT_CALL(m_scheduler, do_run(_, _, _)).WillOnce(::testing::Return(v_interrupted));
+        EXPECT_EQ(v_interrupted, m_scheduler.run(m_node_manager, runnable_map{}));
+    }
+
     TEST_F(scheduler_test, run_rejects_a_root_without_a_seed) {
         on_rank(0);
         EXPECT_CALL(m_scheduler, do_run(_, _, _)).Times(0);

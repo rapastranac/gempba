@@ -65,7 +65,7 @@ public:
     std::optional<gempba::transmission_guard> try_open_transmission_channel() override { return std::nullopt; }
 
 protected:
-    void do_run(gempba::node_manager&, std::map<int, std::shared_ptr<gempba::serial_runnable>>, std::optional<gempba::task_bundle>) override {}
+    gempba::run_outcome do_run(gempba::node_manager&, std::map<int, std::shared_ptr<gempba::serial_runnable>>, std::optional<gempba::task_bundle>) override { return {}; }
     gempba::task_packet do_get_result() override { return gempba::task_packet::EMPTY; }
     std::vector<gempba::result> do_get_all_results() override { return {}; }
 };

@@ -36,7 +36,7 @@ namespace gempba::testing_support {
         MOCK_METHOD(void, synchronize_stats, (), (override));
         MOCK_METHOD(unsigned int, force_push, (task_packet&&, int), (override));
         MOCK_METHOD(std::optional<transmission_guard>, try_open_transmission_channel, (), (override));
-        MOCK_METHOD(void, do_run, (node_manager&, (std::map<int, std::shared_ptr<serial_runnable>>), std::optional<task_bundle>), (override));
+        MOCK_METHOD(run_outcome, do_run, (node_manager&, (std::map<int, std::shared_ptr<serial_runnable>>), std::optional<task_bundle>), (override));
         MOCK_METHOD(task_packet, do_get_result, (), (override));
         MOCK_METHOD(std::vector<result>, do_get_all_results, (), (override));
     };
