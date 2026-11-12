@@ -171,6 +171,12 @@ namespace gempba {
         }
 
 
+        /**
+         * @brief Prunes @p p_node before it is handed out, then lowers its thread's root past any single-child nodes it leaves.
+         *
+         * @see https://rapastranac.github.io/gempba-docs/reference/implementations/load-balancers/quasi-horizontal/#submitting-a-child-of-the-root
+         * @see https://rapastranac.github.io/gempba-docs/reference/implementations/load-balancers/quasi-horizontal/#submitting-a-root-that-has-children
+         */
         void prune_and_fix_parent_root_if_needed(node& p_node) {
             node v_parent = p_node.get_parent();
             const node v_root = p_node.get_root();
@@ -178,26 +184,6 @@ namespace gempba {
                 return; // p_node was root and a leaf — nothing to fix
             }
             p_node.prune();
-
-            /**
-             * Scenarios to consider (binary): (■ = pruned node, x = consumed child, o = pending child)
-             *               root
-             *               /  \
-             *              ■    o ← This will become the new root
-             *
-             *               root
-             *               /  \
-             *              x    o
-             *               \
-             *                x
-             *                 \
-             *                  x   ← This will become the new root
-             *                 / \
-             *                ■   o
-             *
-             * Root correction is done only when the root ends up with a single child after pruning.
-             **/
-
             if (v_parent == nullptr) {
                 return;
             }
@@ -226,8 +212,6 @@ namespace gempba {
                 if (p_node.is_consumed()) {
                     utils::log_and_throw("Node: {} is already consumed", p_node.get_node_id());
                 }
-
-                // after this line, only leftMost node should be pushed
 
                 // node should be pruned before submission —— ORDER MATTERS (avoids memory leaks)
                 prune_and_fix_parent_root_if_needed(p_node);
@@ -314,6 +298,9 @@ namespace gempba {
          * The root child holding @p p_node is RUNNING, so it is never returned, whatever its position among its
          * siblings.
          *
+         * @see https://rapastranac.github.io/gempba-docs/reference/implementations/load-balancers/quasi-horizontal/#root-level-siblings-go-first
+         * @see https://rapastranac.github.io/gempba-docs/reference/implementations/load-balancers/quasi-horizontal/#a-running-branch-is-never-handed-out
+         *
          * @param p_node The node from which to start the search.
          * @return The pending node at the root level, or nullptr if none found.
          */
@@ -340,37 +327,12 @@ namespace gempba {
         }
 
         /**
-         * <pre>this is useful because at level zero of a root, there might be multiple
-         * waiting nodes, though the <code>leftMost</code> branch (at zero level) might be at one of
-         * the very right subbranches deep down, which means that there is a line of
-         * multiple nodes with a single child.
-         * </pre>
-         * <pre>
-         * A node_ with a single child means that it has already been solved and
-         * also its siblings, because children are unlinked from their parent node_
-         * when these are pushed or fully solved (returned)
-         * </pre>
+         * @brief Lowers the thread's root while it has exactly one child, stopping at @p p_node, at a node with two or more
+         * children, or at a leaf.
          *
-         * @code
-         *                    root
-         *                    /|\
-         *                  /  | \
-         *                /    |  \
-         *               x     o   o
-         *                \
-         *                 x
-         *                  \
-         *                   x
-         *                    \
-         *                     ■
-         * @endcode
-         *
-         * <pre>
-         * if there are available threads, and all waiting nodes at level zero are pushed,
-         * then the root should be lowered down where it finds a node_ with at least two children or
-         * the deepest node_
-         * </pre>
-         **/
+         * @see https://rapastranac.github.io/gempba-docs/reference/implementations/load-balancers/quasi-horizontal/#root-correction-after-a-forward
+         * @see https://rapastranac.github.io/gempba-docs/reference/implementations/load-balancers/quasi-horizontal/#lowering-stops-at-the-parent-of-the-submitted-node
+         */
         void try_correct_root(node& p_node) {
             node v_root = p_node.get_root();
             // Check if root is null (shouldn't happen with new prune(), but defensive)
