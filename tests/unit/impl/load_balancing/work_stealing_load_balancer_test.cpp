@@ -392,6 +392,39 @@ TEST_F(work_stealing_load_balancer_test, send_local_throws_when_node_is_already_
     EXPECT_THROW(v_load_balancer.try_local_submit(v_node), std::runtime_error);
 }
 
+TEST_F(work_stealing_load_balancer_test, try_local_submit_returns_true_for_a_dispatched_node) {
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
+    v_load_balancer.set_thread_pool_size(2);
+
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node&) { FAIL(); };
+    for (const gempba::node_state v_state: {gempba::PUSHED, gempba::SENT_TO_ANOTHER_PROCESS, gempba::DISCARDED}) {
+        auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_load_balancer);
+        auto v_child = gempba::node_core_impl<void(int)>::create_explicit(v_load_balancer, v_parent, v_fn, std::make_tuple(0));
+        v_child->set_state(v_state);
+
+        gempba::node v_node(v_child);
+        EXPECT_TRUE(v_load_balancer.try_local_submit(v_node));
+        EXPECT_EQ(v_state, v_child->get_state());
+    }
+    v_load_balancer.wait();
+}
+
+TEST_F(work_stealing_load_balancer_test, try_remote_submit_returns_true_for_a_dispatched_node) {
+    gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
+    EXPECT_CALL(*m_scheduler_mock, try_open_transmission_channel()).Times(0);
+
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node&) { FAIL(); };
+    for (const gempba::node_state v_state: {gempba::PUSHED, gempba::SENT_TO_ANOTHER_PROCESS, gempba::DISCARDED}) {
+        auto v_parent = gempba::node_core_impl<void()>::create_dummy(v_load_balancer);
+        auto v_child = gempba::node_core_impl<void(int)>::create_explicit(v_load_balancer, v_parent, v_fn, std::make_tuple(0));
+        v_child->set_state(v_state);
+
+        gempba::node v_node(v_child);
+        EXPECT_TRUE(v_load_balancer.try_remote_submit(v_node, 0));
+        EXPECT_EQ(v_state, v_child->get_state());
+    }
+}
+
 TEST_F(work_stealing_load_balancer_test, send_local_discards_lazy_node_when_not_worthy) {
     gempba::work_stealing_load_balancer v_load_balancer(m_scheduler_mock);
     v_load_balancer.set_thread_pool_size(2); // guarantee pool is ready before send() inspects it

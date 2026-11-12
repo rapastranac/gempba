@@ -140,6 +140,9 @@ namespace gempba {
 
 
         bool send(node& p_node) {
+            if (is_dispatched(p_node)) {
+                return true;
+            }
             const std::unique_lock v_lock(m_recursive_mutex, std::try_to_lock);
             if (!v_lock.owns_lock()) {
                 return false;
@@ -165,6 +168,9 @@ namespace gempba {
         }
 
         bool send(node& p_node, const int p_runnable_id) {
+            if (is_dispatched(p_node)) {
+                return true;
+            }
             const std::unique_lock v_lock(m_recursive_mutex, std::try_to_lock);
             if (!v_lock.owns_lock()) {
                 return false;

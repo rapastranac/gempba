@@ -202,6 +202,9 @@ namespace gempba {
         }
 
         bool send(node& p_node) {
+            if (is_dispatched(p_node)) {
+                return true;
+            }
             while (true) {
                 const std::unique_lock v_lock(m_recursive_mutex, std::try_to_lock);
                 if (!v_lock.owns_lock()) {
@@ -235,6 +238,9 @@ namespace gempba {
         }
 
         bool send(node& p_node, const int p_runnable_id) {
+            if (is_dispatched(p_node)) {
+                return true;
+            }
             while (true) {
                 const std::unique_lock v_lock(m_recursive_mutex, std::try_to_lock);
                 if (!v_lock.owns_lock()) {
@@ -271,10 +277,6 @@ namespace gempba {
 
             node v_top_node = p_node.map_core([&](const std::shared_ptr<node_core>& p_core) { return get_root_level_pending_node(p_core); });
             if (v_top_node != nullptr) {
-                if (v_top_node.is_consumed()) {
-                    utils::log_and_throw("Attempt to push a consumed node");
-                }
-
                 try_correct_root(p_node); // VERY IMPORTANT!!
                 if (v_top_node.should_branch()) {
                     v_top_node.delegate_locally(this);
@@ -291,10 +293,6 @@ namespace gempba {
 
             node v_top_node = p_node.map_core([&](const std::shared_ptr<node_core>& p_core) { return get_root_level_pending_node(p_core); });
             if (v_top_node != nullptr) {
-                if (v_top_node.is_consumed()) {
-                    utils::log_and_throw("Attempt to push a consumed node");
-                }
-
                 try_correct_root(p_node); // VERY IMPORTANT!!
                 if (v_top_node.should_branch()) {
                     v_top_node.delegate_remotely(m_scheduler, p_runnable_id);
@@ -308,48 +306,34 @@ namespace gempba {
         }
 
         /**
-         * It finds a pending node at the root level, prunes it from the root, and returns it.
+         * @brief Finds the leftmost root child that is still UNUSED, prunes it from the root and returns it.
+         *
+         * The root child holding @p p_node is RUNNING, so it is never returned, whatever its position among its
+         * siblings.
          *
          * @param p_node The node from which to start the search.
          * @return The pending node at the root level, or nullptr if none found.
          */
         static std::shared_ptr<node_core> get_root_level_pending_node(const std::shared_ptr<node_core>& p_node) {
             if (p_node->get_parent() == nullptr) {
-                return nullptr; // there is no parent — node is a root
+                return nullptr;
             }
             if (p_node->get_parent() == p_node->get_root()) {
-                // it avoids pushing the right most siblings first at the root level
-                return nullptr; // parent == root
+                return nullptr;
             }
 
             const std::shared_ptr<node_core> v_root = p_node->get_root();
-
-            if (!v_root) {
+            if (!v_root || v_root->get_children_count() < 2) {
                 return nullptr;
             }
 
-            // Defensive check
-            if (v_root->get_children_count() < 2) {
-                // Not really sure how we can get here, but just in case
-                return nullptr;
+            for (std::shared_ptr<node_core> v_child = v_root->get_leftmost_child(); v_child != nullptr; v_child = v_child->get_right_sibling()) {
+                if (v_child->get_state() == UNUSED) {
+                    v_child->prune();
+                    return v_child;
+                }
             }
-
-            if (v_root->get_children_count() > 2) {
-                // Multiple pending nodes: at least three possible branches
-                // 1. leftmost (already pushed)
-                // 2. second leftmost (pending) <-- to be returned
-                // 3. others (waiting)
-
-                std::shared_ptr<node_core> v_second_child = v_root->get_second_leftmost_child();
-                v_second_child->prune();
-                return v_second_child;
-            }
-
-            // At this point children_count() must be exactly 2 (the < 2 and > 2 branches above already returned).
-            std::shared_ptr<node_core> v_second = v_root->get_second_leftmost_child();
-            v_second->prune();
-            // at this point, root should have only one child: the leftMost which was already resolved
-            return v_second; // Just return it
+            return nullptr;
         }
 
         /**
