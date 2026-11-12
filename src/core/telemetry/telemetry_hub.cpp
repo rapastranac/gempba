@@ -165,14 +165,17 @@ namespace gempba::telemetry {
         // interval before completion.
         if (m_transport) {
             m_seq_no.fetch_add(1, std::memory_order_relaxed);
-            rank_frame v_final{};
-            snapshot_rank_frame(v_final);
-            m_transport->publish_final_rank(v_final);
+            // The node frame goes first: the aggregator stops waiting once every final rank frame is in, and MPI keeps one
+            // sender's messages in order, so a node frame sent after its final rank frame could arrive after that and go
+            // unreceived (#447).
             if (m_is_sentinel.load(std::memory_order_relaxed)) {
                 node_frame v_node_final{};
                 snapshot_node_frame(v_node_final);
                 m_transport->publish_node(v_node_final);
             }
+            rank_frame v_final{};
+            snapshot_rank_frame(v_final);
+            m_transport->publish_final_rank(v_final);
             if (m_aggregator) {
                 drain_inbound_frames();
                 // Ranks shut down independently; give late ranks a bounded window so their final frames reach the dashboard.
