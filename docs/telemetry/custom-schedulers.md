@@ -12,7 +12,7 @@ Every rank calls `scheduler::run(node_manager, runnables, seed)`, and only the r
 
 ## Stopping early
 
-A run stops early when the program calls `gempba::request_stop()` or when `SIGINT` or `SIGTERM` arrives (#465). The load balancers already prune every node that hasn't started on a rank that sees the stop. Your scheduler:
+A run stops early when the program calls `gempba::request_stop()`, when `SIGINT` or `SIGTERM` arrives, or when a dashboard client sends a [stop line](wire-format.md#control-lines) (#465). The load balancers already prune every node that hasn't started on a rank that sees the stop. Your scheduler:
 - Polls `gempba::stop_requested()` in its loops and tells the other ranks, so ranks that saw no signal stop too.
 - Runs no task it receives after the stop, and still acknowledges it, so termination detection completes as usual.
 - Returns the same `run_outcome` from `do_run` on every rank: `end_reason::INTERRUPTED`, with the trigger and signal of the stop the root acted on, once a stop was requested on any rank before the run ended; `end_reason::COMPLETED` otherwise.

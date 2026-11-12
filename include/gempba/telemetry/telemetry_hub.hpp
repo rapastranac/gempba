@@ -248,6 +248,15 @@ namespace gempba::telemetry {
          */
         void apply_control_from_client(control_kind p_kind, std::uint32_t p_value) noexcept;
 
+        /**
+         * @brief Stop the run for a dashboard client whose @p p_token matches @c GEMPBA_STOP_TOKEN in this process's environment.
+         *
+         * Without that variable, or with another token, the stop is refused with a warning.
+         *
+         * @return whether the stop was requested
+         */
+        bool request_stop_from_client(std::string_view p_token) noexcept;
+
     private:
         struct counters;
         struct aggregator;

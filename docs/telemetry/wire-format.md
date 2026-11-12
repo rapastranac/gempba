@@ -343,6 +343,7 @@ A client can write lines back on the same socket, one JSON object per line. The 
 | `{"kind":"resume"}` | Ends a pause; frames resume at the current interval. | v4.3.0 (#368) |
 | `{"kind":"snapshot"}` | Every rank sends one frame on its next tick, whatever the interval and even while paused, and the aggregator sends one full line once all have arrived, or one second after the request. A request within 50 ms of the last accepted one is merged into it. | v4.3.0 (#369) |
 | `{"kind":"mark","label":"..."}` | Records a marker with `source` `"dashboard"`, stamped by the aggregator. Labels take 1 to 64 bytes; at most 32 markers per run, and any over a limit are dropped with a warning. | v4.3.0 (#370) |
+| `{"kind":"stop","token":"..."}` | Stops the run: every rank prunes the work it hasn't started, and the run ends with its best result so far and an `end` whose `trigger` is `"control"`. Accepted only when `token` matches the `GEMPBA_STOP_TOKEN` environment variable the run was started with; without that variable, or with another token, the line is refused with a warning. Any user on the host can reach the socket, so the token keeps others from ending your run. | v5.0.0 (#465) |
 
 `pause`, `resume` and `snapshot` also accept a `value`, which they ignore.
 

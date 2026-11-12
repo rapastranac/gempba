@@ -294,6 +294,14 @@ namespace gempba::telemetry {
             return find_string_field(p_line, "label");
         }
 
+        std::optional<std::string> parse_stop_line(const std::string_view p_line) {
+            const auto v_kind = find_string_field(p_line, "kind");
+            if (!v_kind || trim(*v_kind) != "stop") {
+                return std::nullopt;
+            }
+            return find_string_field(p_line, "token").value_or(std::string{});
+        }
+
         bool parse_control_line(std::string_view p_line, control_kind& p_out_kind, std::uint32_t& p_out_value) {
             const auto v_kind_str = find_string_field(p_line, "kind");
             if (!v_kind_str) {
@@ -521,6 +529,10 @@ namespace gempba::telemetry {
                     if (const auto v_label = parse_marker_line(v_line)) {
                         if (v_impl_ptr->m_hub != nullptr) {
                             (void) v_impl_ptr->m_hub->mark_run(*v_label, marker_source::DASHBOARD);
+                        }
+                    } else if (const auto v_token = parse_stop_line(v_line)) {
+                        if (v_impl_ptr->m_hub != nullptr) {
+                            (void) v_impl_ptr->m_hub->request_stop_from_client(*v_token);
                         }
                     } else if (parse_control_line(v_line, v_kind, v_value)) {
                         if (v_impl_ptr->m_hub != nullptr)

@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cstdlib>
 #include <cstring>
 #include <map>
 #include <memory>
@@ -621,6 +622,21 @@ namespace gempba::telemetry {
 
         const std::scoped_lock v_lock(m_pending_fanout_mtx);
         m_pending_fanout.push_back(v_msg);
+    }
+
+    bool telemetry_hub::request_stop_from_client(const std::string_view p_token) noexcept {
+        const char* v_expected = std::getenv("GEMPBA_STOP_TOKEN");
+        if (v_expected == nullptr || *v_expected == '\0') {
+            spdlog::warn("telemetry: refused a stop line: this run has no GEMPBA_STOP_TOKEN");
+            return false;
+        }
+        if (p_token != v_expected) {
+            spdlog::warn("telemetry: refused a stop line with the wrong token");
+            return false;
+        }
+        spdlog::info("telemetry: a dashboard client stopped the run");
+        gempba::detail::request_stop(stop_trigger::CONTROL);
+        return true;
     }
 
     telemetry_hub* get() noexcept { return g_owner.get(); }
