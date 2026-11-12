@@ -272,7 +272,11 @@ namespace gempba {
             static int branch = 0;
 
             while (true) {
-                switch (branch % 3) {
+                const int v_branch = branch;
+                if (++branch > INT_MAX - 1000) {
+                    branch = 0;
+                }
+                switch (v_branch % 3) {
                     case 0:
                         if (auto v = probe_score_comm_at_node(); v.has_value()) {
                             return v.value();
@@ -288,11 +292,6 @@ namespace gempba {
                             return v.value();
                         }
                         break;
-                }
-
-                // Increment and reset before overflow
-                if (++branch > INT_MAX - 1000) {
-                    branch = 0;
                 }
 
                 // Drive telemetry from inside the busy-wait so rank frames
@@ -591,7 +590,11 @@ namespace gempba {
         MPI_Status probe_communicators_at_center() {
             static int branch = 0;
             while (true) {
-                switch (branch % 2) {
+                const int v_branch = branch;
+                if (++branch > INT_MAX - 1000) {
+                    branch = 0;
+                }
+                switch (v_branch % 2) {
                     case 0: {
                         if (const auto v_optional = probe_world_comm_center(); v_optional.has_value()) {
                             return v_optional.value();
@@ -604,9 +607,6 @@ namespace gempba {
                         }
                         break;
                     }
-                }
-                if (++branch > INT_MAX - 1000) {
-                    branch = 0;
                 }
 
                 // Drive telemetry from inside the center busy-wait so the
