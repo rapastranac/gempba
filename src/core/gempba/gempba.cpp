@@ -5,6 +5,7 @@
 #include <impl/install_scheduler.hpp>
 #include <impl/load_balancing/quasi_horizontal_load_balancer.hpp>
 #include <impl/load_balancing/work_stealing_load_balancer.hpp>
+#include <impl/stop_state.hpp>
 #include <impl/telemetry/telemetry_transport.hpp>
 #include <memory>
 #include <spdlog/spdlog.h>
@@ -160,5 +161,6 @@ int gempba::shutdown() {
     g_make_transport = nullptr;
     g_load_balancer.reset();
     g_node_manager.reset();
+    detail::clear_stop();
     return EXIT_SUCCESS;
 }

@@ -1,0 +1,26 @@
+#ifndef GEMPBA_STOP_STATE_HPP
+#define GEMPBA_STOP_STATE_HPP
+
+#include <gempba/core/stop.hpp>
+#include <gempba/export.h>
+
+namespace gempba::detail {
+
+    /**
+     * @brief Request a stop by @p p_trigger, with the signal's number when it is @ref stop_trigger::SIGNAL.
+     * @note Async-signal-safe: one lock-free atomic exchange. The first request wins.
+     */
+    GEMPBA_API void request_stop(stop_trigger p_trigger, int p_signal = 0) noexcept;
+
+    /**
+     * @return @ref end_reason::INTERRUPTED with the first request's trigger and signal, or the default outcome when no stop was
+     * requested
+     */
+    [[nodiscard]] GEMPBA_API run_outcome requested_stop() noexcept;
+
+    /// @brief Forget the stop requested, for the next run in this process.
+    GEMPBA_API void clear_stop() noexcept;
+
+} // namespace gempba::detail
+
+#endif // GEMPBA_STOP_STATE_HPP
