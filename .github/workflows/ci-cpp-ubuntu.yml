@@ -76,15 +76,11 @@ jobs:
           cmake --build build --parallel $(nproc)
 
       # 6️⃣ Run tests with JUnit XML output
-      - name: Run tests with retry for flaky tests
+      - name: Run tests
         run: |
           cd ${{ github.workspace }}/build
 
-          echo "🟢 Non-flaky tests: single run, must pass"
-          ctest --output-on-failure --output-junit test_results_main.xml -E "FLAKY_"
-
-          echo "🟡 Flaky tests: up to 3 attempts each"
-          ctest --repeat until-pass:3 --output-on-failure --output-junit test_results_flaky.xml -R "FLAKY_" --no-tests=ignore
+          ctest --output-on-failure --output-junit test_results_main.xml
 
       # 7️⃣ Upload coverage to Codecov
       - name: Upload coverage to Codecov

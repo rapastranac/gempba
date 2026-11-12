@@ -64,16 +64,12 @@ jobs:
           cmake --build build --parallel $(nproc)
 
       # 5️⃣ Run tests with JUnit XML output
-      - name: Run tests with retry for flaky tests
+      - name: Run tests
         shell: msys2 {0}
         run: |
           cd "$GITHUB_WORKSPACE/build"
 
-          echo "🟢 Non-flaky tests: single run, must pass"
-          ctest --output-on-failure --output-junit test_results_main.xml -E "FLAKY_"
-
-          echo "🟡 Flaky tests: up to 3 attempts each"
-          ctest --repeat until-pass:3 --output-on-failure --output-junit test_results_flaky.xml -R "FLAKY_" --no-tests=ignore
+          ctest --output-on-failure --output-junit test_results_main.xml
 
       # 6️⃣ Upload test results as artifacts
       - name: Upload test results
