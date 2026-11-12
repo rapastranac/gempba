@@ -83,6 +83,7 @@ namespace {
         }
         g_node_manager = std::make_unique<gempba::node_manager>(p_load_balancer, p_scheduler);
         install_telemetry_hub_if_needed();
+        gempba::detail::take_stop_signals();
         return *g_node_manager;
     }
 } // namespace
@@ -153,7 +154,10 @@ gempba::node_manager& gempba::get_node_manager() {
     return *g_node_manager;
 }
 
-void gempba::reset_node_manager() { g_node_manager.reset(); }
+void gempba::reset_node_manager() {
+    g_node_manager.reset();
+    detail::release_stop_signals();
+}
 
 int gempba::shutdown() {
     telemetry::uninstall();
@@ -161,6 +165,7 @@ int gempba::shutdown() {
     g_make_transport = nullptr;
     g_load_balancer.reset();
     g_node_manager.reset();
+    detail::release_stop_signals();
     detail::clear_stop();
     return EXIT_SUCCESS;
 }

@@ -3,6 +3,7 @@
 
 #include <gempba/core/stop.hpp>
 #include <gempba/export.h>
+#include <string>
 
 namespace gempba::detail {
 
@@ -20,6 +21,15 @@ namespace gempba::detail {
 
     /// @brief Forget the stop requested, for the next run in this process.
     GEMPBA_API void clear_stop() noexcept;
+
+    /// @brief Take @c SIGINT and @c SIGTERM where nothing handles them yet, unless @ref stop_on_signals turned that off.
+    GEMPBA_API void take_stop_signals();
+
+    /// @brief Give back the signals @ref take_stop_signals took.
+    GEMPBA_API void release_stop_signals();
+
+    /// @return @p p_signal's name, such as @c "SIGTERM", or its number for a signal gempba doesn't take
+    [[nodiscard]] GEMPBA_API std::string signal_name(int p_signal);
 
 } // namespace gempba::detail
 

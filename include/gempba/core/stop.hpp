@@ -50,6 +50,14 @@ namespace gempba {
      */
     [[nodiscard]] GEMPBA_API bool stop_requested() noexcept;
 
+    /**
+     * @brief Whether @c SIGINT and @c SIGTERM stop the run gracefully instead of killing the process; on by default.
+     *
+     * While on, @ref create_node_manager takes each of the two signals that nothing else handles yet, and @ref shutdown gives it
+     * back. A second @c SIGINT kills the process. Turning it off gives the signals back at once, so they kill the process again.
+     */
+    GEMPBA_API void stop_on_signals(bool p_enabled);
+
 } // namespace gempba
 
 #endif // GEMPBA_STOP_HPP
