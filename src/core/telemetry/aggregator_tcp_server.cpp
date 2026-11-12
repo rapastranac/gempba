@@ -328,6 +328,9 @@ namespace gempba::telemetry {
             v_payload.m_elapsed_seconds = p_hub.program_elapsed_seconds();
             v_payload.m_paused = p_hub.paused();
             v_payload.m_final = p_final;
+            if (p_final) {
+                v_payload.m_end = p_hub.run_end();
+            }
 
             std::string v_line;
             if (!p_with_frames) {

@@ -1,10 +1,12 @@
 #ifndef GEMPBA_TELEMETRY_JSON_SERIALIZER_HPP
 #define GEMPBA_TELEMETRY_JSON_SERIALIZER_HPP
 
+#include <gempba/core/stop.hpp>
 #include <gempba/telemetry/frames.hpp>
 #include <gempba/telemetry/topology.hpp>
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -29,6 +31,8 @@ namespace gempba::telemetry {
         bool m_paused;
         /// Whether this is the line the aggregator sends at shutdown, the last before it closes the connection.
         bool m_final;
+        /// How the run ended, sent as @c end on the final line when known.
+        std::optional<run_outcome> m_end;
     };
 
     /// Serialize one @ref broadcast_payload to a single JSON line.

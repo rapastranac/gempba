@@ -3,6 +3,7 @@
 #include <functional>
 #include <gempba/telemetry/telemetry_hub.hpp>
 #include <gtest/gtest.h>
+#include <impl/stop_state.hpp>
 #include <impl/telemetry/aggregator_tcp_server.hpp>
 #include <log_capture.hpp>
 #include <string>
@@ -335,6 +336,33 @@ namespace {
         EXPECT_NE(std::string::npos, v_last.find(v_run_id_key)) << v_last;
         EXPECT_NE(std::string::npos, v_first.find(R"("final":false)")) << v_first;
         EXPECT_NE(std::string::npos, v_last.find(R"("final":true)")) << v_last;
+    }
+
+    TEST_F(tcp_server_test, the_final_line_says_how_the_run_ended) {
+        const std::uint16_t v_port = free_loopback_port();
+        gempba::telemetry::configure_port(v_port);
+
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.set_interval_ms(0);
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/true);
+
+        const socket_t v_client = connect_loopback(v_port);
+        ASSERT_NE(k_invalid, v_client);
+        set_recv_timeout(v_client, 200);
+        const std::string v_first = read_one_line(v_client, std::chrono::milliseconds(3000));
+        ASSERT_NE(std::string::npos, v_first.find(R"("final":false)")) << v_first;
+
+        gempba::request_stop();
+        v_hub.shutdown();
+        gempba::detail::clear_stop();
+
+        const std::string v_rest = read_until_closed(v_client, std::chrono::milliseconds(3000));
+        close_sock(v_client);
+        gempba::telemetry::configure_port(9000);
+
+        EXPECT_EQ(std::string::npos, v_first.find(R"("end":)")) << v_first;
+        const std::string v_last = last_complete_line(v_rest);
+        EXPECT_NE(std::string::npos, v_last.find(R"("final":true,"end":{"reason":"interrupted","trigger":"code"},)")) << v_last;
     }
 
     TEST_F(tcp_server_test, a_paused_aggregator_broadcasts_only_the_envelope_until_resumed) {

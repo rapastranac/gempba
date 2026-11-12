@@ -4,6 +4,7 @@
 #include <gempba/telemetry/frames.hpp>
 #include <gempba/telemetry/telemetry_hub.hpp>
 #include <gtest/gtest.h>
+#include <impl/stop_state.hpp>
 #include <memory>
 #include <regex>
 #include <string>
@@ -77,6 +78,36 @@ namespace {
         EXPECT_NO_THROW(v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false));
         gempba::telemetry::telemetry_hub v_other;
         EXPECT_NO_THROW(v_other.on_runtime_ready(gempba::telemetry::runtime_mode::MP_MPI, 3, 8, /*p_start_pump_thread=*/false));
+    }
+
+    TEST_F(telemetry_hub_test, a_multithreading_run_without_a_stop_ends_completed) {
+        gempba::detail::clear_stop();
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+
+        EXPECT_EQ(std::optional{gempba::run_outcome{}}, v_hub.run_end());
+    }
+
+    TEST_F(telemetry_hub_test, a_multithreading_run_ends_with_the_stop_requested) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+
+        gempba::request_stop();
+        const std::optional<gempba::run_outcome> v_end = v_hub.run_end();
+        gempba::detail::clear_stop();
+
+        EXPECT_EQ((std::optional{gempba::run_outcome{gempba::end_reason::INTERRUPTED, gempba::stop_trigger::CODE, 0}}), v_end);
+    }
+
+    TEST_F(telemetry_hub_test, an_mpi_run_ends_as_its_scheduler_recorded) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MP_MPI, 3, 8, /*p_start_pump_thread=*/false);
+        ASSERT_FALSE(v_hub.run_end().has_value());
+
+        const gempba::run_outcome v_interrupted{gempba::end_reason::INTERRUPTED, gempba::stop_trigger::CONTROL, 0};
+        v_hub.record_run_end(v_interrupted);
+
+        EXPECT_EQ(std::optional{v_interrupted}, v_hub.run_end());
     }
 
     TEST_F(telemetry_hub_test, shutdown_is_idempotent) {

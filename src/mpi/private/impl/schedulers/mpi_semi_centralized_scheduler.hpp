@@ -246,7 +246,7 @@ namespace gempba {
             m_end_time = MPI_Wtime();
             m_stats.m_elapsed_time = m_end_time - m_start_time;
             if (auto* v_telemetry = telemetry::get()) {
-                v_telemetry->record_run_end();
+                v_telemetry->record_run_end(m_outcome);
             }
         }
 
@@ -607,7 +607,7 @@ namespace gempba {
             m_end_time = MPI_Wtime();
             m_stats.m_elapsed_time = m_end_time - m_start_time;
             if (auto* v_telemetry = telemetry::get()) {
-                v_telemetry->record_run_end();
+                v_telemetry->record_run_end(m_outcome);
             }
         }
 
