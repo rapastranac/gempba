@@ -37,6 +37,7 @@
 #include <gempba/stats/stats.hpp>
 #include <gempba/stats/stats_visitor.hpp>
 #include <gempba/telemetry/telemetry_hub.hpp>
+#include <impl/stop_state.hpp>
 
 
 using gempba::cabi::detail::buffer_from_packet;
@@ -515,7 +516,7 @@ extern "C" {
     gempba_bool_t gempba_scheduler_is_root(gempba_scheduler_t s) { return s->cpp->is_root() ? 1 : 0; }
 
     gempba_status_t gempba_scheduler_run(gempba_scheduler_t s, gempba_node_manager_t nm, const int32_t* ids, const gempba_serial_runnable_t* runnables, size_t count,
-                                         const gempba_bytes_t* seed, int32_t seed_runnable_id) {
+                                         const gempba_bytes_t* seed, int32_t seed_runnable_id, gempba_run_outcome_t* outcome) {
         GEMPBA_TRY
             if (s == nullptr || nm == nullptr || ids == nullptr || runnables == nullptr) {
                 set_last_error("s, nm, ids, or runnables is null");
@@ -529,7 +530,10 @@ extern "C" {
             if (seed != nullptr) {
                 v_seed.emplace(packet_from_borrowed(*seed), static_cast<int>(seed_runnable_id));
             }
-            s->cpp->run(*reinterpret_cast<gempba::node_manager*>(nm), std::move(map), std::move(v_seed));
+            const gempba::run_outcome v_outcome = s->cpp->run(*reinterpret_cast<gempba::node_manager*>(nm), std::move(map), std::move(v_seed));
+            if (outcome != nullptr) {
+                *outcome = {static_cast<gempba_end_reason_t>(v_outcome.m_reason), static_cast<gempba_stop_trigger_t>(v_outcome.m_trigger), static_cast<int32_t>(v_outcome.m_signal)};
+            }
             return GEMPBA_OK;
         GEMPBA_CATCH_RETURN_STATUS
     }
@@ -566,6 +570,14 @@ extern "C" {
     void gempba_telemetry_enable(void) { gempba::telemetry::enable(); }
     gempba_bool_t gempba_telemetry_is_enabled(void) { return gempba::telemetry::is_enabled() ? 1 : 0; }
     void gempba_telemetry_configure_port(uint16_t port) { gempba::telemetry::configure_port(port); }
+
+    void gempba_request_stop(void) { gempba::request_stop(); }
+
+    void gempba_request_stop_on_signal(const int32_t signal) { gempba::detail::request_stop(gempba::stop_trigger::SIGNAL, static_cast<int>(signal)); }
+
+    gempba_bool_t gempba_stop_requested(void) { return gempba::stop_requested() ? 1 : 0; }
+
+    void gempba_stop_on_signals(const gempba_bool_t enabled) { gempba::stop_on_signals(enabled != 0); }
 
 } // extern "C"
 

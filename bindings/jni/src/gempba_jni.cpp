@@ -767,7 +767,7 @@ extern "C" {
         auto seed_borrow = borrow_jbytearray(env, seed);
         const gempba_bytes_t* seed_bytes = seed != nullptr ? &seed_borrow.bytes : nullptr;
         if (gempba_scheduler_run(from_jlong<gempba_scheduler_t>(handle), from_jlong<gempba_node_manager_t>(nm_handle), c_ids.data(), c_sr.data(), static_cast<size_t>(n), seed_bytes,
-                                 static_cast<int32_t>(seed_runnable_id)) != GEMPBA_OK) {
+                                 static_cast<int32_t>(seed_runnable_id), nullptr) != GEMPBA_OK) {
             throw_from_last_error(env, "native Scheduler.run failed");
         }
     }
