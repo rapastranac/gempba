@@ -996,6 +996,39 @@ TEST_F(quasi_horizontal_load_balancer_test, send_remote_throws_when_node_is_alre
     EXPECT_THROW(v_balancer.try_remote_submit(v_node, 0), std::runtime_error);
 }
 
+TEST_F(quasi_horizontal_load_balancer_test, try_local_submit_returns_true_for_a_dispatched_node) {
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
+    v_balancer.set_thread_pool_size(2);
+
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node&) { FAIL(); };
+    for (const gempba::node_state v_state: {gempba::PUSHED, gempba::SENT_TO_ANOTHER_PROCESS, gempba::DISCARDED}) {
+        std::shared_ptr<gempba::node_core> v_no_parent;
+        auto v_child = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_no_parent, v_fn, std::make_tuple(0));
+        v_child->set_state(v_state);
+
+        gempba::node v_node(v_child);
+        EXPECT_TRUE(v_balancer.try_local_submit(v_node));
+        EXPECT_EQ(v_state, v_child->get_state());
+    }
+    v_balancer.wait();
+}
+
+TEST_F(quasi_horizontal_load_balancer_test, try_remote_submit_returns_true_for_a_dispatched_node) {
+    gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
+    EXPECT_CALL(*m_scheduler_mock, try_open_transmission_channel()).Times(0);
+
+    std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node&) { FAIL(); };
+    for (const gempba::node_state v_state: {gempba::PUSHED, gempba::SENT_TO_ANOTHER_PROCESS, gempba::DISCARDED}) {
+        std::shared_ptr<gempba::node_core> v_no_parent;
+        auto v_child = gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_no_parent, v_fn, std::make_tuple(0));
+        v_child->set_state(v_state);
+
+        gempba::node v_node(v_child);
+        EXPECT_TRUE(v_balancer.try_remote_submit(v_node, 0));
+        EXPECT_EQ(v_state, v_child->get_state());
+    }
+}
+
 TEST_F(quasi_horizontal_load_balancer_test, send_remote_discards_lazy_node_when_not_worthy) {
     gempba::quasi_horizontal_load_balancer v_balancer(m_scheduler_mock);
 
@@ -1283,4 +1316,89 @@ TEST_F(quasi_horizontal_load_balancer_test, try_correct_root_is_a_noop_when_node
     EXPECT_EQ(v_root_node, v_root_node->get_root());
     EXPECT_EQ(nullptr, v_root_node->get_parent());
     EXPECT_EQ(0, v_root_node->get_children_count());
+}
+
+namespace {
+    enum class submit_order { SUBMIT_FIRST_THEN_FORWARD_SECOND, FORWARD_FIRST_THEN_SUBMIT_SECOND, FORWARD_SECOND_THEN_SUBMIT_FIRST };
+
+    struct run_counts {
+        std::atomic<int> m_inner{0};
+        std::atomic<int> m_leaf{0};
+        std::atomic<int> m_exceptions{0};
+    };
+
+    /**
+     * @brief Explores root -> [first, second], where one of them has two leaf children submitted with
+     * try_local_submit(left); forward(right), and the root's children are handled in the given order.
+     */
+    void explore_two_level_tree(const submit_order p_order, const bool p_inner_is_first, run_counts& p_counts) {
+        gempba::quasi_horizontal_load_balancer v_balancer;
+        v_balancer.set_thread_pool_size(2);
+
+        std::function<void(std::thread::id, int, gempba::node)> v_leaf = [&p_counts](std::thread::id, int, const gempba::node&) { ++p_counts.m_leaf; };
+        std::function<void(std::thread::id, int, gempba::node)> v_inner = [&](std::thread::id, int, gempba::node p_parent) {
+            ++p_counts.m_inner;
+            try {
+                std::shared_ptr<gempba::node_core> v_parent_core;
+                if (p_parent == nullptr) {
+                    v_parent_core = gempba::node_core_impl<void()>::create_dummy(v_balancer);
+                } else {
+                    p_parent.apply_core([&v_parent_core](std::shared_ptr<gempba::node_core>& p_core) { v_parent_core = p_core; });
+                }
+                gempba::node v_left(gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_parent_core, v_leaf, std::make_tuple(0)));
+                gempba::node v_right(gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_parent_core, v_leaf, std::make_tuple(0)));
+                v_balancer.try_local_submit(v_left);
+                v_balancer.forward(v_right);
+            } catch (...) {
+                ++p_counts.m_exceptions;
+            }
+        };
+
+        auto v_root = gempba::node_core_impl<void()>::create_dummy(v_balancer);
+        gempba::node v_first(gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_root, p_inner_is_first ? v_inner : v_leaf, std::make_tuple(0)));
+        gempba::node v_second(gempba::node_core_impl<void(int)>::create_explicit(v_balancer, v_root, p_inner_is_first ? v_leaf : v_inner, std::make_tuple(0)));
+
+        try {
+            switch (p_order) {
+                case submit_order::SUBMIT_FIRST_THEN_FORWARD_SECOND: {
+                    v_balancer.try_local_submit(v_first);
+                    v_balancer.forward(v_second);
+                    break;
+                }
+                case submit_order::FORWARD_FIRST_THEN_SUBMIT_SECOND: {
+                    v_balancer.forward(v_first);
+                    v_balancer.try_local_submit(v_second);
+                    break;
+                }
+                case submit_order::FORWARD_SECOND_THEN_SUBMIT_FIRST: {
+                    v_balancer.forward(v_second);
+                    v_balancer.try_local_submit(v_first);
+                    break;
+                }
+            }
+        } catch (...) {
+            ++p_counts.m_exceptions;
+        }
+        v_balancer.wait();
+    }
+
+    void expect_every_node_runs_once(const submit_order p_order) {
+        for (const bool v_inner_is_first: {true, false}) {
+            for (int v_i = 0; v_i < 20; ++v_i) {
+                run_counts v_counts;
+                explore_two_level_tree(p_order, v_inner_is_first, v_counts);
+                ASSERT_EQ(0, v_counts.m_exceptions.load()) << "inner_is_first " << v_inner_is_first << ", iteration " << v_i;
+                ASSERT_EQ(1, v_counts.m_inner.load()) << "inner_is_first " << v_inner_is_first << ", iteration " << v_i;
+                ASSERT_EQ(3, v_counts.m_leaf.load()) << "inner_is_first " << v_inner_is_first << ", iteration " << v_i;
+            }
+        }
+    }
+} // namespace
+
+TEST_F(quasi_horizontal_load_balancer_test, every_node_runs_once_when_first_child_is_submitted_and_second_forwarded) {
+    expect_every_node_runs_once(submit_order::SUBMIT_FIRST_THEN_FORWARD_SECOND);
+}
+
+TEST_F(quasi_horizontal_load_balancer_test, every_node_runs_once_when_first_child_is_forwarded_and_second_submitted) {
+    expect_every_node_runs_once(submit_order::FORWARD_FIRST_THEN_SUBMIT_SECOND);
 }

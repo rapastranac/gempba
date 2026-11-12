@@ -42,6 +42,14 @@ namespace gempba {
     protected:
         load_balancer() = default;
 
+        /**
+         * @return true when a balancer already handed @p p_node to a pool thread or another process, or discarded it
+         */
+        static bool is_dispatched(const node& p_node) {
+            const node_state v_state = p_node.get_state();
+            return v_state == PUSHED || v_state == SENT_TO_ANOTHER_PROCESS || v_state == DISCARDED;
+        }
+
     public:
         virtual ~load_balancer() = default;
 
