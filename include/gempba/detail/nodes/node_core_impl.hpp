@@ -272,6 +272,7 @@ namespace gempba {
                 utils::log_and_throw("node is already consumed, node: {}, state: {}", m_node_id, get_state_string(m_state));
             }
             ensure_args_initialized();
+            m_state = RUNNING;
             m_result = m_invoke(false);
             m_state = FORWARDED;
         }
@@ -570,6 +571,8 @@ namespace gempba {
                     return "RETRIEVED";
                 case SENT_TO_ANOTHER_PROCESS:
                     return "SENT_TO_ANOTHER_PROCESS";
+                case RUNNING:
+                    return "RUNNING";
                 default:
                     return "UNKNOWN_STATE";
             }

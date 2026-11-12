@@ -43,7 +43,8 @@ namespace gempba {
         PUSHED, // Data is pushed to another thread within the same process
         DISCARDED, // Data is discarded within the system
         RETRIEVED, // Result is retrieved from the data
-        SENT_TO_ANOTHER_PROCESS // Data is sent to another process
+        SENT_TO_ANOTHER_PROCESS, // Data is sent to another process
+        RUNNING // Runnable is executing in the current thread
     };
 
     template<typename T>
