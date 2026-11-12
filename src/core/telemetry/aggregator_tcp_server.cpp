@@ -79,6 +79,11 @@ namespace gempba::telemetry {
             return std::nullopt;
         }
         int last_socket_error() noexcept { return ::WSAGetLastError(); }
+        /// @brief Makes a bind fail while another socket listens on the port; Windows' @c SO_REUSEADDR would let both bind it.
+        void claim_listen_port(socket_t p_s) noexcept {
+            const BOOL v_on = TRUE;
+            ::setsockopt(p_s, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, reinterpret_cast<const char*>(&v_on), sizeof(v_on));
+        }
 #else
         using socket_t = int;
         constexpr socket_t k_invalid_socket = -1;
@@ -109,6 +114,11 @@ namespace gempba::telemetry {
             return std::nullopt;
         }
         int last_socket_error() noexcept { return errno; }
+        /// @brief Lets a new run rebind a port a finished run left in @c TIME_WAIT; a port another socket listens on stays refused.
+        void claim_listen_port(socket_t p_s) noexcept {
+            const int v_on = 1;
+            ::setsockopt(p_s, SOL_SOCKET, SO_REUSEADDR, &v_on, sizeof(v_on));
+        }
 #endif
 
         void warn_cannot_listen(const std::uint16_t p_port, const int p_error) {
@@ -416,8 +426,7 @@ namespace gempba::telemetry {
             return false;
         }
 
-        int v_yes = 1;
-        ::setsockopt(m_impl->m_listen_sock, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&v_yes), sizeof(v_yes));
+        claim_listen_port(m_impl->m_listen_sock);
 
         sockaddr_in v_addr{};
         v_addr.sin_family = AF_INET;

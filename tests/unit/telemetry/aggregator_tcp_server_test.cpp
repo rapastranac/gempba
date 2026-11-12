@@ -731,4 +731,18 @@ namespace {
         EXPECT_NE(std::string::npos, v_log.find("gempba::telemetry::configure_port")) << v_log;
     }
 
+    TEST_F(tcp_server_test, a_second_server_cannot_take_a_port_the_first_listens_on) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+
+        gempba::telemetry::aggregator_tcp_server v_first(0, v_hub);
+        ASSERT_TRUE(v_first.start());
+
+        gempba::telemetry::aggregator_tcp_server v_second(v_first.bound_port(), v_hub);
+        EXPECT_FALSE(v_second.start());
+
+        v_second.stop();
+        v_first.stop();
+    }
+
 } // namespace
