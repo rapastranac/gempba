@@ -9,6 +9,7 @@ on:
       - '**'
       - '!docs/**'
       - '!**/*.md'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -21,11 +22,11 @@ concurrency:
 
 jobs:
   # Shared with release-java.yml so tag-time publish reuses the same build path.
-  # The fat JARs are assembled only on the way into main or release.
+  # The macOS legs and the fat JARs run only on the way into main or release, and by hand.
   build:
     uses: ./.github/workflows/_build-java-jars.yml
     with:
-      assemble: ${{ github.event_name == 'push' || contains(fromJSON('["main","release"]'), github.base_ref) }}
+      assemble: ${{ github.event_name != 'pull_request' || contains(fromJSON('["main","release"]'), github.base_ref) }}
 
   # The Maven Central bundle release-java.yml uploads, assembled from this run's Ubuntu JARs and signed with a throwaway
   # key, so a missing file shows up here rather than at release time. Nothing is uploaded.

@@ -3,13 +3,16 @@ name: C/C++ CI (macOS 26)
 on:
   push:
     branches: [ "main", "release" ]
-  # Docs-only PRs start no CI; wire-format.md still does, because a unit test reads it.
+  # Hosted macOS minutes are scarce, so only PRs into main or release run it. Docs-only PRs start no CI; wire-format.md
+  # still does, because a unit test reads it.
   pull_request:
+    branches: [ "main", "release" ]
     paths:
       - '**'
       - '!docs/**'
       - '!**/*.md'
       - 'docs/telemetry/wire-format.md'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -22,7 +25,7 @@ concurrency:
 
 jobs:
   test:
-    runs-on: ${{ fromJSON(vars.RUNNER_MACOS_INTEL || '["macos-26-intel"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_MACOS_ARM64 || '["macos-26"]') }}
     timeout-minutes: 30
 
     steps:
@@ -104,7 +107,7 @@ jobs:
   # Build the gempba-examples sister repo against an installed gempba built
   # from THIS branch. See ci-cpp-ubuntu.yml for rationale.
   build-examples-from-install:
-    runs-on: ${{ fromJSON(vars.RUNNER_MACOS_INTEL || '["macos-26-intel"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_MACOS_ARM64 || '["macos-26"]') }}
     timeout-minutes: 30
     env:
       GEMPBA_EXAMPLES_OWNER: ${{ vars.GEMPBA_EXAMPLES_OWNER || github.repository_owner }}
