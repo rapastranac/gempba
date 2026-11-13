@@ -6,7 +6,7 @@ import io.gempba.scheduler.Scheduler;
 /**
  * The MPI component's calls, mirroring C++ {@code gempba::mpi}.
  *
- * <p>Only the {@code mp-mpi} JAR contains this package; the {@code mt} JAR's native library has no MPI.
+ * <p>Only the {@code gempba-mpi} artifact contains this package; the {@code gempba} artifact's native library has no MPI.
  */
 public final class Mpi {
 
