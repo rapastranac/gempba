@@ -383,6 +383,7 @@ jobs:
           set -euo pipefail
           VERSION=$(grep -m1 '<version>' bindings/java/pom.xml | sed -E 's/[[:space:]]*<version>([^<]+)<\/version>.*/\1/')
           mkdir -p merged
+          EXPECTED=$(printf '%s\n' natives/linux-x86_64/gempba_jni.so natives/win-x86_64/gempba_jni.dll natives/osx-aarch64/gempba_jni.dylib | sort)
           for CLASSIFIER in mt mp-mpi; do
             JAR="gempba-${VERSION}-${CLASSIFIER}.jar"
             cp "per-os/jar-ubuntu-${CLASSIFIER}/${JAR}" "merged/${JAR}"
@@ -394,6 +395,11 @@ jobs:
             done
             echo "--- merged ${JAR} natives/ ---"
             jar tf "merged/${JAR}" | grep '^natives/' | sort
+            NATIVES=$(jar tf "merged/${JAR}" | { grep -E '^natives/[^/]+/gempba_jni\.(so|dll|dylib)$' || true; } | sort)
+            if [ "$NATIVES" != "$EXPECTED" ]; then
+              echo "::error::${JAR} holds [${NATIVES//$'\n'/ }], not [${EXPECTED//$'\n'/ }]"
+              exit 1
+            fi
           done
 
       - name: Upload merged multi-platform JARs
