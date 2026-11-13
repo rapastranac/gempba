@@ -58,6 +58,14 @@ namespace gempba {
      */
     GEMPBA_API void stop_on_signals(bool p_enabled);
 
+    namespace detail {
+        /**
+         * @brief Log how the run ended: @c info for a completed run, @c warning for an interrupted one, naming what stopped it.
+         * @ref scheduler::run calls it on rank 0, and @ref shutdown for a run without a scheduler.
+         */
+        GEMPBA_API void log_run_end(const run_outcome& p_outcome);
+    } // namespace detail
+
 } // namespace gempba
 
 #endif // GEMPBA_STOP_HPP

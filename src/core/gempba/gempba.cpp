@@ -160,6 +160,9 @@ void gempba::reset_node_manager() {
 }
 
 int gempba::shutdown() {
+    if (g_node_manager && !g_scheduler) {
+        detail::log_run_end(detail::requested_stop());
+    }
     telemetry::uninstall();
     g_scheduler.reset();
     g_make_transport = nullptr;

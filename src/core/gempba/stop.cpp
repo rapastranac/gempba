@@ -154,6 +154,28 @@ std::string gempba::detail::signal_name(const int p_signal) {
     return std::to_string(p_signal);
 }
 
+void gempba::detail::log_run_end(const run_outcome& p_outcome) {
+    if (p_outcome.m_reason == end_reason::COMPLETED) {
+        spdlog::info("gempba: run completed: the whole search space was explored, so the result is proven");
+        return;
+    }
+    std::string v_cause;
+    switch (p_outcome.m_trigger) {
+        case stop_trigger::SIGNAL:
+            v_cause = p_outcome.m_signal == SIGINT ? " by SIGINT (Ctrl+C)" : " by " + signal_name(p_outcome.m_signal);
+            break;
+        case stop_trigger::CODE:
+            v_cause = " by gempba::request_stop()";
+            break;
+        case stop_trigger::CONTROL:
+            v_cause = " from the dashboard";
+            break;
+        case stop_trigger::NONE:
+            break;
+    }
+    spdlog::warn("gempba: run interrupted{}: the result is the best one found before the stop, not a proven one", v_cause);
+}
+
 void gempba::request_stop() noexcept { detail::request_stop(stop_trigger::CODE); }
 
 bool gempba::stop_requested() noexcept { return g_requested_stop.load(std::memory_order_relaxed) != 0; }

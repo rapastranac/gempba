@@ -12,6 +12,7 @@
 #include <gempba/utils/result.hpp>
 #include <gempba/utils/task_bundle.hpp>
 #include <gempba/utils/task_packet.hpp>
+#include <log_capture.hpp>
 #include <scheduler_mock.hpp>
 
 namespace {
@@ -54,6 +55,25 @@ namespace {
         const gempba::run_outcome v_interrupted{gempba::end_reason::INTERRUPTED, gempba::stop_trigger::CONTROL, 0};
         EXPECT_CALL(m_scheduler, do_run(_, _, _)).WillOnce(::testing::Return(v_interrupted));
         EXPECT_EQ(v_interrupted, m_scheduler.run(m_node_manager, runnable_map{}));
+    }
+
+    TEST_F(scheduler_test, the_root_logs_how_the_run_ended) {
+        on_rank(0);
+        EXPECT_CALL(m_scheduler, do_run(_, _, _)).WillOnce(Return(gempba::run_outcome{gempba::end_reason::INTERRUPTED, gempba::stop_trigger::CONTROL, 0}));
+        const log_capture v_log;
+
+        (void) m_scheduler.run(m_node_manager, runnable_map{}, seed());
+
+        EXPECT_NE(std::string::npos, v_log.text().find("[warning] gempba: run interrupted from the dashboard")) << v_log.text();
+    }
+
+    TEST_F(scheduler_test, other_ranks_leave_the_run_end_to_the_root) {
+        on_rank(2);
+        const log_capture v_log;
+
+        (void) m_scheduler.run(m_node_manager, runnable_map{});
+
+        EXPECT_EQ(std::string::npos, v_log.text().find("gempba: run")) << v_log.text();
     }
 
     TEST_F(scheduler_test, run_rejects_a_root_without_a_seed) {

@@ -89,14 +89,18 @@ namespace gempba {
          * @param p_node_manager this rank's node manager
          * @param p_runnables the runnables by id, the same on every rank
          * @param p_seed the root's first task; absent on every other rank
-         * @return how the run ended, the same on every rank
+         * @return how the run ended, the same on every rank; the root also logs it
          * @throws std::invalid_argument if the root passes no seed or another rank passes one
          */
         run_outcome run(node_manager& p_node_manager, std::map<int, std::shared_ptr<serial_runnable>> p_runnables, std::optional<task_bundle> p_seed = std::nullopt) {
             if (is_root() != p_seed.has_value()) {
                 throw std::invalid_argument(is_root() ? "the root must pass a seed to scheduler::run" : "only the root passes a seed to scheduler::run");
             }
-            return do_run(p_node_manager, std::move(p_runnables), std::move(p_seed));
+            const run_outcome v_outcome = do_run(p_node_manager, std::move(p_runnables), std::move(p_seed));
+            if (is_root()) {
+                detail::log_run_end(v_outcome);
+            }
+            return v_outcome;
         }
 
         /**

@@ -15,6 +15,8 @@
 #include <impl/load_balancing/quasi_horizontal_load_balancer.hpp>
 #include <impl/load_balancing/work_stealing_load_balancer.hpp>
 #include <impl/stop_state.hpp>
+#include <log_capture.hpp>
+#include <string>
 
 namespace {
 
@@ -74,6 +76,9 @@ namespace {
 
     class stop_pruning_test : public stop_test, public ::testing::WithParamInterface<gempba::balancing_policy> {};
 
+    /// @return @p p_text up to its first line ending, which spdlog writes as "\r\n" on Windows
+    std::string one_line(const std::string& p_text) { return p_text.substr(0, p_text.find_first_of("\r\n")); }
+
 } // namespace
 
 TEST_F(stop_test, no_stop_is_requested_at_first) {
@@ -127,6 +132,34 @@ TEST_F(stop_test, shutdown_forgets_the_stop) {
 
     EXPECT_FALSE(gempba::stop_requested());
     EXPECT_EQ(gempba::run_outcome{}, gempba::detail::requested_stop());
+}
+
+TEST_F(stop_test, a_completed_run_is_logged_as_proven) {
+    const log_capture v_log;
+
+    gempba::detail::log_run_end(gempba::run_outcome{});
+
+    EXPECT_EQ("[info] gempba: run completed: the whole search space was explored, so the result is proven", one_line(v_log.text()));
+}
+
+TEST_F(stop_test, an_interrupted_run_is_logged_with_what_stopped_it) {
+    const std::string v_rest = ": the result is the best one found before the stop, not a proven one";
+    const std::pair<gempba::run_outcome, std::string> v_cases[] = {
+            {{gempba::end_reason::INTERRUPTED, gempba::stop_trigger::SIGNAL, SIGTERM}, "by SIGTERM"},
+            {{gempba::end_reason::INTERRUPTED, gempba::stop_trigger::SIGNAL, SIGINT}, "by SIGINT (Ctrl+C)"},
+            {{gempba::end_reason::INTERRUPTED, gempba::stop_trigger::CODE, 0}, "by gempba::request_stop()"},
+            {{gempba::end_reason::INTERRUPTED, gempba::stop_trigger::CONTROL, 0}, "from the dashboard"},
+    };
+    for (const auto& [v_outcome, v_cause]: v_cases) {
+        const log_capture v_log;
+
+        gempba::detail::log_run_end(v_outcome);
+
+        std::string v_expected = "[warning] gempba: run interrupted ";
+        v_expected += v_cause;
+        v_expected += v_rest;
+        EXPECT_EQ(v_expected, one_line(v_log.text()));
+    }
 }
 
 TEST_P(stop_pruning_test, a_search_with_no_stop_visits_every_node) {
