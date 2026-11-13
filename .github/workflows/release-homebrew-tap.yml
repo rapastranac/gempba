@@ -23,8 +23,8 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to publish (e.g. v3.0.0)"
-        required: true
+        description: "Tag to publish (e.g. v3.0.0); leave empty to only verify this branch's formulas"
+        required: false
         type: string
 
 permissions:
@@ -36,6 +36,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
+      publish: ${{ steps.tag.outputs.publish }}
     env:
       PUBLIC_REPO: ${{ vars.GEMPBA_PUBLIC_REPO || github.repository }}
       TAP_REPO: ${{ vars.HOMEBREW_TAP_REPO || format('{0}/homebrew-gempba', github.repository_owner) }}
@@ -49,15 +50,22 @@ jobs:
       - name: Resolve tag
         id: tag
         run: |
+          VER=$(grep -m1 'project(gempba VERSION' CMakeLists.txt | grep -oP '\d+\.\d+\.\d+')
+          PUBLISH=false
           case "${{ github.event_name }}" in
             workflow_dispatch)
               TAG="${{ inputs.tag }}"
+              if [ -n "$TAG" ]; then
+                PUBLISH=true
+              else
+                TAG="v${VER}-run${{ github.run_number }}"
+              fi
               ;;
             push)
               TAG="${GITHUB_REF_NAME}"
+              PUBLISH=true
               ;;
             pull_request)
-              VER=$(grep -m1 'project(gempba VERSION' CMakeLists.txt | grep -oP '\d+\.\d+\.\d+')
               TAG="v${VER}-pr${{ github.event.pull_request.number }}"
               ;;
             *)
@@ -66,14 +74,15 @@ jobs:
               ;;
           esac
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "Resolved tag: ${TAG}"
+          echo "publish=${PUBLISH}" >> "$GITHUB_OUTPUT"
+          echo "Resolved tag: ${TAG}, publish: ${PUBLISH}"
 
       # api.github.com tarball endpoint, not github.com/.../archive: the latter
       # ignores Authorization and 404s on private repos. Honours GITHUB_TOKEN
       # (and HOMEBREW_GITHUB_API_TOKEN consumer-side).
       - name: Compute tarball sha256
         id: sha
-        if: github.event_name != 'pull_request'
+        if: steps.tag.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ secrets.GEMPBA_CROSS_REPO_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
@@ -101,7 +110,7 @@ jobs:
             sed -i "s|__TAP__|${TAP_REPO/\/homebrew-//}|g" "out/Formula/${name}.rb"
           done
 
-          if [ "${{ github.event_name }}" != "pull_request" ]; then
+          if [ "${{ steps.tag.outputs.publish }}" = "true" ]; then
             URL='${{ steps.sha.outputs.url }}'
             SHA='${{ steps.sha.outputs.sha }}'
             VERSION='${{ steps.sha.outputs.version }}'
@@ -205,7 +214,7 @@ jobs:
 
   publish:
     needs: [ render, verify-macos ]
-    if: github.event_name != 'pull_request'
+    if: needs.render.outputs.publish == 'true'
     runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
     timeout-minutes: 5
     env:
