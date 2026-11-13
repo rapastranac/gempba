@@ -17,7 +17,7 @@ import java.util.*;
  * Java handle to a C++ {@code gempba::scheduler} instance.
  *
  * <p>Controls the coordination between processes.  The built-in MPI ones
- * come from {@code io.gempba.mpi.Mpi#createScheduler}, in the {@code mp-mpi} JAR.
+ * come from {@code io.gempba.mpi.Mpi#createScheduler}, in the {@code gempba-mpi} artifact.
  *
  * <p>The typical MPI pattern is:
  * <pre>{@code

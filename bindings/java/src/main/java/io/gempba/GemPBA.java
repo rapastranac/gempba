@@ -27,7 +27,7 @@ import java.util.function.BooleanSupplier;
  *
  * <p>This class mirrors the C++ {@code gempba::} namespace, the same in both JARs.
  * Creating an MPI scheduler is {@code io.gempba.mpi.Mpi#createScheduler}, which only
- * the {@code mp-mpi} JAR contains, as C++ needs the {@code gempba::mpi} component for it.
+ * the {@code gempba-mpi} artifact contains, as C++ needs the {@code gempba::mpi} component for it.
  *
  * <h2>Typical usage</h2>
  * <pre>{@code
