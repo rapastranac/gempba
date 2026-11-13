@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       assemble:
-        description: 'Merge the per-OS JARs into one multi-platform JAR per variant'
+        description: 'Build the macOS natives, on hosted Apple Silicon minutes, and merge the per-OS JARs into one multi-platform JAR per variant'
         type: boolean
         default: true
 
@@ -220,6 +220,7 @@ jobs:
           if-no-files-found: warn
 
   build-macos:
+    if: inputs.assemble
     runs-on: ${{ fromJSON(vars.RUNNER_MACOS_ARM64 || '["macos-26"]') }}
     timeout-minutes: 30
     strategy:
@@ -289,6 +290,7 @@ jobs:
 
   test-macos:
     needs: build-macos
+    if: inputs.assemble
     runs-on: ${{ fromJSON(vars.RUNNER_MACOS_ARM64 || '["macos-26"]') }}
     timeout-minutes: 20
     strategy:
