@@ -64,6 +64,8 @@ namespace gempba {
                 /* this section protects MPI calls */
                 std::scoped_lock v_lock(m_mutex);
                 maybe_receive_score_from_center();
+                m_stop_relay.receive_from_root(m_world_communicator);
+                m_stop_relay.report(m_world_communicator);
                 maybe_receive_next_process();
 
                 update_score(p_node_manager);

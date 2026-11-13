@@ -3,6 +3,7 @@
 #include <gempba/core/scheduler.hpp>
 #include <gempba/gempba.hpp>
 #include <gempba/telemetry/telemetry_hub.hpp>
+#include <impl/stop_state.hpp>
 #include <impl/telemetry/aggregator_tcp_server.hpp>
 #include <impl/telemetry/local_transport.hpp>
 #include <impl/telemetry/node_probe.hpp>
@@ -15,6 +16,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cstdlib>
 #include <cstring>
 #include <map>
 #include <memory>
@@ -222,6 +224,12 @@ namespace gempba::telemetry {
     void telemetry_hub::record_run_end() noexcept {
         const std::scoped_lock v_lock(m_counters->m_scheduler_mtx);
         m_counters->m_scheduler_clock.on_run_end(monotonic_us());
+    }
+
+    void telemetry_hub::record_run_end(const run_outcome& p_outcome) noexcept {
+        record_run_end();
+        const std::scoped_lock v_lock(m_run_mtx);
+        m_run_end = p_outcome;
     }
 
     void telemetry_hub::record_worker_waiting() noexcept {
@@ -444,6 +452,14 @@ namespace gempba::telemetry {
 
     const std::string& telemetry_hub::run_id() const noexcept { return m_run_id; }
 
+    std::optional<run_outcome> telemetry_hub::run_end() const {
+        const std::scoped_lock v_lock(m_run_mtx);
+        if (m_run_end.has_value() || m_mode != runtime_mode::MT_ONLY) {
+            return m_run_end;
+        }
+        return gempba::detail::requested_stop();
+    }
+
     bool telemetry_hub::annotate_run(const std::string_view p_key, const std::string_view p_value) {
         const std::string_view v_shown_key = p_key.substr(0, MAX_RUN_ANNOTATION_KEY_BYTES);
         if (p_key.empty() || p_key.size() > MAX_RUN_ANNOTATION_KEY_BYTES || p_value.size() > MAX_RUN_ANNOTATION_VALUE_BYTES) {
@@ -606,6 +622,21 @@ namespace gempba::telemetry {
 
         const std::scoped_lock v_lock(m_pending_fanout_mtx);
         m_pending_fanout.push_back(v_msg);
+    }
+
+    bool telemetry_hub::request_stop_from_client(const std::string_view p_token) noexcept {
+        const char* v_expected = std::getenv("GEMPBA_STOP_TOKEN");
+        if (v_expected == nullptr || *v_expected == '\0') {
+            spdlog::warn("telemetry: refused a stop line: this run has no GEMPBA_STOP_TOKEN");
+            return false;
+        }
+        if (p_token != v_expected) {
+            spdlog::warn("telemetry: refused a stop line with the wrong token");
+            return false;
+        }
+        spdlog::info("telemetry: a dashboard client stopped the run");
+        gempba::detail::request_stop(stop_trigger::CONTROL);
+        return true;
     }
 
     telemetry_hub* get() noexcept { return g_owner.get(); }

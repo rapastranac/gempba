@@ -52,7 +52,8 @@ int main(const int p_argc, char* p_argv[]) {
 
     gempba::scheduler* v_scheduler = gempba::mpi::create_scheduler(leaf_count::parse_topology(v_topology_name));
     const int v_rank = v_scheduler->rank_me();
-    const auto v_counter = leaf_count::run(*v_scheduler, v_max_depth);
+    gempba::run_outcome v_outcome{gempba::end_reason::INTERRUPTED, gempba::stop_trigger::NONE, 0};
+    const auto v_counter = leaf_count::run(*v_scheduler, v_max_depth, &v_outcome);
     v_scheduler->barrier();
 
     const long long v_local = v_counter->leaves();
@@ -60,6 +61,10 @@ int main(const int p_argc, char* p_argv[]) {
     MPI_Gather(&v_local, 1, MPI_LONG_LONG, v_per_rank.data(), 1, MPI_LONG_LONG, 0, MPI_COMM_WORLD);
 
     int v_exit_code = 0;
+    if (v_outcome != gempba::run_outcome{}) {
+        std::cerr << "rank " << v_rank << " says the run didn't complete\n";
+        v_exit_code = 1;
+    }
     if (v_rank == 0) {
         const long long v_total = std::accumulate(v_per_rank.begin(), v_per_rank.end(), 0LL);
         const long long v_expected = 1LL << v_max_depth;

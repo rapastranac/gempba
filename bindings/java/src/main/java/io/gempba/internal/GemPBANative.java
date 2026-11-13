@@ -306,9 +306,10 @@ public final class GemPBANative {
          * @param srHandles      handles of the registered {@link SerialRunnable}s
          * @param seed           the root's first task; {@code null} on every other rank
          * @param seedRunnableId runnable ID for the seed; ignored when {@code seed} is {@code null}
+         * @return how the run ended, as {@code {reason, trigger, signal}} ordinals
          */
-        public static native void run(long handle, long nmHandle, int[] ids, long[] srHandles,
-                                      byte[] seed, int seedRunnableId);
+        public static native int[] run(long handle, long nmHandle, int[] ids, long[] srHandles,
+                                       byte[] seed, int seedRunnableId);
 
         /**
          * Returns the best result bytes, empty if none.  Root only.
@@ -319,6 +320,32 @@ public final class GemPBANative {
          * Returns per-rank result bytes, {@code null} where a rank found none.  Root only.
          */
         public static native byte[][] getAllResults(long handle);
+    }
+
+    // ─── gempba::request_stop and friends (process-wide) ────────────────────
+
+    /**
+     * JNI binding for {@code gempba::request_stop / stop_requested / stop_on_signals}.
+     */
+    public static final class Stop {
+
+        static {
+            var ignored = GemPBANative.LOADED;
+        }
+
+        private Stop() {
+        }
+
+        public static native void requestStop();
+
+        /**
+         * Requests a stop on behalf of a signal the JVM caught, so the run's outcome names it.
+         */
+        public static native void requestStopOnSignal(int signal);
+
+        public static native boolean isStopRequested();
+
+        public static native void stopOnSignals(boolean enabled);
     }
 
     // ─── gempba::telemetry (process-wide flag) ───────────────────────────────

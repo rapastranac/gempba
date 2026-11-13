@@ -22,7 +22,7 @@ This is the reference for what gempba's telemetry stream carries: every key of a
   - a full line every telemetry interval: 500 ms by default, never more often than every 50 ms, and changeable live with `set_interval_ms`;
   - while paused, a [paused line](#paused-line) at the same cadence instead;
   - one full line as soon as a [snapshot](#control-lines) is answered;
-  - a final full line at shutdown, even while paused, carrying the run's totals and marked `"final":true`. The aggregator then closes the connection, so a connection that closes without that line ended some other way, such as a crash.
+  - a final full line at shutdown, even while paused, carrying the run's totals, marked `"final":true` and saying how the run ended in `end`. The aggregator then closes the connection, so a connection that closes without that line was lost: killed without warning (`SIGKILL`, a crash, a node failure).
 - Frame counters are cumulative since the process started telemetry. A consumer takes differences between lines to get rates.
 - `first_task_ms`, `last_task_ms` and `last_score_improvement_ms` are milliseconds since the scheduler run started, and stay 0 until the event first happens. `elapsed_seconds` and a marker's `elapsed_ms` count from when telemetry came up. `rank_local_ms` and `sentinel_local_ms` are a rank's own monotonic clock.
 
@@ -227,6 +227,7 @@ While paused, the aggregator sends only the line's header:
 | `elapsed_seconds` | integer | Seconds since telemetry came up on the aggregator. | v3.3.0 |
 | `paused` | boolean | Whether telemetry is paused. A paused line carries only the header, the keys up to `final`; a full line sent while paused, such as a snapshot or the final line, says `true` too. | v4.3.0 (#368) |
 | `final` | boolean | `true` only on the line the aggregator sends at shutdown, the last before it closes the connection; `false` on every other line, paused lines included. | v4.3.0 (#389) |
+| `end` | object | On the final line only: how the run ended. `reason` is `"completed"` when the search space was exhausted, so the result is proven, or `"interrupted"` when a stop ended it early with the best result so far. An interrupted run also has `trigger`: `"code"` (`gempba::request_stop()`), `"signal"` (`SIGINT` or `SIGTERM`) or `"control"` (a [stop line](#control-lines)); a stop by signal also has `signal`, its name, such as `"SIGTERM"`. Absent when the root's scheduler didn't report how the run ended, as when it threw. | v5.0.0 (#465) |
 | `topology` | object | Hosts, ranks and the run setup. See [Topology](#topology). Absent from paused lines. | v3.3.0 |
 | `ranks` | array | The latest [rank frame](#rank-frame) of each rank that has sent one, whatever its role. A topology node's `ranks` holds rank numbers instead. Absent from paused lines. | v3.3.0, as `workers` |
 | `nodes` | array | The latest [node frame](#node-frame) of each host. Absent from paused lines. | v3.3.0 |
@@ -342,6 +343,7 @@ A client can write lines back on the same socket, one JSON object per line. The 
 | `{"kind":"resume"}` | Ends a pause; frames resume at the current interval. | v4.3.0 (#368) |
 | `{"kind":"snapshot"}` | Every rank sends one frame on its next tick, whatever the interval and even while paused, and the aggregator sends one full line once all have arrived, or one second after the request. A request within 50 ms of the last accepted one is merged into it. | v4.3.0 (#369) |
 | `{"kind":"mark","label":"..."}` | Records a marker with `source` `"dashboard"`, stamped by the aggregator. Labels take 1 to 64 bytes; at most 32 markers per run, and any over a limit are dropped with a warning. | v4.3.0 (#370) |
+| `{"kind":"stop","token":"..."}` | Stops the run: every rank prunes the work it hasn't started, and the run ends with its best result so far and an `end` whose `trigger` is `"control"`. Accepted only when `token` matches the `GEMPBA_STOP_TOKEN` environment variable the run was started with; without that variable, or with another token, the line is refused with a warning. Any user on the host can reach the socket, so the token keeps others from ending your run. | v5.0.0 (#465) |
 
 `pause`, `resume` and `snapshot` also accept a `value`, which they ignore.
 

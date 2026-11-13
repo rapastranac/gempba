@@ -27,7 +27,9 @@
 #include <gempba/utils/tree.hpp>
 #include <gempba/utils/utils.hpp>
 #include <impl/schedulers/default_mpi_stats.hpp>
+#include <impl/schedulers/stop_relay.hpp>
 #include <impl/schedulers/termination_detector.hpp>
+#include <impl/stop_state.hpp>
 
 namespace gempba {
 
@@ -51,6 +53,7 @@ namespace gempba {
             TASK = 10,
             RUNNABLE_ID = 11,
             TASK_RECEIVED = 12,
+            STOP = 13,
         };
 
     public:
@@ -218,6 +221,10 @@ namespace gempba {
                         release_parent_if_passive();
                         break;
                     }
+                    case STOP: {
+                        m_stop_relay.receive(v_status, m_world_communicator);
+                        break;
+                    }
                     default: {
                         // nothing
                     };
@@ -239,7 +246,7 @@ namespace gempba {
             m_end_time = MPI_Wtime();
             m_stats.m_elapsed_time = m_end_time - m_start_time;
             if (auto* v_telemetry = telemetry::get()) {
-                v_telemetry->record_run_end();
+                v_telemetry->record_run_end(m_outcome);
             }
         }
 
@@ -271,7 +278,11 @@ namespace gempba {
             static int branch = 0;
 
             while (true) {
-                switch (branch % 3) {
+                const int v_branch = branch;
+                if (++branch > INT_MAX - 1000) {
+                    branch = 0;
+                }
+                switch (v_branch % 3) {
                     case 0:
                         if (auto v = probe_score_comm_at_node(); v.has_value()) {
                             return v.value();
@@ -289,10 +300,7 @@ namespace gempba {
                         break;
                 }
 
-                // Increment and reset before overflow
-                if (++branch > INT_MAX - 1000) {
-                    branch = 0;
-                }
+                m_stop_relay.report(m_world_communicator);
 
                 // Drive telemetry from inside the busy-wait so rank frames
                 // ship in real time even when no task traffic is flowing.
@@ -302,13 +310,14 @@ namespace gempba {
         }
 
         void process_termination(MPI_Status p_status) {
-            std::array<int, 2> v_sent_counts{};
+            std::array<int, 5> v_sent_counts{};
             MPI_Recv(v_sent_counts.data(), static_cast<int>(v_sent_counts.size()), MPI_INT, p_status.MPI_SOURCE, TERMINATION, m_world_communicator, &p_status);
             utils::print_ipc_debug_comments("rank {}, received message from rank {}", m_world_rank, p_status.MPI_SOURCE);
             if (!m_termination.is_quiescent() || !m_tasks_bundle_queue.empty() || m_transmitting.load()) {
                 utils::log_and_throw("rank {} received termination with work in progress: deficit {}, parent {}", m_world_rank, m_termination.deficit(), m_termination.parent());
             }
             drain_center_messages(v_sent_counts[0], v_sent_counts[1]);
+            m_outcome = stop_relay::decode(&v_sent_counts[2]);
 
             utils::log_debug("rank {} exited\n", m_world_rank);
             MPI_Barrier(m_world_communicator);
@@ -335,13 +344,18 @@ namespace gempba {
         }
 
         void process_task_received_ack(MPI_Status p_status) {
-            MPI_Recv(nullptr, 0, MPI_BYTE, p_status.MPI_SOURCE, TASK_RECEIVED, m_world_communicator, &p_status);
+            stop_relay::payload v_stop{};
+            MPI_Recv(v_stop.data(), static_cast<int>(v_stop.size()), MPI_INT, p_status.MPI_SOURCE, TASK_RECEIVED, m_world_communicator, &p_status);
+            stop_relay::apply(v_stop);
             if (!m_termination.on_ack_received()) {
                 utils::log_and_throw("rank {} received an unexpected task acknowledgement from rank {}", m_world_rank, p_status.MPI_SOURCE);
             }
         }
 
-        void send_task_ack(const int p_destination) const { MPI_Send(nullptr, 0, MPI_BYTE, p_destination, TASK_RECEIVED, m_world_communicator); }
+        void send_task_ack(const int p_destination) const {
+            const stop_relay::payload v_stop = stop_relay::current();
+            MPI_Send(v_stop.data(), static_cast<int>(v_stop.size()), MPI_INT, p_destination, TASK_RECEIVED, m_world_communicator);
+        }
 
         void release_parent_if_passive() {
             if (const std::optional<int> v_parent = m_termination.on_passive()) {
@@ -399,9 +413,11 @@ namespace gempba {
             }
 
             //  Delegates the processing of the incoming buffer to the node manager and stores the potential returned value in _returned_value_future.
-            const auto v_runnable = p_runnables[v_runnable_id];
-            utils::print_ipc_debug_comments("rank {}, retrieved runnable: {}", m_world_rank, v_runnable_id);
-            auto v_returned_value = (*v_runnable)(p_node_manager, v_task_packet);
+            if (!stop_requested()) {
+                const auto v_runnable = p_runnables[v_runnable_id];
+                utils::print_ipc_debug_comments("rank {}, retrieved runnable: {}", m_world_rank, v_runnable_id);
+                (void) (*v_runnable)(p_node_manager, v_task_packet);
+            }
             utils::print_ipc_debug_comments("rank {}, push task to runnable: {} \n", m_world_rank, v_runnable_id);
             // **********************************************************************************************
 
@@ -562,9 +578,16 @@ namespace gempba {
                         v_is_terminated = m_termination.deficit() == 0;
                         break;
                     }
+                    case STOP: {
+                        m_stop_relay.receive(v_status, m_world_communicator);
+                        break;
+                    }
                     default: {
                         // nothing
                     };
+                }
+                if (!v_is_terminated) {
+                    m_stop_relay.spread(m_world_communicator, m_world_size);
                 }
 
                 if (auto* v_telemetry = telemetry::get())
@@ -575,6 +598,7 @@ namespace gempba {
             after breaking the previous loop, all jobs are finished and the only remaining step
             is notifying exit and fetching results
             */
+            m_outcome = detail::requested_stop();
             notify_termination();
 
             // receive solution from other processes
@@ -583,14 +607,18 @@ namespace gempba {
             m_end_time = MPI_Wtime();
             m_stats.m_elapsed_time = m_end_time - m_start_time;
             if (auto* v_telemetry = telemetry::get()) {
-                v_telemetry->record_run_end();
+                v_telemetry->record_run_end(m_outcome);
             }
         }
 
         MPI_Status probe_communicators_at_center() {
             static int branch = 0;
             while (true) {
-                switch (branch % 2) {
+                const int v_branch = branch;
+                if (++branch > INT_MAX - 1000) {
+                    branch = 0;
+                }
+                switch (v_branch % 2) {
                     case 0: {
                         if (const auto v_optional = probe_world_comm_center(); v_optional.has_value()) {
                             return v_optional.value();
@@ -604,9 +632,7 @@ namespace gempba {
                         break;
                     }
                 }
-                if (++branch > INT_MAX - 1000) {
-                    branch = 0;
-                }
+                m_stop_relay.spread(m_world_communicator, m_world_size);
 
                 // Drive telemetry from inside the center busy-wait so the
                 // aggregator drains rank frames in real time even when
@@ -784,7 +810,8 @@ namespace gempba {
 
         void notify_termination() const {
             for (int v_rank = 1; v_rank < m_world_size; v_rank++) {
-                const std::array<int, 2> v_sent_counts = {m_score_updates_sent, m_next_processes_sent[v_rank]};
+                const stop_relay::outcome_payload v_outcome = stop_relay::encode(m_outcome);
+                const std::array<int, 5> v_sent_counts = {m_score_updates_sent, m_next_processes_sent[v_rank], v_outcome[0], v_outcome[1], v_outcome[2]};
                 MPI_Send(v_sent_counts.data(), static_cast<int>(v_sent_counts.size()), MPI_INT, v_rank, TERMINATION, m_world_communicator);
             }
             MPI_Barrier(m_world_communicator);
@@ -841,6 +868,10 @@ namespace gempba {
                         MPI_Recv(nullptr, 0, MPI_BYTE, p_rank, NO_RESULT, m_world_communicator, &v_status);
                         utils::log_debug("solution NOT received from rank {}\n", p_rank);
                         return;
+                    }
+                    case STOP: {
+                        m_stop_relay.discard(v_status, m_world_communicator);
+                        break;
                     }
                     default: {
                         utils::log_and_throw(std::format("rank {} received unknown tag {} from rank {} in receive_solution()", m_world_rank, v_status.MPI_TAG, p_rank));
@@ -926,6 +957,8 @@ namespace gempba {
         size_t m_threads_per_process = std::thread::hardware_concurrency(); // detects the number of logical processors in machine
 
         termination_detector m_termination{false};
+        stop_relay m_stop_relay{STOP, CENTER_NODE};
+        run_outcome m_outcome{};
         default_mpi_stats m_stats{-1};
         std::vector<default_mpi_stats> m_stats_vector;
 
@@ -1012,12 +1045,13 @@ namespace gempba {
 
 
     protected:
-        void do_run(node_manager& p_node_manager, std::map<int, std::shared_ptr<serial_runnable>> p_runnables, std::optional<task_bundle> p_seed) override {
+        run_outcome do_run(node_manager& p_node_manager, std::map<int, std::shared_ptr<serial_runnable>> p_runnables, std::optional<task_bundle> p_seed) override {
             if (p_seed) {
                 run_coordinator(p_seed->get_task_packet(), p_seed->get_runnable_id());
             } else {
                 run_worker(p_node_manager, std::move(p_runnables));
             }
+            return m_outcome;
         }
 
         task_packet do_get_result() override { return fetch_solution(); }

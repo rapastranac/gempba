@@ -5,6 +5,7 @@
 #include <impl/install_scheduler.hpp>
 #include <impl/load_balancing/quasi_horizontal_load_balancer.hpp>
 #include <impl/load_balancing/work_stealing_load_balancer.hpp>
+#include <impl/stop_state.hpp>
 #include <impl/telemetry/telemetry_transport.hpp>
 #include <memory>
 #include <spdlog/spdlog.h>
@@ -82,6 +83,7 @@ namespace {
         }
         g_node_manager = std::make_unique<gempba::node_manager>(p_load_balancer, p_scheduler);
         install_telemetry_hub_if_needed();
+        gempba::detail::take_stop_signals();
         return *g_node_manager;
     }
 } // namespace
@@ -152,13 +154,21 @@ gempba::node_manager& gempba::get_node_manager() {
     return *g_node_manager;
 }
 
-void gempba::reset_node_manager() { g_node_manager.reset(); }
+void gempba::reset_node_manager() {
+    g_node_manager.reset();
+    detail::release_stop_signals();
+}
 
 int gempba::shutdown() {
+    if (g_node_manager && !g_scheduler) {
+        detail::log_run_end(detail::requested_stop());
+    }
     telemetry::uninstall();
     g_scheduler.reset();
     g_make_transport = nullptr;
     g_load_balancer.reset();
     g_node_manager.reset();
+    detail::release_stop_signals();
+    detail::clear_stop();
     return EXIT_SUCCESS;
 }

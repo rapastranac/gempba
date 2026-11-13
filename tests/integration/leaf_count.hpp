@@ -83,9 +83,10 @@ namespace leaf_count {
 
     /**
      * Creates the load balancer and node manager for @p p_scheduler and counts the leaves of a tree of depth @p p_max_depth,
-     * seeded from the root, with two threads per rank that runs tasks. Returns once this rank's run ends; keep the counter until shutdown.
+     * seeded from the root, with two threads per rank that runs tasks. Returns once this rank's run ends, with how it ended in
+     * @p p_outcome when given; keep the counter until shutdown.
      */
-    inline std::unique_ptr<leaf_counter> run(gempba::scheduler& p_scheduler, const int p_max_depth) {
+    inline std::unique_ptr<leaf_counter> run(gempba::scheduler& p_scheduler, const int p_max_depth, gempba::run_outcome* p_outcome = nullptr) {
         gempba::load_balancer* v_load_balancer = gempba::create_load_balancer(gempba::balancing_policy::QUASI_HORIZONTAL, &p_scheduler);
         gempba::node_manager& v_node_manager = gempba::create_node_manager(v_load_balancer, &p_scheduler);
         v_node_manager.set_goal(gempba::MAXIMISE, gempba::score_type::I32);
@@ -104,7 +105,10 @@ namespace leaf_count {
         if (p_scheduler.is_root()) {
             v_seed.emplace(serialize(0, p_max_depth), 0);
         }
-        p_scheduler.run(v_node_manager, v_runnables, std::move(v_seed));
+        const gempba::run_outcome v_outcome = p_scheduler.run(v_node_manager, v_runnables, std::move(v_seed));
+        if (p_outcome != nullptr) {
+            *p_outcome = v_outcome;
+        }
         return v_counter;
     }
 

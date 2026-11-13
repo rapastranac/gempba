@@ -26,6 +26,7 @@
 
 #include <gempba/core/load_balancer.hpp>
 #include <gempba/core/scheduler.hpp>
+#include <gempba/core/stop.hpp>
 #include <gempba/detail/nodes/node_core_impl.hpp>
 #include <gempba/detail/runnables/serial_runnable_non_void.hpp>
 #include <gempba/detail/runnables/serial_runnable_void.hpp>

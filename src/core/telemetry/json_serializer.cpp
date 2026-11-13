@@ -1,3 +1,4 @@
+#include <impl/stop_state.hpp>
 #include <impl/telemetry/json_serializer.hpp>
 
 #include <cstdio>
@@ -61,6 +62,35 @@ namespace gempba::telemetry {
             p_out += v_buf;
         }
 
+        std::string_view trigger_name(const stop_trigger p_trigger) {
+            switch (p_trigger) {
+                case stop_trigger::CODE:
+                    return "code";
+                case stop_trigger::SIGNAL:
+                    return "signal";
+                case stop_trigger::CONTROL:
+                    return "control";
+                case stop_trigger::NONE:
+                    break;
+            }
+            return {};
+        }
+
+        void emit_end(std::string& p_out, const run_outcome& p_end) {
+            p_out += p_end.m_reason == end_reason::INTERRUPTED ? R"(,"end":{"reason":"interrupted")" : R"(,"end":{"reason":"completed")";
+            if (const std::string_view v_trigger = trigger_name(p_end.m_trigger); !v_trigger.empty()) {
+                p_out += R"(,"trigger":")";
+                p_out += v_trigger;
+                p_out += '"';
+            }
+            if (p_end.m_trigger == stop_trigger::SIGNAL) {
+                p_out += R"(,"signal":")";
+                p_out += detail::signal_name(p_end.m_signal);
+                p_out += '"';
+            }
+            p_out += '}';
+        }
+
         void emit_broadcast_header(std::string& p_out, const broadcast_payload& p_payload, const bool p_paused) {
             p_out += "{\"version\":";
             emit_u32(p_out, TELEMETRY_SCHEMA_VERSION);
@@ -72,6 +102,9 @@ namespace gempba::telemetry {
             emit_u64(p_out, p_payload.m_elapsed_seconds);
             p_out += p_paused ? R"(,"paused":true)" : R"(,"paused":false)";
             p_out += p_payload.m_final ? R"(,"final":true)" : R"(,"final":false)";
+            if (p_payload.m_final && p_payload.m_end.has_value()) {
+                emit_end(p_out, *p_payload.m_end);
+            }
         }
 
     } // namespace

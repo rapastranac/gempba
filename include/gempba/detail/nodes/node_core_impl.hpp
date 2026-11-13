@@ -41,6 +41,7 @@
 
 #include <gempba/core/load_balancer.hpp>
 #include <gempba/core/node_core.hpp>
+#include <gempba/core/stop.hpp>
 #include <gempba/utils/utils.hpp>
 
 /**
@@ -284,6 +285,9 @@ namespace gempba {
             ensure_args_initialized();
             m_result = p_load_balancer->force_local_submit([v_copy = shared_from_this(), this] {
                 // IMPORTANT: "v_copy" keeps "this" alive until the pool thread executes the function
+                if (stop_requested()) {
+                    return std::any{};
+                }
                 try {
                     return m_invoke(true);
                 } catch (const std::exception& v_e) {
@@ -390,6 +394,9 @@ namespace gempba {
         [[nodiscard]] bool is_consumed() const override { return m_state != UNUSED; }
 
         bool should_branch() override {
+            if (stop_requested()) {
+                return false;
+            }
             if (m_should_branch_cached.has_value()) {
                 utils::print_ipc_debug_comments("run_id: {}, should_branch() returning cached value: {}", m_node_id, m_should_branch_cached.value());
                 return m_should_branch_cached.value();

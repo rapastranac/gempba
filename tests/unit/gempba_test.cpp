@@ -37,6 +37,7 @@
 #include <impl/load_balancing/quasi_horizontal_load_balancer.hpp>
 #include <impl/load_balancing/work_stealing_load_balancer.hpp>
 #include <impl/telemetry/local_transport.hpp>
+#include <log_capture.hpp>
 
 /**
  * @author Andrés Pastrana
@@ -65,7 +66,7 @@ public:
     std::optional<gempba::transmission_guard> try_open_transmission_channel() override { return std::nullopt; }
 
 protected:
-    void do_run(gempba::node_manager&, std::map<int, std::shared_ptr<gempba::serial_runnable>>, std::optional<gempba::task_bundle>) override {}
+    gempba::run_outcome do_run(gempba::node_manager&, std::map<int, std::shared_ptr<gempba::serial_runnable>>, std::optional<gempba::task_bundle>) override { return {}; }
     gempba::task_packet do_get_result() override { return gempba::task_packet::EMPTY; }
     std::vector<gempba::result> do_get_all_results() override { return {}; }
 };
@@ -357,6 +358,28 @@ namespace {
 TEST_F(gempba_test, create_dummy_node_propagates_balancer_exception) {
     throwing_balancer v_lb;
     EXPECT_THROW(gempba::create_dummy_node(v_lb), std::runtime_error);
+}
+
+TEST_F(gempba_test, shutdown_logs_how_a_run_without_a_scheduler_ended) {
+    gempba::telemetry::disable();
+    gempba::create_node_manager(gempba::create_load_balancer(gempba::QUASI_HORIZONTAL));
+    gempba::request_stop();
+    const log_capture v_log;
+
+    gempba::shutdown();
+
+    EXPECT_NE(std::string::npos, v_log.text().find("[warning] gempba: run interrupted by gempba::request_stop()")) << v_log.text();
+}
+
+TEST_F(gempba_test, shutdown_leaves_the_run_end_to_the_scheduler) {
+    gempba::telemetry::disable();
+    gempba::scheduler* v_scheduler = install_stub();
+    gempba::create_node_manager(gempba::create_load_balancer(gempba::QUASI_HORIZONTAL, v_scheduler), v_scheduler);
+    const log_capture v_log;
+
+    gempba::shutdown();
+
+    EXPECT_EQ(std::string::npos, v_log.text().find("gempba: run")) << v_log.text();
 }
 
 TEST_F(gempba_test, create_seed_node_constructs_a_node_with_no_parent) {

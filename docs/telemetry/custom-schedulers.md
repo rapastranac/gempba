@@ -5,10 +5,17 @@ A scheduler passed to `gempba::mpi::create_scheduler(std::unique_ptr<scheduler>)
 ## What your scheduler implements
 
 Every rank calls `scheduler::run(node_manager, runnables, seed)`, and only the root, rank 0, passes the seed. `run`, `get_result()` and `get_all_results()` check that rule and the root before they reach your scheduler (#394). Your scheduler implements:
-- `do_run(node_manager&, runnables, std::optional<task_bundle> seed)`: this rank's part of the run, returning once the whole run has ended. The seed is set exactly on the root. Whether the root also runs tasks is up to your scheduler; the built-in ones keep it as their coordinator.
+- `do_run(node_manager&, runnables, std::optional<task_bundle> seed)`: this rank's part of the run, returning how it ended once the whole run has ended. The seed is set exactly on the root. Whether the root also runs tasks is up to your scheduler; the built-in ones keep it as their coordinator. See [Stopping early](#stopping-early) for the `run_outcome` it returns.
 - `do_get_result()` and `do_get_all_results()`: the best result, and each rank's, which the root reads after `run`.
 - `force_push(task, runnable_id)` and `try_open_transmission_channel()`: how the load balancer hands a task to another rank.
 - The rest of `scheduler`: `barrier()`, `rank_me()`, `world_size()`, the stats calls, `set_goal()` and `set_custom_initial_topology()`.
+
+## Stopping early
+
+A run stops early when the program calls `gempba::request_stop()`, when `SIGINT` or `SIGTERM` arrives, or when a dashboard client sends a [stop line](wire-format.md#control-lines) (#465). The load balancers already prune every node that hasn't started on a rank that sees the stop. Your scheduler:
+- Polls `gempba::stop_requested()` in its loops and tells the other ranks, so ranks that saw no signal stop too.
+- Runs no task it receives after the stop, and still acknowledges it, so termination detection completes as usual.
+- Returns the same `run_outcome` from `do_run` on every rank: `end_reason::INTERRUPTED`, with the trigger and signal of the stop the root acted on, once a stop was requested on any rank before the run ended; `end_reason::COMPLETED` otherwise.
 
 ## Two layers over the same ranks
 

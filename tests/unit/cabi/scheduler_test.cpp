@@ -316,10 +316,10 @@ namespace gempba::cabi_tests {
         const gempba_serial_runnable_t v_handles[] = {reinterpret_cast<gempba_serial_runnable_t>(&v_r)};
 
         EXPECT_CALL(v_mock, do_run(_, _, _)).Times(0);
-        EXPECT_EQ(gempba_scheduler_run(nullptr, v_nm, v_ids, v_handles, 1, nullptr, 0), GEMPBA_ERR_INVALID_ARG);
-        EXPECT_EQ(gempba_scheduler_run(v_handle, nullptr, v_ids, v_handles, 1, nullptr, 0), GEMPBA_ERR_INVALID_ARG);
-        EXPECT_EQ(gempba_scheduler_run(v_handle, v_nm, nullptr, v_handles, 1, nullptr, 0), GEMPBA_ERR_INVALID_ARG);
-        EXPECT_EQ(gempba_scheduler_run(v_handle, v_nm, v_ids, nullptr, 1, nullptr, 0), GEMPBA_ERR_INVALID_ARG);
+        EXPECT_EQ(gempba_scheduler_run(nullptr, v_nm, v_ids, v_handles, 1, nullptr, 0, nullptr), GEMPBA_ERR_INVALID_ARG);
+        EXPECT_EQ(gempba_scheduler_run(v_handle, nullptr, v_ids, v_handles, 1, nullptr, 0, nullptr), GEMPBA_ERR_INVALID_ARG);
+        EXPECT_EQ(gempba_scheduler_run(v_handle, v_nm, nullptr, v_handles, 1, nullptr, 0, nullptr), GEMPBA_ERR_INVALID_ARG);
+        EXPECT_EQ(gempba_scheduler_run(v_handle, v_nm, v_ids, nullptr, 1, nullptr, 0, nullptr), GEMPBA_ERR_INVALID_ARG);
     }
 
     TEST_F(cabi_scheduler_test, run_off_the_root_translates_id_runnable_arrays_to_map) {
@@ -339,9 +339,9 @@ namespace gempba::cabi_tests {
         std::map<int, std::shared_ptr<gempba::serial_runnable>> v_captured;
         std::optional<gempba::task_bundle> v_seed = gempba::task_bundle(gempba::task_packet::EMPTY, -1);
         EXPECT_CALL(v_mock, rank_me()).WillRepeatedly(Return(2));
-        EXPECT_CALL(v_mock, do_run(_, SizeIs(2), _)).WillOnce(::testing::DoAll(::testing::SaveArg<1>(&v_captured), ::testing::SaveArg<2>(&v_seed)));
+        EXPECT_CALL(v_mock, do_run(_, SizeIs(2), _)).WillOnce(::testing::DoAll(::testing::SaveArg<1>(&v_captured), ::testing::SaveArg<2>(&v_seed), Return(gempba::run_outcome{})));
 
-        EXPECT_EQ(gempba_scheduler_run(handle_for(v_mock, v_s), v_nm, v_ids, v_handles, 2, nullptr, 0), GEMPBA_OK);
+        EXPECT_EQ(gempba_scheduler_run(handle_for(v_mock, v_s), v_nm, v_ids, v_handles, 2, nullptr, 0, nullptr), GEMPBA_OK);
         EXPECT_TRUE(v_captured.count(10) == 1);
         EXPECT_TRUE(v_captured.count(20) == 1);
         EXPECT_FALSE(v_seed.has_value());
@@ -360,14 +360,33 @@ namespace gempba::cabi_tests {
 
         std::optional<gempba::task_bundle> v_seed;
         EXPECT_CALL(v_mock, rank_me()).WillRepeatedly(Return(0));
-        EXPECT_CALL(v_mock, do_run(_, _, _)).WillOnce(::testing::SaveArg<2>(&v_seed));
+        EXPECT_CALL(v_mock, do_run(_, _, _)).WillOnce(::testing::DoAll(::testing::SaveArg<2>(&v_seed), Return(gempba::run_outcome{})));
 
-        EXPECT_EQ(gempba_scheduler_run(handle_for(v_mock, v_s), v_nm, v_ids, v_handles, 1, &v_seed_bytes, 5), GEMPBA_OK);
+        EXPECT_EQ(gempba_scheduler_run(handle_for(v_mock, v_s), v_nm, v_ids, v_handles, 1, &v_seed_bytes, 5, nullptr), GEMPBA_OK);
         ASSERT_TRUE(v_seed.has_value());
         EXPECT_EQ(v_seed->get_runnable_id(), 5);
         ASSERT_EQ(v_seed->size(), 2u);
         EXPECT_EQ(v_seed->get_task_packet().data()[0], std::byte{0xAA});
         EXPECT_EQ(v_seed->get_task_packet().data()[1], std::byte{0xBB});
+    }
+
+    TEST_F(cabi_scheduler_test, run_reports_how_the_run_ended) {
+        scheduler_mock v_mock;
+        gempba_scheduler_s v_s;
+        char v_dummy_nm;
+        auto* const v_nm = reinterpret_cast<gempba_node_manager_t>(&v_dummy_nm);
+        const int32_t v_ids[] = {0};
+        gempba_serial_runnable_s v_r{};
+        const gempba_serial_runnable_t v_handles[] = {reinterpret_cast<gempba_serial_runnable_t>(&v_r)};
+
+        EXPECT_CALL(v_mock, rank_me()).WillRepeatedly(Return(1));
+        EXPECT_CALL(v_mock, do_run(_, _, _)).WillOnce(Return(gempba::run_outcome{gempba::end_reason::INTERRUPTED, gempba::stop_trigger::SIGNAL, 15}));
+        gempba_run_outcome_t v_outcome{};
+        EXPECT_EQ(gempba_scheduler_run(handle_for(v_mock, v_s), v_nm, v_ids, v_handles, 1, nullptr, 0, &v_outcome), GEMPBA_OK);
+
+        EXPECT_EQ(GEMPBA_END_INTERRUPTED, v_outcome.reason);
+        EXPECT_EQ(GEMPBA_STOP_SIGNAL, v_outcome.trigger);
+        EXPECT_EQ(15, v_outcome.signal);
     }
 
     TEST_F(cabi_scheduler_test, run_reports_a_root_without_a_seed_as_invalid_arg) {
@@ -381,7 +400,7 @@ namespace gempba::cabi_tests {
 
         EXPECT_CALL(v_mock, rank_me()).WillRepeatedly(Return(0));
         EXPECT_CALL(v_mock, do_run(_, _, _)).Times(0);
-        EXPECT_EQ(gempba_scheduler_run(handle_for(v_mock, v_s), v_nm, v_ids, v_handles, 1, nullptr, 0), GEMPBA_ERR_INVALID_ARG);
+        EXPECT_EQ(gempba_scheduler_run(handle_for(v_mock, v_s), v_nm, v_ids, v_handles, 1, nullptr, 0, nullptr), GEMPBA_ERR_INVALID_ARG);
         EXPECT_NE(gempba_last_error_message(), nullptr);
     }
 

@@ -145,6 +145,28 @@ extern "C" {
         GEMPBA_BALANCING_WORK_STEALING    = 1
     } gempba_balancing_policy_t;
 
+    /** Mirrors gempba::end_reason: how a run ended. */
+    typedef enum {
+        GEMPBA_END_COMPLETED   = 0,
+        GEMPBA_END_INTERRUPTED = 1
+    } gempba_end_reason_t;
+
+    /** Mirrors gempba::stop_trigger: what requested the stop that interrupted a run. */
+    typedef enum {
+        GEMPBA_STOP_NONE    = 0,
+        GEMPBA_STOP_CODE    = 1,
+        GEMPBA_STOP_SIGNAL  = 2,
+        GEMPBA_STOP_CONTROL = 3
+    } gempba_stop_trigger_t;
+
+    /** Mirrors gempba::run_outcome.  `signal` is the signal's number when `trigger` is GEMPBA_STOP_SIGNAL, 0 otherwise.
+     */
+    typedef struct {
+        gempba_end_reason_t   reason;
+        gempba_stop_trigger_t trigger;
+        int32_t               signal;
+    } gempba_run_outcome_t;
+
     /** Mirrors gempba::goal: which direction node_manager should optimise. */
     typedef enum {
         GEMPBA_GOAL_MAXIMISE = 0,
@@ -512,12 +534,14 @@ extern "C" {
      * Wraps gempba::scheduler::run.  Every rank calls it: it registers the runnables (paired ids[i] / runnables[i] for
      * i in [0, count)), runs this rank's part of the search, and returns once the whole run has ended.  `seed` is the
      * root's first task, run under `seed_runnable_id`, and is NULL on every other rank.  GEMPBA_ERR_INVALID_ARG when
-     * the root passes no seed or another rank passes one.
+     * the root passes no seed or another rank passes one.  When `outcome` is not NULL, *outcome is how the run ended,
+     * the same on every rank.
      */
     GEMPBA_API gempba_status_t gempba_scheduler_run(gempba_scheduler_t s, gempba_node_manager_t nm, const int32_t* ids,
                                                     const gempba_serial_runnable_t* runnables, size_t count,
                                                     const gempba_bytes_t* seed /* NULL off the root */,
-                                                    int32_t               seed_runnable_id);
+                                                    int32_t               seed_runnable_id,
+                                                    gempba_run_outcome_t* outcome /* may be NULL */);
 
     /** Wraps gempba::scheduler::get_result.  On the root, after gempba_scheduler_run: *out is the best result gathered
      * from all ranks, or {NULL, 0} if none was produced.  Caller frees *out via gempba_buffer_free if non-empty.
@@ -574,6 +598,23 @@ extern "C" {
      * installs a hub; a later call does not move an already-bound hub.  Mirrors gempba::telemetry::configure_port.
      */
     GEMPBA_API void gempba_telemetry_configure_port(uint16_t port);
+
+    /* ── Stopping a run ──────────────────────────────────────────────────────── */
+
+    /** Wraps gempba::request_stop.  Returns at once; safe from any thread. */
+    GEMPBA_API void gempba_request_stop(void);
+
+    /**
+     * Requests a stop on behalf of `signal`, which the host language caught itself, such as the JVM's SIGTERM.  The
+     * run's outcome then names that signal.
+     */
+    GEMPBA_API void gempba_request_stop_on_signal(int32_t signal);
+
+    /** Wraps gempba::stop_requested: 1 once a stop was requested since the last gempba_shutdown, 0 before. */
+    GEMPBA_API gempba_bool_t gempba_stop_requested(void);
+
+    /** Wraps gempba::stop_on_signals: whether SIGINT and SIGTERM stop the run gracefully; on by default. */
+    GEMPBA_API void gempba_stop_on_signals(gempba_bool_t enabled);
 
 #ifdef __cplusplus
 } /* extern "C" */

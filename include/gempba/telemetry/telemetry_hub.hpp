@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <gempba/core/stop.hpp>
 #include <gempba/export.h>
 #include <gempba/telemetry/frames.hpp>
 #include <gempba/telemetry/runtime_mode.hpp>
@@ -97,6 +98,8 @@ namespace gempba::telemetry {
 
         /// Record the end of this rank's scheduler run; scheduler times stop accruing.
         void record_run_end() noexcept;
+        /// Like @ref record_run_end(), also keeping how the run ended; the root's outcome is the final line's @c end.
+        void record_run_end(const run_outcome& p_outcome) noexcept;
 
         /// Record that this worker waits for a task: at run start and after reporting available.
         void record_worker_waiting() noexcept;
@@ -170,6 +173,12 @@ namespace gempba::telemetry {
         [[nodiscard]] const std::string& run_id() const noexcept;
 
         /**
+         * @return how the run ended: the outcome this rank's scheduler recorded, or in a multithreading-only run the stop requested
+         * so far; empty when a scheduler recorded none
+         */
+        [[nodiscard]] std::optional<run_outcome> run_end() const;
+
+        /**
          * @brief Attach @p p_value to this run under @p p_key, e.g. a run label, problem name or seed.
          *
          * The aggregator broadcasts its annotations with the run setup. Keeps up to @ref MAX_RUN_ANNOTATIONS pairs, keys of 1 to
@@ -239,6 +248,15 @@ namespace gempba::telemetry {
          */
         void apply_control_from_client(control_kind p_kind, std::uint32_t p_value) noexcept;
 
+        /**
+         * @brief Stop the run for a dashboard client whose @p p_token matches @c GEMPBA_STOP_TOKEN in this process's environment.
+         *
+         * Without that variable, or with another token, the stop is refused with a warning.
+         *
+         * @return whether the stop was requested
+         */
+        bool request_stop_from_client(std::string_view p_token) noexcept;
+
     private:
         struct counters;
         struct aggregator;
@@ -280,6 +298,7 @@ namespace gempba::telemetry {
         rank_role m_scheduler_role = rank_role::WORKER;
         std::vector<rank_role> m_rank_roles;
         std::string m_load_balancer_name;
+        std::optional<run_outcome> m_run_end;
     };
 
     /// @return The installed hub, or @c nullptr when none is installed.

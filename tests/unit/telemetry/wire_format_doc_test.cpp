@@ -1,3 +1,4 @@
+#include <csignal>
 #include <filesystem>
 #include <fstream>
 #include <gtest/gtest.h>
@@ -51,12 +52,14 @@ namespace {
         v_payload.m_run = &v_run;
         v_payload.m_rank_frames = &v_rank_frames;
         v_payload.m_nodes = &v_nodes;
+        v_payload.m_final = true;
+        v_payload.m_end = gempba::run_outcome{gempba::end_reason::INTERRUPTED, gempba::stop_trigger::SIGNAL, SIGTERM};
 
         std::string v_lines;
         gempba::telemetry::serialize_broadcast(v_lines, v_payload);
         gempba::telemetry::serialize_paused_broadcast(v_lines, v_payload);
         const std::set<std::string> v_keys = keys_in(v_lines);
-        for (const char* v_nested: {"paused", "role", "cpu_ids", "elapsed_ms", "to", "cpu_pct"}) {
+        for (const char* v_nested: {"paused", "role", "cpu_ids", "elapsed_ms", "to", "cpu_pct", "signal"}) {
             ASSERT_TRUE(v_keys.contains(v_nested)) << "the sample broadcast no longer reaches `" << v_nested << "`";
         }
 

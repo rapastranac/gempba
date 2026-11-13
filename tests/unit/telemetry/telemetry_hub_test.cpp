@@ -1,9 +1,11 @@
 #include <atomic>
 #include <chrono>
+#include <cstdlib>
 #include <gempba/config.h>
 #include <gempba/telemetry/frames.hpp>
 #include <gempba/telemetry/telemetry_hub.hpp>
 #include <gtest/gtest.h>
+#include <impl/stop_state.hpp>
 #include <memory>
 #include <regex>
 #include <string>
@@ -12,6 +14,18 @@
 #include <vector>
 
 namespace {
+
+    void set_stop_token(const char* p_token) {
+#if defined(_WIN32)
+        _putenv_s("GEMPBA_STOP_TOKEN", p_token != nullptr ? p_token : "");
+#else
+        if (p_token != nullptr) {
+            setenv("GEMPBA_STOP_TOKEN", p_token, 1);
+        } else {
+            unsetenv("GEMPBA_STOP_TOKEN");
+        }
+#endif
+    }
 
     class telemetry_hub_test : public ::testing::Test {
     protected:
@@ -77,6 +91,73 @@ namespace {
         EXPECT_NO_THROW(v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false));
         gempba::telemetry::telemetry_hub v_other;
         EXPECT_NO_THROW(v_other.on_runtime_ready(gempba::telemetry::runtime_mode::MP_MPI, 3, 8, /*p_start_pump_thread=*/false));
+    }
+
+    TEST_F(telemetry_hub_test, a_multithreading_run_without_a_stop_ends_completed) {
+        gempba::detail::clear_stop();
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+
+        EXPECT_EQ(std::optional{gempba::run_outcome{}}, v_hub.run_end());
+    }
+
+    TEST_F(telemetry_hub_test, a_multithreading_run_ends_with_the_stop_requested) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+
+        gempba::request_stop();
+        const std::optional<gempba::run_outcome> v_end = v_hub.run_end();
+        gempba::detail::clear_stop();
+
+        EXPECT_EQ((std::optional{gempba::run_outcome{gempba::end_reason::INTERRUPTED, gempba::stop_trigger::CODE, 0}}), v_end);
+    }
+
+    TEST_F(telemetry_hub_test, an_mpi_run_ends_as_its_scheduler_recorded) {
+        gempba::telemetry::telemetry_hub v_hub;
+        v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MP_MPI, 3, 8, /*p_start_pump_thread=*/false);
+        ASSERT_FALSE(v_hub.run_end().has_value());
+
+        const gempba::run_outcome v_interrupted{gempba::end_reason::INTERRUPTED, gempba::stop_trigger::CONTROL, 0};
+        v_hub.record_run_end(v_interrupted);
+
+        EXPECT_EQ(std::optional{v_interrupted}, v_hub.run_end());
+    }
+
+    TEST_F(telemetry_hub_test, a_stop_line_with_the_run_token_stops_the_run) {
+        gempba::detail::clear_stop();
+        set_stop_token("s3cret");
+        gempba::telemetry::telemetry_hub v_hub;
+
+        const bool v_accepted = v_hub.request_stop_from_client("s3cret");
+        const gempba::run_outcome v_stop = gempba::detail::requested_stop();
+        set_stop_token(nullptr);
+        gempba::detail::clear_stop();
+
+        EXPECT_TRUE(v_accepted);
+        EXPECT_EQ((gempba::run_outcome{gempba::end_reason::INTERRUPTED, gempba::stop_trigger::CONTROL, 0}), v_stop);
+    }
+
+    TEST_F(telemetry_hub_test, a_stop_line_with_another_token_is_refused) {
+        gempba::detail::clear_stop();
+        set_stop_token("s3cret");
+        gempba::telemetry::telemetry_hub v_hub;
+
+        const bool v_accepted = v_hub.request_stop_from_client("guess");
+        const bool v_stopped = gempba::stop_requested();
+        set_stop_token(nullptr);
+
+        EXPECT_FALSE(v_accepted);
+        EXPECT_FALSE(v_stopped);
+    }
+
+    TEST_F(telemetry_hub_test, a_stop_line_is_refused_when_the_run_has_no_token) {
+        gempba::detail::clear_stop();
+        set_stop_token(nullptr);
+        gempba::telemetry::telemetry_hub v_hub;
+
+        EXPECT_FALSE(v_hub.request_stop_from_client(""));
+        EXPECT_FALSE(v_hub.request_stop_from_client("anything"));
+        EXPECT_FALSE(gempba::stop_requested());
     }
 
     TEST_F(telemetry_hub_test, shutdown_is_idempotent) {

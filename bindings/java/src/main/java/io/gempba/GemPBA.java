@@ -17,6 +17,7 @@ import io.gempba.value.Score;
 import io.gempba.value.ScoreType;
 
 import io.gempba.internal.GemPBANative;
+import io.gempba.internal.StopSignals;
 
 import java.lang.ref.Reference;
 import java.util.function.BooleanSupplier;
@@ -82,7 +83,43 @@ public final class GemPBA {
      * @return exit code (pass to {@link System#exit})
      */
     public static int shutdown() {
-        return GemPBANative.shutdown();
+        int code = GemPBANative.shutdown();
+        StopSignals.release();
+        return code;
+    }
+
+    /**
+     * Asks the run to stop.  Returns at once and is safe from any thread.  Nodes that haven't started are pruned from
+     * then on, and the run returns its best result so far; under MPI every rank stops.
+     *
+     * <p>Equivalent to {@code gempba::request_stop()} in C++.
+     */
+    public static void requestStop() {
+        GemPBANative.Stop.requestStop();
+    }
+
+    /**
+     * Returns whether a stop was requested since the last {@link #shutdown}, by any trigger.  Long work inside one node
+     * can poll it to return early.
+     *
+     * <p>Equivalent to {@code gempba::stop_requested()} in C++.
+     */
+    public static boolean isStopRequested() {
+        return GemPBANative.Stop.isStopRequested();
+    }
+
+    /**
+     * Sets whether {@code SIGINT} and {@code SIGTERM} stop the run gracefully instead of shutting the JVM down; on by
+     * default.  While on, {@link #createNodeManager} takes both signals and {@link #shutdown} gives them back; a second
+     * {@code SIGINT} shuts the JVM down as usual.
+     *
+     * <p>Equivalent to {@code gempba::stop_on_signals(enabled)} in C++.
+     *
+     * @param enabled whether the signals stop the run gracefully
+     */
+    public static void stopOnSignals(boolean enabled) {
+        GemPBANative.Stop.stopOnSignals(enabled);
+        StopSignals.setEnabled(enabled);
     }
 
     /**
@@ -242,7 +279,9 @@ public final class GemPBA {
      */
     public static NodeManager createNodeManager(LoadBalancer lb, Scheduler scheduler) {
         long schedulerHandle = (scheduler != null) ? scheduler.handle : 0L;
-        return new NodeManager(GemPBANative.createNodeManager(lb.handle, schedulerHandle));
+        NodeManager nm = new NodeManager(GemPBANative.createNodeManager(lb.handle, schedulerHandle));
+        StopSignals.take();
+        return nm;
     }
 
     /**

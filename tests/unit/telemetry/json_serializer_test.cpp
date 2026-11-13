@@ -1,9 +1,13 @@
+#include <csignal>
 #include <cstring>
+#include <gempba/core/stop.hpp>
 #include <gempba/telemetry/frames.hpp>
 #include <gempba/telemetry/topology.hpp>
 #include <gtest/gtest.h>
 #include <impl/telemetry/json_serializer.hpp>
+#include <optional>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -401,6 +405,43 @@ namespace {
         std::string v_out;
         gempba::telemetry::serialize_node_frame(v_out, v_n);
         EXPECT_NE(std::string::npos, v_out.find("\"hostname\":\"host\\\"a\\\\b\""));
+    }
+
+    std::string final_line_ending(const std::optional<gempba::run_outcome>& p_end, const bool p_final = true) {
+        const gempba::telemetry::topology_snapshot v_topo;
+        const std::vector<gempba::telemetry::rank_frame> v_rank_frames;
+        const std::vector<gempba::telemetry::node_frame> v_nodes;
+        gempba::telemetry::broadcast_payload v_p{};
+        v_p.m_topology = &v_topo;
+        v_p.m_rank_frames = &v_rank_frames;
+        v_p.m_nodes = &v_nodes;
+        v_p.m_final = p_final;
+        v_p.m_end = p_end;
+        std::string v_line;
+        gempba::telemetry::serialize_broadcast(v_line, v_p);
+        return v_line;
+    }
+
+    TEST(json_serializer_test, the_final_line_says_a_completed_run_completed) {
+        const std::string v_line = final_line_ending(gempba::run_outcome{});
+        EXPECT_NE(std::string::npos, v_line.find(R"("final":true,"end":{"reason":"completed"},"topology":)")) << v_line;
+    }
+
+    TEST(json_serializer_test, the_final_line_names_the_signal_that_interrupted_the_run) {
+        const std::string v_line = final_line_ending(gempba::run_outcome{gempba::end_reason::INTERRUPTED, gempba::stop_trigger::SIGNAL, SIGTERM});
+        EXPECT_NE(std::string::npos, v_line.find(R"("final":true,"end":{"reason":"interrupted","trigger":"signal","signal":"SIGTERM"},"topology":)")) << v_line;
+    }
+
+    TEST(json_serializer_test, the_final_line_names_a_stop_by_code_or_control_without_a_signal) {
+        const std::string v_code = final_line_ending(gempba::run_outcome{gempba::end_reason::INTERRUPTED, gempba::stop_trigger::CODE, 0});
+        const std::string v_control = final_line_ending(gempba::run_outcome{gempba::end_reason::INTERRUPTED, gempba::stop_trigger::CONTROL, 0});
+        EXPECT_NE(std::string::npos, v_code.find(R"("end":{"reason":"interrupted","trigger":"code"},)")) << v_code;
+        EXPECT_NE(std::string::npos, v_control.find(R"("end":{"reason":"interrupted","trigger":"control"},)")) << v_control;
+    }
+
+    TEST(json_serializer_test, only_a_final_line_with_a_known_end_carries_one) {
+        EXPECT_EQ(std::string::npos, final_line_ending(std::nullopt).find(R"("end":)"));
+        EXPECT_EQ(std::string::npos, final_line_ending(gempba::run_outcome{}, false).find(R"("end":)"));
     }
 
 } // namespace
