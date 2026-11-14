@@ -6,7 +6,7 @@
 
     <groupId>io.github.rapastranac</groupId>
     <artifactId>gempba</artifactId>
-    <version>4.4.0</version>
+    <version>5.0.0</version>
     <packaging>jar</packaging>
 
     <name>gempba</name>

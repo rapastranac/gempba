@@ -6,7 +6,7 @@ pkgname=(
     "${MINGW_PACKAGE_PREFIX}-${_realname}"
     "${MINGW_PACKAGE_PREFIX}-${_realname}-mpi"
 )
-pkgver=4.4.0
+pkgver=5.0.0
 pkgrel=1
 pkgdesc="Generic Massive Parallelisation of Branching Algorithms — hybrid parallel C++23 framework (mingw-w64)"
 arch=('any')
@@ -23,7 +23,7 @@ makedepends=(
     "${MINGW_PACKAGE_PREFIX}-hwloc"
 )
 source=("${_realname}-${pkgver}.tar.gz::https://github.com/rapastranac/gempba/archive/refs/tags/v${pkgver}.tar.gz")
-sha256sums=('965325d5fab633df4a3f722be69e607388760088d1aee8507f683fa7bfc5feb5')
+sha256sums=('SKIP')
 
 build() {
     # One build of the core; the MPI component installs as source, which the consumer's build compiles.

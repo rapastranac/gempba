@@ -2,7 +2,7 @@ class GempbaMpi < Formula
   desc "GemPBA - hybrid parallel C++23 framework (MPI component, as source)"
   homepage "https://github.com/__OWNER_REPO__"
   url "https://api.github.com/repos/__OWNER_REPO__/tarball/refs/tags/v3.3.0"
-  version "4.4.0"
+  version "5.0.0"
   sha256 "0000000000000000000000000000000000000000000000000000000000000000"
   license "MIT"
   head "https://github.com/__OWNER_REPO__.git", branch: "main"
