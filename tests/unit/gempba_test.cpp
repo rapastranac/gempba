@@ -33,44 +33,17 @@
 #include <gempba/gempba.hpp>
 #include <gempba/node_manager.hpp>
 #include <gempba/telemetry/telemetry_hub.hpp>
+#include <impl/install_scheduler.hpp>
 #include <impl/load_balancing/quasi_horizontal_load_balancer.hpp>
 #include <impl/load_balancing/work_stealing_load_balancer.hpp>
+#include <impl/telemetry/local_transport.hpp>
+#include <log_capture.hpp>
 
 /**
  * @author Andrés Pastrana
  * @date 2026
  */
 class scheduler_stub final : public gempba::scheduler {
-    struct center_stub final : center {
-        void barrier() override {}
-
-        [[nodiscard]] int rank_me() const override { return 0; }
-        [[nodiscard]] int world_size() const override { return 1; }
-        [[nodiscard]] std::unique_ptr<gempba::stats> get_stats() const override { return nullptr; }
-
-        void run(gempba::task_packet, int) override {}
-
-        gempba::task_packet get_result() override { return gempba::task_packet::EMPTY; }
-        std::vector<gempba::result> get_all_results() override { return {}; }
-    };
-
-    struct worker_stub final : worker {
-        void barrier() override {}
-
-        [[nodiscard]] int rank_me() const override { return 0; }
-        [[nodiscard]] int world_size() const override { return 1; }
-        [[nodiscard]] std::unique_ptr<gempba::stats> get_stats() const override { return nullptr; }
-
-        void run(gempba::node_manager&, std::map<int, std::shared_ptr<gempba::serial_runnable>>) override {}
-
-        unsigned int force_push(gempba::task_packet&&, int) override { return 0; }
-        [[nodiscard]] unsigned int next_process() const override { return 0; }
-        std::optional<gempba::transmission_guard> try_open_transmission_channel() override { return std::nullopt; }
-    };
-
-    center_stub m_center;
-    worker_stub m_worker;
-
 public:
     void barrier() override {}
 
@@ -89,10 +62,21 @@ public:
 
     void synchronize_stats() override {}
 
-    center& center_view() override { return m_center; }
-    worker& worker_view() override { return m_worker; }
+    unsigned int force_push(gempba::task_packet&&, int) override { return 0; }
+    std::optional<gempba::transmission_guard> try_open_transmission_channel() override { return std::nullopt; }
+
+protected:
+    gempba::run_outcome do_run(gempba::node_manager&, std::map<int, std::shared_ptr<gempba::serial_runnable>>, std::optional<gempba::task_bundle>) override { return {}; }
+    gempba::task_packet do_get_result() override { return gempba::task_packet::EMPTY; }
+    std::vector<gempba::result> do_get_all_results() override { return {}; }
 };
 
+
+namespace {
+    gempba::scheduler* install_stub() {
+        return gempba::detail::install_scheduler(std::make_unique<scheduler_stub>(), [] { return std::make_unique<gempba::telemetry::local_transport>(); });
+    }
+} // namespace
 
 class gempba_test : public ::testing::Test {
 protected:
@@ -108,24 +92,24 @@ protected:
 
 TEST_F(gempba_test, get_load_balancer_returns_nullptr_when_not_created) { EXPECT_EQ(nullptr, gempba::get_load_balancer()); }
 
-TEST_F(gempba_test, mt_create_load_balancer_quasi_horizontal) {
-    gempba::load_balancer* v_lb = gempba::multithreading::create_load_balancer(gempba::QUASI_HORIZONTAL);
+TEST_F(gempba_test, create_load_balancer_quasi_horizontal) {
+    gempba::load_balancer* v_lb = gempba::create_load_balancer(gempba::QUASI_HORIZONTAL);
     ASSERT_NE(nullptr, v_lb);
     EXPECT_EQ(gempba::QUASI_HORIZONTAL, v_lb->get_balancing_policy());
 }
 
-TEST_F(gempba_test, mt_create_load_balancer_work_stealing) {
-    gempba::load_balancer* v_lb = gempba::multithreading::create_load_balancer(gempba::WORK_STEALING);
+TEST_F(gempba_test, create_load_balancer_work_stealing) {
+    gempba::load_balancer* v_lb = gempba::create_load_balancer(gempba::WORK_STEALING);
     ASSERT_NE(nullptr, v_lb);
     EXPECT_EQ(gempba::WORK_STEALING, v_lb->get_balancing_policy());
 }
 
-TEST_F(gempba_test, mt_create_load_balancer_throws_if_already_exists) {
-    gempba::multithreading::create_load_balancer(gempba::QUASI_HORIZONTAL);
-    EXPECT_THROW(gempba::multithreading::create_load_balancer(gempba::QUASI_HORIZONTAL), std::runtime_error);
+TEST_F(gempba_test, create_load_balancer_throws_if_already_exists) {
+    gempba::create_load_balancer(gempba::QUASI_HORIZONTAL);
+    EXPECT_THROW(gempba::create_load_balancer(gempba::QUASI_HORIZONTAL), std::runtime_error);
 }
 
-TEST_F(gempba_test, mt_create_load_balancer_custom_implementation) {
+TEST_F(gempba_test, create_load_balancer_custom_implementation) {
     auto v_custom = std::make_unique<gempba::work_stealing_load_balancer>();
     const gempba::work_stealing_load_balancer* v_raw = v_custom.get();
     gempba::load_balancer* v_lb = gempba::create_load_balancer(std::move(v_custom));
@@ -133,64 +117,55 @@ TEST_F(gempba_test, mt_create_load_balancer_custom_implementation) {
     EXPECT_EQ(v_raw, v_lb);
 }
 
-TEST_F(gempba_test, mt_create_load_balancer_custom_throws_if_already_exists) {
-    gempba::multithreading::create_load_balancer(gempba::QUASI_HORIZONTAL);
+TEST_F(gempba_test, create_load_balancer_custom_throws_if_already_exists) {
+    gempba::create_load_balancer(gempba::QUASI_HORIZONTAL);
     auto v_custom = std::make_unique<gempba::work_stealing_load_balancer>();
     EXPECT_THROW(gempba::create_load_balancer(std::move(v_custom)), std::runtime_error);
 }
 
 TEST_F(gempba_test, get_load_balancer_returns_non_null_after_creation) {
-    gempba::multithreading::create_load_balancer(gempba::WORK_STEALING);
+    gempba::create_load_balancer(gempba::WORK_STEALING);
     EXPECT_NE(nullptr, gempba::get_load_balancer());
 }
 
 TEST_F(gempba_test, reset_load_balancer_clears_instance) {
-    gempba::multithreading::create_load_balancer(gempba::QUASI_HORIZONTAL);
+    gempba::create_load_balancer(gempba::QUASI_HORIZONTAL);
     ASSERT_NE(nullptr, gempba::get_load_balancer());
     gempba::reset_load_balancer();
     EXPECT_EQ(nullptr, gempba::get_load_balancer());
 }
 
-TEST_F(gempba_test, mt_create_node_manager) {
-    gempba::load_balancer* v_lb = gempba::multithreading::create_load_balancer(gempba::QUASI_HORIZONTAL);
-    gempba::node_manager& v_nm = gempba::multithreading::create_node_manager(v_lb);
+TEST_F(gempba_test, create_node_manager) {
+    gempba::load_balancer* v_lb = gempba::create_load_balancer(gempba::QUASI_HORIZONTAL);
+    gempba::node_manager& v_nm = gempba::create_node_manager(v_lb);
     EXPECT_EQ(&v_nm, &gempba::get_node_manager());
 }
 
-TEST_F(gempba_test, mt_create_node_manager_throws_if_already_exists) {
-    gempba::load_balancer* v_lb = gempba::multithreading::create_load_balancer(gempba::QUASI_HORIZONTAL);
-    gempba::multithreading::create_node_manager(v_lb);
-    EXPECT_THROW(gempba::multithreading::create_node_manager(v_lb), std::runtime_error);
+TEST_F(gempba_test, create_node_manager_throws_if_already_exists) {
+    gempba::load_balancer* v_lb = gempba::create_load_balancer(gempba::QUASI_HORIZONTAL);
+    gempba::create_node_manager(v_lb);
+    EXPECT_THROW(gempba::create_node_manager(v_lb), std::runtime_error);
 }
 
 TEST_F(gempba_test, get_node_manager_throws_when_not_instantiated) { EXPECT_THROW([[maybe_unused]] auto& v_ref = gempba::get_node_manager(), std::runtime_error); }
 
 TEST_F(gempba_test, reset_node_manager_clears_instance) {
-    gempba::load_balancer* v_lb = gempba::multithreading::create_load_balancer(gempba::QUASI_HORIZONTAL);
-    gempba::multithreading::create_node_manager(v_lb);
+    gempba::load_balancer* v_lb = gempba::create_load_balancer(gempba::QUASI_HORIZONTAL);
+    gempba::create_node_manager(v_lb);
     gempba::reset_node_manager();
     EXPECT_THROW([[maybe_unused]] auto& v_ref = gempba::get_node_manager(), std::runtime_error);
 }
 
 TEST_F(gempba_test, get_scheduler_throws_when_not_instantiated) { EXPECT_THROW([[maybe_unused]] auto* v_ptr = gempba::get_scheduler(), std::runtime_error); }
 
-TEST_F(gempba_test, mp_create_scheduler_custom_implementation) {
-    auto v_stub = std::make_unique<scheduler_stub>();
-    const scheduler_stub* v_raw = v_stub.get();
-    gempba::scheduler* v_sched = gempba::multiprocessing::create_scheduler(std::move(v_stub));
-    ASSERT_NE(nullptr, v_sched);
-    EXPECT_EQ(v_raw, v_sched);
-    EXPECT_EQ(v_sched, gempba::get_scheduler());
-}
-
-TEST_F(gempba_test, mp_unnamed_scheduler_is_described_to_telemetry_as_custom) {
-    gempba::multiprocessing::create_scheduler(std::make_unique<scheduler_stub>());
+TEST_F(gempba_test, unnamed_scheduler_is_described_to_telemetry_as_custom) {
+    install_stub();
     ASSERT_NE(nullptr, gempba::telemetry::get());
     EXPECT_EQ("custom", gempba::telemetry::get()->describe_run().m_scheduler);
 }
 
-TEST_F(gempba_test, mp_scheduler_roles_are_described_to_telemetry) {
-    gempba::multiprocessing::create_scheduler(std::make_unique<scheduler_stub>());
+TEST_F(gempba_test, scheduler_roles_are_described_to_telemetry) {
+    install_stub();
     ASSERT_NE(nullptr, gempba::telemetry::get());
     const std::vector<gempba::rank_role> v_expected{gempba::rank_role::WORKER};
     EXPECT_EQ(v_expected, gempba::telemetry::get()->describe_run().m_roles);
@@ -202,18 +177,18 @@ TEST_F(gempba_test, a_scheduler_that_names_no_coordinator_reports_every_rank_a_w
     EXPECT_EQ(gempba::rank_role::WORKER, v_stub.role_of(3));
 }
 
-TEST_F(gempba_test, mp_load_balancer_created_after_the_hub_is_described_to_telemetry) {
-    gempba::multiprocessing::create_scheduler(std::make_unique<scheduler_stub>());
+TEST_F(gempba_test, load_balancer_created_after_the_hub_is_described_to_telemetry) {
+    install_stub();
     ASSERT_NE(nullptr, gempba::telemetry::get());
     EXPECT_TRUE(gempba::telemetry::get()->describe_run().m_load_balancer.empty());
 
-    gempba::multiprocessing::create_load_balancer(gempba::QUASI_HORIZONTAL, nullptr);
+    gempba::create_load_balancer(gempba::QUASI_HORIZONTAL, nullptr);
     EXPECT_EQ("quasi_horizontal", gempba::telemetry::get()->describe_run().m_load_balancer);
 }
 
-TEST_F(gempba_test, mt_load_balancer_created_before_the_hub_is_described_to_telemetry) {
-    gempba::load_balancer* v_lb = gempba::multithreading::create_load_balancer(gempba::WORK_STEALING);
-    gempba::multithreading::create_node_manager(v_lb);
+TEST_F(gempba_test, load_balancer_created_before_the_hub_is_described_to_telemetry) {
+    gempba::load_balancer* v_lb = gempba::create_load_balancer(gempba::WORK_STEALING);
+    gempba::create_node_manager(v_lb);
     ASSERT_NE(nullptr, gempba::telemetry::get());
 
     const gempba::telemetry::run_description v_run = gempba::telemetry::get()->describe_run();
@@ -222,10 +197,10 @@ TEST_F(gempba_test, mt_load_balancer_created_before_the_hub_is_described_to_tele
     EXPECT_EQ(gempba::telemetry::runtime_mode::MT_ONLY, v_run.m_mode);
 }
 
-TEST_F(gempba_test, mt_threads_per_process_is_the_pool_size_the_worker_frames_report) {
-    gempba::load_balancer* v_lb = gempba::multithreading::create_load_balancer(gempba::QUASI_HORIZONTAL);
+TEST_F(gempba_test, threads_per_process_is_the_pool_size_the_worker_frames_report) {
+    gempba::load_balancer* v_lb = gempba::create_load_balancer(gempba::QUASI_HORIZONTAL);
     v_lb->set_thread_pool_size(3);
-    gempba::multithreading::create_node_manager(v_lb);
+    gempba::create_node_manager(v_lb);
     auto* v_hub = gempba::telemetry::get();
     ASSERT_NE(nullptr, v_hub);
     v_hub->set_interval_ms(0);
@@ -238,91 +213,44 @@ TEST_F(gempba_test, mt_threads_per_process_is_the_pool_size_the_worker_frames_re
 }
 
 TEST_F(gempba_test, threads_per_process_leaves_out_a_rank_its_scheduler_declares_a_coordinator) {
-    gempba::load_balancer* v_lb = gempba::multithreading::create_load_balancer(gempba::QUASI_HORIZONTAL);
+    gempba::load_balancer* v_lb = gempba::create_load_balancer(gempba::QUASI_HORIZONTAL);
     v_lb->set_thread_pool_size(3);
-    gempba::multithreading::create_node_manager(v_lb);
-    auto* v_hub = gempba::telemetry::get();
-    ASSERT_NE(nullptr, v_hub);
-    v_hub->set_interval_ms(0);
 
-    const auto v_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-    while (v_hub->describe_run().m_threads_per_process == 0 && std::chrono::steady_clock::now() < v_deadline) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-    ASSERT_EQ(3u, v_hub->describe_run().m_threads_per_process);
+    gempba::telemetry::telemetry_hub v_hub;
+    v_hub.describe_scheduler("custom", gempba::rank_role::COORDINATOR);
+    v_hub.on_runtime_ready(gempba::telemetry::runtime_mode::MT_ONLY, 0, 1, /*p_start_pump_thread=*/false);
+    v_hub.set_interval_ms(0);
+    v_hub.tick_if_due();
 
-    v_hub->describe_scheduler("custom", {gempba::rank_role::COORDINATOR});
-    EXPECT_EQ(0u, v_hub->describe_run().m_threads_per_process);
-}
-
-TEST_F(gempba_test, mp_create_scheduler_throws_if_already_exists) {
-    gempba::multiprocessing::create_scheduler(std::make_unique<scheduler_stub>());
-    EXPECT_THROW(gempba::multiprocessing::create_scheduler(std::make_unique<scheduler_stub>()), std::runtime_error);
+    const auto v_frame = v_hub.latest_rank_frame(0);
+    ASSERT_TRUE(v_frame.has_value());
+    EXPECT_EQ(4u, v_frame->m_process_threads);
+    EXPECT_EQ(0u, v_hub.describe_run().m_threads_per_process);
+    v_hub.shutdown();
 }
 
 TEST_F(gempba_test, reset_scheduler_clears_instance) {
-    gempba::multiprocessing::create_scheduler(std::make_unique<scheduler_stub>());
+    install_stub();
     ASSERT_NE(nullptr, gempba::get_scheduler());
     gempba::reset_scheduler();
     EXPECT_THROW([[maybe_unused]] auto* v_ptr = gempba::get_scheduler(), std::runtime_error);
 }
 
-TEST_F(gempba_test, mp_create_load_balancer_quasi_horizontal) {
-    gempba::load_balancer* v_lb = gempba::multiprocessing::create_load_balancer(gempba::QUASI_HORIZONTAL, nullptr);
-    ASSERT_NE(nullptr, v_lb);
-    EXPECT_EQ(gempba::QUASI_HORIZONTAL, v_lb->get_balancing_policy());
-}
-
-TEST_F(gempba_test, mp_create_load_balancer_work_stealing) {
-    gempba::load_balancer* v_lb = gempba::multiprocessing::create_load_balancer(gempba::WORK_STEALING, nullptr);
-    ASSERT_NE(nullptr, v_lb);
-    EXPECT_EQ(gempba::WORK_STEALING, v_lb->get_balancing_policy());
-}
-
-TEST_F(gempba_test, mp_create_load_balancer_throws_if_already_exists) {
-    gempba::multiprocessing::create_load_balancer(gempba::QUASI_HORIZONTAL, nullptr);
-    EXPECT_THROW(gempba::multiprocessing::create_load_balancer(gempba::WORK_STEALING, nullptr), std::runtime_error);
-}
-
-TEST_F(gempba_test, mp_create_load_balancer_custom_implementation) {
-    auto v_custom = std::make_unique<gempba::quasi_horizontal_load_balancer>();
-    const gempba::quasi_horizontal_load_balancer* v_raw = v_custom.get();
-    gempba::load_balancer* v_lb = gempba::create_load_balancer(std::move(v_custom));
-    EXPECT_EQ(v_raw, v_lb);
-}
-
-TEST_F(gempba_test, mp_create_node_manager) {
-    gempba::load_balancer* v_lb = gempba::multiprocessing::create_load_balancer(gempba::QUASI_HORIZONTAL, nullptr);
-    gempba::node_manager& v_nm = gempba::multiprocessing::create_node_manager(v_lb, nullptr);
-    EXPECT_EQ(&v_nm, &gempba::get_node_manager());
-}
-
-TEST_F(gempba_test, mp_create_node_manager_throws_if_already_exists) {
-    gempba::load_balancer* v_lb = gempba::multiprocessing::create_load_balancer(gempba::QUASI_HORIZONTAL, nullptr);
-    gempba::multiprocessing::create_node_manager(v_lb, nullptr);
-    EXPECT_THROW(gempba::multiprocessing::create_node_manager(v_lb, nullptr), std::runtime_error);
-}
-
-TEST_F(gempba_test, mp_get_default_mpi_stats_visitor_returns_non_null) {
-    auto v_visitor = gempba::multiprocessing::get_default_mpi_stats_visitor();
-    ASSERT_NE(nullptr, v_visitor);
-}
-
 TEST_F(gempba_test, telemetry_disable_before_create_scheduler_suppresses_auto_install) {
     gempba::telemetry::disable();
-    gempba::multiprocessing::create_scheduler(std::make_unique<scheduler_stub>());
+    install_stub();
     EXPECT_EQ(nullptr, gempba::telemetry::get());
 }
 
 TEST_F(gempba_test, telemetry_disable_before_create_node_manager_suppresses_auto_install) {
     gempba::telemetry::disable();
-    gempba::load_balancer* v_lb = gempba::multithreading::create_load_balancer(gempba::QUASI_HORIZONTAL);
-    gempba::multithreading::create_node_manager(v_lb);
+    gempba::load_balancer* v_lb = gempba::create_load_balancer(gempba::QUASI_HORIZONTAL);
+    gempba::create_node_manager(v_lb);
     EXPECT_EQ(nullptr, gempba::telemetry::get());
 }
 
 TEST_F(gempba_test, telemetry_disable_after_create_scheduler_tears_down_auto_installed_hub) {
-    gempba::multiprocessing::create_scheduler(std::make_unique<scheduler_stub>());
+    install_stub();
     ASSERT_NE(nullptr, gempba::telemetry::get());
 
     gempba::telemetry::disable();
@@ -330,9 +258,9 @@ TEST_F(gempba_test, telemetry_disable_after_create_scheduler_tears_down_auto_ins
 }
 
 TEST_F(gempba_test, shutdown_resets_all_singletons) {
-    gempba::load_balancer* v_lb = gempba::multithreading::create_load_balancer(gempba::QUASI_HORIZONTAL);
-    gempba::multithreading::create_node_manager(v_lb);
-    gempba::multiprocessing::create_scheduler(std::make_unique<scheduler_stub>());
+    gempba::load_balancer* v_lb = gempba::create_load_balancer(gempba::QUASI_HORIZONTAL);
+    gempba::create_node_manager(v_lb);
+    install_stub();
 
     const int v_ret = gempba::shutdown();
 
@@ -358,7 +286,7 @@ namespace {
     public:
         void run() override {}
         void delegate_locally(gempba::load_balancer*) override {}
-        void delegate_remotely(gempba::scheduler::worker*, int) override {}
+        void delegate_remotely(gempba::scheduler*, int) override {}
         void set_result(const gempba::task_packet&) override {}
         gempba::task_packet get_result() override { return gempba::task_packet::EMPTY; }
         gempba::task_packet serialize() override { return gempba::task_packet::EMPTY; }
@@ -432,6 +360,28 @@ TEST_F(gempba_test, create_dummy_node_propagates_balancer_exception) {
     EXPECT_THROW(gempba::create_dummy_node(v_lb), std::runtime_error);
 }
 
+TEST_F(gempba_test, shutdown_logs_how_a_run_without_a_scheduler_ended) {
+    gempba::telemetry::disable();
+    gempba::create_node_manager(gempba::create_load_balancer(gempba::QUASI_HORIZONTAL));
+    gempba::request_stop();
+    const log_capture v_log;
+
+    gempba::shutdown();
+
+    EXPECT_NE(std::string::npos, v_log.text().find("[warning] gempba: run interrupted by gempba::request_stop()")) << v_log.text();
+}
+
+TEST_F(gempba_test, shutdown_leaves_the_run_end_to_the_scheduler) {
+    gempba::telemetry::disable();
+    gempba::scheduler* v_scheduler = install_stub();
+    gempba::create_node_manager(gempba::create_load_balancer(gempba::QUASI_HORIZONTAL, v_scheduler), v_scheduler);
+    const log_capture v_log;
+
+    gempba::shutdown();
+
+    EXPECT_EQ(std::string::npos, v_log.text().find("gempba: run")) << v_log.text();
+}
+
 TEST_F(gempba_test, create_seed_node_constructs_a_node_with_no_parent) {
     gempba::work_stealing_load_balancer v_lb;
     std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node&) {};
@@ -439,65 +389,65 @@ TEST_F(gempba_test, create_seed_node_constructs_a_node_with_no_parent) {
     EXPECT_NE(nullptr, v_seed);
 }
 
-TEST_F(gempba_test, mt_create_explicit_node_builds_valid_node) {
+TEST_F(gempba_test, create_explicit_node_builds_valid_node) {
     gempba::work_stealing_load_balancer v_lb;
     gempba::node v_parent = gempba::create_dummy_node(v_lb);
     std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node&) {};
-    const gempba::node v_node = gempba::multithreading::create_explicit_node<void, int>(v_lb, v_parent, v_fn, std::make_tuple(7));
+    const gempba::node v_node = gempba::create_explicit_node<void, int>(v_lb, v_parent, v_fn, std::make_tuple(7));
     EXPECT_NE(nullptr, v_node);
 }
 
-TEST_F(gempba_test, mt_create_lazy_node_builds_valid_node) {
+TEST_F(gempba_test, create_lazy_node_builds_valid_node) {
     gempba::work_stealing_load_balancer v_lb;
     const gempba::node v_parent = gempba::create_dummy_node(v_lb);
     std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node&) {};
     std::function<std::optional<std::tuple<int>>()> v_init = [] { return std::make_optional(std::make_tuple(7)); };
-    const gempba::node v_node = gempba::multithreading::create_lazy_node<void, int>(v_lb, v_parent, v_fn, v_init);
+    const gempba::node v_node = gempba::create_lazy_node<void, int>(v_lb, v_parent, v_fn, v_init);
     EXPECT_NE(nullptr, v_node);
 }
 
-TEST_F(gempba_test, mp_create_explicit_node_builds_valid_node) {
+TEST_F(gempba_test, create_explicit_node_with_serializers_builds_valid_node) {
     gempba::work_stealing_load_balancer v_lb;
     const gempba::node v_parent = gempba::create_dummy_node(v_lb);
     std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node&) {};
     std::function<gempba::task_packet(int)> v_ser = [](int) { return gempba::task_packet::EMPTY; };
     std::function<std::tuple<int>(gempba::task_packet)> v_deser = [](const gempba::task_packet&) { return std::make_tuple(0); };
-    const gempba::node v_node = gempba::multiprocessing::create_explicit_node<void, int>(v_lb, v_parent, v_fn, std::make_tuple(7), v_ser, v_deser);
+    const gempba::node v_node = gempba::create_explicit_node<void, int>(v_lb, v_parent, v_fn, std::make_tuple(7), v_ser, v_deser);
     EXPECT_NE(nullptr, v_node);
 }
 
-TEST_F(gempba_test, mp_create_lazy_node_builds_valid_node) {
+TEST_F(gempba_test, create_lazy_node_with_serializers_builds_valid_node) {
     gempba::work_stealing_load_balancer v_lb;
     const gempba::node v_parent = gempba::create_dummy_node(v_lb);
     std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node&) {};
     std::function<std::optional<std::tuple<int>>()> v_init = [] { return std::make_optional(std::make_tuple(7)); };
     std::function<gempba::task_packet(int)> v_ser = [](int) { return gempba::task_packet::EMPTY; };
     std::function<std::tuple<int>(gempba::task_packet)> v_deser = [](const gempba::task_packet&) { return std::make_tuple(0); };
-    const gempba::node v_node = gempba::multiprocessing::create_lazy_node<void, int>(v_lb, v_parent, v_fn, v_init, v_ser, v_deser);
+    const gempba::node v_node = gempba::create_lazy_node<void, int>(v_lb, v_parent, v_fn, v_init, v_ser, v_deser);
     EXPECT_NE(nullptr, v_node);
 }
 
-TEST_F(gempba_test, mp_create_from_bytes_node_builds_valid_node) {
+TEST_F(gempba_test, create_from_bytes_node_builds_valid_node) {
     gempba::work_stealing_load_balancer v_lb;
     const gempba::node v_parent = gempba::create_dummy_node(v_lb);
     std::function<void(std::thread::id, int, gempba::node)> v_fn = [](std::thread::id, int, const gempba::node&) {};
     std::function<gempba::task_packet(int)> v_ser = [](int) { return gempba::task_packet::EMPTY; };
     std::function<std::tuple<int>(gempba::task_packet)> v_deser = [](const gempba::task_packet&) { return std::make_tuple(0); };
-    const gempba::node v_node = gempba::multiprocessing::create_from_bytes_node<void, int>(v_lb, v_parent, v_fn, v_ser, v_deser);
+    const gempba::node v_node = gempba::create_from_bytes_node<void, int>(v_lb, v_parent, v_fn, v_ser, v_deser);
     EXPECT_NE(nullptr, v_node);
 }
 
-TEST_F(gempba_test, mp_runnables_return_none_create_builds_serial_runnable) {
+TEST_F(gempba_test, runnables_return_none_create_builds_serial_runnable) {
     auto v_invokable = [](std::thread::id, int, const gempba::node&) {};
     const std::function<std::tuple<int>(const gempba::task_packet&&)> v_deser = [](const gempba::task_packet&&) { return std::make_tuple(0); };
-    const std::shared_ptr<gempba::serial_runnable> v_runnable = gempba::multiprocessing::runnables::return_none::create<int>(1, v_invokable, v_deser);
+    const std::shared_ptr<gempba::serial_runnable> v_runnable = gempba::runnables::return_none::create<int>(1, v_invokable, v_deser);
     EXPECT_NE(nullptr, v_runnable);
 }
 
-TEST_F(gempba_test, mp_runnables_return_value_create_builds_serial_runnable) {
+TEST_F(gempba_test, runnables_return_value_create_builds_serial_runnable) {
     auto v_invokable = [](std::thread::id, int, const gempba::node&) -> int { return 0; };
     const std::function<std::tuple<int>(const gempba::task_packet&&)> v_deser = [](const gempba::task_packet&&) { return std::make_tuple(0); };
     const std::function<gempba::task_packet(int)> v_result_ser = [](int) { return gempba::task_packet::EMPTY; };
-    const std::shared_ptr<gempba::serial_runnable> v_runnable = gempba::multiprocessing::runnables::return_value::create<int, int>(1, v_invokable, v_deser, v_result_ser);
+    const std::shared_ptr<gempba::serial_runnable> v_runnable = gempba::runnables::return_value::create<int, int>(1, v_invokable, v_deser, v_result_ser);
     EXPECT_NE(nullptr, v_runnable);
 }

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Uninstalls every installed gempba Homebrew flavor, and fails if one is still installed afterwards.
+# Uninstalls every installed gempba Homebrew formula, and fails if one is still installed afterwards.
 #
-# The flavors conflict with each other, so the Homebrew verify job runs this on its persistent macOS
-# runner before installing a flavor and again at cleanup.
+# The Homebrew verify job runs this on its persistent macOS runner before installing a formula and again at
+# cleanup, so each run starts from the tap's formulae alone.
 #
 # Usage:
 #   scripts/homebrew_uninstall_gempba.sh

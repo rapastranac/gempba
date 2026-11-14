@@ -46,25 +46,21 @@
 #include <gempba/stats/stats_visitor.hpp>
 #include <gempba/utils/result.hpp>
 #include <gempba/utils/score.hpp>
+#include <gempba/utils/task_bundle.hpp>
 #include <gempba/utils/task_packet.hpp>
 #include <gempba/utils/transmission_guard.hpp>
+#include <scheduler_mock.hpp>
 
 namespace gempba::cabi_tests {
 
     using ::testing::_;
     using ::testing::ByMove;
     using ::testing::Return;
-    using ::testing::ReturnRef;
     using ::testing::SizeIs;
 
     class cabi_scheduler_test : public cabi_fixture {};
 
     // ─── No-handle / null-arg guards ────────────────────────────────────────
-
-    TEST_F(cabi_scheduler_test, create_null_out_returns_invalid_arg) {
-        EXPECT_EQ(gempba_scheduler_create(GEMPBA_TOPOLOGY_CENTRALIZED, /*timeout=*/0.0, /*out=*/nullptr), GEMPBA_ERR_INVALID_ARG);
-        EXPECT_NE(gempba_last_error_message(), nullptr);
-    }
 
     TEST_F(cabi_scheduler_test, destroy_null_is_safe) {
         gempba_scheduler_destroy(nullptr);
@@ -81,29 +77,34 @@ namespace gempba::cabi_tests {
     //     the matching gempba::goal / gempba::score_type values
     //   - returns the right type-cast of the C++ result
 
-    class scheduler_mock : public gempba::scheduler {
-    public:
-        // scheduler_traits
-        MOCK_METHOD(void, barrier, (), (override));
-        MOCK_METHOD(int, rank_me, (), (const, override));
-        MOCK_METHOD(int, world_size, (), (const, override));
-        MOCK_METHOD(std::unique_ptr<gempba::stats>, get_stats, (), (const, override));
-
-        // scheduler
-        MOCK_METHOD(double, elapsed_time, (), (const, override));
-        MOCK_METHOD(std::size_t, get_pending_request_count, (), (const, override));
-        MOCK_METHOD(void, set_goal, (gempba::goal, gempba::score_type), (override));
-        MOCK_METHOD(void, set_custom_initial_topology, (tree&&), (override));
-        MOCK_METHOD(std::vector<std::unique_ptr<gempba::stats>>, get_stats_vector, (), (const, override));
-        MOCK_METHOD(void, synchronize_stats, (), (override));
-        MOCK_METHOD(gempba::scheduler::center&, center_view, (), (override));
-        MOCK_METHOD(gempba::scheduler::worker&, worker_view, (), (override));
-    };
+    using scheduler_mock = testing_support::scheduler_mock;
 
     /** Wraps a scheduler_mock in the C ABI handle shape so tests can call the C entry points. */
     static gempba_scheduler_t handle_for(scheduler_mock& p_mock, gempba_scheduler_s& p_storage) {
         p_storage.cpp = &p_mock;
         return reinterpret_cast<gempba_scheduler_t>(&p_storage);
+    }
+
+    /** A scheduler that records its destruction, standing in for the one the core's registry owns. */
+    class destruction_witness final : public scheduler_mock {
+    public:
+        explicit destruction_witness(bool& p_destroyed) : m_destroyed(p_destroyed) {}
+        ~destruction_witness() override { m_destroyed = true; }
+
+    private:
+        bool& m_destroyed;
+    };
+
+    TEST_F(cabi_scheduler_test, destroy_frees_the_handle_and_leaves_the_scheduler_to_shutdown) {
+        bool v_destroyed = false;
+        auto* v_scheduler = new destruction_witness(v_destroyed);
+
+        gempba_scheduler_destroy(new gempba_scheduler_s{v_scheduler});
+
+        EXPECT_FALSE(v_destroyed);
+        if (!v_destroyed) {
+            delete v_scheduler;
+        }
     }
 
     TEST_F(cabi_scheduler_test, barrier_dispatches_to_underlying_scheduler) {
@@ -294,80 +295,145 @@ namespace gempba::cabi_tests {
         EXPECT_EQ(v_collected[5].m_i, 1); // bool true → 1
     }
 
-    // ─── scheduler::center view + dispatch ──────────────────────────────────
+    // ─── run, is_root and the root's results ────────────────────────────────
 
-    class scheduler_center_mock : public gempba::scheduler::center {
-    public:
-        // scheduler_traits
-        MOCK_METHOD(void, barrier, (), (override));
-        MOCK_METHOD(int, rank_me, (), (const, override));
-        MOCK_METHOD(int, world_size, (), (const, override));
-        MOCK_METHOD(std::unique_ptr<gempba::stats>, get_stats, (), (const, override));
-        // center
-        MOCK_METHOD(void, run, (gempba::task_packet, int), (override));
-        MOCK_METHOD(gempba::task_packet, get_result, (), (override));
-        MOCK_METHOD(std::vector<gempba::result>, get_all_results, (), (override));
-    };
-
-    TEST_F(cabi_scheduler_test, center_view_returns_the_center_reference_as_handle) {
+    TEST_F(cabi_scheduler_test, is_root_is_true_on_rank_0_only) {
         scheduler_mock v_mock;
-        scheduler_center_mock v_center;
         gempba_scheduler_s v_s;
-        EXPECT_CALL(v_mock, center_view()).WillOnce(ReturnRef(v_center));
-        const auto v_c = gempba_scheduler_center_view(handle_for(v_mock, v_s));
-        EXPECT_EQ(v_c, reinterpret_cast<gempba_scheduler_center_t>(&v_center));
+        EXPECT_CALL(v_mock, rank_me()).WillOnce(Return(0)).WillOnce(Return(3));
+        EXPECT_EQ(gempba_scheduler_is_root(handle_for(v_mock, v_s)), 1);
+        EXPECT_EQ(gempba_scheduler_is_root(handle_for(v_mock, v_s)), 0);
     }
 
-    TEST_F(cabi_scheduler_test, center_barrier_dispatches_to_underlying_center) {
-        scheduler_center_mock v_center;
-        EXPECT_CALL(v_center, barrier()).Times(1);
-        gempba_scheduler_center_barrier(reinterpret_cast<gempba_scheduler_center_t>(&v_center));
+    TEST_F(cabi_scheduler_test, run_returns_invalid_arg_on_null_pointers) {
+        scheduler_mock v_mock;
+        gempba_scheduler_s v_s;
+        const auto v_handle = handle_for(v_mock, v_s);
+        char v_dummy_nm;
+        auto* const v_nm = reinterpret_cast<gempba_node_manager_t>(&v_dummy_nm);
+        const int32_t v_ids[] = {0};
+        gempba_serial_runnable_s v_r{};
+        const gempba_serial_runnable_t v_handles[] = {reinterpret_cast<gempba_serial_runnable_t>(&v_r)};
+
+        EXPECT_CALL(v_mock, do_run(_, _, _)).Times(0);
+        EXPECT_EQ(gempba_scheduler_run(nullptr, v_nm, v_ids, v_handles, 1, nullptr, 0, nullptr), GEMPBA_ERR_INVALID_ARG);
+        EXPECT_EQ(gempba_scheduler_run(v_handle, nullptr, v_ids, v_handles, 1, nullptr, 0, nullptr), GEMPBA_ERR_INVALID_ARG);
+        EXPECT_EQ(gempba_scheduler_run(v_handle, v_nm, nullptr, v_handles, 1, nullptr, 0, nullptr), GEMPBA_ERR_INVALID_ARG);
+        EXPECT_EQ(gempba_scheduler_run(v_handle, v_nm, v_ids, nullptr, 1, nullptr, 0, nullptr), GEMPBA_ERR_INVALID_ARG);
     }
 
-    TEST_F(cabi_scheduler_test, center_rank_me_returns_underlying_value) {
-        scheduler_center_mock v_center;
-        EXPECT_CALL(v_center, rank_me()).WillOnce(Return(0));
-        EXPECT_EQ(gempba_scheduler_center_rank_me(reinterpret_cast<gempba_scheduler_center_t>(&v_center)), 0);
+    TEST_F(cabi_scheduler_test, run_off_the_root_translates_id_runnable_arrays_to_map) {
+        scheduler_mock v_mock;
+        gempba_scheduler_s v_s;
+        char v_dummy_nm;
+        auto* const v_nm = reinterpret_cast<gempba_node_manager_t>(&v_dummy_nm);
+
+        // The cabi just copies the shared_ptr; nullptr inside is fine because the mock never dereferences the runnable.
+        gempba_serial_runnable_s v_r0{}, v_r1{};
+        const gempba_serial_runnable_t v_handles[] = {
+                reinterpret_cast<gempba_serial_runnable_t>(&v_r0),
+                reinterpret_cast<gempba_serial_runnable_t>(&v_r1),
+        };
+        const int32_t v_ids[] = {10, 20};
+
+        std::map<int, std::shared_ptr<gempba::serial_runnable>> v_captured;
+        std::optional<gempba::task_bundle> v_seed = gempba::task_bundle(gempba::task_packet::EMPTY, -1);
+        EXPECT_CALL(v_mock, rank_me()).WillRepeatedly(Return(2));
+        EXPECT_CALL(v_mock, do_run(_, SizeIs(2), _)).WillOnce(::testing::DoAll(::testing::SaveArg<1>(&v_captured), ::testing::SaveArg<2>(&v_seed), Return(gempba::run_outcome{})));
+
+        EXPECT_EQ(gempba_scheduler_run(handle_for(v_mock, v_s), v_nm, v_ids, v_handles, 2, nullptr, 0, nullptr), GEMPBA_OK);
+        EXPECT_TRUE(v_captured.count(10) == 1);
+        EXPECT_TRUE(v_captured.count(20) == 1);
+        EXPECT_FALSE(v_seed.has_value());
     }
 
-    TEST_F(cabi_scheduler_test, center_world_size_returns_underlying_value) {
-        scheduler_center_mock v_center;
-        EXPECT_CALL(v_center, world_size()).WillOnce(Return(8));
-        EXPECT_EQ(gempba_scheduler_center_world_size(reinterpret_cast<gempba_scheduler_center_t>(&v_center)), 8);
-    }
-
-    TEST_F(cabi_scheduler_test, center_run_forwards_packet_and_runnable_id) {
-        scheduler_center_mock v_center;
-        EXPECT_CALL(v_center, run(_, 5)).Times(1);
+    TEST_F(cabi_scheduler_test, run_hands_the_root_its_seed) {
+        scheduler_mock v_mock;
+        gempba_scheduler_s v_s;
+        char v_dummy_nm;
+        auto* const v_nm = reinterpret_cast<gempba_node_manager_t>(&v_dummy_nm);
+        const int32_t v_ids[] = {5};
+        gempba_serial_runnable_s v_r{};
+        const gempba_serial_runnable_t v_handles[] = {reinterpret_cast<gempba_serial_runnable_t>(&v_r)};
         const std::uint8_t v_buf[] = {0xAA, 0xBB};
-        EXPECT_EQ(gempba_scheduler_center_run(reinterpret_cast<gempba_scheduler_center_t>(&v_center), gempba_bytes_t{v_buf, sizeof(v_buf)}, 5), GEMPBA_OK);
+        const gempba_bytes_t v_seed_bytes{v_buf, sizeof(v_buf)};
+
+        std::optional<gempba::task_bundle> v_seed;
+        EXPECT_CALL(v_mock, rank_me()).WillRepeatedly(Return(0));
+        EXPECT_CALL(v_mock, do_run(_, _, _)).WillOnce(::testing::DoAll(::testing::SaveArg<2>(&v_seed), Return(gempba::run_outcome{})));
+
+        EXPECT_EQ(gempba_scheduler_run(handle_for(v_mock, v_s), v_nm, v_ids, v_handles, 1, &v_seed_bytes, 5, nullptr), GEMPBA_OK);
+        ASSERT_TRUE(v_seed.has_value());
+        EXPECT_EQ(v_seed->get_runnable_id(), 5);
+        ASSERT_EQ(v_seed->size(), 2u);
+        EXPECT_EQ(v_seed->get_task_packet().data()[0], std::byte{0xAA});
+        EXPECT_EQ(v_seed->get_task_packet().data()[1], std::byte{0xBB});
     }
 
-    TEST_F(cabi_scheduler_test, center_get_result_returns_invalid_arg_on_null_out) {
-        scheduler_center_mock v_center;
-        EXPECT_CALL(v_center, get_result()).Times(0);
-        EXPECT_EQ(gempba_scheduler_center_get_result(reinterpret_cast<gempba_scheduler_center_t>(&v_center), nullptr), GEMPBA_ERR_INVALID_ARG);
+    TEST_F(cabi_scheduler_test, run_reports_how_the_run_ended) {
+        scheduler_mock v_mock;
+        gempba_scheduler_s v_s;
+        char v_dummy_nm;
+        auto* const v_nm = reinterpret_cast<gempba_node_manager_t>(&v_dummy_nm);
+        const int32_t v_ids[] = {0};
+        gempba_serial_runnable_s v_r{};
+        const gempba_serial_runnable_t v_handles[] = {reinterpret_cast<gempba_serial_runnable_t>(&v_r)};
+
+        EXPECT_CALL(v_mock, rank_me()).WillRepeatedly(Return(1));
+        EXPECT_CALL(v_mock, do_run(_, _, _)).WillOnce(Return(gempba::run_outcome{gempba::end_reason::INTERRUPTED, gempba::stop_trigger::SIGNAL, 15}));
+        gempba_run_outcome_t v_outcome{};
+        EXPECT_EQ(gempba_scheduler_run(handle_for(v_mock, v_s), v_nm, v_ids, v_handles, 1, nullptr, 0, &v_outcome), GEMPBA_OK);
+
+        EXPECT_EQ(GEMPBA_END_INTERRUPTED, v_outcome.reason);
+        EXPECT_EQ(GEMPBA_STOP_SIGNAL, v_outcome.trigger);
+        EXPECT_EQ(15, v_outcome.signal);
     }
 
-    TEST_F(cabi_scheduler_test, center_get_result_yields_empty_buffer_when_packet_is_empty) {
-        scheduler_center_mock v_center;
-        EXPECT_CALL(v_center, get_result()).WillOnce(Return(ByMove(gempba::task_packet::EMPTY)));
+    TEST_F(cabi_scheduler_test, run_reports_a_root_without_a_seed_as_invalid_arg) {
+        scheduler_mock v_mock;
+        gempba_scheduler_s v_s;
+        char v_dummy_nm;
+        auto* const v_nm = reinterpret_cast<gempba_node_manager_t>(&v_dummy_nm);
+        const int32_t v_ids[] = {0};
+        gempba_serial_runnable_s v_r{};
+        const gempba_serial_runnable_t v_handles[] = {reinterpret_cast<gempba_serial_runnable_t>(&v_r)};
+
+        EXPECT_CALL(v_mock, rank_me()).WillRepeatedly(Return(0));
+        EXPECT_CALL(v_mock, do_run(_, _, _)).Times(0);
+        EXPECT_EQ(gempba_scheduler_run(handle_for(v_mock, v_s), v_nm, v_ids, v_handles, 1, nullptr, 0, nullptr), GEMPBA_ERR_INVALID_ARG);
+        EXPECT_NE(gempba_last_error_message(), nullptr);
+    }
+
+    TEST_F(cabi_scheduler_test, get_result_returns_invalid_arg_on_null_out) {
+        scheduler_mock v_mock;
+        gempba_scheduler_s v_s;
+        EXPECT_CALL(v_mock, do_get_result()).Times(0);
+        EXPECT_EQ(gempba_scheduler_get_result(handle_for(v_mock, v_s), nullptr), GEMPBA_ERR_INVALID_ARG);
+    }
+
+    TEST_F(cabi_scheduler_test, get_result_yields_empty_buffer_when_packet_is_empty) {
+        scheduler_mock v_mock;
+        gempba_scheduler_s v_s;
+        EXPECT_CALL(v_mock, rank_me()).WillRepeatedly(Return(0));
+        EXPECT_CALL(v_mock, do_get_result()).WillOnce(Return(ByMove(gempba::task_packet::EMPTY)));
         gempba_buffer_t v_out{nullptr, 99};
-        EXPECT_EQ(gempba_scheduler_center_get_result(reinterpret_cast<gempba_scheduler_center_t>(&v_center), &v_out), GEMPBA_OK);
+        EXPECT_EQ(gempba_scheduler_get_result(handle_for(v_mock, v_s), &v_out), GEMPBA_OK);
         EXPECT_EQ(v_out.data, nullptr);
         EXPECT_EQ(v_out.len, 0u);
     }
 
-    TEST_F(cabi_scheduler_test, center_get_result_copies_packet_bytes_into_owned_buffer) {
-        scheduler_center_mock v_center;
+    TEST_F(cabi_scheduler_test, get_result_copies_packet_bytes_into_owned_buffer) {
+        scheduler_mock v_mock;
+        gempba_scheduler_s v_s;
         gempba::task_packet v_pkt(3);
         v_pkt.data()[0] = std::byte{0xC0};
         v_pkt.data()[1] = std::byte{0xFF};
         v_pkt.data()[2] = std::byte{0xEE};
-        EXPECT_CALL(v_center, get_result()).WillOnce(Return(ByMove(std::move(v_pkt))));
+        EXPECT_CALL(v_mock, rank_me()).WillRepeatedly(Return(0));
+        EXPECT_CALL(v_mock, do_get_result()).WillOnce(Return(ByMove(std::move(v_pkt))));
 
         gempba_buffer_t v_out{nullptr, 0};
-        EXPECT_EQ(gempba_scheduler_center_get_result(reinterpret_cast<gempba_scheduler_center_t>(&v_center), &v_out), GEMPBA_OK);
+        EXPECT_EQ(gempba_scheduler_get_result(handle_for(v_mock, v_s), &v_out), GEMPBA_OK);
         ASSERT_NE(v_out.data, nullptr);
         ASSERT_EQ(v_out.len, 3u);
         EXPECT_EQ(v_out.data[0], 0xC0);
@@ -376,8 +442,19 @@ namespace gempba::cabi_tests {
         gempba_buffer_free(&v_out);
     }
 
-    TEST_F(cabi_scheduler_test, center_visit_all_results_drives_visitor_in_rank_order) {
-        scheduler_center_mock v_center;
+    TEST_F(cabi_scheduler_test, get_result_off_the_root_is_a_runtime_error) {
+        scheduler_mock v_mock;
+        gempba_scheduler_s v_s;
+        EXPECT_CALL(v_mock, rank_me()).WillRepeatedly(Return(1));
+        EXPECT_CALL(v_mock, do_get_result()).Times(0);
+        gempba_buffer_t v_out{nullptr, 0};
+        EXPECT_EQ(gempba_scheduler_get_result(handle_for(v_mock, v_s), &v_out), GEMPBA_ERR_RUNTIME);
+        EXPECT_NE(gempba_last_error_message(), nullptr);
+    }
+
+    TEST_F(cabi_scheduler_test, visit_all_results_drives_visitor_in_rank_order) {
+        scheduler_mock v_mock;
+        gempba_scheduler_s v_s;
 
         gempba::task_packet v_p0(1);
         v_p0.data()[0] = std::byte{0x11};
@@ -388,15 +465,16 @@ namespace gempba::cabi_tests {
         std::vector<gempba::result> v_results;
         v_results.emplace_back(gempba::score::make(int{1}), std::move(v_p0));
         v_results.emplace_back(gempba::score::make(int{2}), std::move(v_p1));
-        EXPECT_CALL(v_center, get_all_results()).WillOnce(Return(ByMove(std::move(v_results))));
+        EXPECT_CALL(v_mock, rank_me()).WillRepeatedly(Return(0));
+        EXPECT_CALL(v_mock, do_get_all_results()).WillOnce(Return(ByMove(std::move(v_results))));
 
         struct entry {
             std::size_t m_idx;
             std::vector<std::uint8_t> m_bytes;
         };
         std::vector<entry> v_collected;
-        gempba_scheduler_center_visit_all_results(
-                reinterpret_cast<gempba_scheduler_center_t>(&v_center),
+        gempba_scheduler_visit_all_results(
+                handle_for(v_mock, v_s),
                 [](void* p_ud, std::size_t p_idx, gempba_bytes_t p_bytes) {
                     auto* v_out = static_cast<std::vector<entry>*>(p_ud);
                     v_out->push_back({p_idx, std::vector<std::uint8_t>{p_bytes.data, p_bytes.data + p_bytes.len}});
@@ -413,93 +491,23 @@ namespace gempba::cabi_tests {
         EXPECT_EQ(v_collected[1].m_bytes[1], 0x33);
     }
 
-    TEST_F(cabi_scheduler_test, center_visit_all_results_null_visitor_is_safe) {
-        scheduler_center_mock v_center;
-        EXPECT_CALL(v_center, get_all_results()).Times(0);
-        gempba_scheduler_center_visit_all_results(reinterpret_cast<gempba_scheduler_center_t>(&v_center), nullptr, nullptr);
+    TEST_F(cabi_scheduler_test, visit_all_results_null_visitor_is_safe) {
+        scheduler_mock v_mock;
+        gempba_scheduler_s v_s;
+        EXPECT_CALL(v_mock, do_get_all_results()).Times(0);
+        gempba_scheduler_visit_all_results(handle_for(v_mock, v_s), nullptr, nullptr);
         SUCCEED();
     }
 
-    // ─── scheduler::worker view + dispatch ──────────────────────────────────
-
-    class scheduler_worker_mock : public gempba::scheduler::worker {
-    public:
-        // scheduler_traits
-        MOCK_METHOD(void, barrier, (), (override));
-        MOCK_METHOD(int, rank_me, (), (const, override));
-        MOCK_METHOD(int, world_size, (), (const, override));
-        MOCK_METHOD(std::unique_ptr<gempba::stats>, get_stats, (), (const, override));
-        // worker
-        MOCK_METHOD(void, run, (gempba::node_manager&, (std::map<int, std::shared_ptr<gempba::serial_runnable>>) ), (override));
-        MOCK_METHOD(unsigned int, force_push, (gempba::task_packet&&, int), (override));
-        MOCK_METHOD(unsigned int, next_process, (), (const, override));
-        MOCK_METHOD((std::optional<gempba::transmission_guard>), try_open_transmission_channel, (), (override));
-    };
-
-    TEST_F(cabi_scheduler_test, worker_view_returns_the_worker_reference_as_handle) {
+    TEST_F(cabi_scheduler_test, visit_all_results_off_the_root_visits_nothing) {
         scheduler_mock v_mock;
-        scheduler_worker_mock v_worker;
         gempba_scheduler_s v_s;
-        EXPECT_CALL(v_mock, worker_view()).WillOnce(ReturnRef(v_worker));
-        const auto v_w = gempba_scheduler_worker_view(handle_for(v_mock, v_s));
-        EXPECT_EQ(v_w, reinterpret_cast<gempba_scheduler_worker_t>(&v_worker));
-    }
-
-    TEST_F(cabi_scheduler_test, worker_barrier_dispatches_to_underlying_worker) {
-        scheduler_worker_mock v_worker;
-        EXPECT_CALL(v_worker, barrier()).Times(1);
-        gempba_scheduler_worker_barrier(reinterpret_cast<gempba_scheduler_worker_t>(&v_worker));
-    }
-
-    TEST_F(cabi_scheduler_test, worker_rank_me_returns_underlying_value) {
-        scheduler_worker_mock v_worker;
-        EXPECT_CALL(v_worker, rank_me()).WillOnce(Return(3));
-        EXPECT_EQ(gempba_scheduler_worker_rank_me(reinterpret_cast<gempba_scheduler_worker_t>(&v_worker)), 3);
-    }
-
-    TEST_F(cabi_scheduler_test, worker_world_size_returns_underlying_value) {
-        scheduler_worker_mock v_worker;
-        EXPECT_CALL(v_worker, world_size()).WillOnce(Return(8));
-        EXPECT_EQ(gempba_scheduler_worker_world_size(reinterpret_cast<gempba_scheduler_worker_t>(&v_worker)), 8);
-    }
-
-    TEST_F(cabi_scheduler_test, worker_run_returns_invalid_arg_on_null_pointers) {
-        scheduler_worker_mock v_worker;
-        auto* const v_w = reinterpret_cast<gempba_scheduler_worker_t>(&v_worker);
-        char v_dummy_nm;
-        auto* const v_nm = reinterpret_cast<gempba_node_manager_t>(&v_dummy_nm);
-        const int32_t v_ids[] = {0};
-        gempba_serial_runnable_s v_r{};
-        const gempba_serial_runnable_t v_handles[] = {reinterpret_cast<gempba_serial_runnable_t>(&v_r)};
-
-        EXPECT_CALL(v_worker, run(_, _)).Times(0);
-        EXPECT_EQ(gempba_scheduler_worker_run(nullptr, v_nm, v_ids, v_handles, 1), GEMPBA_ERR_INVALID_ARG);
-        EXPECT_EQ(gempba_scheduler_worker_run(v_w, nullptr, v_ids, v_handles, 1), GEMPBA_ERR_INVALID_ARG);
-        EXPECT_EQ(gempba_scheduler_worker_run(v_w, v_nm, nullptr, v_handles, 1), GEMPBA_ERR_INVALID_ARG);
-        EXPECT_EQ(gempba_scheduler_worker_run(v_w, v_nm, v_ids, nullptr, 1), GEMPBA_ERR_INVALID_ARG);
-    }
-
-    TEST_F(cabi_scheduler_test, worker_run_translates_id_runnable_arrays_to_map) {
-        scheduler_worker_mock v_worker;
-        auto* const v_w = reinterpret_cast<gempba_scheduler_worker_t>(&v_worker);
-        char v_dummy_nm;
-        auto* const v_nm = reinterpret_cast<gempba_node_manager_t>(&v_dummy_nm);
-
-        // The cabi just copies the shared_ptr; nullptr inside is fine because the
-        // worker mock never dereferences the runnable.
-        gempba_serial_runnable_s v_r0{}, v_r1{};
-        const gempba_serial_runnable_t v_handles[] = {
-                reinterpret_cast<gempba_serial_runnable_t>(&v_r0),
-                reinterpret_cast<gempba_serial_runnable_t>(&v_r1),
-        };
-        const int32_t v_ids[] = {10, 20};
-
-        std::map<int, std::shared_ptr<gempba::serial_runnable>> v_captured;
-        EXPECT_CALL(v_worker, run(_, SizeIs(2))).WillOnce(::testing::DoAll(::testing::SaveArg<1>(&v_captured)));
-
-        EXPECT_EQ(gempba_scheduler_worker_run(v_w, v_nm, v_ids, v_handles, 2), GEMPBA_OK);
-        EXPECT_TRUE(v_captured.count(10) == 1);
-        EXPECT_TRUE(v_captured.count(20) == 1);
+        EXPECT_CALL(v_mock, rank_me()).WillRepeatedly(Return(1));
+        EXPECT_CALL(v_mock, do_get_all_results()).Times(0);
+        int v_visits = 0;
+        gempba_scheduler_visit_all_results(handle_for(v_mock, v_s), [](void* p_ud, std::size_t, gempba_bytes_t) { ++*static_cast<int*>(p_ud); }, &v_visits);
+        EXPECT_EQ(v_visits, 0);
+        EXPECT_NE(gempba_last_error_message(), nullptr);
     }
 
 } // namespace gempba::cabi_tests

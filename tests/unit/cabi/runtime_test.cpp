@@ -39,7 +39,7 @@ namespace gempba::cabi_tests {
     }
 
     TEST_F(cabi_runtime_test, invalid_arg_sets_last_error) {
-        gempba_load_balancer_t v_lb = gempba_mt_create_load_balancer(GEMPBA_BALANCING_QUASI_HORIZONTAL);
+        gempba_load_balancer_t v_lb = gempba_create_load_balancer(GEMPBA_BALANCING_QUASI_HORIZONTAL, /*scheduler=*/nullptr);
         ASSERT_NE(v_lb, nullptr);
 
         gempba_status_t v_st = gempba_create_dummy_node(v_lb, /*out=*/nullptr);

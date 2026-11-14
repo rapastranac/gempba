@@ -1,5 +1,5 @@
 name: Resolve gempba-examples ref
-description: Pick the gempba-examples branch matching the current ref, falling back to main.
+description: Pick the gempba-examples branch matching the current ref, else the pull request's base branch, else main.
 
 inputs:
   examples-owner:
@@ -12,7 +12,7 @@ inputs:
 
 outputs:
   ref:
-    description: Resolved branch — the current branch if it exists in gempba-examples, else main.
+    description: Resolved branch — the current branch if it exists in gempba-examples, else the pull request's base branch if it does, else main.
     value: ${{ steps.resolve.outputs.ref }}
 
 runs:
@@ -29,22 +29,27 @@ runs:
         else
           EX_URL="https://github.com/${EXAMPLES_OWNER}/gempba-examples.git"
         fi
-        BRANCH="${{ github.head_ref || github.ref_name }}"
         # actions/checkout@v6 writes its GITHUB_TOKEN auth header to a config file
         # --unset-all can't reach, shadowing the URL-embedded token; -c clears it
         # for this command only.
-        set +e
-        LS_OUTPUT=$(git -c http."https://github.com/".extraheader= -c credential.helper= ls-remote --exit-code --heads "$EX_URL" "$BRANCH" 2>&1)
-        LS_EXIT=$?
-        set -e
-        if [ "$LS_EXIT" = "0" ]; then
-          echo "ref=$BRANCH" >> "$GITHUB_OUTPUT"
-          echo "Picked sister branch '$BRANCH' from ${EXAMPLES_OWNER}/gempba-examples"
-        elif [ "$LS_EXIT" = "2" ]; then
-          echo "ref=main" >> "$GITHUB_OUTPUT"
-          echo "Sister branch '$BRANCH' not present in ${EXAMPLES_OWNER}/gempba-examples; falling back to main"
-        else
-          echo "::error::ls-remote against ${EXAMPLES_OWNER}/gempba-examples failed (exit $LS_EXIT)"
-          echo "$LS_OUTPUT"
-          exit "$LS_EXIT"
-        fi
+        for BRANCH in "${{ github.head_ref || github.ref_name }}" "${{ github.base_ref }}"; do
+          if [ -z "$BRANCH" ]; then
+            continue
+          fi
+          set +e
+          LS_OUTPUT=$(git -c http."https://github.com/".extraheader= -c credential.helper= ls-remote --exit-code --heads "$EX_URL" "$BRANCH" 2>&1)
+          LS_EXIT=$?
+          set -e
+          if [ "$LS_EXIT" = "0" ]; then
+            echo "ref=$BRANCH" >> "$GITHUB_OUTPUT"
+            echo "Picked sister branch '$BRANCH' from ${EXAMPLES_OWNER}/gempba-examples"
+            exit 0
+          elif [ "$LS_EXIT" != "2" ]; then
+            echo "::error::ls-remote against ${EXAMPLES_OWNER}/gempba-examples failed (exit $LS_EXIT)"
+            echo "$LS_OUTPUT"
+            exit "$LS_EXIT"
+          fi
+          echo "Sister branch '$BRANCH' not present in ${EXAMPLES_OWNER}/gempba-examples"
+        done
+        echo "ref=main" >> "$GITHUB_OUTPUT"
+        echo "Falling back to main"

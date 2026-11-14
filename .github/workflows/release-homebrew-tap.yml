@@ -23,8 +23,8 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to publish (e.g. v3.0.0)"
-        required: true
+        description: "Tag to publish (e.g. v3.0.0); leave empty to only verify this branch's formulas"
+        required: false
         type: string
 
 permissions:
@@ -36,8 +36,10 @@ jobs:
     timeout-minutes: 5
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
+      publish: ${{ steps.tag.outputs.publish }}
     env:
       PUBLIC_REPO: ${{ vars.GEMPBA_PUBLIC_REPO || github.repository }}
+      TAP_REPO: ${{ vars.HOMEBREW_TAP_REPO || format('{0}/homebrew-gempba', github.repository_owner) }}
 
     steps:
       - name: Checkout gempba
@@ -48,15 +50,22 @@ jobs:
       - name: Resolve tag
         id: tag
         run: |
+          VER=$(grep -m1 'project(gempba VERSION' CMakeLists.txt | grep -oP '\d+\.\d+\.\d+')
+          PUBLISH=false
           case "${{ github.event_name }}" in
             workflow_dispatch)
               TAG="${{ inputs.tag }}"
+              if [ -n "$TAG" ]; then
+                PUBLISH=true
+              else
+                TAG="v${VER}-run${{ github.run_number }}"
+              fi
               ;;
             push)
               TAG="${GITHUB_REF_NAME}"
+              PUBLISH=true
               ;;
             pull_request)
-              VER=$(grep -m1 'project(gempba VERSION' CMakeLists.txt | grep -oP '\d+\.\d+\.\d+')
               TAG="v${VER}-pr${{ github.event.pull_request.number }}"
               ;;
             *)
@@ -65,14 +74,15 @@ jobs:
               ;;
           esac
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "Resolved tag: ${TAG}"
+          echo "publish=${PUBLISH}" >> "$GITHUB_OUTPUT"
+          echo "Resolved tag: ${TAG}, publish: ${PUBLISH}"
 
       # api.github.com tarball endpoint, not github.com/.../archive: the latter
       # ignores Authorization and 404s on private repos. Honours GITHUB_TOKEN
       # (and HOMEBREW_GITHUB_API_TOKEN consumer-side).
       - name: Compute tarball sha256
         id: sha
-        if: github.event_name != 'pull_request'
+        if: steps.tag.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ secrets.GEMPBA_CROSS_REPO_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
@@ -96,9 +106,11 @@ jobs:
           for name in gempba gempba-mpi; do
             cp "packaging/homebrew/${name}.rb.in" "out/Formula/${name}.rb"
             sed -i "s|__OWNER_REPO__|${PUBLIC_REPO}|g" "out/Formula/${name}.rb"
+            # gempba-mpi names the tap it depends on gempba from, so another tap with a gempba formula can't make it ambiguous.
+            sed -i "s|__TAP__|${TAP_REPO/\/homebrew-//}|g" "out/Formula/${name}.rb"
           done
 
-          if [ "${{ github.event_name }}" != "pull_request" ]; then
+          if [ "${{ steps.tag.outputs.publish }}" = "true" ]; then
             URL='${{ steps.sha.outputs.url }}'
             SHA='${{ steps.sha.outputs.sha }}'
             VERSION='${{ steps.sha.outputs.version }}'
@@ -125,7 +137,7 @@ jobs:
 
   verify-macos:
     needs: render
-    runs-on: ${{ fromJSON(vars.RUNNER_MACOS_INTEL || '["macos-26-intel"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_MACOS_ARM64 || '["macos-26"]') }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -172,10 +184,12 @@ jobs:
           SRC="$RUNNER_TEMP/gempba-src.tar.gz"
           git archive --format=tar.gz --prefix=gempba/ -o "$SRC" HEAD
           SHA=$(shasum -a 256 "$SRC" | awk '{print $1}')
-          f="out/Formula/${FLAVOR}.rb"
-          sed -i '' -E "s|^([[:space:]]*url[[:space:]]+\")https://api\.github\.com/repos/.*(\")|\1file://${SRC}\2|" "$f"
-          # Range exclusion skips the resource blocks so only the package sha is rewritten.
-          sed -i '' -E "/^[[:space:]]*resource /,/^[[:space:]]*end$/!s|^([[:space:]]*sha256[[:space:]]+\")[0-9a-fA-F]{64}(\")|\1${SHA}\2|" "$f"
+          # Both formulas point at it: gempba-mpi depends on gempba.
+          for f in out/Formula/*.rb; do
+            sed -i '' -E "s|^([[:space:]]*url[[:space:]]+\")https://api\.github\.com/repos/.*(\")|\1file://${SRC}\2|" "$f"
+            # Range exclusion skips the resource blocks so only the package sha is rewritten.
+            sed -i '' -E "/^[[:space:]]*resource /,/^[[:space:]]*end$/!s|^([[:space:]]*sha256[[:space:]]+\")[0-9a-fA-F]{64}(\")|\1${SHA}\2|" "$f"
+          done
 
           # Persistent runner: hard-reset the tap namespace so a leftover tap
           # dir from an interrupted run cannot collide.
@@ -184,7 +198,10 @@ jobs:
           brew tap-new gempba/citest --no-git
           TAP="$(brew --repository)/Library/Taps/gempba/homebrew-citest/Formula"
           mkdir -p "$TAP"
-          cp "out/Formula/${FLAVOR}.rb" "$TAP"/
+          cp out/Formula/*.rb "$TAP"/
+          # gempba-mpi depends on gempba from the tap it publishes to; here that's this test tap.
+          sed -i '' -E 's|^([[:space:]]*depends_on[[:space:]]+")[^"/]+/[^"/]+/gempba"|\1gempba/citest/gempba"|' "$TAP"/gempba-mpi.rb
+          brew trust gempba/citest
 
           brew install --build-from-source "gempba/citest/${FLAVOR}"
           brew test                        "gempba/citest/${FLAVOR}"
@@ -197,7 +214,7 @@ jobs:
 
   publish:
     needs: [ render, verify-macos ]
-    if: github.event_name != 'pull_request'
+    if: needs.render.outputs.publish == 'true'
     runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
     timeout-minutes: 5
     env:

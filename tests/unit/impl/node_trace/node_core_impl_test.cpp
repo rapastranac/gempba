@@ -45,6 +45,7 @@
 #include <gempba/stats/stats.hpp>
 #include <gempba/utils/transmission_guard.hpp>
 #include <impl/nodes/node_factory.hpp>
+#include <scheduler_mock.hpp>
 
 
 /**
@@ -987,18 +988,6 @@ TEST_F(node_core_impl_test, get_siblings) {
     ASSERT_EQ(nullptr, v_child5.get_right_sibling());
 }
 
-class scheduler_worker_mock final : public gempba::scheduler::worker {
-public:
-    MOCK_METHOD(void, barrier, (), (override));
-    MOCK_METHOD(int, rank_me, (), (const, override));
-    MOCK_METHOD(int, world_size, (), (const, override));
-    MOCK_METHOD(void, run, (gempba::node_manager & p_node_manager, (std::map<int, std::shared_ptr<gempba::serial_runnable>> p_runnables)), (override));
-    MOCK_METHOD(unsigned int, force_push, (gempba::task_packet && p_task, int p_function_id), (override));
-    MOCK_METHOD(std::optional<gempba::transmission_guard>, try_open_transmission_channel, (), (override));
-    MOCK_METHOD(std::unique_ptr<gempba::stats>, get_stats, (), (const, override));
-    MOCK_METHOD(unsigned int, next_process, (), (const, override));
-};
-
 namespace {
     using v_void_fn = std::function<void(std::thread::id, int, gempba::node)>;
     using v_lazy_init = std::function<std::optional<std::tuple<int>>()>;
@@ -1019,7 +1008,8 @@ namespace {
 } // namespace
 
 TEST_F(node_core_impl_test, run_throws_on_each_consumed_state) {
-    gempba::node_state v_consumed_states[] = {gempba::FORWARDED, gempba::PUSHED, gempba::DISCARDED, gempba::RETRIEVED, gempba::SENT_TO_ANOTHER_PROCESS, static_cast<gempba::node_state>(99)};
+    gempba::node_state v_consumed_states[] = {
+            gempba::FORWARDED, gempba::PUSHED, gempba::DISCARDED, gempba::RETRIEVED, gempba::SENT_TO_ANOTHER_PROCESS, gempba::RUNNING, static_cast<gempba::node_state>(99)};
     for (const auto v_state: v_consumed_states) {
         auto v_dummy = gempba::node();
         v_void_fn v_fn = make_noop_fn();
@@ -1027,6 +1017,20 @@ TEST_F(node_core_impl_test, run_throws_on_each_consumed_state) {
         v_node.set_state(v_state);
         EXPECT_THROW(v_node.run(), std::runtime_error);
     }
+}
+
+TEST_F(node_core_impl_test, run_marks_the_node_running_while_its_runnable_executes) {
+    std::optional<gempba::node_state> v_state_inside;
+    v_void_fn v_fn = [&v_state_inside](std::thread::id, int, const gempba::node& p_self) { v_state_inside = p_self.get_state(); };
+    auto v_dummy = gempba::node();
+    auto v_node = gempba::node_factory::create_explicit_node<void>(m_balancer_mock, v_dummy, v_fn, std::make_tuple(0));
+
+    ASSERT_EQ(gempba::UNUSED, v_node.get_state());
+    v_node.run();
+
+    ASSERT_TRUE(v_state_inside.has_value());
+    EXPECT_EQ(gempba::RUNNING, v_state_inside.value());
+    EXPECT_EQ(gempba::FORWARDED, v_node.get_state());
 }
 
 TEST_F(node_core_impl_test, run_throws_when_lazy_initializer_returns_nullopt) {
@@ -1079,7 +1083,7 @@ TEST_F(node_core_impl_test, delegate_locally_initializes_lazy_arguments_on_succe
 }
 
 TEST_F(node_core_impl_test, delegate_remotely_throws_when_already_consumed) {
-    scheduler_worker_mock v_worker;
+    gempba::testing_support::scheduler_mock v_worker;
     auto v_dummy = gempba::node();
     v_void_fn v_fn = make_noop_fn();
     v_int_serializer v_ser = make_empty_serializer();
@@ -1090,7 +1094,7 @@ TEST_F(node_core_impl_test, delegate_remotely_throws_when_already_consumed) {
 }
 
 TEST_F(node_core_impl_test, delegate_remotely_throws_when_uninitialized) {
-    scheduler_worker_mock v_worker;
+    gempba::testing_support::scheduler_mock v_worker;
     auto v_dummy = gempba::node();
     v_void_fn v_fn = make_noop_fn();
     v_int_serializer v_ser = make_empty_serializer();
@@ -1100,7 +1104,7 @@ TEST_F(node_core_impl_test, delegate_remotely_throws_when_uninitialized) {
 }
 
 TEST_F(node_core_impl_test, delegate_remotely_throws_when_lazy_initializer_returns_nullopt) {
-    scheduler_worker_mock v_worker;
+    gempba::testing_support::scheduler_mock v_worker;
     auto v_dummy = gempba::node();
     v_void_fn v_fn = make_noop_fn();
     v_int_serializer v_ser = make_empty_serializer();
@@ -1111,7 +1115,7 @@ TEST_F(node_core_impl_test, delegate_remotely_throws_when_lazy_initializer_retur
 }
 
 TEST_F(node_core_impl_test, delegate_remotely_initializes_lazy_arguments_on_success) {
-    scheduler_worker_mock v_worker;
+    gempba::testing_support::scheduler_mock v_worker;
     EXPECT_CALL(v_worker, force_push(testing::_, testing::_)).WillOnce([](gempba::task_packet&&, int) { return 0u; });
 
     auto v_dummy = gempba::node();
@@ -1341,7 +1345,7 @@ TEST_F(node_core_impl_test, int_specialization_delegate_locally_pushes_to_pool) 
 }
 
 TEST_F(node_core_impl_test, int_specialization_delegate_remotely_serialises_and_pushes) {
-    scheduler_worker_mock v_worker;
+    gempba::testing_support::scheduler_mock v_worker;
     EXPECT_CALL(v_worker, force_push(testing::_, testing::_)).WillOnce([](gempba::task_packet&&, int) { return 7u; });
 
     auto v_dummy = gempba::node();

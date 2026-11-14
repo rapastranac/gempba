@@ -2,19 +2,21 @@
 #define GEMPBA_TESTS_INTEGRATION_LEAF_COUNT_HPP
 
 #include <gempba/gempba.hpp>
+#include <gempba/mpi.hpp>
 
 #include <atomic>
 #include <cstring>
 #include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string_view>
 #include <thread>
 #include <tuple>
 
 /**
- * Counts the leaves of a full binary tree across all ranks with many tiny tasks. Each leaf's score is its
- * rank-local visit index, so the best score keeps improving and the center keeps broadcasting score updates
+ * Counts the leaves of a full binary tree across all ranks with many tiny tasks. Each leaf's score and result are
+ * its rank-local visit index, so the best score keeps improving and the center keeps broadcasting score updates
  * until the search ends.
  */
 namespace leaf_count {
@@ -41,8 +43,8 @@ namespace leaf_count {
     private:
         void explore(const int p_depth, const int p_max_depth, const gempba::node& p_parent) {
             if (p_depth == p_max_depth) {
-                const long long v_leaf_index = m_leaves.fetch_add(1, std::memory_order_relaxed);
-                m_node_manager.try_update_score_and_invalidate_result(gempba::score::make(static_cast<int>(v_leaf_index)));
+                int v_leaf_index = static_cast<int>(m_leaves.fetch_add(1, std::memory_order_relaxed));
+                m_node_manager.try_update_result(v_leaf_index, gempba::score::make(v_leaf_index), m_result_serializer);
                 return;
             }
             gempba::node v_parent = p_parent == nullptr ? gempba::create_dummy_node(m_load_balancer) : p_parent;
@@ -61,35 +63,51 @@ namespace leaf_count {
         };
         std::function<gempba::task_packet(int, int)> m_serializer = serialize;
         std::function<std::tuple<int, int>(gempba::task_packet)> m_deserializer = [](const gempba::task_packet& p_packet) { return deserialize(p_packet); };
+        std::function<gempba::task_packet(int&)> m_result_serializer = [](const int& p_leaf_index) {
+            return gempba::task_packet{reinterpret_cast<const char*>(&p_leaf_index), sizeof(p_leaf_index)};
+        };
     };
 
-    inline gempba::scheduler_topology parse_topology(const std::string_view p_name) {
-        return p_name == "centralized" ? gempba::scheduler_topology::CENTRALIZED : gempba::scheduler_topology::SEMI_CENTRALIZED;
+    inline std::optional<int> deserialize_leaf_index(const gempba::task_packet& p_packet) {
+        if (p_packet.size() != sizeof(int)) {
+            return std::nullopt;
+        }
+        int v_leaf_index;
+        std::memcpy(&v_leaf_index, p_packet.data(), sizeof(v_leaf_index));
+        return v_leaf_index;
+    }
+
+    inline gempba::mpi::scheduler_topology parse_topology(const std::string_view p_name) {
+        return p_name == "centralized" ? gempba::mpi::scheduler_topology::CENTRALIZED : gempba::mpi::scheduler_topology::SEMI_CENTRALIZED;
     }
 
     /**
-     * Creates the load balancer and node manager for @p p_scheduler and counts the leaves of a tree of depth @p p_max_depth
-     * from the center with two threads per worker. Returns once this rank's run ends; keep the counter until shutdown.
+     * Creates the load balancer and node manager for @p p_scheduler and counts the leaves of a tree of depth @p p_max_depth,
+     * seeded from the root, with two threads per rank that runs tasks. Returns once this rank's run ends, with how it ended in
+     * @p p_outcome when given; keep the counter until shutdown.
      */
-    inline std::unique_ptr<leaf_counter> run(gempba::scheduler& p_scheduler, const int p_max_depth) {
-        const int v_rank = p_scheduler.rank_me();
-        gempba::scheduler::worker* v_worker = v_rank == 0 ? nullptr : &p_scheduler.worker_view();
-        gempba::load_balancer* v_load_balancer = gempba::create_load_balancer(gempba::balancing_policy::QUASI_HORIZONTAL, v_worker);
-        gempba::node_manager& v_node_manager = gempba::create_node_manager(v_load_balancer, v_worker);
+    inline std::unique_ptr<leaf_counter> run(gempba::scheduler& p_scheduler, const int p_max_depth, gempba::run_outcome* p_outcome = nullptr) {
+        gempba::load_balancer* v_load_balancer = gempba::create_load_balancer(gempba::balancing_policy::QUASI_HORIZONTAL, &p_scheduler);
+        gempba::node_manager& v_node_manager = gempba::create_node_manager(v_load_balancer, &p_scheduler);
         v_node_manager.set_goal(gempba::MAXIMISE, gempba::score_type::I32);
         p_scheduler.set_goal(gempba::MAXIMISE, gempba::score_type::I32);
         v_node_manager.set_score(gempba::score::make(0));
         auto v_counter = std::make_unique<leaf_counter>(*v_load_balancer, v_node_manager);
         p_scheduler.barrier();
 
-        if (v_rank == 0) {
-            p_scheduler.center_view().run(serialize(0, p_max_depth), 0);
-        } else {
+        if (!p_scheduler.is_root()) {
             v_node_manager.set_thread_pool_size(2);
-            const std::function<std::tuple<int, int>(const gempba::task_packet&&)> v_deserializer = [](const gempba::task_packet&& p_packet) { return deserialize(p_packet); };
-            const auto v_runnable = gempba::runnables::return_none::create(0, v_counter->function(), v_deserializer);
-            const std::map<int, std::shared_ptr<gempba::serial_runnable>> v_runnables{{v_runnable->get_id(), v_runnable}};
-            p_scheduler.worker_view().run(v_node_manager, v_runnables);
+        }
+        const std::function<std::tuple<int, int>(const gempba::task_packet&&)> v_deserializer = [](const gempba::task_packet&& p_packet) { return deserialize(p_packet); };
+        const auto v_runnable = gempba::runnables::return_none::create(0, v_counter->function(), v_deserializer);
+        const std::map<int, std::shared_ptr<gempba::serial_runnable>> v_runnables{{v_runnable->get_id(), v_runnable}};
+        std::optional<gempba::task_bundle> v_seed;
+        if (p_scheduler.is_root()) {
+            v_seed.emplace(serialize(0, p_max_depth), 0);
+        }
+        const gempba::run_outcome v_outcome = p_scheduler.run(v_node_manager, v_runnables, std::move(v_seed));
+        if (p_outcome != nullptr) {
+            *p_outcome = v_outcome;
         }
         return v_counter;
     }

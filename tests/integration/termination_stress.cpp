@@ -27,6 +27,7 @@
 #include <gempba/gempba.hpp>
 #include <mpi.h>
 
+#include <algorithm>
 #include <iostream>
 #include <numeric>
 #include <string>
@@ -35,7 +36,8 @@
 
 /**
  * Runs the leaf count with many tiny tasks, so that termination races the hand-offs. A premature termination
- * loses subtrees (wrong count), aborts on a stray message, or hangs.
+ * loses subtrees (wrong count), aborts on a stray message, or hangs. A lost score proposal leaves rank 0 without
+ * the best result: the highest visit index any rank reached.
  *
  * Usage: termination_stress <depth> <semi_centralized|centralized>
  */
@@ -48,9 +50,10 @@ int main(const int p_argc, char* p_argv[]) {
     const int v_max_depth = std::stoi(p_argv[1]);
     const std::string_view v_topology_name = p_argv[2];
 
-    gempba::scheduler* v_scheduler = gempba::create_scheduler(leaf_count::parse_topology(v_topology_name));
+    gempba::scheduler* v_scheduler = gempba::mpi::create_scheduler(leaf_count::parse_topology(v_topology_name));
     const int v_rank = v_scheduler->rank_me();
-    const auto v_counter = leaf_count::run(*v_scheduler, v_max_depth);
+    gempba::run_outcome v_outcome{gempba::end_reason::INTERRUPTED, gempba::stop_trigger::NONE, 0};
+    const auto v_counter = leaf_count::run(*v_scheduler, v_max_depth, &v_outcome);
     v_scheduler->barrier();
 
     const long long v_local = v_counter->leaves();
@@ -58,15 +61,22 @@ int main(const int p_argc, char* p_argv[]) {
     MPI_Gather(&v_local, 1, MPI_LONG_LONG, v_per_rank.data(), 1, MPI_LONG_LONG, 0, MPI_COMM_WORLD);
 
     int v_exit_code = 0;
+    if (v_outcome != gempba::run_outcome{}) {
+        std::cerr << "rank " << v_rank << " says the run didn't complete\n";
+        v_exit_code = 1;
+    }
     if (v_rank == 0) {
         const long long v_total = std::accumulate(v_per_rank.begin(), v_per_rank.end(), 0LL);
         const long long v_expected = 1LL << v_max_depth;
-        std::cout << v_topology_name << " ranks=" << v_scheduler->world_size() << " leaves=" << v_total << " expected=" << v_expected << " per_rank=";
+        const long long v_expected_best = *std::ranges::max_element(v_per_rank) - 1;
+        const int v_best = leaf_count::deserialize_leaf_index(v_scheduler->get_result()).value_or(-1);
+        std::cout << v_topology_name << " ranks=" << v_scheduler->world_size() << " leaves=" << v_total << " expected=" << v_expected << " best=" << v_best
+                  << " expected_best=" << v_expected_best << " per_rank=";
         for (const long long v_count: v_per_rank) {
             std::cout << ' ' << v_count;
         }
         std::cout << '\n';
-        if (v_total != v_expected) {
+        if (v_total != v_expected || v_best != v_expected_best) {
             v_exit_code = 1;
         }
     }

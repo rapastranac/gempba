@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       assemble:
-        description: 'Merge the per-OS JARs into one multi-platform JAR per variant'
+        description: 'Build the macOS natives, on hosted Apple Silicon minutes, and merge the per-OS JARs into one multi-platform JAR per variant'
         type: boolean
         default: true
 
@@ -220,7 +220,8 @@ jobs:
           if-no-files-found: warn
 
   build-macos:
-    runs-on: ${{ fromJSON(vars.RUNNER_MACOS_INTEL || '["macos-26-intel"]') }}
+    if: inputs.assemble
+    runs-on: ${{ fromJSON(vars.RUNNER_MACOS_ARM64 || '["macos-26"]') }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -289,18 +290,17 @@ jobs:
 
   test-macos:
     needs: build-macos
-    runs-on: ${{ fromJSON(vars.RUNNER_MACOS_INTEL || '["macos-26-intel"]') }}
+    if: inputs.assemble
+    runs-on: ${{ fromJSON(vars.RUNNER_MACOS_ARM64 || '["macos-26"]') }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         include:
           - variant: MT
-            mp_flag: 'OFF'
             mvn_variant: multithreading
             classifier: mt
           - variant: MP
-            mp_flag: 'ON'
             mvn_variant: multiprocessing
             classifier: mp-mpi
 
@@ -318,11 +318,13 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ github.ref }}
 
-      - name: Setup native deps
-        uses: ./.github/actions/setup-macos-deps
-        with:
-          multiprocessing: ${{ matrix.mp_flag }}
-          tests: 'false'
+      # None of gempba's Homebrew deps: the dylib links hwloc, fmt and spdlog statically, so the tests fail if it needs
+      # anything more than macOS and, for MP, the Open MPI a user installs.
+      - name: Install Open MPI
+        if: matrix.variant == 'MP'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+        run: brew install open-mpi
 
       - name: Setup JDK 25
         uses: ./.github/actions/setup-java-jdk
@@ -381,6 +383,7 @@ jobs:
           set -euo pipefail
           VERSION=$(grep -m1 '<version>' bindings/java/pom.xml | sed -E 's/[[:space:]]*<version>([^<]+)<\/version>.*/\1/')
           mkdir -p merged
+          EXPECTED=$(printf '%s\n' natives/linux-x86_64/gempba_jni.so natives/win-x86_64/gempba_jni.dll natives/osx-aarch64/gempba_jni.dylib | sort)
           for CLASSIFIER in mt mp-mpi; do
             JAR="gempba-${VERSION}-${CLASSIFIER}.jar"
             cp "per-os/jar-ubuntu-${CLASSIFIER}/${JAR}" "merged/${JAR}"
@@ -392,6 +395,11 @@ jobs:
             done
             echo "--- merged ${JAR} natives/ ---"
             jar tf "merged/${JAR}" | grep '^natives/' | sort
+            NATIVES=$(jar tf "merged/${JAR}" | { grep -E '^natives/[^/]+/gempba_jni\.(so|dll|dylib)$' || true; } | sort)
+            if [ "$NATIVES" != "$EXPECTED" ]; then
+              echo "::error::${JAR} holds [${NATIVES//$'\n'/ }], not [${EXPECTED//$'\n'/ }]"
+              exit 1
+            fi
           done
 
       - name: Upload merged multi-platform JARs

@@ -34,9 +34,9 @@ namespace gempba::cabi_tests {
     class cabi_serial_runnable_test : public cabi_fixture {};
 
     TEST_F(cabi_serial_runnable_test, non_void_invoke_round_trips_bytes) {
-        gempba_load_balancer_t v_lb = gempba_mt_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING);
+        gempba_load_balancer_t v_lb = gempba_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING, /*scheduler=*/nullptr);
         ASSERT_NE(v_lb, nullptr);
-        gempba_node_manager_t v_nm = gempba_mt_create_node_manager(v_lb);
+        gempba_node_manager_t v_nm = gempba_create_node_manager(v_lb, /*scheduler=*/nullptr);
         ASSERT_NE(v_nm, nullptr);
 
         cb_state v_state;
@@ -63,9 +63,9 @@ namespace gempba::cabi_tests {
     }
 
     TEST_F(cabi_serial_runnable_test, void_invoke_returns_no_value) {
-        gempba_load_balancer_t v_lb = gempba_mt_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING);
+        gempba_load_balancer_t v_lb = gempba_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING, /*scheduler=*/nullptr);
         ASSERT_NE(v_lb, nullptr);
-        gempba_node_manager_t v_nm = gempba_mt_create_node_manager(v_lb);
+        gempba_node_manager_t v_nm = gempba_create_node_manager(v_lb, /*scheduler=*/nullptr);
         ASSERT_NE(v_nm, nullptr);
 
         cb_state v_state;

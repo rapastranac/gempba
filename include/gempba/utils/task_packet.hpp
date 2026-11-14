@@ -28,6 +28,7 @@
 #include <compare>
 #include <cstddef>
 #include <cstring>
+#include <gempba/export.h>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -35,7 +36,7 @@
 
 namespace gempba {
     // Requires: C++17 or later
-    class task_packet {
+    class GEMPBA_API task_packet {
         std::vector<std::byte> m_data;
 
     public:

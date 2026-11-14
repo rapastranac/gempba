@@ -39,7 +39,7 @@ namespace gempba::cabi_tests {
     // ─── dummy node ─────────────────────────────────────────────────────────
 
     TEST_F(cabi_node_test, dummy_node_create_and_destroy) {
-        gempba_load_balancer_t v_lb = gempba_mt_create_load_balancer(GEMPBA_BALANCING_QUASI_HORIZONTAL);
+        gempba_load_balancer_t v_lb = gempba_create_load_balancer(GEMPBA_BALANCING_QUASI_HORIZONTAL, /*scheduler=*/nullptr);
         ASSERT_NE(v_lb, nullptr);
 
         gempba_node_t v_node = nullptr;
@@ -58,7 +58,7 @@ namespace gempba::cabi_tests {
     // ─── seed node ──────────────────────────────────────────────────────────
 
     TEST_F(cabi_node_test, seed_node_lifecycle) {
-        gempba_load_balancer_t v_lb = gempba_mt_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING);
+        gempba_load_balancer_t v_lb = gempba_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING, /*scheduler=*/nullptr);
         ASSERT_NE(v_lb, nullptr);
 
         cb_state v_state;
@@ -76,7 +76,7 @@ namespace gempba::cabi_tests {
     }
 
     TEST_F(cabi_node_test, seed_create_null_out_releases_user_data) {
-        gempba_load_balancer_t v_lb = gempba_mt_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING);
+        gempba_load_balancer_t v_lb = gempba_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING, /*scheduler=*/nullptr);
         ASSERT_NE(v_lb, nullptr);
 
         cb_state v_state;
@@ -84,13 +84,13 @@ namespace gempba::cabi_tests {
         EXPECT_EQ(v_state.m_releases.load(), 1);
     }
 
-    // ─── multithreading explicit node ───────────────────────────────────────
+    // ─── explicit node ───────────────────────────────────────────
 
-    TEST_F(cabi_node_test, mt_explicit_invokes_callback_and_releases_user_data_once) {
-        gempba_load_balancer_t v_lb = gempba_mt_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING);
+    TEST_F(cabi_node_test, explicit_invokes_callback_and_releases_user_data_once) {
+        gempba_load_balancer_t v_lb = gempba_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING, /*scheduler=*/nullptr);
         ASSERT_NE(v_lb, nullptr);
 
-        gempba_node_manager_t v_nm = gempba_mt_create_node_manager(v_lb);
+        gempba_node_manager_t v_nm = gempba_create_node_manager(v_lb, /*scheduler=*/nullptr);
         ASSERT_NE(v_nm, nullptr);
         gempba_nm_set_thread_pool_size(v_nm, 2);
 
@@ -102,7 +102,7 @@ namespace gempba::cabi_tests {
         gempba_bytes_t v_args{v_payload, sizeof(v_payload)};
 
         gempba_node_t v_child = nullptr;
-        ASSERT_EQ(gempba_mt_create_explicit_node(v_lb, v_parent, copy_args_runnable, &v_state, increment_release, v_args, &v_child), GEMPBA_OK);
+        ASSERT_EQ(gempba_create_explicit_node(v_lb, v_parent, copy_args_runnable, &v_state, increment_release, v_args, &v_child), GEMPBA_OK);
         ASSERT_NE(v_child, nullptr);
 
         gempba_bool_t v_accepted = 0;
@@ -128,18 +128,18 @@ namespace gempba::cabi_tests {
         }
     }
 
-    TEST_F(cabi_node_test, mt_explicit_create_null_parent_releases_user_data) {
-        gempba_load_balancer_t v_lb = gempba_mt_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING);
+    TEST_F(cabi_node_test, explicit_create_null_parent_releases_user_data) {
+        gempba_load_balancer_t v_lb = gempba_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING, /*scheduler=*/nullptr);
         ASSERT_NE(v_lb, nullptr);
 
         cb_state v_state;
         gempba_node_t v_out = nullptr;
-        EXPECT_EQ(gempba_mt_create_explicit_node(v_lb, /*parent=*/nullptr, copy_args_runnable, &v_state, increment_release, gempba_bytes_t{nullptr, 0}, &v_out), GEMPBA_ERR_INVALID_ARG);
+        EXPECT_EQ(gempba_create_explicit_node(v_lb, /*parent=*/nullptr, copy_args_runnable, &v_state, increment_release, gempba_bytes_t{nullptr, 0}, &v_out), GEMPBA_ERR_INVALID_ARG);
         EXPECT_EQ(v_out, nullptr);
         EXPECT_EQ(v_state.m_releases.load(), 1);
     }
 
-    // ─── multithreading lazy node ───────────────────────────────────────────
+    // ─── lazy node ───────────────────────────────────────────────
 
     namespace {
         // Lazy producer that signals "no more args" on every call.
@@ -169,10 +169,10 @@ namespace gempba::cabi_tests {
         }
     } // namespace
 
-    TEST_F(cabi_node_test, mt_lazy_node_lifecycle) {
-        gempba_load_balancer_t v_lb = gempba_mt_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING);
+    TEST_F(cabi_node_test, lazy_node_lifecycle) {
+        gempba_load_balancer_t v_lb = gempba_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING, /*scheduler=*/nullptr);
         ASSERT_NE(v_lb, nullptr);
-        gempba_node_manager_t v_nm = gempba_mt_create_node_manager(v_lb);
+        gempba_node_manager_t v_nm = gempba_create_node_manager(v_lb, /*scheduler=*/nullptr);
         ASSERT_NE(v_nm, nullptr);
         gempba_nm_set_thread_pool_size(v_nm, 2);
 
@@ -181,7 +181,7 @@ namespace gempba::cabi_tests {
 
         cb_state v_state;
         gempba_node_t v_lazy = nullptr;
-        ASSERT_EQ(gempba_mt_create_lazy_node(v_lb, v_parent, copy_args_runnable, no_args_lazy, &v_state, increment_release, &v_lazy), GEMPBA_OK);
+        ASSERT_EQ(gempba_create_lazy_node(v_lb, v_parent, copy_args_runnable, no_args_lazy, &v_state, increment_release, &v_lazy), GEMPBA_OK);
         ASSERT_NE(v_lazy, nullptr);
 
         // Lazy children form a parent↔child shared_ptr cycle. We must submit
@@ -197,29 +197,29 @@ namespace gempba::cabi_tests {
         EXPECT_EQ(v_state.m_releases.load(), 1);
     }
 
-    TEST_F(cabi_node_test, mt_lazy_create_null_lazy_args_releases_user_data) {
-        gempba_load_balancer_t v_lb = gempba_mt_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING);
+    TEST_F(cabi_node_test, lazy_create_null_lazy_args_releases_user_data) {
+        gempba_load_balancer_t v_lb = gempba_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING, /*scheduler=*/nullptr);
         ASSERT_NE(v_lb, nullptr);
         gempba_node_t v_parent = nullptr;
         ASSERT_EQ(gempba_create_dummy_node(v_lb, &v_parent), GEMPBA_OK);
 
         cb_state v_state;
         gempba_node_t v_out = nullptr;
-        EXPECT_EQ(gempba_mt_create_lazy_node(v_lb, v_parent, copy_args_runnable, /*lazy_args=*/nullptr, &v_state, increment_release, &v_out), GEMPBA_ERR_INVALID_ARG);
+        EXPECT_EQ(gempba_create_lazy_node(v_lb, v_parent, copy_args_runnable, /*lazy_args=*/nullptr, &v_state, increment_release, &v_out), GEMPBA_ERR_INVALID_ARG);
         EXPECT_EQ(v_out, nullptr);
         EXPECT_EQ(v_state.m_releases.load(), 1);
 
         gempba_node_destroy(v_parent);
     }
 
-    TEST_F(cabi_node_test, mt_lazy_node_runs_with_produced_args) {
+    TEST_F(cabi_node_test, lazy_node_runs_with_produced_args) {
         // Exercises the make_cpp_lazy_args produced=1 branch — the producer
         // hands back an owned buffer that the C ABI must convert to a
         // task_packet and route into the runnable. Without this, only the
         // produced=0 branch (mt_lazy_node_lifecycle) is reached.
-        gempba_load_balancer_t v_lb = gempba_mt_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING);
+        gempba_load_balancer_t v_lb = gempba_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING, /*scheduler=*/nullptr);
         ASSERT_NE(v_lb, nullptr);
-        gempba_node_manager_t v_nm = gempba_mt_create_node_manager(v_lb);
+        gempba_node_manager_t v_nm = gempba_create_node_manager(v_lb, /*scheduler=*/nullptr);
         ASSERT_NE(v_nm, nullptr);
         gempba_nm_set_thread_pool_size(v_nm, 2);
 
@@ -228,7 +228,7 @@ namespace gempba::cabi_tests {
 
         cb_state v_state;
         gempba_node_t v_lazy = nullptr;
-        ASSERT_EQ(gempba_mt_create_lazy_node(v_lb, v_parent, copy_args_runnable, one_shot_lazy, &v_state, increment_release, &v_lazy), GEMPBA_OK);
+        ASSERT_EQ(gempba_create_lazy_node(v_lb, v_parent, copy_args_runnable, one_shot_lazy, &v_state, increment_release, &v_lazy), GEMPBA_OK);
 
         gempba_bool_t v_accepted = 0;
         ASSERT_EQ(gempba_nm_try_local_submit(v_nm, v_lazy, &v_accepted), GEMPBA_OK);
@@ -246,62 +246,13 @@ namespace gempba::cabi_tests {
         EXPECT_EQ(v_state.m_releases.load(), 1);
     }
 
-    // ─── multiprocessing explicit node (MP/DEV builds) ──────────────────────
-
-    TEST_F(cabi_node_test, mp_create_explicit_node_null_parent_releases_user_data) {
-        gempba_load_balancer_t v_lb = gempba_mp_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING, /*worker=*/nullptr);
-        ASSERT_NE(v_lb, nullptr);
-
-        cb_state v_state;
-        gempba_node_t v_out = nullptr;
-        EXPECT_EQ(gempba_mp_create_explicit_node(v_lb, /*parent=*/nullptr, copy_args_runnable, &v_state, increment_release, gempba_bytes_t{nullptr, 0}, &v_out), GEMPBA_ERR_INVALID_ARG);
-        EXPECT_EQ(v_out, nullptr);
-        EXPECT_EQ(v_state.m_releases.load(), 1);
-    }
-
-    TEST_F(cabi_node_test, mp_create_explicit_node_happy_path_round_trips_bytes) {
-        // In an MP/DEV build the gempba_mp_create_explicit_node body is its
-        // own code path (separate identity_ser / identity_deser_value bridges
-        // from the MT one). This test pins the MP shim end-to-end without
-        // needing MPI.
-        gempba_load_balancer_t v_lb = gempba_mp_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING, /*worker=*/nullptr);
-        ASSERT_NE(v_lb, nullptr);
-        gempba_node_manager_t v_nm = gempba_mp_create_node_manager(v_lb, /*worker=*/nullptr);
-        ASSERT_NE(v_nm, nullptr);
-        gempba_nm_set_thread_pool_size(v_nm, 2);
-
-        gempba_node_t v_parent = nullptr;
-        ASSERT_EQ(gempba_create_dummy_node(v_lb, &v_parent), GEMPBA_OK);
-
-        cb_state v_state;
-        const uint8_t v_payload[] = {0x11, 0x22, 0x33};
-        gempba_bytes_t v_args{v_payload, sizeof(v_payload)};
-        gempba_node_t v_child = nullptr;
-        ASSERT_EQ(gempba_mp_create_explicit_node(v_lb, v_parent, copy_args_runnable, &v_state, increment_release, v_args, &v_child), GEMPBA_OK);
-        ASSERT_NE(v_child, nullptr);
-
-        gempba_bool_t v_accepted = 0;
-        ASSERT_EQ(gempba_nm_try_local_submit(v_nm, v_child, &v_accepted), GEMPBA_OK);
-        ASSERT_EQ(gempba_nm_wait(v_nm), GEMPBA_OK);
-
-        gempba_buffer_t v_out{nullptr, 0};
-        ASSERT_EQ(gempba_node_get_result(v_child, &v_out), GEMPBA_OK);
-        ASSERT_EQ(v_out.len, sizeof(v_payload));
-        EXPECT_EQ(std::memcmp(v_out.data, v_payload, sizeof(v_payload)), 0);
-        gempba_buffer_free(&v_out);
-
-        gempba_node_destroy(v_child);
-        gempba_node_destroy(v_parent);
-        EXPECT_EQ(v_state.m_releases.load(), 1);
-    }
-
     // ─── node_get_result branches ───────────────────────────────────────────
 
     TEST_F(cabi_node_test, node_get_result_returns_runnable_output) {
-        gempba_load_balancer_t v_lb = gempba_mt_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING);
+        gempba_load_balancer_t v_lb = gempba_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING, /*scheduler=*/nullptr);
         ASSERT_NE(v_lb, nullptr);
 
-        gempba_node_manager_t v_nm = gempba_mt_create_node_manager(v_lb);
+        gempba_node_manager_t v_nm = gempba_create_node_manager(v_lb, /*scheduler=*/nullptr);
         ASSERT_NE(v_nm, nullptr);
         gempba_nm_set_thread_pool_size(v_nm, 2);
 
@@ -313,7 +264,7 @@ namespace gempba::cabi_tests {
         gempba_bytes_t v_args{v_payload, sizeof(v_payload)};
 
         gempba_node_t v_child = nullptr;
-        ASSERT_EQ(gempba_mt_create_explicit_node(v_lb, v_parent, copy_args_runnable, &v_state, increment_release, v_args, &v_child), GEMPBA_OK);
+        ASSERT_EQ(gempba_create_explicit_node(v_lb, v_parent, copy_args_runnable, &v_state, increment_release, v_args, &v_child), GEMPBA_OK);
         ASSERT_NE(v_child, nullptr);
 
         gempba_bool_t v_accepted = 0;
@@ -350,7 +301,7 @@ namespace gempba::cabi_tests {
     }
 
     TEST_F(cabi_node_test, node_get_result_null_out_returns_invalid_arg) {
-        gempba_load_balancer_t v_lb = gempba_mt_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING);
+        gempba_load_balancer_t v_lb = gempba_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING, /*scheduler=*/nullptr);
         ASSERT_NE(v_lb, nullptr);
         gempba_node_t v_node = nullptr;
         ASSERT_EQ(gempba_create_dummy_node(v_lb, &v_node), GEMPBA_OK);
@@ -365,7 +316,7 @@ namespace gempba::cabi_tests {
         // A dummy node has no runnable, so its future never resolves with a
         // value — the std::any unwraps as empty and the C ABI returns OK +
         // {nullptr, 0}.
-        gempba_load_balancer_t v_lb = gempba_mt_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING);
+        gempba_load_balancer_t v_lb = gempba_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING, /*scheduler=*/nullptr);
         ASSERT_NE(v_lb, nullptr);
         gempba_node_t v_node = nullptr;
         ASSERT_EQ(gempba_create_dummy_node(v_lb, &v_node), GEMPBA_OK);
@@ -396,9 +347,9 @@ namespace gempba::cabi_tests {
         // writing into c_out, so make_cpp_runnable frees and throws; (2) the
         // exception propagates through node_core's future and is re-raised
         // when gempba_node_get_result calls get_any_result.
-        gempba_load_balancer_t v_lb = gempba_mt_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING);
+        gempba_load_balancer_t v_lb = gempba_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING, /*scheduler=*/nullptr);
         ASSERT_NE(v_lb, nullptr);
-        gempba_node_manager_t v_nm = gempba_mt_create_node_manager(v_lb);
+        gempba_node_manager_t v_nm = gempba_create_node_manager(v_lb, /*scheduler=*/nullptr);
         ASSERT_NE(v_nm, nullptr);
         gempba_nm_set_thread_pool_size(v_nm, 2);
 
@@ -408,7 +359,7 @@ namespace gempba::cabi_tests {
         cb_state v_state;
         const uint8_t v_payload[] = {0xEE};
         gempba_node_t v_child = nullptr;
-        ASSERT_EQ(gempba_mt_create_explicit_node(v_lb, v_parent, failing_runnable, &v_state, increment_release, gempba_bytes_t{v_payload, sizeof(v_payload)}, &v_child), GEMPBA_OK);
+        ASSERT_EQ(gempba_create_explicit_node(v_lb, v_parent, failing_runnable, &v_state, increment_release, gempba_bytes_t{v_payload, sizeof(v_payload)}, &v_child), GEMPBA_OK);
 
         // try_local_submit may queue the task (OK; the throw is captured in
         // the node's future and resurfaces from gempba_node_get_result) or —
@@ -474,9 +425,9 @@ namespace gempba::cabi_tests {
      * to the thread pool and the future re-threw on get_result).
      */
     static void expect_runnable_translates_to(gempba_runnable_fn p_runnable, gempba_status_t p_inline_expected, gempba_status_t p_queued_expected) {
-        gempba_load_balancer_t v_lb = gempba_mt_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING);
+        gempba_load_balancer_t v_lb = gempba_create_load_balancer(GEMPBA_BALANCING_WORK_STEALING, /*scheduler=*/nullptr);
         ASSERT_NE(v_lb, nullptr);
-        gempba_node_manager_t v_nm = gempba_mt_create_node_manager(v_lb);
+        gempba_node_manager_t v_nm = gempba_create_node_manager(v_lb, /*scheduler=*/nullptr);
         ASSERT_NE(v_nm, nullptr);
         gempba_nm_set_thread_pool_size(v_nm, 2);
 
@@ -485,7 +436,7 @@ namespace gempba::cabi_tests {
 
         cb_state v_state;
         gempba_node_t v_child = nullptr;
-        ASSERT_EQ(gempba_mt_create_explicit_node(v_lb, v_parent, p_runnable, &v_state, increment_release, gempba_bytes_t{nullptr, 0}, &v_child), GEMPBA_OK);
+        ASSERT_EQ(gempba_create_explicit_node(v_lb, v_parent, p_runnable, &v_state, increment_release, gempba_bytes_t{nullptr, 0}, &v_child), GEMPBA_OK);
 
         gempba_bool_t v_accepted = 0;
         const gempba_status_t v_submit_rc = gempba_nm_try_local_submit(v_nm, v_child, &v_accepted);

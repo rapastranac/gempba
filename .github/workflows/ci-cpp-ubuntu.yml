@@ -55,45 +55,55 @@ jobs:
           echo "libgtest-dev: $(dpkg -s libgtest-dev | grep 'Version' | awk '{print $2}')"
           echo "libgmock-dev: $(dpkg -s libgmock-dev | grep 'Version' | awk '{print $2}')"
 
-      # 4️⃣ Set up ccache. Tests reference gempba::mp::* directly, so only MP=ON is built here.
+      # 4️⃣ Set up ccache. The MPI component's tests need it, so it is built too.
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1
         with:
           key: build-ubuntu-mpON
 
-      # 5️⃣ Configure + build with MP=ON
+      # 5️⃣ Configure + build with the MPI component
       - name: Configure + cached build
         run: |
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DGEMPBA_MULTIPROCESSING=ON \
+            -DGEMPBA_BUILD_MPI=ON \
             -DGEMPBA_MPI_INTEGRATION_TESTS=ON \
             -DMPIEXEC_PREFLAGS=--oversubscribe \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_FLAGS="--coverage" \
+            -DCMAKE_CXX_FLAGS="--coverage -fprofile-update=atomic" \
             -DCMAKE_EXE_LINKER_FLAGS="--coverage"
           cmake --build build --parallel $(nproc)
 
       # 6️⃣ Run tests with JUnit XML output
-      - name: Run tests with retry for flaky tests
+      - name: Run tests
         run: |
           cd ${{ github.workspace }}/build
 
-          echo "🟢 Non-flaky tests: single run, must pass"
-          ctest --output-on-failure --output-junit test_results_main.xml -E "FLAKY_"
+          ctest --output-on-failure --output-junit test_results_main.xml
 
-          echo "🟡 Flaky tests: up to 3 attempts each"
-          ctest --repeat until-pass:3 --output-on-failure --output-junit test_results_flaky.xml -R "FLAKY_" --no-tests=ignore
+      # 7️⃣ Report coverage with gcovr, leaving out branches only an exception or unreachable code would take
+      - name: Generate coverage report
+        run: |
+          sudo apt-get install -y gcovr
+          gcovr --version | head -1
+          gcovr -r . build -j "$(nproc)" \
+            --gcov-executable gcov-14 \
+            --filter 'src/' --filter 'include/' \
+            --exclude-throw-branches --exclude-unreachable-branches \
+            --cobertura coverage.xml --txt-summary
 
-      # 7️⃣ Upload coverage to Codecov
+      # 8️⃣ Upload coverage to Codecov
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          disable_search: true
+          plugins: noop
           fail_ci_if_error: true
 
-      # 8️⃣ Upload test results as artifacts
+      # 9️⃣ Upload test results as artifacts
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v7
@@ -102,7 +112,7 @@ jobs:
           path: ${{ github.workspace }}/build/test_results_*.xml
           retention-days: 30
 
-      # 9️⃣ Publish test results as a check
+      # 🔟 Publish test results as a check
       - name: Publish Test Report
         if: ${{ !cancelled() }}
         uses: mikepenz/action-junit-report@v4
@@ -162,51 +172,40 @@ jobs:
           git -c http."https://github.com/".extraheader= -c credential.helper= clone --depth 1 --branch "${{ steps.examples_ref.outputs.ref }}" \
             "$EX_URL" "$RUNNER_TEMP/gempba-examples-src"
 
-      # 5️⃣ Install gempba mt (the base package) into the prefix. The mpi
-      #    topping package depends on the mt base for headers and the
-      #    gempbaConfig.cmake dispatcher, so the mt install comes first.
-      - name: Install gempba (mt base)
+      # 5️⃣ Install gempba, the core and the MPI component, into the prefix
+      - name: Install gempba (the core and the MPI component)
         run: |
-          cmake -S . -B "$RUNNER_TEMP/gempba-build-mt" \
+          cmake -S . -B "$RUNNER_TEMP/gempba-build" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="$GEMPBA_INSTALL_PREFIX" \
             -DGEMPBA_BUILD_TESTS=OFF \
-            -DGEMPBA_DEV_MODE=OFF \
-            -DGEMPBA_MULTIPROCESSING=OFF
-          cmake --build "$RUNNER_TEMP/gempba-build-mt" --parallel $(nproc)
-          cmake --install "$RUNNER_TEMP/gempba-build-mt"
+            -DGEMPBA_BUILD_MPI=ON
+          cmake --build "$RUNNER_TEMP/gempba-build" --parallel $(nproc)
+          cmake --install "$RUNNER_TEMP/gempba-build"
 
-      # 6️⃣ Build the examples against the mt base alone
-      - name: Build gempba-examples (MP=OFF)
+      # 6️⃣ Build the examples, the multithreading and the MPI ones, against it
+      - name: Build gempba-examples
         run: |
-          cmake -S "$RUNNER_TEMP/gempba-examples-src" -B "$RUNNER_TEMP/gempba-examples-build-mt" \
+          cmake -S "$RUNNER_TEMP/gempba-examples-src" -B "$RUNNER_TEMP/gempba-examples-build" \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$GEMPBA_INSTALL_PREFIX" \
-            -DGEMPBA_MULTIPROCESSING=OFF
-          cmake --build "$RUNNER_TEMP/gempba-examples-build-mt" --parallel $(nproc)
+            -DCMAKE_PREFIX_PATH="$GEMPBA_INSTALL_PREFIX"
+          cmake --build "$RUNNER_TEMP/gempba-examples-build" --parallel $(nproc)
 
-      # 7️⃣ Layer the mpi topping on top of the mt base. Adds
-      #    libgempba_mpi.a + gempba_mpi-targets.cmake so
-      #    find_package(gempba COMPONENTS mpi) resolves.
-      - name: Install gempba (mpi topping)
-        run: |
-          cmake -S . -B "$RUNNER_TEMP/gempba-build-mpi" \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX="$GEMPBA_INSTALL_PREFIX" \
-            -DGEMPBA_BUILD_TESTS=OFF \
-            -DGEMPBA_DEV_MODE=OFF \
-            -DGEMPBA_MULTIPROCESSING=ON
-          cmake --build "$RUNNER_TEMP/gempba-build-mpi" --parallel $(nproc)
-          cmake --install "$RUNNER_TEMP/gempba-build-mpi"
+  # gempba installed without MPI, and a consumer that compiles gempba::mpi from the installed sources against MPICH,
+  # run on 4 ranks in a clean Debian 13 container.
+  mpich-consumer:
+    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
+    timeout-minutes: 30
 
-      # 8️⃣ Build the examples against the mt base plus the mpi topping
-      - name: Build gempba-examples (MP=ON)
-        run: |
-          cmake -S "$RUNNER_TEMP/gempba-examples-src" -B "$RUNNER_TEMP/gempba-examples-build-mpi" \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$GEMPBA_INSTALL_PREFIX" \
-            -DGEMPBA_MULTIPROCESSING=ON
-          cmake --build "$RUNNER_TEMP/gempba-examples-build-mpi" --parallel $(nproc)
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.ref }}
+
+      - name: Build and run an MPICH consumer against the installed gempba
+        run: bash scripts/test_mpich_consumer.sh
 
   # Packaging only on the way into main or release: PRs into them and pushes to them.
   build-deb:

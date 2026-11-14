@@ -30,6 +30,9 @@ set(TEST_DIR "${CMAKE_CURRENT_LIST_DIR}")
 # Collect all test source files recursively
 file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS "${TEST_DIR}/*.cpp")
 list(FILTER TEST_SOURCES EXCLUDE REGEX "/integration/")
+if (NOT TARGET gempba_mpi_objects)
+    list(FILTER TEST_SOURCES EXCLUDE REGEX "/unit/mpi/")
+endif ()
 
 # Ensure that source files are found
 if (NOT TEST_SOURCES)
@@ -43,7 +46,8 @@ add_executable(all_tests ${TEST_SOURCES})
 # Link necessary libraries
 target_link_libraries(all_tests
         PRIVATE
-        gempba
+        gempba_objects
+        $<TARGET_NAME_IF_EXISTS:gempba_mpi_objects>
         gempba_logging
         GTest::gtest
         GTest::gmock_main
@@ -76,9 +80,9 @@ gtest_discover_tests(all_tests
 message(STATUS "GTest test discovery enabled for all_tests executable")
 
 option(GEMPBA_MPI_INTEGRATION_TESTS "Register multi-rank MPI tests with CTest (runs mpiexec)" OFF)
-if (GEMPBA_MPI_INTEGRATION_TESTS)
+if (GEMPBA_MPI_INTEGRATION_TESTS AND TARGET gempba_mpi)
     add_executable(termination_stress integration/termination_stress.cpp)
-    target_link_libraries(termination_stress PRIVATE gempba)
+    target_link_libraries(termination_stress PRIVATE gempba_mpi)
     foreach (v_topology semi_centralized centralized)
         foreach (v_ranks 2 4 8)
             set(v_test_name mpi_termination_stress_${v_topology}_${v_ranks})
@@ -88,8 +92,21 @@ if (GEMPBA_MPI_INTEGRATION_TESTS)
         endforeach ()
     endforeach ()
 
+    add_executable(stop_stress integration/stop_stress.cpp)
+    target_link_libraries(stop_stress PRIVATE gempba_mpi)
+    foreach (v_topology semi_centralized centralized)
+        foreach (v_trigger code signal)
+            foreach (v_stopping_rank 0 1 -1)
+                set(v_test_name mpi_stop_stress_${v_topology}_${v_trigger}_rank${v_stopping_rank}_4)
+                add_test(NAME ${v_test_name}
+                        COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4 ${MPIEXEC_PREFLAGS} $<TARGET_FILE:stop_stress> ${MPIEXEC_POSTFLAGS} ${v_topology} ${v_trigger} ${v_stopping_rank} 1000)
+                set_tests_properties(${v_test_name} PROPERTIES TIMEOUT 120)
+            endforeach ()
+        endforeach ()
+    endforeach ()
+
     add_executable(telemetry_stress integration/telemetry_stress.cpp)
-    target_link_libraries(telemetry_stress PRIVATE gempba)
+    target_link_libraries(telemetry_stress PRIVATE gempba_mpi)
     if (WIN32)
         target_link_libraries(telemetry_stress PRIVATE ws2_32)
     endif ()

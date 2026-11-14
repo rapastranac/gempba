@@ -111,11 +111,11 @@ namespace gempba::cabi_tests {
      * only when a test exercises the policy itself.
      */
     inline gempba_node_manager_t make_node_manager(gempba_balancing_policy_t p_policy = GEMPBA_BALANCING_WORK_STEALING) {
-        gempba_load_balancer_t v_lb = gempba_mt_create_load_balancer(p_policy);
+        gempba_load_balancer_t v_lb = gempba_create_load_balancer(p_policy, /*scheduler=*/nullptr);
         if (v_lb == nullptr) {
             return nullptr;
         }
-        return gempba_mt_create_node_manager(v_lb);
+        return gempba_create_node_manager(v_lb, /*scheduler=*/nullptr);
     }
 
 } // namespace gempba::cabi_tests

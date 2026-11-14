@@ -55,25 +55,21 @@ jobs:
           echo "mingw-w64-ucrt-x86_64-msmpi: $(pacman -Qi mingw-w64-ucrt-x86_64-msmpi | grep Version | awk '{print $3}')"
           echo "mingw-w64-ucrt-x86_64-gtest: $(pacman -Qi mingw-w64-ucrt-x86_64-gtest | grep Version | awk '{print $3}')"
 
-      # 4️⃣ Configure + build with MP=ON. Tests reference gempba::mp::* directly,
-      # so only MP=ON is built here.
+      # 4️⃣ Configure + build with the MPI component. The MPI component's tests need it,
+      # so it is built too.
       - name: Configure + build
         shell: msys2 {0}
         run: |
-          cmake -G "MSYS Makefiles" -DGEMPBA_MULTIPROCESSING=ON -S . -B build
+          cmake -G "MSYS Makefiles" -DGEMPBA_BUILD_MPI=ON -S . -B build
           cmake --build build --parallel $(nproc)
 
       # 5️⃣ Run tests with JUnit XML output
-      - name: Run tests with retry for flaky tests
+      - name: Run tests
         shell: msys2 {0}
         run: |
           cd "$GITHUB_WORKSPACE/build"
 
-          echo "🟢 Non-flaky tests: single run, must pass"
-          ctest --output-on-failure --output-junit test_results_main.xml -E "FLAKY_"
-
-          echo "🟡 Flaky tests: up to 3 attempts each"
-          ctest --repeat until-pass:3 --output-on-failure --output-junit test_results_flaky.xml -R "FLAKY_" --no-tests=ignore
+          ctest --output-on-failure --output-junit test_results_main.xml
 
       # 6️⃣ Upload test results as artifacts
       - name: Upload test results
@@ -143,62 +139,31 @@ jobs:
           git -c http."https://github.com/".extraheader= -c credential.helper= clone --depth 1 --branch "${{ steps.examples_ref.outputs.ref }}" \
             "$EX_URL" "$RUNNER_TEMP/gempba-examples-src"
 
-      # 5️⃣ Install gempba mt (the base package) into the prefix. The mpi
-      #    topping package depends on the mt base for headers and the
-      #    gempbaConfig.cmake dispatcher, so the mt install comes first.
-      - name: Install gempba (mt base)
+      # 5️⃣ Install gempba, the core and the MPI component, into the prefix
+      - name: Install gempba (the core and the MPI component)
         shell: msys2 {0}
         run: |
           WS=$(cygpath -u "$GITHUB_WORKSPACE")
           GEMPBA_INSTALL_PREFIX="$WS/.gempba-install"
           echo "GEMPBA_INSTALL_PREFIX=$GEMPBA_INSTALL_PREFIX" >> "$GITHUB_ENV"
           cmake -G "MSYS Makefiles" \
-            -S . -B "$RUNNER_TEMP/gempba-build-mt" \
+            -S . -B "$RUNNER_TEMP/gempba-build" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="$GEMPBA_INSTALL_PREFIX" \
             -DGEMPBA_BUILD_TESTS=OFF \
-            -DGEMPBA_DEV_MODE=OFF \
-            -DGEMPBA_MULTIPROCESSING=OFF
-          cmake --build "$RUNNER_TEMP/gempba-build-mt" --parallel $(nproc)
-          cmake --install "$RUNNER_TEMP/gempba-build-mt"
+            -DGEMPBA_BUILD_MPI=ON
+          cmake --build "$RUNNER_TEMP/gempba-build" --parallel $(nproc)
+          cmake --install "$RUNNER_TEMP/gempba-build"
 
-      # 6️⃣ Build the examples against the mt base alone
-      - name: Build gempba-examples (MP=OFF)
+      # 6️⃣ Build the examples, the multithreading and the MPI ones, against it
+      - name: Build gempba-examples
         shell: msys2 {0}
         run: |
           cmake -G "MSYS Makefiles" \
-            -S "$RUNNER_TEMP/gempba-examples-src" -B "$RUNNER_TEMP/gempba-examples-build-mt" \
+            -S "$RUNNER_TEMP/gempba-examples-src" -B "$RUNNER_TEMP/gempba-examples-build" \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$GEMPBA_INSTALL_PREFIX" \
-            -DGEMPBA_MULTIPROCESSING=OFF
-          cmake --build "$RUNNER_TEMP/gempba-examples-build-mt" --parallel $(nproc)
-
-      # 7️⃣ Layer the mpi topping on top of the mt base. Adds
-      #    libgempba_mpi.a + gempba_mpi-targets.cmake so
-      #    find_package(gempba COMPONENTS mpi) resolves.
-      - name: Install gempba (mpi topping)
-        shell: msys2 {0}
-        run: |
-          cmake -G "MSYS Makefiles" \
-            -S . -B "$RUNNER_TEMP/gempba-build-mpi" \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX="$GEMPBA_INSTALL_PREFIX" \
-            -DGEMPBA_BUILD_TESTS=OFF \
-            -DGEMPBA_DEV_MODE=OFF \
-            -DGEMPBA_MULTIPROCESSING=ON
-          cmake --build "$RUNNER_TEMP/gempba-build-mpi" --parallel $(nproc)
-          cmake --install "$RUNNER_TEMP/gempba-build-mpi"
-
-      # 8️⃣ Build the examples against the mt base plus the mpi topping
-      - name: Build gempba-examples (MP=ON)
-        shell: msys2 {0}
-        run: |
-          cmake -G "MSYS Makefiles" \
-            -S "$RUNNER_TEMP/gempba-examples-src" -B "$RUNNER_TEMP/gempba-examples-build-mpi" \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$GEMPBA_INSTALL_PREFIX" \
-            -DGEMPBA_MULTIPROCESSING=ON
-          cmake --build "$RUNNER_TEMP/gempba-examples-build-mpi" --parallel $(nproc)
+            -DCMAKE_PREFIX_PATH="$GEMPBA_INSTALL_PREFIX"
+          cmake --build "$RUNNER_TEMP/gempba-examples-build" --parallel $(nproc)
 
   # Packaging only on the way into main or release: PRs into them and pushes to them.
   build-msys2:

@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>io.gempba</groupId>
+    <groupId>io.github.rapastranac</groupId>
     <artifactId>gempba</artifactId>
     <version>4.4.0</version>
     <packaging>jar</packaging>
@@ -20,6 +20,20 @@
         </license>
     </licenses>
 
+    <developers>
+        <developer>
+            <id>rapastranac</id>
+            <name>Andres Pastrana</name>
+            <url>https://github.com/rapastranac</url>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:https://github.com/rapastranac/gempba.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/rapastranac/gempba.git</developerConnection>
+        <url>https://github.com/rapastranac/gempba</url>
+    </scm>
+
     <properties>
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
@@ -30,8 +44,8 @@
             can `mvn install` and the JAR loads without any external runtime.
             Multiprocessing requires an IPC backend installed on the host (today:
             MS-MPI / OpenMPI / MPICH), so it stays opt-in via -Dgempba.variant=multiprocessing.
-            The variant gates the variant-specific source roots (java-multithreading
-            / java-multiprocessing) and surfaces in the JAR's finalName + manifest.
+            The multiprocessing variant adds the MPI component's sources (src/main/java-mpi, the
+            io.gempba.mpi package), and the variant surfaces in the JAR's finalName + manifest.
         -->
         <gempba.variant>multithreading</gempba.variant>
 
@@ -43,6 +57,9 @@
             without renaming the existing mp-mpi artifact.
         -->
         <gempba.ipc.backend>mpi</gempba.ipc.backend>
+
+        <!-- Whether the native library built by the build-native profile has the MPI component; the mp variant turns it on. -->
+        <gempba.build.mpi>OFF</gempba.build.mpi>
     </properties>
 
     <dependencies>
@@ -64,47 +81,6 @@
                     <!-- Required on Java 17+ to load the JNI native library without a restricted-method warning becoming an error. -->
                     <argLine>--enable-native-access=ALL-UNNAMED</argLine>
                 </configuration>
-            </plugin>
-            <!--
-                Variant source-root wiring.  The shared Java sources live in
-                src/main/java; the variant-specific GemPBA (and, for MP, the
-                Scheduler / SerialRunnable family) live under
-                src/main/java-${gempba.variant}.  Mirrors the C++ pattern in
-                gempba.hpp where the multithreading / multiprocessing
-                namespaces are #if'd in or out of the translation unit
-                depending on GEMPBA_MULTIPROCESSING — only one is compiled
-                per consumer build.
-            -->
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>build-helper-maven-plugin</artifactId>
-                <version>3.6.0</version>
-                <executions>
-                    <execution>
-                        <id>add-variant-source</id>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>add-source</goal>
-                        </goals>
-                        <configuration>
-                            <sources>
-                                <source>${project.basedir}/src/main/java-${gempba.variant}</source>
-                            </sources>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>add-variant-test-source</id>
-                        <phase>generate-test-sources</phase>
-                        <goals>
-                            <goal>add-test-source</goal>
-                        </goals>
-                        <configuration>
-                            <sources>
-                                <source>${project.basedir}/src/test/java-${gempba.variant}</source>
-                            </sources>
-                        </configuration>
-                    </execution>
-                </executions>
             </plugin>
         </plugins>
     </build>
@@ -182,10 +158,9 @@
               gempba.variant=multiprocessing, ipc.backend=mpi     → mp-mpi
               gempba.variant=multiprocessing, ipc.backend=<other> → mp-<other>
 
-            Consumers MUST specify a classifier in their dependency block — there is no
-            unclassified default.  This mirrors the convention used by every other
-            JVM-native-binding library (JBLAS, OpenCV-Java, native-Netty, LWJGL, JavaCPP,
-            …) and makes the runtime native dependency explicit at compile time.
+            The classifier names the variant's JAR in target/.  Each variant is published as
+            its own artifact (#410): mt as io.github.rapastranac:gempba, mp-mpi as
+            io.github.rapastranac:gempba-mpi; scripts/_java_artifact.sh maps one to the other.
         -->
         <profile>
             <id>classifier-mt</id>
@@ -210,22 +185,48 @@
             </activation>
             <properties>
                 <gempba.classifier>mp-${gempba.ipc.backend}</gempba.classifier>
+                <gempba.build.mpi>ON</gempba.build.mpi>
             </properties>
-        </profile>
-
-        <!--
-            Convenience IDE / dev profile: flips gempba.variant to multiprocessing so
-            the build-helper's add-source picks src/main/java-multiprocessing as the
-            active variant source root.  Equivalent to `-Dgempba.variant=multiprocessing`
-            on the command line, but toggleable in IntelliJ's Maven tool window so the
-            IDE indexes the right files when you're working on MP-only types
-            (Scheduler, SerialRunnable, MP-flavoured GemPBA).
-        -->
-        <profile>
-            <id>variant-mp</id>
-            <properties>
-                <gempba.variant>multiprocessing</gempba.variant>
-            </properties>
+            <!--
+                The MPI component's Java sources, io.gempba.mpi, mirror C++'s src/mpi/: only the
+                mp-mpi JAR, whose native library has MPI, contains them.  In an IDE, enable this
+                profile to index them.
+            -->
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>build-helper-maven-plugin</artifactId>
+                        <version>3.6.0</version>
+                        <executions>
+                            <execution>
+                                <id>add-mpi-source</id>
+                                <phase>generate-sources</phase>
+                                <goals>
+                                    <goal>add-source</goal>
+                                </goals>
+                                <configuration>
+                                    <sources>
+                                        <source>${project.basedir}/src/main/java-mpi</source>
+                                    </sources>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>add-mpi-test-source</id>
+                                <phase>generate-test-sources</phase>
+                                <goals>
+                                    <goal>add-test-source</goal>
+                                </goals>
+                                <configuration>
+                                    <sources>
+                                        <source>${project.basedir}/src/test/java-mpi</source>
+                                    </sources>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
 
         <!--
@@ -285,6 +286,45 @@
                                         </artifact>
                                     </artifacts>
                                 </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!--
+            The sources and javadoc JARs Maven Central requires, built with the variant's JAR:
+              mvn package -DskipTests -Dgempba.variant=<variant> -Ppublish
+            scripts/central_bundle.sh runs it for both variants.
+        -->
+        <profile>
+            <id>publish</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <version>3.3.1</version>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <goals>
+                                    <goal>jar-no-fork</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <version>3.11.2</version>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
                             </execution>
                         </executions>
                     </plugin>
@@ -382,7 +422,7 @@
                                         <argument>${project.build.outputDirectory}</argument>
                                         <argument>--classpath</argument>
                                         <argument>${project.build.testOutputDirectory}</argument>
-                                        <argument>--select-class=io.gempba.SchedulerNativeTest</argument>
+                                        <argument>--select-class=io.gempba.scheduler.SchedulerNativeTest</argument>
                                         <argument>--fail-if-no-tests</argument>
                                     </arguments>
                                 </configuration>
@@ -428,6 +468,7 @@
                                         <argument>-DGEMPBA_BUILD_JAVA_BINDING=ON</argument>
                                         <argument>-DGEMPBA_JNI_CLASSIFIER=${gempba.jni.classifier}</argument>
                                         <argument>-DGEMPBA_BUILD_TESTS=OFF</argument>
+                                        <argument>-DGEMPBA_BUILD_MPI=${gempba.build.mpi}</argument>
                                         <argument>-DFETCHCONTENT_FULLY_DISCONNECTED=ON</argument>
                                     </arguments>
                                 </configuration>
