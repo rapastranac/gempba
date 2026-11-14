@@ -1,0 +1,112 @@
+#include <chrono>
+#include <gempba/node_manager.hpp>
+#include <gempba/telemetry/telemetry_hub.hpp>
+#include <impl/schedulers/mpi_centralized_scheduler.hpp>
+
+namespace gempba {
+    void mpi_centralized_scheduler::send_final_solution_to_center(node_manager& p_node_manager) const {
+        auto v_bytes_opt = p_node_manager.get_result_bytes();
+
+        if (!v_bytes_opt.has_value()) {
+            MPI_Send(nullptr, 0, MPI_BYTE, CENTER_NODE, NO_RESULT, m_world_communicator);
+            return;
+        }
+
+        const result& v_result = v_bytes_opt.value();
+        const task_packet v_bytes = v_result.get_task_packet();
+
+        if (v_bytes.empty()) {
+            MPI_Send(nullptr, 0, MPI_BYTE, CENTER_NODE, NO_RESULT, m_world_communicator);
+            return;
+        }
+
+        MPI_Send(v_bytes.data(), static_cast<int>(v_bytes.size()), MPI_BYTE, CENTER_NODE, HAS_RESULT, m_world_communicator);
+
+        const score& v_score = v_result.get_score();
+        MPI_Send(&v_score, sizeof(score), MPI_BYTE, CENTER_NODE, HAS_RESULT, m_world_communicator);
+    }
+
+    void mpi_centralized_scheduler::collect_stats_data(const node_manager& p_node_manager) {
+        m_idle_time = p_node_manager.get_idle_time();
+        m_stats.m_idle_time = p_node_manager.get_idle_time();
+        m_stats.m_total_thread_requests = p_node_manager.get_thread_request_count();
+    }
+
+    void mpi_centralized_scheduler::task_funneling(node_manager& p_node_manager) {
+        std::shared_ptr<task_bundle> v_packet;
+        bool v_is_pop = m_tasks_bundle_queue.pop(v_packet);
+
+        while (true) {
+            while (v_is_pop) {
+                // as long as there is a message
+                std::scoped_lock v_lock(m_mutex);
+                m_sent_tasks++;
+                m_total_requests_number++;
+                m_stats.m_sent_task_count++;
+
+                const auto v_send_start = std::chrono::steady_clock::now();
+                send_task_to_center(*v_packet);
+                if (auto* v_telemetry = telemetry::get()) {
+                    v_telemetry->record_send(static_cast<std::uint32_t>(CENTER_NODE), v_packet->size(), std::chrono::steady_clock::now() - v_send_start);
+                }
+
+                v_is_pop = m_tasks_bundle_queue.pop(v_packet);
+
+                if (!v_is_pop) {
+                    m_transmitting = false;
+                } else {
+                    utils::log_and_throw("Task found in queue, this should not happen in task_funneling()\n");
+                }
+            }
+            {
+                /* this section protects MPI calls */
+                std::scoped_lock<std::mutex> v_lock(m_mutex);
+                maybe_receive_score_from_center();
+                m_stop_relay.receive_from_root(m_world_communicator);
+                m_stop_relay.report(m_world_communicator);
+                maybe_receive_center_fullness();
+
+                update_score(p_node_manager);
+            }
+
+            v_is_pop = m_tasks_bundle_queue.pop(v_packet);
+
+            if (!v_is_pop && p_node_manager.is_done()) {
+                /* by the time this thread realises that the thread pool has no more tasks,
+                    another buffer might have been pushed, which should be verified in the next line*/
+                v_is_pop = m_tasks_bundle_queue.pop(v_packet);
+
+                if (!v_is_pop) {
+                    break;
+                }
+            }
+
+            // Workers spend most of their time inside this loop while user
+            // computation runs on the thread pool; drive telemetry from here
+            // so worker frames keep flowing during long computations.
+            if (auto* v_telemetry = telemetry::get())
+                v_telemetry->tick_if_due();
+        }
+        update_score(p_node_manager);
+        utils::print_ipc_debug_comments("rank {} sent {} tasks\n", m_world_rank, m_sent_tasks);
+
+        if (!m_tasks_bundle_queue.empty()) {
+            utils::log_and_throw("leaving process with a pending message\n");
+        }
+    }
+
+    void mpi_centralized_scheduler::update_score(node_manager& p_node_manager) {
+        const score v_global_score_temp = m_global_score; // constant within this scope
+        const score v_local_score_temp = p_node_manager.get_score(); // constant within this scope
+
+        if (should_update_local(m_goal, v_global_score_temp, v_local_score_temp)) {
+            p_node_manager.try_update_score_and_invalidate_result(v_global_score_temp);
+        } else if (should_update_global(m_goal, v_global_score_temp, v_local_score_temp)) {
+            MPI_Ssend(&v_local_score_temp, sizeof(score), MPI_BYTE, CENTER_NODE, SCORE_PROPOSAL, m_global_score_communicator);
+            if (auto* v_telemetry = telemetry::get()) {
+                v_telemetry->record_score_proposal_sent();
+            }
+        }
+    }
+
+} // namespace gempba

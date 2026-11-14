@@ -44,8 +44,8 @@ fetch hwloc "https://download.open-mpi.org/release/hwloc/v${hwloc_version%.*}/hw
     cd "$work/hwloc"
     ./configure --prefix="$prefix" --enable-static --disable-shared --with-pic \
         --disable-io --disable-libxml2 --disable-cairo --disable-libudev --disable-plugins --without-x
-    make -j"$jobs"
-    make install
+    make -j"$jobs" SUBDIRS="include hwloc"
+    make install SUBDIRS="include hwloc"
 )
 
 fetch fmt "https://github.com/fmtlib/fmt/archive/refs/tags/$fmt_version.tar.gz" "$fmt_sha256"

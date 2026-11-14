@@ -5,9 +5,10 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <gempba/core/stop.hpp>
+#include <gempba/export.h>
 #include <gempba/telemetry/frames.hpp>
 #include <gempba/telemetry/runtime_mode.hpp>
-#include <gempba/telemetry/telemetry_transport.hpp>
 #include <gempba/telemetry/topology.hpp>
 #include <gempba/utils/gempba_utils.hpp>
 #include <memory>
@@ -35,19 +36,20 @@ namespace gempba::telemetry {
     class process_probe;
     class node_probe;
     class aggregator_tcp_server;
+    class telemetry_transport;
 
     /**
      * @brief Process-wide runtime-telemetry hub.
      *
      * Owns the transport, counters, probes, and (on the aggregator) the
-     * dashboard server. Workers feed it via the @c record_* hot-path hooks;
+     * dashboard server. Each rank feeds it via the @c record_* hot-path hooks;
      * the pump thread periodically snapshots the counters into frames and
      * pushes them through the transport.
      *
      * One hub per process. Use the free functions @ref install, @ref get,
      * @ref uninstall to manage the singleton.
      */
-    class telemetry_hub {
+    class GEMPBA_API telemetry_hub {
     public:
         telemetry_hub();
         ~telemetry_hub();
@@ -56,13 +58,13 @@ namespace gempba::telemetry {
         telemetry_hub& operator=(const telemetry_hub&) = delete;
 
         /**
-         * @brief Bind the hub to a runtime mode and start the transport.
+         * @brief Bind the hub to a single-process run, with an in-process transport.
          *
          * Call once after the runtime is up and the rank / world_size
          * are known. Sets up the transport, populates the topology snapshot,
          * and (on the aggregator) starts the dashboard server.
          *
-         * @param p_mode              Runtime mode driving transport choice.
+         * @param p_mode              Runtime mode the frames report.
          * @param p_rank              This rank (0..world_size-1).
          * @param p_world_size        Total rank count in this run.
          * @param p_start_pump_thread When @c false, the periodic pump thread
@@ -71,6 +73,9 @@ namespace gempba::telemetry {
          *                            then be called manually. Used by tests.
          */
         void on_runtime_ready(runtime_mode p_mode, std::uint32_t p_rank, std::uint32_t p_world_size, bool p_start_pump_thread = true);
+
+        /** @brief Like the overload above, reaching the other ranks through @p p_transport. */
+        void on_runtime_ready(runtime_mode p_mode, std::uint32_t p_rank, std::uint32_t p_world_size, std::unique_ptr<telemetry_transport> p_transport, bool p_start_pump_thread = true);
 
         /// Stop the pump, drain a final frame, and release transport resources.
         void shutdown();
@@ -93,6 +98,8 @@ namespace gempba::telemetry {
 
         /// Record the end of this rank's scheduler run; scheduler times stop accruing.
         void record_run_end() noexcept;
+        /// Like @ref record_run_end(), also keeping how the run ended; the root's outcome is the final line's @c end.
+        void record_run_end(const run_outcome& p_outcome) noexcept;
 
         /// Record that this worker waits for a task: at run start and after reporting available.
         void record_worker_waiting() noexcept;
@@ -145,16 +152,13 @@ namespace gempba::telemetry {
          * Safe alongside concurrent @c record_* calls (relaxed atomics).
          * Not @c const — the process probe maintains delta state for CPU%.
          */
-        void snapshot_worker_frame(worker_frame& p_out) noexcept;
+        void snapshot_rank_frame(rank_frame& p_out) noexcept;
 
         /// Fill @p p_out with the current host-level snapshot. Sentinel ranks only.
         void snapshot_node_frame(node_frame& p_out) noexcept;
 
         /// @return The latest frame of rank @p p_rank, if one has been received.
-        [[nodiscard]] std::optional<worker_frame> latest_rank_frame(std::uint32_t p_rank) const;
-
-        /// @deprecated Use @ref latest_rank_frame. Removed in v5.0.0 (#373).
-        [[deprecated("use latest_rank_frame")]] [[nodiscard]] std::optional<worker_frame> latest_worker_frame(std::uint32_t p_rank) const;
+        [[nodiscard]] std::optional<rank_frame> latest_rank_frame(std::uint32_t p_rank) const;
 
         /// @return The latest node_frame of the host whose sentinel is rank @p p_sentinel_rank, if one has been received.
         [[nodiscard]] std::optional<node_frame> latest_node_frame(std::uint32_t p_sentinel_rank) const;
@@ -167,6 +171,12 @@ namespace gempba::telemetry {
 
         /// The UUID v4 the aggregator generated for this run at @ref on_runtime_ready; empty on other ranks.
         [[nodiscard]] const std::string& run_id() const noexcept;
+
+        /**
+         * @return how the run ended: the outcome this rank's scheduler recorded, or in a multithreading-only run the stop requested
+         * so far; empty when a scheduler recorded none
+         */
+        [[nodiscard]] std::optional<run_outcome> run_end() const;
 
         /**
          * @brief Attach @p p_value to this run under @p p_key, e.g. a run label, problem name or seed.
@@ -197,8 +207,8 @@ namespace gempba::telemetry {
         /// @return this run's markers, in the order they were recorded.
         [[nodiscard]] std::vector<run_marker> run_markers() const;
 
-        /// Record the scheduler this run uses, by its scheduler::get_name(), and each rank's scheduler::role_of(), indexed by rank.
-        void describe_scheduler(std::string_view p_name, std::vector<rank_role> p_roles = {});
+        /// Record the scheduler this run uses, by its scheduler::get_name(), and this rank's own role, its scheduler::role_of(rank_me()); call it before @ref on_runtime_ready.
+        void describe_scheduler(std::string_view p_name, rank_role p_role = rank_role::WORKER);
 
         /// Record the load balancer this run uses.
         void describe_load_balancer(balancing_policy p_policy);
@@ -209,23 +219,11 @@ namespace gempba::telemetry {
         /// Set the telemetry interval at which rank frames, and each host sentinel's node frame, are emitted. Fans out to other ranks.
         void set_interval_ms(std::uint32_t p_interval_ms) noexcept;
 
-        /// @deprecated Use @ref set_interval_ms. Removed in v5.0.0 (#373).
-        [[deprecated("use set_interval_ms")]] void set_worker_interval_ms(std::uint32_t p_interval_ms) noexcept;
-
-        /// @deprecated Does nothing: node frames follow @ref set_interval_ms since v4.3.0. Removed in the next breaking release.
-        [[deprecated("node frames follow set_interval_ms")]] void set_node_interval_ms(std::uint32_t p_interval_ms) noexcept;
-
         /// Promote this rank to its host's sentinel; it will start emitting node frames.
         void mark_as_node_sentinel() noexcept;
 
         /// @return The current telemetry interval, in milliseconds.
         [[nodiscard]] std::uint32_t interval_ms() const noexcept;
-
-        /// @deprecated Use @ref interval_ms. Removed in v5.0.0 (#373).
-        [[deprecated("use interval_ms")]] [[nodiscard]] std::uint32_t worker_interval_ms() const noexcept;
-
-        /// @deprecated Node frames follow the telemetry interval since v4.3.0, so this returns @ref interval_ms. Removed in the next breaking release.
-        [[deprecated("node frames follow interval_ms")]] [[nodiscard]] std::uint32_t node_interval_ms() const noexcept;
 
         /// @return whether a @ref control_kind::PAUSE holds; frames are neither published nor ingested until a @ref control_kind::RESUME.
         [[nodiscard]] bool paused() const noexcept;
@@ -249,6 +247,15 @@ namespace gempba::telemetry {
          * @ref control_kind for the semantics per kind.
          */
         void apply_control_from_client(control_kind p_kind, std::uint32_t p_value) noexcept;
+
+        /**
+         * @brief Stop the run for a dashboard client whose @p p_token matches @c GEMPBA_STOP_TOKEN in this process's environment.
+         *
+         * Without that variable, or with another token, the stop is refused with a warning.
+         *
+         * @return whether the stop was requested
+         */
+        bool request_stop_from_client(std::string_view p_token) noexcept;
 
     private:
         struct counters;
@@ -288,12 +295,14 @@ namespace gempba::telemetry {
         std::vector<std::pair<std::string, std::string>> m_run_annotations;
         std::vector<run_marker> m_run_markers;
         std::string m_scheduler_name;
-        std::vector<rank_role> m_scheduler_roles;
+        rank_role m_scheduler_role = rank_role::WORKER;
+        std::vector<rank_role> m_rank_roles;
         std::string m_load_balancer_name;
+        std::optional<run_outcome> m_run_end;
     };
 
     /// @return The installed hub, or @c nullptr when none is installed.
-    telemetry_hub* get() noexcept;
+    GEMPBA_API telemetry_hub* get() noexcept;
 
     /**
      * @brief Annotate the current run on the installed hub; see @ref telemetry_hub::annotate_run.
@@ -302,7 +311,7 @@ namespace gempba::telemetry {
      *
      * @return whether the pair was kept
      */
-    bool annotate_run(std::string_view p_key, std::string_view p_value);
+    GEMPBA_API bool annotate_run(std::string_view p_key, std::string_view p_value);
 
     /**
      * @brief Record a marker on the installed hub; see @ref telemetry_hub::mark_run.
@@ -311,13 +320,13 @@ namespace gempba::telemetry {
      *
      * @return whether the marker was kept
      */
-    bool mark_run(std::string_view p_label);
+    GEMPBA_API bool mark_run(std::string_view p_label);
 
     /// Install @p p_hub as the process-wide singleton; transfers ownership.
-    void install(std::unique_ptr<telemetry_hub> p_hub) noexcept;
+    GEMPBA_API void install(std::unique_ptr<telemetry_hub> p_hub) noexcept;
 
     /// Tear down and destroy the installed hub. No-op when none is installed.
-    void uninstall() noexcept;
+    GEMPBA_API void uninstall() noexcept;
 
     /**
      * @brief Tear down the installed hub and block subsequent @ref install calls until @ref enable.
@@ -328,13 +337,13 @@ namespace gempba::telemetry {
      * to call @ref disable on every rank before any @c create_* runtime entry
      * point.
      */
-    void disable() noexcept;
+    GEMPBA_API void disable() noexcept;
 
     /// Lift a prior @ref disable; subsequent @ref install calls take effect again.
-    void enable() noexcept;
+    GEMPBA_API void enable() noexcept;
 
     /// @return @c true when the kill switch is in the @ref enable state.
-    [[nodiscard]] bool is_enabled() noexcept;
+    [[nodiscard]] GEMPBA_API bool is_enabled() noexcept;
 
     /**
      * @brief Set the TCP port the aggregator will bind for the dashboard.
@@ -342,7 +351,7 @@ namespace gempba::telemetry {
      * Must be called before the hub is installed (i.e., before the first
      * node_manager / scheduler is created). Default is 9000 if never called.
      */
-    void configure_port(std::uint16_t p_port) noexcept;
+    GEMPBA_API void configure_port(std::uint16_t p_port) noexcept;
 
 } // namespace gempba::telemetry
 

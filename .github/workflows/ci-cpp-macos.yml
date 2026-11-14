@@ -3,13 +3,16 @@ name: C/C++ CI (macOS 26)
 on:
   push:
     branches: [ "main", "release" ]
-  # Docs-only PRs start no CI; wire-format.md still does, because a unit test reads it.
+  # Hosted macOS minutes are scarce, so only PRs into main or release run it. Docs-only PRs start no CI; wire-format.md
+  # still does, because a unit test reads it.
   pull_request:
+    branches: [ "main", "release" ]
     paths:
       - '**'
       - '!docs/**'
       - '!**/*.md'
       - 'docs/telemetry/wire-format.md'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -22,7 +25,7 @@ concurrency:
 
 jobs:
   test:
-    runs-on: ${{ fromJSON(vars.RUNNER_MACOS_INTEL || '["macos-26-intel"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_MACOS_ARM64 || '["macos-26"]') }}
     timeout-minutes: 30
 
     steps:
@@ -58,32 +61,28 @@ jobs:
           echo "open-mpi: $(mpicc --showme:version 2>/dev/null || brew info open-mpi --json | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["versions"]["stable"])')"
           echo "googletest: $(brew info googletest --json | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["versions"]["stable"])')"
 
-      # 4️⃣ Set up ccache. Tests reference gempba::mp::* directly, so only MP=ON is built here.
+      # 4️⃣ Set up ccache. The MPI component's tests need it, so it is built too.
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1
         with:
           key: build-macos-mpON
 
-      # 5️⃣ Configure + build with MP=ON
+      # 5️⃣ Configure + build with the MPI component
       - name: Configure + cached build
         run: |
           cmake -S . -B build \
-            -DGEMPBA_MULTIPROCESSING=ON \
+            -DGEMPBA_BUILD_MPI=ON \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_PREFIX_PATH=$(brew --prefix boost)
           cmake --build build --parallel $(sysctl -n hw.logicalcpu)
 
       # 6️⃣ Run tests with JUnit XML output
-      - name: Run tests with retry for flaky tests
+      - name: Run tests
         run: |
           cd ${{ github.workspace }}/build
 
-          echo "🟢 Non-flaky tests: single run, must pass"
-          ctest --output-on-failure --output-junit test_results_main.xml -E "FLAKY_"
-
-          echo "🟡 Flaky tests: up to 3 attempts each"
-          ctest --repeat until-pass:3 --output-on-failure --output-junit test_results_flaky.xml -R "FLAKY_" --no-tests=ignore
+          ctest --output-on-failure --output-junit test_results_main.xml
 
       # 7️⃣ Upload test results as artifacts
       - name: Upload test results
@@ -108,7 +107,7 @@ jobs:
   # Build the gempba-examples sister repo against an installed gempba built
   # from THIS branch. See ci-cpp-ubuntu.yml for rationale.
   build-examples-from-install:
-    runs-on: ${{ fromJSON(vars.RUNNER_MACOS_INTEL || '["macos-26-intel"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_MACOS_ARM64 || '["macos-26"]') }}
     timeout-minutes: 30
     env:
       GEMPBA_EXAMPLES_OWNER: ${{ vars.GEMPBA_EXAMPLES_OWNER || github.repository_owner }}
@@ -156,50 +155,23 @@ jobs:
           git -c http."https://github.com/".extraheader= -c credential.helper= clone --depth 1 --branch "${{ steps.examples_ref.outputs.ref }}" \
             "$EX_URL" "$RUNNER_TEMP/gempba-examples-src"
 
-      # 5️⃣ Install gempba mt (the base package) into the prefix. The mpi
-      #    topping package depends on the mt base for headers and the
-      #    gempbaConfig.cmake dispatcher, so the mt install comes first.
-      - name: Install gempba (mt base)
+      # 5️⃣ Install gempba, the core and the MPI component, into the prefix
+      - name: Install gempba (the core and the MPI component)
         run: |
-          cmake -S . -B "$RUNNER_TEMP/gempba-build-mt" \
+          cmake -S . -B "$RUNNER_TEMP/gempba-build" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="$GEMPBA_INSTALL_PREFIX" \
             -DGEMPBA_BUILD_TESTS=OFF \
-            -DGEMPBA_DEV_MODE=OFF \
-            -DGEMPBA_MULTIPROCESSING=OFF \
+            -DGEMPBA_BUILD_MPI=ON \
             -DCMAKE_PREFIX_PATH=$(brew --prefix boost)
-          cmake --build "$RUNNER_TEMP/gempba-build-mt" --parallel $(sysctl -n hw.logicalcpu)
-          cmake --install "$RUNNER_TEMP/gempba-build-mt"
+          cmake --build "$RUNNER_TEMP/gempba-build" --parallel $(sysctl -n hw.logicalcpu)
+          cmake --install "$RUNNER_TEMP/gempba-build"
 
-      # 6️⃣ Build the examples against the mt base alone
-      - name: Build gempba-examples (MP=OFF)
+      # 6️⃣ Build the examples, the multithreading and the MPI ones, against it
+      - name: Build gempba-examples
         run: |
-          cmake -S "$RUNNER_TEMP/gempba-examples-src" -B "$RUNNER_TEMP/gempba-examples-build-mt" \
+          cmake -S "$RUNNER_TEMP/gempba-examples-src" -B "$RUNNER_TEMP/gempba-examples-build" \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$GEMPBA_INSTALL_PREFIX;$(brew --prefix boost)" \
-            -DGEMPBA_MULTIPROCESSING=OFF
-          cmake --build "$RUNNER_TEMP/gempba-examples-build-mt" --parallel $(sysctl -n hw.logicalcpu)
+            -DCMAKE_PREFIX_PATH="$GEMPBA_INSTALL_PREFIX;$(brew --prefix boost)"
+          cmake --build "$RUNNER_TEMP/gempba-examples-build" --parallel $(sysctl -n hw.logicalcpu)
 
-      # 7️⃣ Layer the mpi topping on top of the mt base. Adds
-      #    libgempba_mpi.a + gempba_mpi-targets.cmake so
-      #    find_package(gempba COMPONENTS mpi) resolves.
-      - name: Install gempba (mpi topping)
-        run: |
-          cmake -S . -B "$RUNNER_TEMP/gempba-build-mpi" \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX="$GEMPBA_INSTALL_PREFIX" \
-            -DGEMPBA_BUILD_TESTS=OFF \
-            -DGEMPBA_DEV_MODE=OFF \
-            -DGEMPBA_MULTIPROCESSING=ON \
-            -DCMAKE_PREFIX_PATH=$(brew --prefix boost)
-          cmake --build "$RUNNER_TEMP/gempba-build-mpi" --parallel $(sysctl -n hw.logicalcpu)
-          cmake --install "$RUNNER_TEMP/gempba-build-mpi"
-
-      # 8️⃣ Build the examples against the mt base plus the mpi topping
-      - name: Build gempba-examples (MP=ON)
-        run: |
-          cmake -S "$RUNNER_TEMP/gempba-examples-src" -B "$RUNNER_TEMP/gempba-examples-build-mpi" \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$GEMPBA_INSTALL_PREFIX;$(brew --prefix boost)" \
-            -DGEMPBA_MULTIPROCESSING=ON
-          cmake --build "$RUNNER_TEMP/gempba-examples-build-mpi" --parallel $(sysctl -n hw.logicalcpu)

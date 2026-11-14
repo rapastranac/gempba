@@ -34,8 +34,8 @@
 
 #include "leaf_count.hpp"
 
-#include <gempba/defaults/default_mpi_stats_visitor.hpp>
 #include <gempba/gempba.hpp>
+#include <gempba/mpi/default_mpi_stats_visitor.hpp>
 #include <gempba/telemetry/frames.hpp>
 #include <gempba/telemetry/telemetry_hub.hpp>
 #include <mpi.h>
@@ -56,10 +56,10 @@
 /**
  * Runs the leaf count and checks what telemetry reports about it across ranks: each rank's own frame, totals
  * gathered to rank 0, and the aggregator's final broadcast as a dashboard connected to its TCP port receives it.
- * Then the aggregator pauses telemetry and resumes it, each step between barriers: the pause must reach every worker
+ * Then the aggregator pauses telemetry and resumes it, each step between barriers: the pause must reach every rank
  * and stop all frames, a snapshot requested while paused must bring every rank's frame to the aggregator and the
  * dashboard, and after the resume the aggregator must receive the tasks the workers counted while paused.
- * Every check compares totals or waits for a state with a generous deadline; only the snapshot needs every worker,
+ * Every check compares totals or waits for a state with a generous deadline; only the snapshot needs every rank,
  * ticking every few milliseconds, to answer within the aggregator's one-second wait.
  *
  * Usage: telemetry_stress <depth> <semi_centralized|centralized>
@@ -178,7 +178,7 @@ namespace {
         int m_failures = 0;
     };
 
-    std::uint64_t edge_bytes(const gempba::telemetry::worker_frame& p_frame) {
+    std::uint64_t edge_bytes(const gempba::telemetry::rank_frame& p_frame) {
         std::uint64_t v_sum = 0;
         for (const auto& v_edge: p_frame.m_edges_out) {
             v_sum += v_edge.m_bytes;
@@ -195,9 +195,9 @@ namespace {
         return p_done();
     }
 
-    gempba::telemetry::worker_frame own_frame(gempba::telemetry::telemetry_hub& p_hub) {
-        gempba::telemetry::worker_frame v_frame;
-        p_hub.snapshot_worker_frame(v_frame);
+    gempba::telemetry::rank_frame own_frame(gempba::telemetry::telemetry_hub& p_hub) {
+        gempba::telemetry::rank_frame v_frame;
+        p_hub.snapshot_rank_frame(v_frame);
         return v_frame;
     }
 } // namespace
@@ -217,7 +217,7 @@ int main(const int p_argc, char* p_argv[]) {
     const std::uint16_t v_port = free_loopback_port();
     gempba::telemetry::configure_port(v_port);
 
-    gempba::scheduler* v_scheduler = gempba::create_scheduler(leaf_count::parse_topology(v_topology_name));
+    gempba::scheduler* v_scheduler = gempba::mpi::create_scheduler(leaf_count::parse_topology(v_topology_name));
     const int v_rank = v_scheduler->rank_me();
     const int v_world_size = v_scheduler->world_size();
     checks v_checks(v_rank);
@@ -238,8 +238,8 @@ int main(const int p_argc, char* p_argv[]) {
     const auto v_counter = leaf_count::run(*v_scheduler, v_max_depth);
     v_scheduler->barrier();
 
-    gempba::telemetry::worker_frame v_frame;
-    gempba::telemetry::get()->snapshot_worker_frame(v_frame);
+    gempba::telemetry::rank_frame v_frame;
+    gempba::telemetry::get()->snapshot_rank_frame(v_frame);
     v_checks.expect(edge_bytes(v_frame) == v_frame.m_bytes_sent_total, "summed edges_out bytes differ from bytes_sent_total");
     if (v_rank != 0) {
         const auto v_elapsed_us = static_cast<long long>(v_scheduler->elapsed_time() * 1e6);
@@ -287,7 +287,7 @@ int main(const int p_argc, char* p_argv[]) {
         v_hub.apply_control_from_client(gempba::telemetry::control_kind::PAUSE, 0);
         v_hub.tick_if_due();
     } else {
-        v_checks.expect(tick_until(v_hub, [&] { return v_hub.paused(); }), "the pause did not reach this worker");
+        v_checks.expect(tick_until(v_hub, [&] { return v_hub.paused(); }), "the pause did not reach this rank");
     }
     v_scheduler->barrier();
 
@@ -344,7 +344,7 @@ int main(const int p_argc, char* p_argv[]) {
         v_checks.expect(v_broadcast, "the dashboard received no snapshot while paused");
         v_checks.expect(v_hub.paused(), "the snapshot ended the pause");
     } else {
-        v_checks.expect(tick_until(v_hub, [&] { return own_frame(v_hub).m_snapshot_id != 0; }), "this worker did not answer the snapshot");
+        v_checks.expect(tick_until(v_hub, [&] { return own_frame(v_hub).m_snapshot_id != 0; }), "this rank did not answer the snapshot");
         for (unsigned long long v_i = 0; v_i < k_tasks_after_snapshot; ++v_i) {
             v_hub.record_task_local();
         }
@@ -357,7 +357,7 @@ int main(const int p_argc, char* p_argv[]) {
         v_hub.tick_if_due();
     } else {
         v_checks.expect(tick_until(v_hub, [&] { return !v_hub.paused() && own_frame(v_hub).m_seq_no != v_snapshot_seq_no; }),
-                        "the resume did not reach this worker, or it published no frame after it");
+                        "the resume did not reach this rank, or it published no frame after it");
     }
     v_scheduler->barrier();
     if (v_rank == 0) {

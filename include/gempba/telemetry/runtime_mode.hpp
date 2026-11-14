@@ -10,9 +10,9 @@ namespace gempba::telemetry {
      * transport and topology layout.
      */
     enum class runtime_mode {
-        /// Single-process run; one worker, one host.
+        /// Single-process run; one rank, one host.
         MT_ONLY,
-        /// Multi-process run; one worker per rank, one or more hosts.
+        /// Multi-process run; one or more ranks on one or more hosts.
         MP_MPI,
     };
 

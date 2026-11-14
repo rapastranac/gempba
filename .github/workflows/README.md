@@ -17,11 +17,11 @@ groups workflows by purpose.
 
 ### Reusable building blocks
 - `_build-apt-index.yml` — rebuild the apt repository index after new debs land
-- `_build-deb.yml` — build the gempba `.deb` package
+- `_build-deb.yml` — build the gempba `.deb` packages, the core and the MPI component
 - `_build-msys2.yml` — build the gempba MSYS2 PKGBUILD artefact
 
 ### CI
-- `ci-cpp-ubuntu.yml` — C/C++ test (MP=ON, coverage, MPI integration tests) on Ubuntu 24.04, gempba-examples built against both installed flavors, and the deb + apt-index reusables
+- `ci-cpp-ubuntu.yml` — C/C++ test (with the MPI component, coverage, MPI integration tests) on Ubuntu 24.04, gempba-examples built against an installed gempba, and the deb + apt-index reusables
 - `ci-cpp-windows.yml` — C/C++ test and gempba-examples on Windows Server 2025 via MSYS2 UCRT64, and the MSYS2 package
 - `ci-cpp-macos.yml` — C/C++ test and gempba-examples on macOS 26 with Homebrew toolchain
 - `ci-java.yml` — JNI shared library + Java JAR build + test across Ubuntu / Windows / macOS, MT/MP matrix
@@ -31,12 +31,13 @@ groups workflows by purpose.
 
 | Event | Runs |
 |---|---|
-| PR into any branch | Lint; per OS, the C/C++ test job, the gempba-examples job, and the Java build and test jobs |
-| PR into `main` or `release`, push to them | The above, plus the deb + apt index, the MSYS2 package and the multi-platform JARs |
+| PR into any branch | Lint; on Linux and Windows, the C/C++ test job, the gempba-examples job, and the Java build and test jobs |
+| PR into `main` or `release`, push to them | The above, the same jobs on macOS, plus the deb + apt index, the MSYS2 package and the multi-platform JARs |
+| `workflow_dispatch` of `ci-cpp-macos.yml` or `ci-java.yml` | That workflow's jobs, macOS and the multi-platform JARs included |
 | PR that changes only `docs/` or Markdown | Nothing. The C/C++ workflows still run when `docs/telemetry/wire-format.md` changes, because `wire_format_doc_test` reads it |
 | `v*` tag | The `release-*` workflows |
 
-Each test job publishes its own JUnit report. The Java tests keep their own jobs so that a flaky test reruns without rebuilding the native library. Push triggers carry no path filter, so the README badges and the Codecov main graph always get a run.
+The macOS jobs run on GitHub's hosted Apple Silicon runner, whose minutes come out of the account's monthly allowance, so a PR into an integration branch that touches macOS gets a manual run: `gh workflow run ci-java.yml --ref <branch>`. Each test job publishes its own JUnit report. The Java tests keep their own jobs so that a flaky test reruns without rebuilding the native library. Push triggers carry no path filter, so the README badges and the Codecov main graph always get a run.
 
 ### Release
 - `prepare-release.yml` — bumps versions, generates PKGBUILD/deb manifests, opens the release PR

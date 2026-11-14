@@ -4,11 +4,11 @@
 
 namespace {
 
+    using gempba::telemetry::rank_frame;
     using gempba::telemetry::scheduler_clock;
-    using gempba::telemetry::worker_frame;
 
-    worker_frame fill_at(const scheduler_clock& p_clock, const std::uint64_t p_now) {
-        worker_frame v_frame{};
+    rank_frame fill_at(const scheduler_clock& p_clock, const std::uint64_t p_now) {
+        rank_frame v_frame{};
         p_clock.fill(v_frame, p_now);
         return v_frame;
     }
@@ -23,7 +23,7 @@ namespace {
         v_clock.on_worker_waiting(16'000);
         v_clock.on_run_end(21'000);
 
-        const worker_frame v_frame = fill_at(v_clock, 30'000);
+        const rank_frame v_frame = fill_at(v_clock, 30'000);
         EXPECT_EQ(9'000u, v_frame.m_sched_running_microseconds);
         EXPECT_EQ(11'000u, v_frame.m_sched_waiting_microseconds);
         EXPECT_EQ(20'000u, v_frame.m_sched_running_microseconds + v_frame.m_sched_waiting_microseconds);
@@ -38,7 +38,7 @@ namespace {
         v_clock.on_worker_running(10'000);
         v_clock.on_worker_waiting(16'000);
 
-        const worker_frame v_frame = fill_at(v_clock, 20'000);
+        const rank_frame v_frame = fill_at(v_clock, 20'000);
         EXPECT_EQ(2u, v_frame.m_first_task_ms);
         EXPECT_EQ(15u, v_frame.m_last_task_ms);
     }
@@ -49,12 +49,12 @@ namespace {
         v_clock.on_worker_waiting(0);
         v_clock.on_worker_running(1'000);
 
-        const worker_frame v_running = fill_at(v_clock, 4'000);
+        const rank_frame v_running = fill_at(v_clock, 4'000);
         EXPECT_EQ(3'000u, v_running.m_sched_running_microseconds);
         EXPECT_EQ(1'000u, v_running.m_sched_waiting_microseconds);
 
         v_clock.on_worker_waiting(5'000);
-        const worker_frame v_waiting = fill_at(v_clock, 7'000);
+        const rank_frame v_waiting = fill_at(v_clock, 7'000);
         EXPECT_EQ(4'000u, v_waiting.m_sched_running_microseconds);
         EXPECT_EQ(3'000u, v_waiting.m_sched_waiting_microseconds);
     }
@@ -71,7 +71,7 @@ namespace {
         v_clock.on_run_end(8'000);
         v_clock.on_worker_running(9'000);
 
-        const worker_frame v_frame = fill_at(v_clock, 12'000);
+        const rank_frame v_frame = fill_at(v_clock, 12'000);
         EXPECT_EQ(0u, v_frame.m_sched_running_microseconds);
         EXPECT_EQ(3'000u, v_frame.m_sched_waiting_microseconds);
         EXPECT_EQ(0u, v_frame.m_first_task_ms);
@@ -84,7 +84,7 @@ namespace {
         v_clock.on_assignment_accepted(1, 400);
         v_clock.on_assignment_accepted(2, 1'200);
 
-        const worker_frame v_frame = fill_at(v_clock, 2'000);
+        const rank_frame v_frame = fill_at(v_clock, 2'000);
         EXPECT_EQ(1'300u, v_frame.m_assign_latency_microseconds_total);
         EXPECT_EQ(2u, v_frame.m_assign_count);
         EXPECT_EQ(1'000u, v_frame.m_assign_latency_microseconds_max);
@@ -96,10 +96,10 @@ namespace {
         v_clock.on_assignment(3, 600);
         v_clock.on_assignment_accepted(3, 700);
         v_clock.on_assignment_accepted(3, 900);
-        v_clock.on_assignment(gempba::telemetry::MAX_WORKERS, 1'000);
-        v_clock.on_assignment_accepted(gempba::telemetry::MAX_WORKERS, 1'100);
+        v_clock.on_assignment(gempba::telemetry::MAX_RANKS, 1'000);
+        v_clock.on_assignment_accepted(gempba::telemetry::MAX_RANKS, 1'100);
 
-        const worker_frame v_frame = fill_at(v_clock, 2'000);
+        const rank_frame v_frame = fill_at(v_clock, 2'000);
         EXPECT_EQ(100u, v_frame.m_assign_latency_microseconds_total);
         EXPECT_EQ(1u, v_frame.m_assign_count);
     }
@@ -111,11 +111,11 @@ namespace {
         v_clock.on_coordinator_queue(3, false, 1'000);
         v_clock.on_coordinator_queue(1, true, 3'000);
 
-        const worker_frame v_live = fill_at(v_clock, 3'500);
+        const rank_frame v_live = fill_at(v_clock, 3'500);
         EXPECT_EQ(2'500u, v_live.m_available_microseconds_queue_empty);
 
         v_clock.on_run_end(4'000);
-        const worker_frame v_final = fill_at(v_clock, 9'000);
+        const rank_frame v_final = fill_at(v_clock, 9'000);
         EXPECT_EQ(3'000u, v_final.m_available_microseconds_queue_empty);
     }
 
@@ -164,7 +164,7 @@ namespace {
         v_clock.on_coordinator_queue(2, true, 0);
         v_clock.on_run_end(5'000);
 
-        const worker_frame v_frame = fill_at(v_clock, 5'000);
+        const rank_frame v_frame = fill_at(v_clock, 5'000);
         EXPECT_EQ(0u, v_frame.m_sched_running_microseconds);
         EXPECT_EQ(0u, v_frame.m_sched_waiting_microseconds);
         EXPECT_EQ(10'000u, v_frame.m_available_microseconds_queue_empty);

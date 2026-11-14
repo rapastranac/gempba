@@ -92,7 +92,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Directories that hold first-party sources.
-SOURCE_DIRS=(include src tests private)
+SOURCE_DIRS=(include src tests)
 
 # Collect all in-repo C/C++ files, excluding build and external trees.
 mapfile -t SOURCE_FILES < <(
@@ -185,7 +185,7 @@ if [[ $DO_TIDY -eq 1 ]]; then
             -DCMAKE_BUILD_TYPE=Debug \
             -DCMAKE_CXX_SCAN_FOR_MODULES=OFF \
             -DGEMPBA_BUILD_TESTS=ON \
-            -DGEMPBA_MULTIPROCESSING=ON \
+            -DGEMPBA_BUILD_MPI=ON \
             >/dev/null
     fi
 
@@ -201,9 +201,9 @@ if [[ $DO_TIDY -eq 1 ]]; then
     if command -v cygpath >/dev/null 2>&1; then
         FILTER_ROOT="$(cygpath -m "$WORKSPACE")"
     fi
-    FILE_FILTER="^$(printf '%s\n' "$FILTER_ROOT" | sed 's/[][\.*^$/]/\\&/g')/(include|src|tests|private)/"
+    FILE_FILTER="^$(printf '%s\n' "$FILTER_ROOT" | sed 's/[][\.*^$/]/\\&/g')/(include|src|tests)/"
 
-    HEADER_FILTER="$(printf '%s\n' "$FILTER_ROOT" | sed 's/[][\.*^$/]/\\&/g')/(include|src|tests|private)/.*"
+    HEADER_FILTER="$(printf '%s\n' "$FILTER_ROOT" | sed 's/[][\.*^$/]/\\&/g')/(include|src|tests)/.*"
 
     TIDY_ARGS=(
         -p "$BUILD_DIR"

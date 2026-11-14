@@ -38,7 +38,7 @@ class node_core_mock final : public gempba::node_core {
 public:
     MOCK_METHOD(void, run, (), (override));
     MOCK_METHOD(void, delegate_locally, (gempba::load_balancer * p_manager), (override));
-    MOCK_METHOD(void, delegate_remotely, (gempba::scheduler::worker * p_scheduler, int p_runner_id), (override));
+    MOCK_METHOD(void, delegate_remotely, (gempba::scheduler * p_scheduler, int p_runner_id), (override));
     MOCK_METHOD(void, set_result, (const gempba::task_packet& p_result), (override));
     MOCK_METHOD(gempba::task_packet, get_result, (), (override));
     MOCK_METHOD(gempba::task_packet, serialize, (), (override));

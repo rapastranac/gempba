@@ -27,8 +27,8 @@ class NodeManagerNativeTest {
 
     @Test
     void createNodeManager_returns_valid_handle() {
-        long lbHandle = GemPBANative.MT.createLoadBalancer(BalancingPolicy.QUASI_HORIZONTAL.ordinal());
-        long nmHandle = GemPBANative.MT.createNodeManager(lbHandle);
+        long lbHandle = GemPBANative.createLoadBalancer(BalancingPolicy.QUASI_HORIZONTAL.ordinal(), 0L);
+        long nmHandle = GemPBANative.createNodeManager(lbHandle, 0L);
         assertNotEquals(0L, nmHandle, "MT.createNodeManager must return a non-zero handle");
         GemPBANative.NodeManager.destroy(nmHandle);
     }
@@ -40,8 +40,8 @@ class NodeManagerNativeTest {
 
     @Test
     void leaf_task_reports_score_via_tryUpdateResultMT() throws InterruptedException {
-        long lbHandle = GemPBANative.MT.createLoadBalancer(BalancingPolicy.QUASI_HORIZONTAL.ordinal());
-        NodeManager nm = new NodeManager(GemPBANative.MT.createNodeManager(lbHandle));
+        long lbHandle = GemPBANative.createLoadBalancer(BalancingPolicy.QUASI_HORIZONTAL.ordinal(), 0L);
+        NodeManager nm = new NodeManager(GemPBANative.createNodeManager(lbHandle, 0L));
 
         nm.setGoal(Goal.MAXIMISE, ScoreType.I32);
         nm.setThreadPoolSize(1);

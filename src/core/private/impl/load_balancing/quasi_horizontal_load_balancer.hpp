@@ -1,0 +1,382 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) 2025. Andrés Pastrana
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+#ifndef GEMPBA_QUASI_HORIZONTAL_LOAD_BALANCER_HPP
+#define GEMPBA_QUASI_HORIZONTAL_LOAD_BALANCER_HPP
+
+#include <BS_thread_pool.hpp>
+#include <atomic>
+#include <set>
+#include <spdlog/spdlog.h>
+#include <thread>
+
+#include <gempba/core/load_balancer.hpp>
+#include <gempba/core/node.hpp>
+#include <gempba/telemetry/telemetry_hub.hpp>
+#include <gempba/utils/transmission_guard.hpp>
+#include <gempba/utils/utils.hpp>
+
+/**
+ * @author Andres Pastrana
+ * @date 2025-08-30
+ */
+
+namespace gempba {
+    class quasi_horizontal_load_balancer final : public load_balancer {
+
+        BS::thread_pool<> m_thread_pool{1};
+        unsigned int m_unique_id_counter = 0;
+        std::recursive_mutex m_recursive_mutex;
+        scheduler* const m_scheduler;
+        std::map<std::thread::id, std::shared_ptr<std::shared_ptr<node_core>>> m_roots; // every thread will be solving a subtree, this point to their roots
+        unsigned int m_thread_count = std::thread::hardware_concurrency();
+        std::size_t m_thread_request_count = 0;
+        std::atomic<std::size_t> m_spawn_rejected_pool_full_count{0};
+        std::atomic<std::size_t> m_spawn_remote_rejected_count{0};
+
+    public:
+        explicit quasi_horizontal_load_balancer(scheduler* const p_scheduler = nullptr) : m_scheduler(p_scheduler) { m_thread_pool.wait(); }
+
+        balancing_policy get_balancing_policy() override { return QUASI_HORIZONTAL; }
+
+        unsigned generate_unique_id() override { return ++m_unique_id_counter; }
+
+        std::future<std::any> force_local_submit(std::function<std::any()>&& p_function) override {
+            ++m_thread_request_count;
+            if (auto* v_telemetry = telemetry::get())
+                v_telemetry->record_task_local();
+            return m_thread_pool.submit_task(p_function);
+        }
+
+        void prune_and_correct_root_after_forward(node& p_node) {
+            node v_parent = p_node.get_parent();
+            if (v_parent == nullptr) {
+                // p_node is a root (or was just made root), just prune it
+                p_node.prune();
+                return;
+            }
+            p_node.prune(); // prune as it was already resolved
+            try_correct_root(v_parent);
+        }
+
+        void forward(node& p_node) override {
+            if (p_node.get_state() == UNUSED && p_node.should_branch()) {
+                p_node.run();
+            }
+            prune_and_correct_root_after_forward(p_node);
+        }
+
+        bool try_local_submit(node& p_node) override {
+            if (send(p_node)) {
+                return true;
+            }
+            forward(p_node);
+            return false;
+        }
+
+        bool try_remote_submit(node& p_node, const int p_runnable_id) override {
+            if (!m_scheduler) {
+                utils::log_and_throw("Attempted to do remote submission without a scheduler worker");
+            }
+            if (send(p_node, p_runnable_id)) {
+                return true;
+            }
+            try_local_submit(p_node);
+            return false;
+        }
+
+        [[nodiscard]] double get_idle_time() const override { return m_thread_pool.get_wall_idle_time(); }
+
+        [[nodiscard]] double get_starved_idle_time() const override { return m_thread_pool.get_wall_starved_idle_time(); }
+
+        [[nodiscard]] double get_imbalanced_idle_time() const override { return m_thread_pool.get_wall_imbalanced_idle_time(); }
+
+        void set_root(const std::thread::id p_thread_id, std::shared_ptr<node_core>& p_root) override {
+            std::scoped_lock v_lock(m_recursive_mutex);
+            if (m_roots.contains(p_thread_id)) {
+                const auto v_ptr = m_roots.at(p_thread_id);
+                *v_ptr = p_root; // should I assign this way
+            } else {
+                m_roots.emplace(p_thread_id, std::make_shared<std::shared_ptr<node_core>>(p_root));
+            }
+        }
+
+        std::shared_ptr<std::shared_ptr<node_core>> get_root(const std::thread::id p_thread_id) override {
+            std::scoped_lock v_lock(m_recursive_mutex);
+            if (m_roots.contains(p_thread_id)) {
+                return m_roots.at(p_thread_id);
+            }
+            return nullptr;
+        }
+
+        void set_thread_pool_size(const unsigned p_size) override {
+            m_thread_pool.reset(p_size);
+            m_thread_pool.wait();
+            spdlog::debug("thread pool size: {}", m_thread_pool.get_thread_count());
+        }
+
+        [[nodiscard]] unsigned int get_thread_pool_size() const override { return m_thread_pool.get_thread_count(); }
+
+        [[nodiscard]] std::size_t get_tasks_running_count() const override { return m_thread_pool.get_tasks_running(); }
+
+        void wait() override { m_thread_pool.wait(); }
+
+        bool is_done() const override { return m_thread_pool.get_tasks_total() == 0; }
+
+        std::size_t get_thread_request_count() const override { return m_thread_request_count; }
+
+        [[nodiscard]] std::size_t get_spawn_rejected_pool_full_count() const override { return m_spawn_rejected_pool_full_count.load(std::memory_order_relaxed); }
+
+        [[nodiscard]] std::size_t get_spawn_remote_rejected_count() const override { return m_spawn_remote_rejected_count.load(std::memory_order_relaxed); }
+
+#if GEMPBA_BUILD_TESTS
+
+    public:
+#else
+    private:
+#endif
+
+
+        /**
+         * @brief Utility method to check if the thread_pool can receive another task. Always use within a lock_guard as
+         * it might change when attempting to submit a new task.
+         *
+         * @return Returns true if the thread pool is not full, false otherwise.
+         */
+        bool is_thread_pool_full() const {
+            const unsigned int v_thread_count = m_thread_pool.get_thread_count();
+            const unsigned int v_tasks_running = m_thread_pool.get_tasks_running();
+            return v_tasks_running == v_thread_count;
+        }
+
+
+        /**
+         * @brief Prunes @p p_node before it is handed out, then lowers its thread's root past any single-child nodes it leaves.
+         *
+         * @see https://rapastranac.github.io/gempba-docs/reference/implementations/load-balancers/quasi-horizontal/#submitting-a-child-of-the-root
+         * @see https://rapastranac.github.io/gempba-docs/reference/implementations/load-balancers/quasi-horizontal/#submitting-a-root-that-has-children
+         */
+        void prune_and_fix_parent_root_if_needed(node& p_node) {
+            node v_parent = p_node.get_parent();
+            const node v_root = p_node.get_root();
+            if (p_node == v_root && p_node.get_children_count() == 0) {
+                return; // p_node was root and a leaf — nothing to fix
+            }
+            p_node.prune();
+            if (v_parent == nullptr) {
+                return;
+            }
+            try_correct_root(v_parent);
+        }
+
+        bool send(node& p_node) {
+            if (is_dispatched(p_node)) {
+                return true;
+            }
+            while (true) {
+                const std::unique_lock v_lock(m_recursive_mutex, std::try_to_lock);
+                if (!v_lock.owns_lock()) {
+                    return false;
+                }
+                if (is_thread_pool_full()) {
+                    m_spawn_rejected_pool_full_count.fetch_add(1, std::memory_order_relaxed);
+                    return false;
+                }
+                const bool v_node_found_and_pushed = try_push_root_level_node_locally(p_node);
+                if (v_node_found_and_pushed) {
+                    // if top holder found, then it was pushed
+                    continue; // keeps iterating from root to current level
+                }
+                // push current node
+                if (p_node.is_consumed()) {
+                    utils::log_and_throw("Node: {} is already consumed", p_node.get_node_id());
+                }
+
+                // node should be pruned before submission —— ORDER MATTERS (avoids memory leaks)
+                prune_and_fix_parent_root_if_needed(p_node);
+                if (p_node.should_branch()) {
+                    p_node.delegate_locally(this);
+                } else {
+                    p_node.set_state(DISCARDED);
+                }
+                return true; // signalize that node was consumed
+            }
+        }
+
+        bool send(node& p_node, const int p_runnable_id) {
+            if (is_dispatched(p_node)) {
+                return true;
+            }
+            while (true) {
+                const std::unique_lock v_lock(m_recursive_mutex, std::try_to_lock);
+                if (!v_lock.owns_lock()) {
+                    return false;
+                }
+
+                const std::optional<transmission_guard> v_lock_optional = m_scheduler->try_open_transmission_channel();
+                if (!v_lock_optional.has_value()) {
+                    m_spawn_remote_rejected_count.fetch_add(1, std::memory_order_relaxed);
+                    return false;
+                }
+                const bool v_node_found_and_pushed = try_push_root_level_node_remotely(p_node, p_runnable_id);
+                if (v_node_found_and_pushed) {
+                    // if top holder found, then it was pushed
+                    continue; // keeps iterating from root to current level
+                }
+                // push current node
+                if (p_node.is_consumed()) {
+                    utils::log_and_throw("Node: {} is already consumed", p_node.get_node_id());
+                }
+
+                // node should be pruned before submission —— ORDER MATTERS (avoids memory leaks)
+                prune_and_fix_parent_root_if_needed(p_node);
+                if (p_node.should_branch()) {
+                    p_node.delegate_remotely(m_scheduler, p_runnable_id);
+                } else {
+                    p_node.set_state(DISCARDED);
+                }
+                return true; // signalize that node was consumed
+            }
+        }
+
+        bool try_push_root_level_node_locally(node& p_node) {
+
+            node v_top_node = p_node.map_core([&](const std::shared_ptr<node_core>& p_core) { return get_root_level_pending_node(p_core); });
+            if (v_top_node != nullptr) {
+                try_correct_root(p_node); // VERY IMPORTANT!!
+                if (v_top_node.should_branch()) {
+                    v_top_node.delegate_locally(this);
+                } else {
+                    v_top_node.set_state(DISCARDED);
+                }
+                // root-level node found whether discarded or pushed
+                return true;
+            }
+            return false;
+        }
+
+        bool try_push_root_level_node_remotely(node& p_node, const int p_runnable_id) {
+
+            node v_top_node = p_node.map_core([&](const std::shared_ptr<node_core>& p_core) { return get_root_level_pending_node(p_core); });
+            if (v_top_node != nullptr) {
+                try_correct_root(p_node); // VERY IMPORTANT!!
+                if (v_top_node.should_branch()) {
+                    v_top_node.delegate_remotely(m_scheduler, p_runnable_id);
+                } else {
+                    v_top_node.set_state(DISCARDED);
+                }
+                // root-level node found whether discarded or pushed
+                return true;
+            }
+            return false;
+        }
+
+        /**
+         * @brief Finds the leftmost root child that is still UNUSED, prunes it from the root and returns it.
+         *
+         * The root child holding @p p_node is RUNNING, so it is never returned, whatever its position among its
+         * siblings.
+         *
+         * @see https://rapastranac.github.io/gempba-docs/reference/implementations/load-balancers/quasi-horizontal/#root-level-siblings-go-first
+         * @see https://rapastranac.github.io/gempba-docs/reference/implementations/load-balancers/quasi-horizontal/#a-running-branch-is-never-handed-out
+         *
+         * @param p_node The node from which to start the search.
+         * @return The pending node at the root level, or nullptr if none found.
+         */
+        static std::shared_ptr<node_core> get_root_level_pending_node(const std::shared_ptr<node_core>& p_node) {
+            if (p_node->get_parent() == nullptr) {
+                return nullptr;
+            }
+            if (p_node->get_parent() == p_node->get_root()) {
+                return nullptr;
+            }
+
+            const std::shared_ptr<node_core> v_root = p_node->get_root();
+            if (!v_root || v_root->get_children_count() < 2) {
+                return nullptr;
+            }
+
+            for (std::shared_ptr<node_core> v_child = v_root->get_leftmost_child(); v_child != nullptr; v_child = v_child->get_right_sibling()) {
+                if (v_child->get_state() == UNUSED) {
+                    v_child->prune();
+                    return v_child;
+                }
+            }
+            return nullptr;
+        }
+
+        /**
+         * @brief Lowers the thread's root while it has exactly one child, stopping at @p p_node, at a node with two or more
+         * children, or at a leaf.
+         *
+         * @see https://rapastranac.github.io/gempba-docs/reference/implementations/load-balancers/quasi-horizontal/#root-correction-after-a-forward
+         * @see https://rapastranac.github.io/gempba-docs/reference/implementations/load-balancers/quasi-horizontal/#lowering-stops-at-the-parent-of-the-submitted-node
+         */
+        void try_correct_root(node& p_node) {
+            node v_root = p_node.get_root();
+            // Check if root is null (shouldn't happen with new prune(), but defensive)
+            if (v_root == nullptr) {
+                return;
+            }
+
+            // Check if p_node is already its own root (was pruned)
+            if (v_root == p_node && v_root.get_children_count() == 0) {
+                return; // Nothing to correct - node is already root and a leaf
+            }
+
+            if (v_root.get_children_count() >= 2) {
+                return; // root has multiple children, no need to correct
+            }
+
+            // Root has 0 or 1 children, need to lower it
+            while (v_root.get_children_count() == 1) {
+                node v_leftmost = v_root.get_leftmost_child();
+                make_root(v_leftmost);
+                v_root.prune();
+                v_root = v_leftmost;
+
+                // Check if we've reached p_node or a node with 2+ children
+                if (v_root == p_node || v_root.get_children_count() >= 2) {
+                    return;
+                }
+            }
+            // After exiting loop, v_root either:
+            // - has 0 children (is a leaf) - it's already the root
+            // - has 2+ children (has pending work) - it's already the root
+        }
+
+        void make_root(node& p_node) {
+            p_node.map_core([this](std::shared_ptr<node_core>& p_core) {
+                this->set_root(p_core->get_thread_id(), p_core);
+                p_core->set_parent(nullptr);
+                return p_core;
+            });
+        }
+    };
+
+
+} // namespace gempba
+
+
+#endif // GEMPBA_QUASI_HORIZONTAL_LOAD_BALANCER_HPP

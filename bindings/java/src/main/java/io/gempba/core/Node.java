@@ -3,6 +3,7 @@ package io.gempba.core;
 import io.gempba.internal.GemPBANative;
 
 import java.lang.ref.Cleaner;
+import java.lang.ref.Reference;
 
 /**
  * Java representation of one node in the gempba search tree.
@@ -157,7 +158,11 @@ public final class Node implements AutoCloseable {
      * @return serialised result bytes, or {@code null} for void / pruned nodes
      */
     public byte[] getResult() {
-        return GemPBANative.Node.getResult(state.handle);
+        try {
+            return GemPBANative.Node.getResult(state.handle);
+        } finally {
+            Reference.reachabilityFence(this);
+        }
     }
 
     /**

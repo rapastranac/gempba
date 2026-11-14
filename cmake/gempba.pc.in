@@ -3,9 +3,8 @@ exec_prefix=${prefix}
 libdir=${prefix}/@CMAKE_INSTALL_LIBDIR@
 includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
 
-Name: @GEMPBA_PC_NAME@
+Name: gempba
 Description: Generic Massive Parallelisation of Branching Algorithms — hybrid parallel C++23 framework
 Version: @PROJECT_VERSION@
-Requires: @GEMPBA_PC_REQUIRES@
-Libs: -L${libdir} -l@GEMPBA_PC_LIB@ @GEMPBA_PC_STACKTRACE_LIBS@ -lpthread
-Cflags: -I${includedir} -std=c++23 -DGEMPBA_MULTIPROCESSING=@GEMPBA_PC_MP@ @GEMPBA_PC_STACKTRACE_CFLAGS@
+Libs: -L${libdir} -lgempba @GEMPBA_PC_STACKTRACE_LIBS@ -lpthread
+Cflags: -I${includedir} -std=c++23 @GEMPBA_PC_STACKTRACE_CFLAGS@

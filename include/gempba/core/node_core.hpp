@@ -53,7 +53,7 @@ namespace gempba {
 
         void delegate_locally(load_balancer* p_load_balancer) override = 0;
 
-        void delegate_remotely(scheduler::worker* p_scheduler, int p_runner_id) override = 0;
+        void delegate_remotely(scheduler* p_scheduler, int p_runner_id) override = 0;
 
         void set_result(const task_packet& p_result) override = 0;
 

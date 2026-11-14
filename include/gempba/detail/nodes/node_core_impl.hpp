@@ -41,6 +41,7 @@
 
 #include <gempba/core/load_balancer.hpp>
 #include <gempba/core/node_core.hpp>
+#include <gempba/core/stop.hpp>
 #include <gempba/utils/utils.hpp>
 
 /**
@@ -272,6 +273,7 @@ namespace gempba {
                 utils::log_and_throw("node is already consumed, node: {}, state: {}", m_node_id, get_state_string(m_state));
             }
             ensure_args_initialized();
+            m_state = RUNNING;
             m_result = m_invoke(false);
             m_state = FORWARDED;
         }
@@ -283,6 +285,9 @@ namespace gempba {
             ensure_args_initialized();
             m_result = p_load_balancer->force_local_submit([v_copy = shared_from_this(), this] {
                 // IMPORTANT: "v_copy" keeps "this" alive until the pool thread executes the function
+                if (stop_requested()) {
+                    return std::any{};
+                }
                 try {
                     return m_invoke(true);
                 } catch (const std::exception& v_e) {
@@ -294,12 +299,12 @@ namespace gempba {
             m_state = PUSHED;
         }
 
-        void delegate_remotely(scheduler::worker* p_worker, const int p_runner_id) override {
+        void delegate_remotely(scheduler* p_scheduler, const int p_runner_id) override {
             if (m_state != UNUSED) {
                 utils::log_and_throw("node is already consumed, node: {}, state: {}", m_node_id, get_state_string(m_state));
             }
             ensure_args_initialized();
-            m_remote_node = p_worker->force_push(serialize(), p_runner_id);
+            m_remote_node = p_scheduler->force_push(serialize(), p_runner_id);
             m_state = SENT_TO_ANOTHER_PROCESS;
         }
 
@@ -389,6 +394,9 @@ namespace gempba {
         [[nodiscard]] bool is_consumed() const override { return m_state != UNUSED; }
 
         bool should_branch() override {
+            if (stop_requested()) {
+                return false;
+            }
             if (m_should_branch_cached.has_value()) {
                 utils::print_ipc_debug_comments("run_id: {}, should_branch() returning cached value: {}", m_node_id, m_should_branch_cached.value());
                 return m_should_branch_cached.value();
@@ -570,6 +578,8 @@ namespace gempba {
                     return "RETRIEVED";
                 case SENT_TO_ANOTHER_PROCESS:
                     return "SENT_TO_ANOTHER_PROCESS";
+                case RUNNING:
+                    return "RUNNING";
                 default:
                     return "UNKNOWN_STATE";
             }

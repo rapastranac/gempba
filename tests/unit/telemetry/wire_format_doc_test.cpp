@@ -1,3 +1,4 @@
+#include <csignal>
 #include <filesystem>
 #include <fstream>
 #include <gtest/gtest.h>
@@ -30,18 +31,18 @@ namespace {
     TEST(wire_format_doc_test, documents_every_key_a_broadcast_sends) {
         gempba::telemetry::topology_snapshot v_topology;
         gempba::telemetry::topology_node v_node;
-        v_node.m_worker_ids = {0, 1};
+        v_node.m_ranks = {0, 1};
         v_node.m_sockets.push_back(gempba::telemetry::topology_socket{0, "cpu", 2, 4, {0, 1, 2, 3}});
         v_topology.m_nodes.push_back(v_node);
         v_topology.m_identities.resize(2);
-        v_topology.m_identities[1].m_worker_id = 1;
+        v_topology.m_identities[1].m_rank = 1;
 
         gempba::telemetry::run_description v_run;
         v_run.m_mode = gempba::telemetry::runtime_mode::MP_MPI;
         v_run.m_markers = {{120, "phase 2", gempba::telemetry::marker_source::DASHBOARD}};
 
-        std::vector<gempba::telemetry::worker_frame> v_workers(1);
-        v_workers[0].m_edges_out.push_back(gempba::telemetry::edge_counter{1, 64, 1});
+        std::vector<gempba::telemetry::rank_frame> v_rank_frames(1);
+        v_rank_frames[0].m_edges_out.push_back(gempba::telemetry::edge_counter{1, 64, 1});
         std::vector<gempba::telemetry::node_frame> v_nodes(1);
         v_nodes[0].m_socket_count = 1;
 
@@ -49,14 +50,16 @@ namespace {
         v_payload.m_run_id = "123e4567-e89b-42d3-a456-426614174000";
         v_payload.m_topology = &v_topology;
         v_payload.m_run = &v_run;
-        v_payload.m_workers = &v_workers;
+        v_payload.m_rank_frames = &v_rank_frames;
         v_payload.m_nodes = &v_nodes;
+        v_payload.m_final = true;
+        v_payload.m_end = gempba::run_outcome{gempba::end_reason::INTERRUPTED, gempba::stop_trigger::SIGNAL, SIGTERM};
 
         std::string v_lines;
         gempba::telemetry::serialize_broadcast(v_lines, v_payload);
         gempba::telemetry::serialize_paused_broadcast(v_lines, v_payload);
         const std::set<std::string> v_keys = keys_in(v_lines);
-        for (const char* v_nested: {"paused", "role", "cpu_ids", "elapsed_ms", "to", "cpu_pct"}) {
+        for (const char* v_nested: {"paused", "role", "cpu_ids", "elapsed_ms", "to", "cpu_pct", "signal"}) {
             ASSERT_TRUE(v_keys.contains(v_nested)) << "the sample broadcast no longer reaches `" << v_nested << "`";
         }
 

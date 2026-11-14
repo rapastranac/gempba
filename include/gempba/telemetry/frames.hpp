@@ -2,18 +2,19 @@
 #define GEMPBA_TELEMETRY_FRAMES_HPP
 
 #include <cstdint>
+#include <gempba/core/rank_role.hpp>
 #include <vector>
 
 namespace gempba::telemetry {
 
-    /** @brief Hard upper bound on worker_id values in the local transport and the coordinator's assignment table; edges are not capped. */
-    inline constexpr unsigned MAX_WORKERS = 1024;
+    /** @brief Hard upper bound on rank values in the local transport and the coordinator's assignment table; edges are not capped. */
+    inline constexpr unsigned MAX_RANKS = 1024;
     /** @brief Hard upper bound on per-host socket count; sizes node_frame::m_sockets. */
     inline constexpr unsigned MAX_SOCKETS = 8;
 
     /**
      * @brief Hard upper bound on a node's logical CPU count, and the derived 64-bit word
-     * count for worker_identity's allowed-CPU bitmap. Covers the widest current
+     * count for rank_identity's allowed-CPU bitmap. Covers the widest current
      * servers (e.g. dual 192-core SMT) with headroom.
      */
     inline constexpr unsigned MAX_LOGICAL_CPUS = 1024;
@@ -28,44 +29,45 @@ namespace gempba::telemetry {
     /**
      * @brief Static, one-shot description of a rank.
      *
-     * Published once per rank at startup. Joins a rank (its worker_id) to a host / pid
+     * Published once per rank at startup. Joins a rank to a host / pid
      * plus its CPU-affinity mask so the dashboard can place it in the topology.
-     * The worker_* names predate the rank vocabulary and change in v5.0.0 (#373).
      */
-    struct worker_identity {
+    struct rank_identity {
         std::uint16_t m_version;
-        std::uint32_t m_worker_id;
+        std::uint32_t m_rank;
         char m_hostname[64];
         std::uint32_t m_pid;
-        /** @brief Socket the worker's affinity places it on (0 when affinity is unknown). */
+        /** @brief Socket the rank's affinity places it on (0 when affinity is unknown). */
         std::uint8_t m_primary_socket;
+        /** @brief This rank's role, as its own scheduler's @c role_of reports it at startup. */
+        rank_role m_role;
         /**
-         * @brief Bitmap of the logical CPUs this worker may run on, one bit per CPU
+         * @brief Bitmap of the logical CPUs this rank may run on, one bit per CPU
          * across @ref MAX_LOGICAL_CPUS: word @c w bit @c b means CPU @c w*64+b.
          * Wide enough to represent every CPU on big nodes, not just the low 64.
          */
         std::uint64_t m_allowed_cpu_mask[CPU_MASK_WORDS];
     };
 
-    /** @brief Traffic to one destination in @ref worker_frame::m_edges_out. */
+    /** @brief Traffic to one destination in @ref rank_frame::m_edges_out. */
     struct edge_counter {
-        std::uint32_t m_dst_worker_id;
+        std::uint32_t m_dst_rank;
         std::uint64_t m_bytes;
         std::uint64_t m_count;
     };
 
     /**
-     * @brief The fixed-size part of a @ref worker_frame; it travels over MPI as one block ahead of the edges.
+     * @brief The fixed-size part of a @ref rank_frame; it travels over MPI as one block ahead of the edges.
      *
      * Counters are cumulative since the rank started telemetry; consumers compute deltas if they want rate-of-change.
      */
-    struct worker_frame_header {
+    struct rank_frame_header {
         std::uint16_t m_version;
-        std::uint32_t m_worker_id;
+        std::uint32_t m_rank;
         std::uint32_t m_seq_no;
         /** @brief Id of the latest @ref control_kind::SNAPSHOT request this rank answered; 0 before any. */
         std::uint32_t m_snapshot_id;
-        std::uint64_t m_worker_local_ms;
+        std::uint64_t m_rank_local_ms;
 
         /**
          * @brief Subtrees handed to a pool thread (load_balancer::force_local_submit), received subtrees included, counted at
@@ -73,11 +75,11 @@ namespace gempba::telemetry {
          * with @ref m_tasks_sent_total or @ref m_tasks_recv_total.
          */
         std::uint64_t m_tasks_started_total;
-        /** @brief Tasks sent to a remote worker. */
+        /** @brief Tasks sent to another rank. */
         std::uint64_t m_tasks_sent_total;
-        /** @brief Tasks received from a remote worker. */
+        /** @brief Tasks received from another rank. */
         std::uint64_t m_tasks_recv_total;
-        /** @brief Bytes of the tasks sent; the sum of @ref worker_frame::m_edges_out bytes. */
+        /** @brief Bytes of the tasks sent; the sum of @ref rank_frame::m_edges_out bytes. */
         std::uint64_t m_bytes_sent_total;
         /** @brief Bytes of the tasks received. */
         std::uint64_t m_bytes_recv_total;
@@ -95,7 +97,7 @@ namespace gempba::telemetry {
          * full, or no target rank); those nodes were then tried locally.
          */
         std::uint64_t m_spawn_remote_rejected;
-        /** @brief Tasks currently executing on the worker's thread pool. */
+        /** @brief Tasks currently executing on the rank's thread pool. */
         std::uint32_t m_tasks_running;
         /** @brief Outstanding requests in the scheduler queue. */
         std::uint32_t m_scheduler_pending_count;
@@ -103,10 +105,10 @@ namespace gempba::telemetry {
          * @brief Average microseconds a pool thread has been idle since startup
          * (cumulative pool idle time / pool size).
          */
-        std::uint64_t m_idle_microseconds_per_worker;
-        /** @brief Part of @ref m_idle_microseconds_per_worker spent while no task ran in the pool. */
+        std::uint64_t m_idle_microseconds_per_thread;
+        /** @brief Part of @ref m_idle_microseconds_per_thread spent while no task ran in the pool. */
         std::uint64_t m_idle_microseconds_starved;
-        /** @brief Part of @ref m_idle_microseconds_per_worker spent while other pool threads ran tasks. */
+        /** @brief Part of @ref m_idle_microseconds_per_thread spent while other pool threads ran tasks. */
         std::uint64_t m_idle_microseconds_imbalanced;
 
         /** @brief Worker: microseconds from receiving a task to reporting available, summed over its tasks. */
@@ -157,8 +159,8 @@ namespace gempba::telemetry {
      *
      * Its size follows the destinations the rank actually sent tasks to, not the size of the run.
      */
-    struct worker_frame : worker_frame_header {
-        /** @brief One entry per destination this worker sent tasks to, in ascending @c m_dst_worker_id; others are absent. */
+    struct rank_frame : rank_frame_header {
+        /** @brief One entry per destination this rank sent tasks to, in ascending @c m_dst_rank; others are absent. */
         std::vector<edge_counter> m_edges_out;
     };
 
@@ -173,13 +175,13 @@ namespace gempba::telemetry {
     /**
      * @brief Periodic per-host telemetry sample.
      *
-     * Emitted by the host's sentinel worker with each of its worker frames.
+     * Emitted by the host's sentinel rank with each of its rank frames.
      * Aggregates host-wide signals (CPU, memory) that are not meaningful
-     * per-worker.
+     * per rank.
      */
     struct node_frame {
         std::uint16_t m_version;
-        std::uint32_t m_sentinel_worker_id;
+        std::uint32_t m_sentinel_rank;
         std::uint64_t m_sentinel_local_ms;
 
         char m_hostname[64];
@@ -205,17 +207,15 @@ namespace gempba::telemetry {
         UNSPECIFIED = 0,
         /** @brief Promote this rank to its host's sentinel (emits node frames). */
         BE_NODE_SENTINEL = 1,
-        /** @brief Reset the telemetry interval, for rank and node frames alike, to @c m_value milliseconds; sent as the set_interval_ms control, or set_worker_interval_ms until v5.0.0. */
+        /** @brief Reset the telemetry interval, for rank and node frames alike, to @c m_value milliseconds; sent as the set_interval_ms control. */
         SET_INTERVAL_MS = 2,
-        /** @deprecated Use @ref SET_INTERVAL_MS. Removed in v5.0.0 (#373). */
-        SET_WORKER_INTERVAL_MS [[deprecated("use SET_INTERVAL_MS")]] = SET_INTERVAL_MS,
         /** @brief Stop publishing and ingesting rank and node frames until @ref RESUME; per-event counters keep counting, and shutdown still sends the final frames. */
         PAUSE = 3,
         /** @brief Publish and ingest frames again at the current interval. */
         RESUME = 4,
         /**
-         * @brief Publish one worker frame, and a sentinel's node frame, on the next tick regardless of the interval or a pause;
-         * @c m_value is the request id the frame echoes in @ref worker_frame_header::m_snapshot_id.
+         * @brief Publish one rank frame, and a sentinel's node frame, on the next tick regardless of the interval or a pause;
+         * @c m_value is the request id the frame echoes in @ref rank_frame_header::m_snapshot_id.
          */
         SNAPSHOT = 5,
     };

@@ -43,7 +43,8 @@ namespace gempba {
         PUSHED, // Data is pushed to another thread within the same process
         DISCARDED, // Data is discarded within the system
         RETRIEVED, // Result is retrieved from the data
-        SENT_TO_ANOTHER_PROCESS // Data is sent to another process
+        SENT_TO_ANOTHER_PROCESS, // Data is sent to another process
+        RUNNING // Runnable is executing in the current thread
     };
 
     template<typename T>
@@ -210,7 +211,7 @@ namespace gempba {
          *
          * @return true if the task was successfully delegated, false otherwise.
          */
-        virtual void delegate_remotely(scheduler::worker* p_scheduler, int p_runner_id) = 0;
+        virtual void delegate_remotely(scheduler* p_scheduler, int p_runner_id) = 0;
 
         virtual void set_result(const task_packet& p_result) = 0;
 
