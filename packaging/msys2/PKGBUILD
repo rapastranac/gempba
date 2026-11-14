@@ -23,7 +23,7 @@ makedepends=(
     "${MINGW_PACKAGE_PREFIX}-hwloc"
 )
 source=("${_realname}-${pkgver}.tar.gz::https://github.com/rapastranac/gempba/archive/refs/tags/v${pkgver}.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('30ee6fad22a8e25a116c1e294fc4ddb4d1aea314e8ec0ee5a43f19bfa4b45450')
 
 build() {
     # One build of the core; the MPI component installs as source, which the consumer's build compiles.
